@@ -1,15 +1,21 @@
-// Neon Terrarium: the film (open the game with #film; record it with tools/trailer/record.py --film). No music, about 85 seconds
-// (the exact length depends on when the person at the station gets their train):
+// Neon Terrarium: the film (open the game with #film; record it with tools/trailer/record.py --film). No music, one continuous take
+// (the exact length depends on the train's run to the far end of its line):
 //
 //   0     out of empty sky the city is built, plot by plot with the game's own build animation, from a garden in the middle
 //         outwards; the landmarks arrive (the town square, the police station, the LIDAR array, the Wire Nest and more),
-//         a metro is laid across it tile by tile; the camera pulls back until the city fills the frame
-//   14.5  down into the garden: the person cam on two people out on the lawn, seven seconds each, the log filling in
-//   31    late afternoon in the town square: someone crossing it is mugged in the open middle, a police drone flies in
-//         with its searchlight and turns it red on the mugger, two officers run after them
-//   ~45   someone walks to the metro station, rides its lift up (golden hour by the top) and boards the train
-//   then  the train, followed from the side, low, as night falls; then back over the dark city, the lights coming on one
-//         by one as they do in the game; the title, and the rain comes in
+//         a metro is laid across it tile by tile; the camera pulls back until the city fills the frame. Morning
+//   14.5  down into the garden: the person cam on two people out on the lawn, the log filling in. The view turns for the second,
+//         who then walks home and in through their door
+//   30.6  their apartment in Furnish pod: the hologram flies in, a couch, a floor lamp and a plant are set down, the hologram flies
+//         back out to the city as it was left
+//   ~42   the camera travels across town to the square, the light turning slowly gold: someone crossing it is mugged in the open,
+//         a police drone flies in and turns its light red on the mugger, two officers run after them
+//   then  someone walks past it to the metro station, rides the lift up and boards the train as the sun gets low
+//   then  the train, followed from the side, low, all the way to the far end of the line, as the sun sets and night comes on;
+//         then back over the dark city, the lights coming on one by one; the title, and the rain comes in
+//
+// Rendered, not played: the page is in render mode (saveguard.js), every frame drawn whole, and when the apartment's lab still has work
+// to do the film's clock waits for it (F.held) while the recorder keeps stepping without taking pictures
 //
 // Like #trailer it keeps nothing: every save and setting is locked while it is open (saveguard.js).
 'use strict';
@@ -34,9 +40,13 @@ const FILM = (() => {
   const lerpPose = (a, b, u) => ({ x: lerp(a.x, b.x, u), y: lerp(a.y, b.y, u), z: lerp(a.z, b.z, u), yaw: a.yaw + wrapA(b.yaw - a.yaw)*u, zoom: elerp(a.zoom, b.zoom, u), pitch: lerp(a.pitch, b.pitch, u) });
 
   /* ---------- the fixed part of the timeline (from the station on, each part starts when the one before it is done) ---------- */
-  const MK = { built: 13.6, dive: 14.5, p: [17, 24], garden: 31, square: 33.5, strikeBy: 35, strikeLast: 38.5, chaseFor: 9 };
-  const CUT = .35;   // half the dip to black at a cut, seconds
-  const DUR = { toRider: 2.2, riderMax: 22, toSide: 2.2, side: 16, out: 9, lightsIn: 1.5, title: 8.5 };
+  // leave2: the second person sets off home; door: they are through it; open: the apartment opens; the hologram in (APT.holo), the
+  // furnishing (APT.furn), the hologram out (APT.back) and the lab fading off the city (APT.fade); garden: the camera sets off for the
+  // square; square: it is there
+  const MK = { built: 13.6, dive: 14.5, p: [17, 24], leave2: 27.6, door: 30.2, open: 30.6 };
+  const APT = { holo: 3.05, furn: 5.2, back: 3.05, fade: .45 };
+  MK.room = MK.open + APT.holo; MK.unroom = MK.room + APT.furn; MK.back = MK.unroom + APT.back; MK.garden = MK.back + APT.fade; MK.square = MK.garden + 6.5;
+  const DUR = { out: 9, lightsIn: 1.5, title: 8.5 };
 
   /* ---------- the city plan ---------- */
   const R = 13, RW = 16, RX = 20;                                // plots from -16 to 13 each way (west and south a little further: the west end's street shots stay over the city)
@@ -123,7 +133,9 @@ const FILM = (() => {
     document.documentElement.classList.add('tr-on');
     const st = document.createElement('style'); st.id = 'filmStyle';
     st.textContent = `
-      html.tr-on body > *:not(#view):not(#flOv):not(.tr-keep){visibility:hidden!important}
+      html.tr-on body > *:not(#view):not(#flOv):not(#furnish):not(.tr-keep){visibility:hidden!important}
+      html.tr-on .furnish-frame{transition:none!important}
+      html.tr-on .furnish.derez::before, html.tr-on .furnish.derez::after{display:none!important}
       html.tr-on #cctv, html.tr-on #cctvFade{display:none!important}
       html.tr-on, html.tr-on *{cursor:none!important}
       html.tr-on #flOv.ask, html.tr-on #flOv.ask *{cursor:pointer!important}
@@ -185,6 +197,7 @@ const FILM = (() => {
     // every frame drawn the same way: the static cache's frames and the frames between them (when the shadows are redrawn, every other frame
     // while the hour moves) placed the metro a little differently, so it shook from side to side
     safe('cache', () => { SC.mode = 'off'; });
+    safe('looks', () => { LK.auto = [{ id: 'late', start: 3 }, { id: 'morning', start: 5.5 }, { id: 'golden', start: 14 }, { id: 'dusk', start: 18.5 }, { id: 'night', start: 20 }]; });   // (morning hands straight over to golden: the afternoon look, the palest, is left out. Nothing is saved)
     // render mode (saveguard.js sets the switches read at load; these are the ones set at run time): no speed-based or small-triangle detail loss, no
     // slow updates for people off screen, no sharp far view
     safe('render', () => { const T = window.PERF_HUD && window.PERF_HUD.tests; if (T) T.noSlowFar = T.noSmall = T.noSpeed = true; if (typeof SD !== 'undefined') SD.on = false; if (typeof FARV !== 'undefined') FARV.on = false; });
@@ -196,7 +209,7 @@ const FILM = (() => {
   // A puppet is drawn where its script says, with the frames it says (people.js, mega.js: p.puppet, L.puppet, a drone's st.puppet).
   const camR = () => ({ x: Math.cos(yaw), z: -Math.sin(yaw) });
   const walkF = (t, ph, sp = 1) => Math.floor(t*9*sp + ph) % PPL.walk;   // (sp: the pace as a multiple of the game's walking speed)
-  const PACE = v => v/PPL_SPEED;   // the stride rate for a speed in world units a second
+  const stride = v => v/PPL_SPEED;   // the stride rate for a speed in world units a second
   const runF = (t, ph) => F_RUN + Math.floor(t*11 + ph) % PPL.walk;
   const idleF = (t, ph) => F_IDLE + Math.floor(t*2.5 + ph) % PPL.idle;
   const talkF = (t, ph) => F_SPEC + Math.floor(t*6 + ph) % 6;
@@ -226,31 +239,86 @@ const FILM = (() => {
   }
 
   /* ---------- the garden: two pairs walk out onto the lawn and talk; the person cam on one of each ---------- */
-  const G1 = { x: GC.x - 4.4, z: GC.z - 1.2 }, G2 = { x: GC.x - .6, z: GC.z + 2.4 };   // where each pair stands (both out on the open lawn, nowhere near its edge, so no building stands in front of either)
+  // Each pair's spot is picked when they are cast, by looking along the line from the spot to where that person cam's camera will be: no plot on
+  // that line may stand taller than the line (so no building ever hides them). The second person lives on the lawn's edge: the second view looks
+  // at their front door, and after their talk they walk home through it (then their apartment, in Furnish pod)
+  const GV = { pitch: 46*DEG, y1: .95, y2: null };   // the two views' yaw (y2: worked out from the second person's door)
   const GW = .5, GT = { walkIn: 14.7, there: 14.7 + 2.2/GW };   // (walking in at the game's pace)
+  const LAWN = { x0: (GARDEN.i0 - .5)*LOT + 1.1, x1: (GARDEN.i1 + .5)*LOT - 1.1, z0: (GARDEN.j0 - .5)*LOT + 1.1, z1: (GARDEN.j1 + .5)*LOT - 1.1 };
+  const XW = [[[GC.x - 6.6, GC.z + 3.0], [GC.x - 6.6, GC.z - 6.4]], [[GC.x + 3.2, GC.z - 6.6], [GC.x - 5.0, GC.z - 6.6]]];   // (the garden extras' walks: no spot on them)
+  const segD = (x, z, a, b) => { const dx = b[0] - a[0], dz = b[1] - a[1], u = clamp01(((x - a[0])*dx + (z - a[1])*dz)/(dx*dx + dz*dz || 1)); return Math.hypot(a[0] + dx*u - x, a[1] + dz*u - z); };
+  // how far above everything between it and the camera the line from a spot (at a person's head) runs; under zero, something is in the way
+  const plotTop = (x, z) => { const c = cells.get(ckey(Math.round(x/LOT), Math.round(z/LOT))); if (!c) return -1e9; if (c.mega) return 1e9; return c.height || 0; };
+  function clearance(x, z, yaw, pitch){
+    const sx = Math.sin(yaw), sz = Math.cos(yaw), k = Math.tan(pitch); let worst = 1e9;
+    for (let r = .5; r < 60; r += .3){ const h = plotTop(x + sx*r, z + sz*r); if (h > -1e8) worst = Math.min(worst, CURB + 1.2 + r*k - h); }
+    return worst;
+  }
+  function bestSpot(yaw, ok, score){
+    let best = null;
+    for (let x = LAWN.x0; x <= LAWN.x1; x += .5) for (let z = LAWN.z0; z <= LAWN.z1; z += .5){
+      if (XW.some(([a, b]) => segD(x, z, a, b) < 1.4) || !ok(x, z)) continue;
+      const c = clearance(x, z, yaw, GV.pitch); if (c < .8) continue;
+      const v = Math.min(c, 6) + (score ? score(x, z) : 0); if (!best || v > best.v) best = { x, z, v, c };
+    }
+    return best;
+  }
+  const APTH = { p: null, pod: null, door: null, out: null };   // the second person's home: their pod and its street door
   F.pairs = null;
   function gardenCast(){
-    const people = nearestPeople(GC.x, GC.z, 4);
-    if (people.length < 4) return warn('garden', 'only ' + people.length + ' people in the city');
-    F.pairs = [[people[0], people[1], G1, 0], [people[2], people[3], G2, 1]].map(([A, B, spot, k]) => {
+    const near = nearestPeople(GC.x, GC.z, 24);
+    // the second person: someone with a pod of their own whose street door opens near the lawn
+    let home = null;
+    for (const p of near){ if (!p.pod) continue; const pl = places.get(p.home), d = pl && safe('door', () => STORY.streetDoor(pl)); if (!d || !d.wall || !d.inside) continue;
+      const ox = d.wall.x - d.inside.x, oz = d.wall.z - d.inside.z, ol = Math.hypot(ox, oz) || 1, o = { x: ox/ol, z: oz/ol };
+      const dist = Math.hypot(d.wall.x - GC.x, d.wall.z - GC.z); if (dist > 3.2*LOT) continue;
+      if (!home || dist < home.dist) home = { p, d, o, dist }; }
+    if (home){
+      APTH.p = home.p; APTH.pod = home.p.pod; APTH.door = home.d; APTH.out = home.d.stand ? { x: home.d.stand.x, z: home.d.stand.z } : { x: home.d.wall.x + home.o.x*.9, z: home.d.wall.z + home.o.z*.9 };   // (where a resident stands to go in)
+      GV.y2 = Math.atan2(home.o.x, home.o.z) + .45;   // (the camera on the side the door faces, a little round: the door seen three-quarters on)
+      if (Math.abs(wrapA(GV.y2 - GV.y1)) < .7) GV.y2 = GV.y1 + Math.sign(wrapA(GV.y2 - GV.y1) || 1)*.7;   // (and a clear change of angle from the first)
+    } else { warn('garden', 'nobody near the lawn with a pod and a street door: no apartment'); GV.y2 = GV.y1 - 1.1; }
+    const s2 = bestSpot(GV.y2, () => true, home ? (x, z) => -.35*Math.hypot(x - APTH.out.x, z - APTH.out.z) : null);
+    const s1 = s2 && bestSpot(GV.y1, (x, z) => Math.hypot(x - s2.x, z - s2.z) > 4.5);
+    if (!s1 || !s2) return warn('garden', 'no spot on the lawn the camera can see');
+    F.info.spots = [s1, s2].map(q => q.x.toFixed(1) + ',' + q.z.toFixed(1) + ' clear ' + q.c.toFixed(1));
+    const others = near.filter(p => p !== (home && home.p));
+    if (others.length < 3) return warn('garden', 'only ' + others.length + ' other people near the lawn');
+    const A2 = home ? home.p : others[3];
+    F.pairs = [[others[0], others[1], s1, 0], [A2, others[2], s2, 1]].map(([A, B, spot, k]) => {
       const ang = k ? 2.3 : -.6, ox = Math.cos(ang)*.38, oz = Math.sin(ang)*.38;   // the two of them face each other across the spot
       const posA = { x: spot.x - ox, z: spot.z - oz }, posB = { x: spot.x + ox, z: spot.z + oz };
       const from = (pos, s) => ({ x: pos.x + Math.cos(ang + s)*2.2, z: pos.z + Math.sin(ang + s)*2.2 });   // (walking in from either side of the lawn)
+      // the second person, once they have talked: home along the footways to their door, and in
+      let homeW = null;
+      if (k === 1 && home){
+        const way = routePts(posA.x, posA.z, APTH.out.x, APTH.out.z), L_ = pathLen(way), v = clamp(L_/(MK.door - .5 - MK.leave2), .45, 1.1);
+        homeW = { way, L_, v, t0: MK.door - .5 - L_/v };
+      }
       const role = (me, pos, other, first) => {
         const f0 = from(pos, first ? 2.6 : -.5), path = [{ t: GT.walkIn + (first ? 0 : .25), x: f0.x, z: f0.z }, { t: GT.there + (first ? 0 : .25), x: pos.x, z: pos.z }];
         return takePerson(me, t => {
-          const ft = F.t, a = along(path, ft);
-          if (a.moving) return { x: a.x, y: CURB, z: a.z, frame: walkF(ft, me.phase || 0, PACE(GW)), dx: a.dx, dz: a.dz };
+          const ft = F.t, ph = me.phase || 0, a = along(path, ft);
+          if (homeW && first && ft >= homeW.t0){   // going home
+            if (ft < MK.door - .5){ const q = pointAt(homeW.way, (ft - homeW.t0)*homeW.v); return { x: q.x, y: CURB, z: q.z, frame: walkF(ft, ph, stride(homeW.v)), dx: q.dx, dz: q.dz }; }
+            const u = seg(ft, MK.door - .5, MK.door), w = APTH.door.wall;
+            return { x: lerp(APTH.out.x, w.x, u), y: CURB, z: lerp(APTH.out.z, w.z, u), frame: walkF(ft, ph, stride(.6)), dx: w.x - APTH.out.x, dz: w.z - APTH.out.z, alpha: 1 - ss((u - .25)/.75) };
+          }
+          if (homeW && !first && ft >= homeW.t0 - .4){   // the friend waves them off and watches them go
+            const q = homeW && ft >= homeW.t0 ? pointAt(homeW.way, Math.min(homeW.L_, (ft - homeW.t0)*homeW.v)) : other;
+            return { x: pos.x, y: CURB, z: pos.z, frame: ft < homeW.t0 + 1.4 ? talkF(ft, ph) : idleF(ft, ph), dx: q.x - pos.x, dz: q.z - pos.z };
+          }
+          if (a.moving) return { x: a.x, y: CURB, z: a.z, frame: walkF(ft, ph, stride(GW)), dx: a.dx, dz: a.dz };
           // they take turns talking, a couple of seconds each, facing each other
           const turn = Math.floor((ft - GT.there)/2.3) % 2 === (first ? 0 : 1);
-          return { x: pos.x, y: CURB, z: pos.z, frame: turn && Math.floor(ft*.9 + (me.phase || 0)) % 3 ? talkF(ft, me.phase || 0) : idleF(ft, me.phase || 0), dx: other.x - pos.x, dz: other.z - pos.z };
+          return { x: pos.x, y: CURB, z: pos.z, frame: turn && Math.floor(ft*.9 + ph) % 3 ? talkF(ft, ph) : idleF(ft, ph), dx: other.x - pos.x, dz: other.z - pos.z };
         });
       };
       role(A, posA, posB, true); role(B, posB, posA, false);
-      return { A, B, spot, posA };
+      return { A, B, spot, posA, homeW };
     });
     F.info.garden = F.pairs.map(q => q.A.id);
-    say('garden cast', JSON.stringify(F.info.garden));
+    say('garden cast', JSON.stringify(F.info.garden), JSON.stringify(F.info.spots), 'views', GV.y1.toFixed(2), GV.y2.toFixed(2), 'pod', APTH.pod);
   }
   // the person cam's log, filled in from what they say
   function reveal(c, tmpl, fact, channel = 'document', ctx = {}){
@@ -320,7 +388,7 @@ const FILM = (() => {
       if (r) return r;
       const d = Math.max(0, ft - t0)*speed, k = Math.floor(d/L_), u = d - k*L_, back = k % 2 === 1, q = pointAt(pts, back ? L_ - u : u);
       st.x = q.x; st.z = q.z; st.dx = back ? -q.dx : q.dx; st.dz = back ? -q.dz : q.dz;
-      return { x: q.x, y: CURB, z: q.z, frame: walkF(ft, ph, PACE(speed)), dx: st.dx, dz: st.dz };
+      return { x: q.x, y: CURB, z: q.z, frame: walkF(ft, ph, stride(speed)), dx: st.dx, dz: st.dz };
     });
     EXTRAS.push(p); return p;
   }
@@ -376,7 +444,7 @@ const FILM = (() => {
 
   /* ---------- the mugging, in the open middle of the town square ---------- */
   // fixed times (seconds into the film); the places come from the square's footways
-  const MG = { walk0: 31, stop: 35.6, reach: 36.0, rob1: 37.6, alarm: 35.3, copsGo: 37.9, pass: 38.9, release: 52 };
+  const MG = (o => { const k = MK.square - 33.5; for (const n in o) o[n] += k; return o; })({ walk0: 31, stop: 35.6, reach: 36.0, rob1: 37.6, alarm: 35.3, copsGo: 37.9, pass: 38.9 });   // (as they were with the camera in the square at 33.5)
   const VW = .5;   // the victim's walking speed (the game's own pace)
   const MUG = { victim: null, L: null, drone: null, cops: [], caught: 0, mx: SC_.x, mz: SC_.z };
   function muggingCast(){
@@ -396,7 +464,7 @@ const FILM = (() => {
     MUG.victim = v; MUG.VSTOP = VSTOP;
     takePerson(v, () => {
       const ft = F.t, ph = v.phase || 0;
-      if (ft < MG.stop){ const d = dC - (MG.stop - ft)*VW, q = pointAt(vp, Math.max(0, d)); return { x: q.x, y: CURB, z: q.z, frame: d > 0 ? walkF(ft, ph, PACE(VW)) : idleF(ft, ph), dx: q.dx, dz: q.dz }; }
+      if (ft < MG.stop){ const d = dC - (MG.stop - ft)*VW, q = pointAt(vp, Math.max(0, d)); return { x: q.x, y: CURB, z: q.z, frame: d > 0 ? walkF(ft, ph, stride(VW)) : idleF(ft, ph), dx: q.dx, dz: q.dz }; }
       if (ft < MG.rob1 + .2) return { x: VSTOP.x, y: CURB, z: VSTOP.z, frame: idleF(ft, ph), dx: MHIT.x - VSTOP.x, dz: MHIT.z - VSTOP.z };   // frozen, facing the mugger
       const q = pointAt(vp, dC + (ft - MG.rob1 - .2)*1.0);   // then hurrying on the way they were going
       return { x: q.x, y: CURB, z: q.z, frame: walkF(ft, ph, 2), dx: q.dx, dz: q.dz };
@@ -467,7 +535,7 @@ const FILM = (() => {
 
   /* ---------- the passer-by: past the mugging, on to the station, up the lift, onto the train ---------- */
   const RD = { p: null, st: null, cab: null, T: null };
-  const RIDE_V = 6.5, RIDE_A = 2.0;   // the train's speed and pick-up for the ride, world units a second (the game's own 2.8 looks parked from the side)
+  const RIDE_V = 7.5, RIDE_A = 2.2;   // the train's speed and pick-up for the ride, world units a second (the game's own 2.8 looks parked from the side)
   const RT = { speed: 1.0, intoCab: .5, lift: 3.0, toPlat: 1.6, trainIn: 2.6, doorsOpen: .7, board: 1.0, wait: .6, close: .7 };
   function riderCast(){
     if (!LINE || !LINE.stn || !LINE.cabs) return warn('station', 'no metro');
@@ -489,6 +557,9 @@ const FILM = (() => {
     T.atLift = tt; T.inCab = tt += RT.intoCab; T.atTop = tt += RT.lift; T.onPlat = tt += RT.toPlat;
     T.trainAt = T.onPlat - .2; T.trainFrom = T.trainAt - RT.trainIn; T.doorsOpen = T.trainAt + RT.doorsOpen; T.inTrain = T.doorsOpen + RT.board; T.close = T.inTrain + RT.wait; T.depart = T.close + RT.close;
     RD.T = T;
+    { // the run to the next stop (the far end of the line): how long the train takes, so the sunset can be fitted to it
+      const P = mtPath(LINE), si = P.stops.findIndex(s_ => s_.k === st.k), nx = Math.min(P.stops.length - 1, si + 1), D = P.stops[nx].s - P.stops[si].s;
+      const ta = RIDE_V/RIDE_A, da = .5*RIDE_A*ta*ta, tRun = Math.max(0, (D - 2*da)/RIDE_V); RD.arrive = T.depart + 2*ta + tRun; F.info.ride = { from: T.depart.toFixed(1), to: RD.arrive.toFixed(1) }; }
     const yPlat = MT_Y + MT_PLAT_Y;
     const p = nearestPeople(from.x, from.z, 1)[0]; if (!p) return warn('station', 'nobody to ride');
     RD.p = takePerson(p, () => {
@@ -518,7 +589,6 @@ const FILM = (() => {
         // accelerate, run, brake into the next station (a trapezoid: the same easing as the game's own trains)
         const tRun = Math.max(0, (D - 2*da)/V), tAll = 2*ta + tRun, u = Math.min(ft - T.depart, tAll);
         const s = u < ta ? .5*A*u*u : u < ta + tRun ? da + V*(u - ta) : D - .5*A*(tAll - u)*(tAll - u);
-        RD.arrive = T.depart + tAll;
         if (ft < RD.arrive){ tr.dwell = 0; tr.dir = 1; tr.at = si; tr.next = nx; tr.v = 0; tr.s = s0 + s; }
         else { if (!(tr.dwell > 0)) tr.stopT = 0; tr.s = s1; tr.at = nx; tr.next = nx; tr.v = 0; tr.dwell = 50; } }
     });
@@ -543,15 +613,19 @@ const FILM = (() => {
   const trainPos = () => { const cp = LINE && LINE.train && LINE.train.cp && LINE.train.cp[1]; return cp ? { x: cp[0], y: cp[1], z: cp[2] } : null; };
   function camAt(t, dt){
     if (t < MK.dive){ Object.assign(CAM, buildCam(t)); }
-    else if (t < MK.garden){   // into the garden, then on each person
-      if (!gview) gview = { yaw: .95, pitch: 46*DEG };
-      const a = buildCam(MK.dive), u = ease(seg(t, MK.dive, MK.p[0]));
-      const q = F.pairs ? F.pairs[who(t)] : null, p = q && q.A, tx = p && p.x !== undefined ? p.x : q ? q.posA.x : GC.x, tz = p && p.x !== undefined ? p.z : q ? q.posA.z : GC.z;
-      const sx = smooth('gx', tx, t < MK.p[0] ? 8 : 3, dt), sz = smooth('gz', tz, t < MK.p[0] ? 8 : 3, dt);
-      Object.assign(CAM, { x: lerp(a.x, sx, u), z: lerp(a.z, sz, u), y: lerp(TARGET_Y, CURB + .5, u), yaw: a.yaw + wrapA(gview.yaw - a.yaw)*u, zoom: elerp(a.zoom, 4.4, u), pitch: lerp(a.pitch, gview.pitch, u) });
+    else if (t < MK.garden){   // into the garden, on the first person; the view turns for the second and follows them home; held there while the apartment is open
+      if (t >= MK.open && F.homeCam){ Object.assign(CAM, F.homeCam); }
+      else {
+        const a = buildCam(MK.dive), u = ease(seg(t, MK.dive, MK.p[0]));
+        const q = F.pairs ? F.pairs[who(t)] : null, p = q && q.A, tx = p && p.x !== undefined ? p.x : q ? q.posA.x : GC.x, tz = p && p.x !== undefined ? p.z : q ? q.posA.z : GC.z;
+        const sx = smooth('gx', tx, t < MK.p[0] ? 8 : 2.2, dt), sz = smooth('gz', tz, t < MK.p[0] ? 8 : 2.2, dt);
+        const gy = GV.y1 + wrapA((GV.y2 ?? GV.y1) - GV.y1)*ease(seg(t, MK.p[1] - .3, MK.p[1] + 2.2));   // (the turn to the second view, as the camera moves over to them)
+        Object.assign(CAM, { x: lerp(a.x, sx, u), z: lerp(a.z, sz, u), y: lerp(TARGET_Y, CURB + .5, u), yaw: a.yaw + wrapA(gy - a.yaw)*u, zoom: elerp(a.zoom, 4.4, u), pitch: lerp(a.pitch, GV.pitch, u) });
+        if (t >= MK.door - .05) F.homeCam = Object.assign({}, CAM);
+      }
     }
-    else if (PH.name === 'square'){   // the square (a cut, under a dip to black): on the victim as they cross, then the mugger, the drone over them, the officers coming
-      const u = 1, v = MUG.victim;
+    else if (PH.name === 'square'){   // across town to the square (the camera lifts a little over the roofs on the way); then on the victim as they cross, the mugger, the drone, the officers
+      const lin = seg(t, PH.t0, MK.square), u = ease(lin), v = MUG.victim;
       let tx = SC_.x, tz = SC_.z, ty = CURB + .5, need = STREET.zoom;
       if (t < MG.strike && v && v.x !== undefined){ tx = lerp(SC_.x, v.x, .5); tz = lerp(SC_.z, v.z, .5); }
       else if (MUG.L){ tx = MUG.mx; tz = MUG.mz;
@@ -560,6 +634,7 @@ const FILM = (() => {
         for (const c of MUG.cops) if (c.x !== undefined && t > MG.copsGo + .5) need = Math.max(need, Math.min(14, Math.hypot(c.x - MUG.mx, c.z - MUG.mz)*.55 + 3.8)); }
       const g = { x: smooth('sx', tx, 2.2, dt), y: smooth('sy', ty, 2.2, dt), z: smooth('sz', tz, 2.2, dt), zoom: smooth('szm', Math.min(14, need), 1.4, dt) };
       Object.assign(CAM, lerpPose(PH.from, Object.assign({ yaw: STREET.yaw, pitch: STREET.pitch }, g), u));
+      CAM.zoom *= 1 + 1.6*Math.sin(Math.PI*ss(lin));
     }
     else if (PH.name === 'rider'){   // with the rider: the walk, the lift, the platform, onto the train
       const u = ease(seg(t, PH.t0, PH.t0 + 2.6)), p = RD.p, tp = p && p.x !== undefined ? { x: p.x, y: (p._ey ?? CURB) + .4, z: p.z } : { x: CAM.x, y: CAM.y, z: CAM.z };
@@ -577,20 +652,17 @@ const FILM = (() => {
     camGoal.set(CAM.x, CAM.y, CAM.z); camT.copy(camGoal);
     yaw = yawT = CAM.yaw; zoom = zoomT = CAM.zoom; PITCH = pitchT = CAM.pitch;
   }
-  // the hour: morning while it's built, early afternoon in the garden, late afternoon in the square, golden hour as the rider reaches the
-  // platform, night as the train pulls away
+  // The hour, one continuous day (a jump turned every shadow at once): morning through the build, the garden and the apartment; from the
+  // moment the camera sets off for the square it moves on slowly to golden hour, there as the train pulls out; then over the train's whole run
+  // to the far end of the line the sun goes down and night comes on. (settle() takes the afternoon look out of the day: morning hands
+  // straight over to golden)
+  const H = { morning: 10.0, golden: 17.2, night: 22.2 };
   function hourAt(t){
-    // each scene has its own time of day, and within a scene the sun barely moves (the morning look for the build and the garden; the cut to the
-    // square lands in golden hour, which deepens a little through the mugging and the walk to the lift; the sun goes down and night comes on over
-    // the last third of the ride). The afternoon look, the palest, is never used
-    if (t < MK.dive) return lerp(8.6, 10.0, ss(t/MK.dive));
-    if (t < MK.garden) return lerp(10.0, 10.6, seg(t, MK.dive, MK.garden));
-    if (PH.name === 'square') return lerp(16.9, 17.3, seg(t, PH.t0, MG.pass));
-    if (PH.name === 'rider'){ const T = RD.T; if (F.hR === undefined) F.hR = S.hour; return T ? lerp(F.hR, 17.5, seg(t, PH.t0, T.atTop)) : 17.5; }
-    if (PH.name === 'side'){
-      if (F.hS === undefined) F.hS = S.hour; const tS = PH.t0 + DUR.side*.6;
-      return t < tS ? lerp(F.hS, 17.8, seg(t, PH.t0, tS)) : lerp(17.8, 22.2, ss(seg(t, tS, PH.t0 + DUR.side - .4))); }
-    return 22.2;
+    if (t < MK.dive) return lerp(8.6, H.morning, ss(t/MK.dive));
+    if (t < MK.garden) return H.morning;
+    const T = RD.T, dep = T ? T.depart : MG.pass + 14, arr = RD.arrive || dep + 16;
+    if (t < dep) return lerp(H.morning, H.golden, ss(seg(t, MK.garden, dep)));
+    return lerp(H.golden, H.night, ss(seg(t, dep + .4, arr - .2)));
   }
   function lightsAt(t){
     if (PH.name === 'side') return t > PH.t0 + 2 ? 0 : null;
@@ -611,6 +683,142 @@ const FILM = (() => {
   let alertOff = false;
   function quietAlert(){ if (alertOff || !policeDroneAlert) return; policeDroneAlert = () => false; alertOff = true; }
 
+  /* ---------- the apartment: the second person's pod, in Furnish pod ---------- */
+  // The lab (furnish.html in its own frame) plays its hologram fly-in from the game's view down into the pod; here its clock is the film's
+  // (PodContext._debug.hold sets the hologram's time each frame), and where the lab still has work to do (the city sent over, the home
+  // built, its light baked) the film waits for it (F.held) rather than letting the hologram wait on screen. Then a couch, a floor lamp and a
+  // plant are set down, and the same hologram plays backwards, out of the pod and up to the game's view as it was left, where the city
+  // takes over again.
+  const AP = { on: false, pick: {}, drops: [], done: new Set(), closed: false, heldN: 0, rev: false };
+  const labWin = () => { const f = FURN.frame; return f && f.contentWindow; };
+  const labPC = () => { const w = labWin(); return w && w.PodContext; };
+  const labB = () => { const w = labWin(); return w && w.PodBuilder && w.PodBuilder._B; };
+  function labClean(){   // only the lab's 3D view shows: its bars, labels and notes go
+    const w = labWin(); if (!w || !w.document || !w.document.head) return;
+    const d = w.document;
+    if (!d.getElementById('flLab')){ const st = d.createElement('style'); st.id = 'flLab'; st.textContent = 'body *{visibility:hidden!important}.fl-vis{visibility:visible!important}*{cursor:none!important;transition:none!important}'; d.head.appendChild(st); }
+    const big = w.innerWidth*w.innerHeight*.45;
+    for (const cv of d.querySelectorAll('canvas')){ const r = cv.getBoundingClientRect(); cv.classList.toggle('fl-vis', r.width*r.height > big); }
+  }
+  function labSharp(){   // the city round the apartment drawn sharp (the lab's depth-of-field blur taken to nothing, its haze thinned)
+    const B = labB(); if (!B || !B.dr || B.dr._flSharp) return;
+    const R = B.dr, render = R.render.bind(R); R._flSharp = true;
+    R.render = (sc, c) => { const m = sc && sc.children && sc.children[0] && sc.children[0].material, u = m && m.uniforms;
+      if (u && u.kMin && u.range && u.hazeK){ u.kMin.value = 0; u.range.value = 1e6; u.hazeK.value = Math.min(u.hazeK.value, .25); }
+      return render(sc, c); };
+  }
+  // a point in the room to the lab's canvas (its camera's view and projection by hand: the frame runs its own three.js)
+  function labScreen(B, x, y, z){
+    const V = B.cam.matrixWorldInverse.elements, P = B.cam.projectionMatrix.elements;
+    const ex = V[0]*x + V[4]*y + V[8]*z + V[12], ey = V[1]*x + V[5]*y + V[9]*z + V[13], ez = V[2]*x + V[6]*y + V[10]*z + V[14], ew = V[3]*x + V[7]*y + V[11]*z + V[15];
+    const cx = P[0]*ex + P[4]*ey + P[8]*ez + P[12]*ew, cy = P[1]*ex + P[5]*ey + P[9]*ez + P[13]*ew, cw = P[3]*ex + P[7]*ey + P[11]*ez + P[15]*ew;
+    const w = labWin(), cv = w.document.getElementById('bCanvas') || w.document.querySelector('canvas.fl-vis') || w.document.querySelector('canvas');
+    const r = cv.getBoundingClientRect(); return { cv, x: r.left + (cx/cw + 1)/2*r.width, y: r.top + (1 - cy/cw)/2*r.height };
+  }
+  // set something down the way a player does: pick it, point at the spot, click (null if it would not go there)
+  function labPlace(arch, seed, wx, wy, wz){
+    const w = labWin(), B = labB(); if (!w || !B) return null;
+    const before = new Set(B.inst.keys());
+    w.PodBuilder.startPlace(arch, seed);
+    const s_ = labScreen(B, wx, wy, wz), o = { clientX: s_.x, clientY: s_.y, bubbles: true, cancelable: true, pointerId: 1, pointerType: 'mouse', isPrimary: true };
+    s_.cv.dispatchEvent(new w.PointerEvent('pointermove', Object.assign({ button: -1, buttons: 0 }, o)));
+    try { if (w.PodBuilder._B.place) w.PodBuilder._B.ptr.dirty = true; } catch (e) {}
+    s_.cv.dispatchEvent(new w.PointerEvent('pointerdown', Object.assign({ button: 0, buttons: 1 }, o)));
+    s_.cv.dispatchEvent(new w.PointerEvent('pointerup', Object.assign({ button: 0, buttons: 0 }, o)));
+    if (B.place) safe('cancel place', () => w.PodBuilder.cancel());
+    safe('deselect', () => w.PodBuilder.select(null));
+    const id = [...B.inst.keys()].find(k => !before.has(k));
+    return id !== undefined ? B.inst.get(id) : null;
+  }
+  // the three pieces: the room's own couch, floor light and plant if it has them (hidden while the hologram covers the room, then set down
+  // again), otherwise new ones placed on the floor near the middle of the room
+  const CATS = { couch: ['modular', 'futon', 'retro', 'pallet', 'corner', 'carseat', 'cloud'], light: ['floorlamp', 'lamp', 'tube', 'neon', 'stringlights', 'pendant'], plant: ['monstera', 'fern', 'snake', 'bamboo', 'bonsai', 'hydro', 'hanging'] };
+  const NEW = { couch: ['retro', 11], light: ['floorlamp', 7], plant: ['monstera', 5] };
+  const DROP = { couch: .35, light: 1.75, plant: 3.15 };   // (seconds into the furnishing)
+  function labPick(B){
+    for (const i of B.inst.values()){ if (!i.pivot || !i.rec || i.rec.parent) continue;
+      for (const k in CATS) if (!AP.pick[k] && CATS[k].includes(i.rec.arch)) AP.pick[k] = { i, y: i.pivot.position.y }; }
+    for (const k in AP.pick) AP.pick[k].i.pivot.visible = false;
+    F.info.apt = Object.keys(CATS).map(k => k + ':' + (AP.pick[k] ? 'own' : 'new')).join(' ');
+  }
+  function labNew(B, k){
+    const root = B.root.position, pts = [...B.inst.values()].filter(i => i.lbox && !(i.rec && i.rec.parent)).map(i => i.pivot.position);
+    const mx = pts.length ? pts.reduce((a, p) => a + p.x, 0)/pts.length : 2, mz = pts.length ? pts.reduce((a, p) => a + p.z, 0)/pts.length : 2;
+    const OFF = [[0, 0], [.9, 0], [-.9, 0], [0, .9], [0, -.9], [1.3, 1.3], [-1.3, 1.3], [1.3, -1.3], [-1.3, -1.3], [1.8, 0], [-1.8, 0], [0, 1.8], [0, -1.8]];
+    const sh = { couch: 0, light: 4, plant: 8 }[k];
+    for (let n = 0; n < OFF.length; n++){ const [ox, oz] = OFF[(n + sh) % OFF.length];
+      const i = safe('place ' + k, () => labPlace(NEW[k][0], NEW[k][1], mx + ox + root.x, root.y, mz + oz + root.z)); if (i) return { i, y: i.pivot.position.y }; }
+    warn('apartment', 'no room for the ' + k); return null;
+  }
+  function aptOpen(){
+    if (!APTH.pod){ warn('apartment', 'no pod'); return; }
+    AP.on = !!safe('open', () => FURN.openKey(APTH.pod));
+    if (!AP.on) warn('apartment', 'did not open ' + APTH.pod); else say('apartment', APTH.pod);
+  }
+  // waiting on the lab: the home still being built, or its light not baked yet
+  function labLightWait(){
+    const w = labWin(); if (!w) return false;
+    try { const PB = w.PodBuilder, PR = w.PodRender, PC = w.PodContext, building = !!(PB && PB.homePending && PB.homePending());
+      if (building) return 'build'; if (PB && PB.prOn && PB.prOn()) return !(PC._prDriving && PC._prDriving()) || (PR && PR.lightPending && PR.lightPending()) ? 'light' : false; } catch (e) {}
+    return false;
+  }
+  function aptTick(t){
+    F.held = false;
+    if (!AP.on || AP.closed || t < MK.open) return;
+    const ov = document.getElementById('furnish'), fr = FURN.frame, PC = labPC(), B = labB();
+    if (!fr || !PC || !PC._debug) return aptEnd('the lab went away');
+    safe('lab', labClean); safe('sharp', labSharp);
+    if (B) B.needs = true;
+    const D_ = PC._debug.DUR || 3.05, st = PC._debug.state(), live = ov && ov.classList.contains('live');
+    const wait = why => { if (++AP.heldN > 60*90){ if (AP.heldN === 60*90 + 1) warn('apartment', 'waited 90 s for the lab (' + why + '): going on'); return false; } F.held = true; F.info.aptWait = why; return true; };
+    if (t < MK.room){   // the hologram flies in
+      const u = (t - MK.open)/APT.holo*D_;
+      if (!live && wait('the hologram')) return;
+      if (st && st.trans){
+        const lw = u >= 1.7 ? labLightWait() : false;
+        st.trans.holding = !!lw; st.trans.holdBuild = lw === 'build';   // (so the lab draws the room under the hologram and can bake its light)
+        if (u >= .55 && !(st.ready && st.shown && !st.pendingHome) && wait('the city')) return;
+        if (lw && wait(lw)) return;
+        PC._debug.hold(u);
+      }
+      if (u >= 2.0 && B && !AP.picked){ AP.picked = true; safe('pick', () => labPick(B)); }
+      fr.style.opacity = String(ss((t - MK.open)/.3));
+      return;
+    }
+    if (t < MK.unroom){   // the furnishing
+      if (st && st.trans){ PC._debug.hold(D_ + .01); return; }   // (the hologram ends with its next frame)
+      if (PC.transitioning && wait('the hologram to end')) return;
+      fr.style.opacity = '1';
+      const k = t - MK.room;
+      for (const c of ['couch', 'light', 'plant']) if (k >= DROP[c] && !AP.done.has(c) && B){ AP.done.add(c);
+        const q = AP.pick[c] || labNew(B, c); if (q){ AP.drops.push({ i: q.i, y: q.y, from: c === 'light' ? 1.2 : 1.6, t }); q.i.pivot.visible = false; } }
+      for (const d of AP.drops){   // dropped in from above, with a little bounce
+        const u = (t - d.t)/.55; d.i.pivot.visible = u >= 0; if (u < 0) continue;
+        const v = Math.min(1, u), fall = 1 - v*v, bounce = v < 1 ? 0 : Math.max(0, Math.sin(Math.min(1, (u - 1)/.6)*Math.PI))*.05*Math.max(0, 1 - (u - 1)/.6);
+        d.i.pivot.position.y = d.y + d.from*fall + bounce;
+      }
+      return;
+    }
+    if (t < MK.back){   // the hologram flies back out, to the game's view as it was left
+      for (const d of AP.drops){ d.i.pivot.visible = true; d.i.pivot.position.y = d.y; }
+      if (!AP.rev){ AP.rev = true;
+        if (st && !st.trans){ st.trans = { t0: performance.now(), vt: D_, last: performance.now(), drift: 0, gate: false, rm: false, frames: [], onDone: null, resolve(){}, skipped: false, lhDone: true, hold: D_ }; PC.transitioning = true; }
+        FURN.hold = false;   // (the city is drawn again underneath, from the camera where it was left)
+      }
+      if (st && st.trans){ st.trans.holding = false; PC._debug.hold(Math.max(0, D_*(1 - (t - MK.unroom)/APT.back))); }
+      return;
+    }
+    if (t < MK.garden){ if (st && st.trans) PC._debug.hold(0); fr.style.opacity = String(1 - ss(seg(t, MK.back, MK.garden))); return; }   // and the city again
+    aptEnd();
+  }
+  function aptEnd(why){
+    if (AP.closed) return; AP.closed = true; F.held = false;
+    if (why) warn('apartment', why);
+    safe('close', () => { const PC = labPC(), st = PC && PC._debug && PC._debug.state(); if (st && st.trans){ st.trans = null; PC.transitioning = false; }
+      const ov = document.getElementById('furnish'); if (ov) ov.classList.remove('live');   // (so it goes at once, without the game's own power-down)
+      FURN.close(); if (FURN.frame) FURN.frame.style.opacity = ''; });
+  }
+
   /* ---------- the timeline ---------- */
   const EV = []; let fired = 0, t0 = 0, lastT = 0;
   const at = (t, f, name) => EV.push({ t, f, name });
@@ -621,12 +829,14 @@ const FILM = (() => {
     at(t0_ + .1, () => { if (!F.pairs) return; MON.open(F.pairs[k].A.id); keep(document.getElementById('monitor'), true); monTab('log'); }, 'person cam ' + (k + 1));
     [.6, 1.8, 3.0, 4.3].forEach((d, s) => at(t0_ + d, () => { if (F.pairs) revealStep(k, s); }, 'reveal ' + (k + 1) + '.' + (s + 1)));
   });
-  at(MG.walk0 - .2, () => muggingCast(), 'the square: victim, mugger, officers');
-  at(MG.alarm - .1, () => droneCast(), 'the drone');
+  // the square's cast is put in place while the apartment still covers the screen (nobody appears out of nothing once the camera can see them)
+  at(MK.back - .3, () => muggingCast(), 'the square: victim, mugger, officers');
+  at(MK.back - .25, () => droneCast(), 'the drone');
+  at(MK.back - .2, () => { riderCast(); if (RD.cab && RD.way) stationExtras(RD.cab, RD.way); }, 'the passer-by');
+  at(MK.open, () => aptOpen(), 'the apartment');
   at(MK.garden, () => { E.sel.style.display = 'none'; phase('square', MK.garden); }, 'to the square');
-  at(MK.garden + .6, () => { const m = document.getElementById('monitor'); keep(m, false); MON.close(); if (m) m.style.opacity = ''; }, 'the person cam closes');
+  at(MK.door, () => { const m = document.getElementById('monitor'); keep(m, false); MON.close(); if (m) m.style.opacity = ''; }, 'the person cam closes');
   at(MK.square + 1.5, () => { if (F.pairs) for (const q of F.pairs){ release(q.A); release(q.B); } releaseExtras(p => p.__area === 'garden'); }, 'the garden lets go');   // (once the camera is well away)
-  at(MG.walk0 - .1, () => { riderCast(); if (RD.cab && RD.way) stationExtras(RD.cab, RD.way); }, 'the passer-by');
   at(MG.stop, () => { if (MUG.victim) emote(MUG.victim, 'bang', 1.6); }, 'the victim sees him');
   at(MG.reach + .4, () => { for (const p of EXTRAS) if (p.__area === 'square') emote(p, 'bang', 1.6); }, 'the square sees it');
   at(MG.pass - .4, () => phase('rider', MG.pass - .4), 'with the passer-by');
@@ -637,30 +847,32 @@ const FILM = (() => {
   F.len = 0;
   function paint(t){
     const tt = PH.name === 'title' ? t - PH.t0 : -1, end = tt >= 0 && tt > DUR.title - .8;
-    const dip = t > MK.garden && t < MK.garden + CUT*2 ? 1 - Math.abs(t - MK.garden - CUT)/CUT : 0;   // (the cut from the garden to the square)
-    const black = t < 1 ? 1 - ss(t) : end ? ss((tt - (DUR.title - .8))/.8) : tt >= 0 ? .4*ss(tt/1.4) : dip;
+    const black = t < 1 ? 1 - ss(t) : end ? ss((tt - (DUR.title - .8))/.8) : tt >= 0 ? .4*ss(tt/1.4) : 0;
     E.black.style.opacity = String(black);
-    if (t >= MK.garden && t < MK.garden + .6){ const m = document.getElementById('monitor'); if (m) m.style.opacity = String(1 - ss((t - MK.garden)/.55)); }
+    if (t >= MK.door - .6 && t < MK.door){ const m = document.getElementById('monitor'); if (m) m.style.opacity = String(1 - ss((t - MK.door + .6)/.55)); }
     if (E.tNeon){ E.tNeon.style.opacity = String(tt > .5 ? neonAt(tt - .5) : 0); E.tTerr.style.opacity = String(tt > .9 ? neonAt(tt - .9) : 0); }
   }
-  const clock = () => (performance.now() - t0)/1000;
+  // the film's clock: wall time since it started, less the time it was held (F.held: the recorder steps on without taking pictures)
+  let heldMs = 0, lastRaw = -1;
+  const clock = () => { const raw = performance.now(); if (lastRaw >= 0 && raw !== lastRaw && F.held) heldMs += raw - lastRaw; lastRaw = raw; return (raw - t0 - heldMs)/1000; };
   function tick(){
     requestAnimationFrame(tick);
     if (!F.playing) return;
     const t = clock(); lastT = t; F.t = t;
     while (fired < EV.length && EV[fired].t <= t){ const e = EV[fired++]; safe(e.name, e.f); }
     if (t > 4) quietAlert();
+    safe('apartment', () => aptTick(t));
     // the square is let go once the passer-by is up in the lift and it is out of shot (anyone let go earlier would vanish from the picture: PPL_ONLY)
     if (RD.T && !F.sqDone && t > RD.T.inCab + 1){ F.sqDone = true; safe('the square lets go', () => { muggingEnd(); releaseExtras(p => p.__area === 'square'); }); }
     if (window.PPL_ONLY) safe('only', () => {
       for (const st of POLICE_STATIONS) for (const d of st.drones) if (!d.st.puppet){ if (!d._held){ d._held = d.g.position.clone(); } const h = d._held; d.st.puppet = () => ({ x: h.x, y: h.y, z: h.z, light: 0, red: 0 }); d._still = true; d.g.visible = false; }
       if (typeof POLICE_BIKES !== 'undefined') for (const b of POLICE_BIKES) if (b.spr) b.spr.visible = !b.rider; });
     paint(t);
-    if (t >= MK.p[0] && t < MK.garden && F.pairs){ const p = F.pairs[who(t)].A; brackets(p.x, p._ey ?? CURB, p.z); }
+    if (t >= MK.p[0] && t < MK.door - .6 && F.pairs){ const p = F.pairs[who(t)].A; brackets(p.x, p._ey ?? CURB, p.z); }
     else if (E.sel.style.display !== 'none') E.sel.style.display = 'none';
     if (PH.name === 'rider' && RD.T && t > RD.T.depart + .3) phase('side', t);
     else if (PH.name === 'rider' && !RD.T && t > PH.t0 + 3) phase('side', t);   // (no station: straight on)
-    else if (PH.name === 'side' && t > PH.t0 + DUR.side){ F.outT0 = t; phase('out', t); release(RD.p); releaseExtras();
+    else if (PH.name === 'side' && t > (RD.arrive ? RD.arrive + .5 : PH.t0 + 16)){   /* (the whole run, into the far end's station) */ F.outT0 = t; phase('out', t); release(RD.p); releaseExtras();
       window.PPL_ONLY = false; for (const st of POLICE_STATIONS) for (const d of st.drones) if (d._still){ d._still = false; d.st.puppet = null; d.g.visible = true; d.st.mode = 'home'; d.st.target = null; } }
     else if (PH.name === 'out' && t > F.outT0 + DUR.out){ phase('title', t); LK.wx.fadeSec = 5; LK.setWeather('rain', false, true); }
     else if (PH.name === 'title' && t > PH.t0 + DUR.title){ F.playing = false; F.done = true; F.len = t; say('done at', t.toFixed(2));
@@ -676,6 +888,9 @@ const FILM = (() => {
     status('waking the city');
     await title().catch(e => warn('title', e));
     await until(() => typeof pplReady !== 'undefined' && pplReady, 120).catch(e => warn('people', e));
+    status('waking the apartment lab');
+    safe('lab', () => FURN.preload());
+    await until(() => FURN.warmed() && FURN.frame && FURN.ready, 300).catch(e => warn('apartment lab', e));
     await wait(.5);
     safe('cam', () => camAt(0, 0));
     await wait(1);
@@ -684,7 +899,7 @@ const FILM = (() => {
     if (!CAP){ E.ov.classList.add('ask'); E.status.innerHTML = 'click to play<br><small>about 85 s, no sound</small>'; E.ov.addEventListener('click', go, { once: true }); }
     say('ready');
   }
-  function go(){ E.ov.classList.remove('ask'); E.msg.hidden = true; F.playing = true; F.done = false; fired = 0; t0 = performance.now(); lastT = 0; F.t = 0; say('rolling'); }
+  function go(){ E.ov.classList.remove('ask'); E.msg.hidden = true; F.playing = true; F.done = false; fired = 0; t0 = performance.now(); heldMs = 0; lastRaw = -1; F.held = false; lastT = 0; F.t = 0; say('rolling'); }
   F.start = () => { if (!F.ready || F.playing) return false; go(); return true; };
   F.__dbg = () => {
     const d = q => !q ? '-' : (q.x === undefined ? '?' : q.x.toFixed(1) + ',' + q.z.toFixed(1)) + (q.puppet ? ' puppet' : '') + ' y' + (q._ey ?? 0).toFixed(1);
@@ -693,7 +908,7 @@ const FILM = (() => {
       drone: MUG.drone ? MUG.drone.g.position.toArray().map(v => +v.toFixed(1)).join(',') + ' red' + (MUG.drone.st.redOn || 0).toFixed(2) : null, cops: MUG.cops.map(d), caught: MUG.caught,
       rider: d(RD.p), train: tr ? { s: +tr.s.toFixed(1), dwell: +tr.dwell.toFixed(1), doors: +tr.doors.toFixed(2) } : null };
   };
-  F.state = () => ({ ready: F.ready, playing: F.playing, done: F.done, t: F.t, stage: F.stage, phase: PH.name, info: F.info, log: F.log.slice(-30) });
+  F.state = () => ({ ready: F.ready, playing: F.playing, done: F.done, held: !!F.held, t: F.t, stage: F.stage, phase: PH.name, info: F.info, log: F.log.slice(-30) });
   window.addEventListener('load', () => {
     setup().then(() => requestAnimationFrame(tick)).catch(e => { warn('setup', e); status('could not set up: ' + (e && e.message || e)); F.failed = String(e && e.message || e); });
   });

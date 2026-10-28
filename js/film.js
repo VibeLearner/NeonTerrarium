@@ -383,7 +383,7 @@ const FILM = (() => {
 
   /* ---------- the passer-by: past the mugging, on to the station, up the lift, onto the train ---------- */
   const RD = { p: null, st: null, cab: null, T: null };
-  const RT = { speed: 1.55, intoCab: .5, lift: 3.0, toPlat: 1.6, trainIn: 2.6, doorsOpen: .7, board: 1.0, wait: .6, close: .7 };
+  const RT = { speed: 2.1, intoCab: .5, lift: 3.0, toPlat: 1.6, trainIn: 2.6, doorsOpen: .7, board: 1.0, wait: .6, close: .7 };
   function riderCast(){
     if (!LINE || !LINE.stn || !LINE.cabs) return warn('station', 'no metro');
     const P = mtPath(LINE), withCab = P.stops.map((s_, i) => ({ s: s_, i, st: LINE.stn.get(s_.k), cab: LINE.cabs.find(c => c.k === s_.k) }))
@@ -394,8 +394,8 @@ const FILM = (() => {
     const st = pick.st, cab = pick.cab;
     RD.st = st; RD.cab = cab;
     // past the hold-up on the camera's side of it, then on along the footways to the lift
-    const H_ = MUG.MHIT, cx = Math.sin(STREET.yaw), cz = Math.cos(STREET.yaw), by = nodeNear(H_.x + cx*1.6 + cz*.8, H_.z + cz*1.6 - cx*.8);
-    const from = nodeNear(H_.x + cx*1.6 + cz*9, H_.z + cz*1.6 - cx*9);
+    const H_ = MUG.MHIT, by = nodeNear(H_.x + (cab.x - H_.x)*.12, H_.z + (cab.z - H_.z)*.12 + .6);   // (a step towards the station from the hold-up)
+    const ax = -(cab.z - H_.z), az = cab.x - H_.x, al = Math.hypot(ax, az) || 1, from = nodeNear(by.x + ax/al*6, by.z + az/al*6);   // (coming across it from the side)
     const leg1 = routePts(from.x, from.z, by.x, by.z), leg2 = routePts(by.x, by.z, cab.x, cab.z), pts = leg1.concat(leg2.slice(1));
     const dPass = pathLen(leg1), L_ = pathLen(pts), t0 = MG.pass - dPass/RT.speed;
     const top = mtW(st, st.side*MT_LIFT_OFF, 0), door = mtW(st, st.side*.62, 0), inn = mtW(st, st.side*.12, 0);
@@ -407,7 +407,7 @@ const FILM = (() => {
     const p = nearestPeople(from.x, from.z, 1)[0]; if (!p) return warn('station', 'nobody to ride');
     RD.p = takePerson(p, () => {
       const ft = F.t, ph = p.phase || 0;
-      if (ft < T.atLift){ const q = pointAt(pts, Math.max(0, (ft - t0)*RT.speed)); return { x: q.x, y: CURB, z: q.z, frame: ft < t0 ? idleF(ft, ph) : walkF(ft, ph, 1.1), dx: q.dx, dz: q.dz }; }
+      if (ft < T.atLift){ const q = pointAt(pts, Math.max(0, (ft - t0)*RT.speed)); return { x: q.x, y: CURB, z: q.z, frame: ft < t0 ? idleF(ft, ph) : walkF(ft, ph, 1.45), dx: q.dx, dz: q.dz }; }
       if (ft < T.atTop){ const u = ss(seg(ft, T.inCab, T.atTop)); return { x: cab.x, y: lerp(CURB, yPlat, u) + .02, z: cab.z, frame: idleF(ft, ph), dx: door[0] - cab.x, dz: door[1] - cab.z }; }   // in the cab, going up
       if (ft < T.onPlat){ const u = seg(ft, T.atTop, T.onPlat); return { x: lerp(top[0], door[0], u), y: yPlat, z: lerp(top[1], door[1], u), frame: walkF(ft, ph), dx: door[0] - top[0], dz: door[1] - top[1] }; }
       if (ft < T.doorsOpen) return { x: door[0], y: yPlat, z: door[1], frame: idleF(ft, ph), dx: inn[0] - door[0], dz: inn[1] - door[1] };   // the train pulls in

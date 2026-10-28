@@ -47,11 +47,12 @@ const FILM = (() => {
   const MEGAS = [
     ['square', -15, 5, 5, 5, 3.2],     // the town square at the west end, right by the line's west station (the mugging happens in its open part)
     ['police', -10, 5, 3, 3, 4.4],     // the police station beside it (the drone and the officers come from here)
-    ['wirenest', -10, 9, 4, 4, 6.4],   // the Wire Nest behind them
+    ['wirenest', -6, 9, 4, 4, 6.4],    // the Wire Nest further east (clear of the square shot's foreground)
     ['club', 4, 6, 4, 4, 5.4],         // the Neon Dome in the commercial quarter
     ['lidar', 10, 9, 3, 3, 7.2],       // the LIDAR array out at the east edge, watching
     ['market', 2, -11, 4, 4, 4.8],     // the market
     ['foundry', 7, -12, 6, 4, 3.8]];   // the foundry, with the industry
+  const LOW_NORTH = { i0: -18, i1: -9, j0: 10, j1: 13 };   // north of the square, between it and the street camera: kept low so the square shows
   const LOW_FRONT = { i0: -20, i1: -3, j0: -12, j1: MT_J - 1 };   // south of the track where the side-on shot looks across: kept low so the train shows
   const inBox = (b, i, j) => i >= b.i0 && i <= b.i1 && j >= b.j0 && j <= b.j1;
   const megaAt = (i, j) => MEGAS.find(([, mi, mj, w, h]) => i >= mi && i < mi + w && j >= mj && j < mj + h);
@@ -65,7 +66,7 @@ const FILM = (() => {
     if (ring) zone = 'low';
     else if (Rnd() < .18) zone = ['low', 'mid', 'low', 'ind', 'mid'][Math.floor(Rnd()*5)];
     if (j === MT_J) return { kind: 'bld', zone: zone === 'high' ? 'mid' : zone, n: 1, mf: 2 };
-    if (inBox(LOW_FRONT, i, j)) return { kind: 'bld', zone: zone === 'high' ? 'mid' : zone, n: 1, mf: Rnd() < .5 ? 1 : 2 };
+    if (inBox(LOW_FRONT, i, j) || inBox(LOW_NORTH, i, j)) return { kind: 'bld', zone: zone === 'high' ? 'mid' : zone, n: 1, mf: Rnd() < .5 ? 1 : 2 };
     const edge = d > 10, core = (zone === 'mid' && d < 9) || (d < 6 && !ring);
     const u = Rnd();
     let n = ring ? (u < .5 ? 2 : 3) : edge ? (u < .65 ? 1 : 2) : core ? (u < .25 ? 2 : u < .7 ? 3 : 4) : (u < .4 ? 1 : u < .8 ? 2 : 3);
@@ -375,7 +376,7 @@ const FILM = (() => {
   function muggingCast(){
     // the victim: across the square, west to east, stopping in the middle when the mugger comes at them
     const tc = { x: Math.sin(STREET.yaw), z: Math.cos(STREET.yaw) }, pp = { x: tc.z, z: -tc.x };   // (towards the camera; across the view)
-    const MP = { x: SC_.x + tc.x*4.6, z: SC_.z + tc.z*4.6 };   // the open ground between the pavilion and the camera
+    const MP = { x: SC_.x + tc.x*4, z: SC_.z + tc.z*4 };   // the open ground between the pavilion and the camera
     const va = nodeNear(MP.x - pp.x*7, MP.z - pp.z*7), vb = nodeNear(MP.x + pp.x*7, MP.z + pp.z*7);
     const vp = routePts(va.x, va.z, vb.x, vb.z), dC = distNear(vp, MP.x, MP.z), VSTOP = pointAt(vp, dC);
     // the mugger: out from the far side of the square (away from the camera), along the footway to them
@@ -523,7 +524,7 @@ const FILM = (() => {
 
   /* ---------- the camera: set outright every frame ---------- */
   const CAM = { x: GC.x, y: TARGET_Y, z: GC.z, yaw: .55, zoom: 8, pitch: 40*DEG };
-  const STREET = { yaw: -2.35 + Math.PI, pitch: 38*DEG, zoom: 8.6 };   // (from the south-west, the track side, looking in over the square towards the city)   // the game's own close view, from the track side
+  const STREET = { yaw: 0, pitch: 38*DEG, zoom: 8.6 };   // (from the south-west, the track side, looking in over the square towards the city)   // the game's own close view, from the track side
   const SIDE = { yaw: Math.PI, pitch: 11*DEG, zoom: 9.5 };            // the metro, side on and low
   const PH = { name: 'build', t0: 0, from: null };
   const phase = (name, t) => { PH.name = name; PH.t0 = t; PH.from = Object.assign({}, CAM); say('phase', name, 'at', t.toFixed(2)); };

@@ -524,7 +524,7 @@ const FILM = (() => {
 
   /* ---------- the camera: set outright every frame ---------- */
   const CAM = { x: GC.x, y: TARGET_Y, z: GC.z, yaw: .55, zoom: 8, pitch: 40*DEG };
-  const STREET = { yaw: 0, pitch: 38*DEG, zoom: 8.6 };   // (from the south-west, the track side, looking in over the square towards the city)   // the game's own close view, from the track side
+  const STREET = { yaw: Math.PI, pitch: 38*DEG, zoom: 8.6 };   // (from the south-west, the track side, looking in over the square towards the city)   // the game's own close view, from the track side
   const SIDE = { yaw: Math.PI, pitch: 11*DEG, zoom: 9.5 };            // the metro, side on and low
   const PH = { name: 'build', t0: 0, from: null };
   const phase = (name, t) => { PH.name = name; PH.t0 = t; PH.from = Object.assign({}, CAM); say('phase', name, 'at', t.toFixed(2)); };

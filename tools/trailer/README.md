@@ -52,6 +52,16 @@ key, which is handy for turning a quick burst of building into a steady build-up
 If you record from the middle of a trailer, the city first has to look the way it does at that moment, so it asks to
 reload the city with every edit before the playhead built.
 
+### The scripted trailer, editable
+
+`tools/trailer/neon-terrarium.trailer.json` is the built-in trailer remade for the trailer maker (without the apartment
+and the coast, so it runs 53.55 s and everything from the metro ride on is 15.95 s earlier than in the scripted one).
+Import it from the menu ("Import a trailer file"). It has the trailer's city, the 139 builds of the opening build-up on
+the Edits row, the camera path (the turntable, the dive into the garden, the ride past the landmarks, the pull back over
+the dense city), the time of day, three person cam stretches in the garden (each follows whoever is nearest that spot),
+a flash into the ride, a fade through black for the night, the lights flickering on, the logo and the fade out. The
+arcology (trailer-only geometry) is replaced by ordinary towers and the night comes in through a fade to black instead.
+
 ### Getting the video
 
 Open the menu (the trailer's name at the left), set the music start and fade, then **Export file**. Then on your Mac:

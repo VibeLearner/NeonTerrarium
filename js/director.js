@@ -1051,7 +1051,8 @@ const DIRECTOR = (() => {
     settle(play);
     status('loading the city');
     if (!CAP) toast('Loading the city...', 60000);
-    await until(() => typeof pplReady !== 'undefined' && pplReady && !anims.length && !(typeof LOADP !== 'undefined' && LOADP.on), 240).catch(e => warn('loading', e));
+    // (the whole city must be in before a film plays; editing can start while the far parts are still coming in)
+    await until(() => typeof pplReady !== 'undefined' && pplReady && !anims.length && !(typeof LOADP !== 'undefined' && LOADP.on), play ? 3600 : 900).catch(e => warn('loading', e));
     await wait(.4);
     if (!P){ toast('Pick or make a trailer'); D.ready = true; status('no trailer'); projects(); return; }
     const at = clamp(+BOOT.at || 0, 0, P.len);
@@ -1077,6 +1078,7 @@ const DIRECTOR = (() => {
   D.start = () => { if (!D.ready || !P || D.mode !== 'play') return false; go(+BOOT.at || 0); return true; };
   D.state = () => ({ ready: D.ready, playing: D.playing, done: D.done, t: D.t, stage: D.stage, info: { name: P && P.name, len: P && P.len, edits: P && P.edits.length }, log: D.log.slice(-30) });
   D.project = () => P;
+  D.seek = t => { if (P && !RUN.kind) setHead(+t || 0); };   // (jump the playhead: for scripts and the console)
   window.addEventListener('load', () => {
     setup().then(() => requestAnimationFrame(tick)).catch(e => { warn('setup', e); D.failed = String(e && e.message || e); if (!CAP) toast('Could not set up: ' + D.failed, 8000); });
   });

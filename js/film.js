@@ -333,27 +333,39 @@ const FILM = (() => {
     stroll(ex[1], [[GC.x + 3.2, GC.z - 6.6], [GC.x - 5.0, GC.z - 6.6]], 14.3, .8).__area = 'garden';
     standAt(ex[2], GC.x - 6.2, GC.z + 4.6, 1, -.4, false).__area = 'garden';
   }
-  // the square: people crossing it and chatting in it; when the mugging starts they stop and stare
-  function squareExtras(react){
-    const ex = nearestPeople(SC_.x, SC_.z, 7); if (ex.length < 7) return;
-    const c = (dx, dz) => nodeNear(SC_.x + dx, SC_.z + dz), R_ = (a, b) => routePts(a.x, a.z, b.x, b.z);
-    stroll(ex[0], R_(c(-7, 6.5), c(7, 6.5)), 29, 1.15, react).__area = 'square';
-    stroll(ex[1], R_(c(6.5, -7), c(6.5, 7)), 29.6, 1.05, react).__area = 'square';
-    stroll(ex[2], R_(c(-6.5, -6.5), c(-6.5, 6)), 30.4, 1.2, react).__area = 'square';
-    const P1 = c(4.2, 4.6), P2 = c(-4.6, 3.8);
-    standAt(ex[3], P1.x - .36, P1.z, 1, 0, true, react).__area = 'square'; standAt(ex[4], P1.x + .36, P1.z, -1, 0, true, react).__area = 'square';
-    standAt(ex[5], P2.x, P2.z - .36, 0, 1, true, react).__area = 'square'; standAt(ex[6], P2.x, P2.z + .36, 0, -1, true, react).__area = 'square';
-  }
-  // by the west station: two walking the street past it (never through its lift)
-  function stationExtras(cab){
-    const ex = nearestPeople(cab.x, cab.z, 6), used = [];
-    for (const [ax, az, bx, bz] of [[-6, 2, 6, 2], [-6, -2.5, 6, -2.5], [2.5, -6, 2.5, 6], [-2.5, -6, -2.5, 6]]){
-      if (used.length >= 2) break;
-      const a = nodeNear(cab.x + ax, cab.z + az), b = nodeNear(cab.x + bx, cab.z + bz), pts = routePts(a.x, a.z, b.x, b.z), L_ = pathLen(pts);
-      let ok = L_ > 4; for (let d = 0; ok && d <= L_; d += .25){ const q = pointAt(pts, d); if (Math.hypot(q.x - cab.x, q.z - cab.z) < 1.4) ok = false; }
-      if (ok && ex[used.length]) used.push(stroll(ex[used.length], pts, 36 + used.length*.9, 1.1));
+  // a crowd round a point: walkers on footway routes between nodes of the area (back and forth, each at its own pace and start), and
+  // groups standing talking; all from a fixed seed, so it plays the same every time. keepOff: points (with a radius) none may stand on or
+  // cross (the main cast's marks, a lift's door); react: as for stroll
+  function crowd(area, cx, cz, rad, nWalk, nGroups, seed, t0, keepOff, react){
+    const Rn = mulberry32(seed), nodes = [];
+    for (let k = 0; k < NG.x.length; k++) if (Math.hypot(NG.x[k] - cx, NG.z[k] - cz) < rad) nodes.push({ x: NG.x[k], z: NG.z[k] });
+    if (nodes.length < 4) return 0;
+    const clear = (x, z, pad = 0) => keepOff.every(([kx, kz, kr]) => Math.hypot(x - kx, z - kz) > kr + pad);
+    const pool = nearestPeople(cx, cz, nWalk + nGroups*3 + 8); let used = 0, made = 0;
+    for (let w = 0, tries = 0; w < nWalk && tries < nWalk*12 && used < pool.length; tries++){
+      const a = nodes[Math.floor(Rn()*nodes.length)], b = nodes[Math.floor(Rn()*nodes.length)];
+      if (Math.hypot(a.x - b.x, a.z - b.z) < rad*.6) continue;
+      const pts = routePts(a.x, a.z, b.x, b.z), L_ = pathLen(pts); if (L_ < 4 || L_ > rad*3.5) continue;
+      let ok = true; for (let d = 0; ok && d <= L_; d += .3){ const q = pointAt(pts, d); if (!clear(q.x, q.z)) ok = false; }
+      if (!ok) continue;
+      stroll(pool[used++], pts, t0 - Rn()*L_/1.1, .85 + Rn()*.5, react).__area = area; w++; made++;
     }
-    for (const p of used) p.__area = 'station';
+    for (let g = 0, tries = 0; g < nGroups && tries < nGroups*14 && used + 1 < pool.length; tries++){
+      const c = nodes[Math.floor(Rn()*nodes.length)]; if (!clear(c.x, c.z, 1.2)) continue;
+      const n = Rn() < .45 ? 3 : 2, a0 = Rn()*Math.PI*2;
+      for (let k = 0; k < n && used < pool.length; k++){ const a = a0 + k*Math.PI*2/n, x = c.x + Math.cos(a)*.38, z = c.z + Math.sin(a)*.38;
+        standAt(pool[used++], x, z, c.x - x, c.z - z, true, react).__area = area; made++; }
+      g++;
+    }
+    return made;
+  }
+  // the square, busy: people crossing it every way and standing about in twos and threes (none on the mugging's marks); when it
+  // happens, everyone stops and stares
+  function squareExtras(react, marks){ F.info.squareCrowd = crowd('square', SC_.x, SC_.z, 10, 16, 6, 4401, 31, marks, react); }
+  // along the passer-by's way to the station: people walking the streets both ways, never through the lift
+  function stationExtras(cab, way){
+    const mid = pointAt(way, pathLen(way)*.55);
+    F.info.stationCrowd = crowd('station', mid.x, mid.z, 11, 10, 2, 5502, 38, [[cab.x, cab.z, 1.5]]);
   }
 
   /* ---------- the mugging, in the open middle of the town square ---------- */
@@ -407,11 +419,12 @@ const FILM = (() => {
     });
     MUG.cops = cops; F.info.cops = cops.map(c => c.id); if (cops.length < 2) warn('mugging', 'only ' + cops.length + ' officers in the city');
     MUG.MHIT = MHIT; F.info.mugging = { victim: v.id, strike: +tStrike.toFixed(2), flee: +fleeEnd.toFixed(2) };
+    const marks = [[MHIT.x, MHIT.z, 1.6], [VSTOP.x, VSTOP.z, 1.6], [m0.x, m0.z, 1.0]]; for (let d = 0; d <= pathLen(vp); d += 1.2){ const q = pointAt(vp, d); marks.push([q.x, q.z, .7]); }
     squareExtras((ft, st) => {
       if (ft < tStrike + .4 || ft > MG.rob1 + 2.4 || Math.hypot(st.x - MHIT.x, st.z - MHIT.z) > 11) return null;
       if (!st.saw){ st.saw = true; }
       return { x: st.x, y: CURB, z: st.z, frame: F_IDLE + Math.floor(ft*2.5) % PPL.idle, dx: MUG.mx - st.x, dz: MUG.mz - st.z };
-    });
+    }, marks);
     later(() => { for (const p of EXTRAS) if (p.__area === 'square') emote(p, 'bang', 1.4); }, 1);
     say('mugging cast', v.id, JSON.stringify(F.info.mugging));
   }
@@ -459,6 +472,7 @@ const FILM = (() => {
     const ax = -(cab.z - H_.z), az = cab.x - H_.x, al = Math.hypot(ax, az) || 1, from = nodeNear(by.x + ax/al*6, by.z + az/al*6);   // (coming across it from the side)
     const leg1 = routePts(from.x, from.z, by.x, by.z), leg2 = routePts(by.x, by.z, cab.x, cab.z), pts = leg1.concat(leg2.slice(1));
     const dPass = pathLen(leg1), L_ = pathLen(pts), t0 = MG.pass - dPass/RT.speed;
+    RD.way = pts;
     const top = mtW(st, st.side*MT_LIFT_OFF, 0), door = mtW(st, st.side*.62, 0), inn = mtW(st, st.side*.12, 0);
     const T = { start: t0 }; let tt = t0 + L_/RT.speed;
     T.atLift = tt; T.inCab = tt += RT.intoCab; T.atTop = tt += RT.lift; T.onPlat = tt += RT.toPlat;
@@ -596,7 +610,7 @@ const FILM = (() => {
   at(MK.garden, () => { E.sel.style.display = 'none'; phase('square', MK.garden); }, 'to the square');
   at(MK.garden + .6, () => { const m = document.getElementById('monitor'); keep(m, false); MON.close(); if (m) m.style.opacity = ''; }, 'the person cam closes');
   at(MK.square + 1.5, () => { if (F.pairs) for (const q of F.pairs){ release(q.A); release(q.B); } releaseExtras(p => p.__area === 'garden'); }, 'the garden lets go');   // (once the camera is well away)
-  at(MG.walk0 - .1, () => { riderCast(); if (RD.cab) stationExtras(RD.cab); }, 'the passer-by');
+  at(MG.walk0 - .1, () => { riderCast(); if (RD.cab && RD.way) stationExtras(RD.cab, RD.way); }, 'the passer-by');
   at(MG.stop, () => { if (MUG.victim) emote(MUG.victim, 'bang', 1.6); }, 'the victim sees him');
   at(MG.reach + .4, () => { for (const p of EXTRAS) if (p.__area === 'square') emote(p, 'bang', 1.6); }, 'the square sees it');
   at(MG.pass - .4, () => phase('rider', MG.pass - .4), 'with the passer-by');

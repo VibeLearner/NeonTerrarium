@@ -612,6 +612,7 @@ const FILM = (() => {
   const who = t => t < MK.p[1] ? 0 : 1;
   const trainPos = () => { const cp = LINE && LINE.train && LINE.train.cp && LINE.train.cp[1]; return cp ? { x: cp[0], y: cp[1], z: cp[2] } : null; };
   function camAt(t, dt){
+    window.FILM_SH_HALF = t < MK.dive ? 150 : 0;
     if (t < MK.dive){ Object.assign(CAM, buildCam(t)); }
     else if (t < MK.garden){   // into the garden, on the first person; the view turns for the second and follows them home; held there while the apartment is open
       if (t >= MK.open && F.homeCam){ Object.assign(CAM, F.homeCam); }
@@ -652,16 +653,14 @@ const FILM = (() => {
     camGoal.set(CAM.x, CAM.y, CAM.z); camT.copy(camGoal);
     yaw = yawT = CAM.yaw; zoom = zoomT = CAM.zoom; PITCH = pitchT = CAM.pitch;
   }
-  // The hour, one continuous day (a jump turned every shadow at once): morning through the build, the garden and the apartment; from the
-  // moment the camera sets off for the square it moves on slowly to golden hour, there as the train pulls out; then over the train's whole run
-  // to the far end of the line the sun goes down and night comes on. (settle() takes the afternoon look out of the day: morning hands
-  // straight over to golden)
+  // The hour is held still wherever the city is seen in daylight (a moving sun moves every shadow): morning through the build, the garden and the
+  // walk home; while the apartment is on screen it becomes golden hour, which holds through the square and the station; then over the train's
+  // whole run to the far end of the line the sun goes down and night comes on, with the rain
   const H = { morning: 10.0, golden: 17.2, night: 22.2 };
   function hourAt(t){
-    if (t < MK.dive) return lerp(8.6, H.morning, ss(t/MK.dive));
-    if (t < MK.garden) return H.morning;
+    if (t < MK.unroom) return H.morning;   // (the morning held still through the build, the garden and the apartment)
     const T = RD.T, dep = T ? T.depart : MG.pass + 14, arr = RD.arrive || dep + 16;
-    if (t < dep) return lerp(H.morning, H.golden, ss(seg(t, MK.garden, dep)));
+    if (t < dep) return H.golden;   // (golden hour from the moment the hologram starts back out of the apartment, behind it, held to the train)
     return lerp(H.golden, H.night, ss(seg(t, dep + .4, arr - .2)));
   }
   function lightsAt(t){
@@ -730,25 +729,21 @@ const FILM = (() => {
     const id = [...B.inst.keys()].find(k => !before.has(k));
     return id !== undefined ? B.inst.get(id) : null;
   }
-  // the three pieces: the room's own couch, floor light and plant if it has them (hidden while the hologram covers the room, then set down
-  // again), otherwise new ones placed on the floor near the middle of the room
-  const CATS = { couch: ['modular', 'futon', 'retro', 'pallet', 'corner', 'carseat', 'cloud'], light: ['floorlamp', 'lamp', 'tube', 'neon', 'stringlights', 'pendant'], plant: ['monstera', 'fern', 'snake', 'bamboo', 'bonsai', 'hydro', 'hanging'] };
-  const NEW = { couch: ['retro', 11], light: ['floorlamp', 7], plant: ['monstera', 5] };
-  const DROP = { couch: .35, light: 1.75, plant: 3.15 };   // (seconds into the furnishing)
+  // the three pieces are the room's own, in the places its layout gave them (so nothing is dumped in the middle or into something else): a couch
+  // (or failing that a bed or a chair), a light, a plant (or failing that a storage piece or a table). Hidden while the hologram covers the room,
+  // then set down one after another
+  const CATS = {
+    couch: [['modular', 'futon', 'retro', 'pallet', 'corner', 'carseat', 'cloud'], ['cryo', 'container', 'bunks', 'suspended', 'murphy', 'netrunner', 'hover', 'platform', 'capsule', 'loft', 'floorbed'], ['lounge', 'shell', 'gamer', 'floorseat', 'folding', 'barstool', 'cratestool']],
+    light: [['floorlamp', 'lamp', 'pendant', 'tube', 'neon', 'stringlights']],
+    plant: [['monstera', 'fern', 'snake', 'bamboo', 'bonsai', 'hydro', 'hanging'], ['rack', 'cubby', 'locker', 'dresser', 'crateshelf', 'server', 'wardrobe'], ['slab', 'crate', 'spool', 'holo', 'loop', 'block', 'cafe', 'kotatsu', 'fold', 'bar', 'drum']] };
+  const DROP = { couch: .45, light: 1.85, plant: 3.25 };   // (seconds into the furnishing)
   function labPick(B){
-    for (const i of B.inst.values()){ if (!i.pivot || !i.rec || i.rec.parent) continue;
-      for (const k in CATS) if (!AP.pick[k] && CATS[k].includes(i.rec.arch)) AP.pick[k] = { i, y: i.pivot.position.y }; }
-    for (const k in AP.pick) AP.pick[k].i.pivot.visible = false;
-    F.info.apt = Object.keys(CATS).map(k => k + ':' + (AP.pick[k] ? 'own' : 'new')).join(' ');
-  }
-  function labNew(B, k){
-    const root = B.root.position, pts = [...B.inst.values()].filter(i => i.lbox && !(i.rec && i.rec.parent)).map(i => i.pivot.position);
-    const mx = pts.length ? pts.reduce((a, p) => a + p.x, 0)/pts.length : 2, mz = pts.length ? pts.reduce((a, p) => a + p.z, 0)/pts.length : 2;
-    const OFF = [[0, 0], [.9, 0], [-.9, 0], [0, .9], [0, -.9], [1.3, 1.3], [-1.3, 1.3], [1.3, -1.3], [-1.3, -1.3], [1.8, 0], [-1.8, 0], [0, 1.8], [0, -1.8]];
-    const sh = { couch: 0, light: 4, plant: 8 }[k];
-    for (let n = 0; n < OFF.length; n++){ const [ox, oz] = OFF[(n + sh) % OFF.length];
-      const i = safe('place ' + k, () => labPlace(NEW[k][0], NEW[k][1], mx + ox + root.x, root.y, mz + oz + root.z)); if (i) return { i, y: i.pivot.position.y }; }
-    warn('apartment', 'no room for the ' + k); return null;
+    const all = [...B.inst.values()].filter(i => i.pivot && i.rec && !i.rec.parent && i.pivot.visible), used = new Set();
+    const size = i => i.lbox ? (i.lbox.max.x - i.lbox.min.x)*(i.lbox.max.z - i.lbox.min.z) : 0;
+    for (const k in CATS) for (const archs of CATS[k]){
+      const c = all.filter(i => !used.has(i) && archs.includes(i.rec.arch)).sort((a, b) => size(b) - size(a))[0];
+      if (c){ used.add(c); AP.pick[k] = { i: c, y: c.pivot.position.y }; c.pivot.visible = false; break; } }
+    F.info.apt = Object.keys(CATS).map(k => k + ':' + (AP.pick[k] ? AP.pick[k].i.rec.arch : 'none')).join(' ');
   }
   function aptOpen(){
     if (!APTH.pod){ warn('apartment', 'no pod'); return; }
@@ -791,11 +786,11 @@ const FILM = (() => {
       fr.style.opacity = '1';
       const k = t - MK.room;
       for (const c of ['couch', 'light', 'plant']) if (k >= DROP[c] && !AP.done.has(c) && B){ AP.done.add(c);
-        const q = AP.pick[c] || labNew(B, c); if (q){ AP.drops.push({ i: q.i, y: q.y, from: c === 'light' ? 1.2 : 1.6, t }); q.i.pivot.visible = false; } }
-      for (const d of AP.drops){   // dropped in from above, with a little bounce
-        const u = (t - d.t)/.55; d.i.pivot.visible = u >= 0; if (u < 0) continue;
-        const v = Math.min(1, u), fall = 1 - v*v, bounce = v < 1 ? 0 : Math.max(0, Math.sin(Math.min(1, (u - 1)/.6)*Math.PI))*.05*Math.max(0, 1 - (u - 1)/.6);
-        d.i.pivot.position.y = d.y + d.from*fall + bounce;
+        const q = AP.pick[c]; if (q) AP.drops.push({ i: q.i, y: q.y, t }); }
+      for (const d of AP.drops){   // lowered into its place, settling softly
+        const u = (t - d.t)/.75; d.i.pivot.visible = u >= 0; if (u < 0) continue;
+        const v = Math.min(1, u), e = 1 - Math.pow(1 - v, 3);
+        d.i.pivot.position.y = d.y + .45*(1 - e);
       }
       return;
     }
@@ -870,11 +865,12 @@ const FILM = (() => {
     paint(t);
     if (t >= MK.p[0] && t < MK.door - .6 && F.pairs){ const p = F.pairs[who(t)].A; brackets(p.x, p._ey ?? CURB, p.z); }
     else if (E.sel.style.display !== 'none') E.sel.style.display = 'none';
+    if (PH.name === 'side' && RD.T && RD.arrive && !F.rain && t > lerp(RD.T.depart, RD.arrive, .45)){ F.rain = true; LK.wx.fadeSec = 6; LK.setWeather('rain', false, true); }   // (the rain coming in as the light goes)
     if (PH.name === 'rider' && RD.T && t > RD.T.depart + .3) phase('side', t);
     else if (PH.name === 'rider' && !RD.T && t > PH.t0 + 3) phase('side', t);   // (no station: straight on)
     else if (PH.name === 'side' && t > (RD.arrive ? RD.arrive + .5 : PH.t0 + 16)){   /* (the whole run, into the far end's station) */ F.outT0 = t; phase('out', t); release(RD.p); releaseExtras();
       window.PPL_ONLY = false; for (const st of POLICE_STATIONS) for (const d of st.drones) if (d._still){ d._still = false; d.st.puppet = null; d.g.visible = true; d.st.mode = 'home'; d.st.target = null; } }
-    else if (PH.name === 'out' && t > F.outT0 + DUR.out){ phase('title', t); LK.wx.fadeSec = 5; LK.setWeather('rain', false, true); }
+    else if (PH.name === 'out' && t > F.outT0 + DUR.out){ phase('title', t); }
     else if (PH.name === 'title' && t > PH.t0 + DUR.title){ F.playing = false; F.done = true; F.len = t; say('done at', t.toFixed(2));
       if (!CAP){ E.msg.hidden = false; E.status.innerHTML = 'click to play again'; E.ov.classList.add('ask'); E.ov.addEventListener('click', () => location.reload(), { once: true }); } }
   }

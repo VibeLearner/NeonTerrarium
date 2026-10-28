@@ -38,7 +38,7 @@ window.NT_FILM2 = /#film\b/.test(location.hash);   // (#film: js/film.js, a scri
 // for the rest: shadows and clouds drawn whole every frame, no shadow-box steps, no whole-pixel camera snap, the person cam's feed every frame
 if (window.NT_FILM2 || window.NT_STAGE){
   window.NT_RENDER = true;
-  window.__NV_OFF = window.__SYNC_NOW = window.__STAGE_NOW = window.__GEN_MAIN = window.__KEEP_GEO = window.__ALERT_NOW = window.__DISPOSE_NOW = true;
+  window.__NV_OFF = window.__SYNC_NOW = window.__STAGE_NOW = window.__GEN_MAIN = window.__KEEP_GEO = window.__ALERT_NOW = window.__DISPOSE_NOW = window.__KEEP_CPU = true;
   window.__TIER_OFF = window.__SOFT_FULL = window.__FULL_RATE = true;
 }
 // #stage: js/stage.js, the film as a play (the game draws, the stage decides everything). Like #film it keeps nothing, and it reads nothing of the

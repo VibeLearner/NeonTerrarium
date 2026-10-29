@@ -124,7 +124,8 @@ def main():
         # and every frame would be the top-left part of the picture, stretched. Then the film is made without a window instead
         if not a.headless:
             png = grab('png'); w, h = struct.unpack('>II', png[16:24])
-            if (w, h) != (1920, 1080):
+            # (a Retina screen draws the window at twice the pixels: 3840 x 2160 is the whole picture, sharper, and ffmpeg scales it to 1920 x 1080)
+            if (w, h) != (1920, 1080) and not (w % 1920 == 0 and h % 1080 == 0 and w//1920 == h//1080):
                 print(f'  the browser window only shows {w} x {h} of the 1920 x 1080 picture (the screen is too small): filming without a window instead')
                 browser.close(); a.headless = True
                 browser = launch(pw, True)

@@ -202,8 +202,10 @@ const PLAY = (() => {
         const k = keyed(D.keys.map(q => [q[0], q[1], q[7]]), G.t);
         // keys [t, x, y, z, yaw, light, red, easing]: each value eased to the next key
         const v = j => keyed(D.keys.map(q => [q[0], q[j], q[7]]), G.t);
-        const y = v(2); if (y > rest.y + .05) d.st.spin = 1;   // (its rotors at full speed whenever it is off its pad: mega.js spins them only for a drone not resting, and a scripted one never leaves 'rest')
-        return { x: v(1), y, z: v(3), yaw: v(4), light: v(5), red: v(6) };
+        const y = v(2), up = y > rest.y + .05; d.st.spin = up ? 1 : 0;
+        // the rotors turned by the film's clock, a fixed step a frame (.37 rad: plainly spinning, never a whole blade's turn, so never seen still)
+        if (up) d.st.bA = (G.frame*.37) % (2*Math.PI);
+        return { x: v(1), y, z: v(3), yaw: v(4), light: v(5), red: v(6), blades: d.st.bA || 0 };
       };
     }));
   }

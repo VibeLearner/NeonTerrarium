@@ -3828,7 +3828,7 @@ function policeDrone(m, idx = 0, padM = m.dronePad, crew = null){
       red.b.visible = red.sp.visible = on && a && fl; blue.b.visible = blue.sp.visible = on && !a && fl;
       let light = 0;
       if (st.puppet){   // flown by a script (the film: js/film.js): where it is, which way it faces, its searchlight and how red it is
-        const r = st.puppet(dt, time); if (r){ g.position.set(r.x, r.y, r.z); if (r.yaw !== undefined) st.yaw = r.yaw; light = r.light || 0; st.redOn = r.red || 0; st.aim = r.aim || null; } }
+        const r = st.puppet(dt, time); if (r){ g.position.set(r.x, r.y, r.z); if (r.yaw !== undefined) st.yaw = r.yaw; light = r.light || 0; st.redOn = r.red || 0; st.aim = r.aim || null; if (r.blades !== undefined) for (const h of blades) h.rotation.y = r.blades; } }   // (blades: the script's own rotor angle, set outright: turned by real time, a slow recording spun them a random amount a frame)
       else if (st.mode === 'rest'){
         st.timer -= dt;
         if (st.chase){ st.mode = 'up'; st.k = 0; st.way = []; }   // scrambled to a mugging

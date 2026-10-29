@@ -576,15 +576,25 @@ const PLAY = (() => {
   }
   function homeHide(on){
     const A = SC_.apartment, k = String(A.pod).split('|')[0].split(',').map(Number), c = cells.get(ckey(k[0], k[1])); if (!c) return warn('apartment', 'no home plot ' + k);
-    if (on){ if (AP.hh) return; const h = AP.hh = { pcs: [], mem: [], g: c.group ? c.group.visible : null, v: c.view ? c.view.visible : null };
+    if (on){ if (AP.hh) return; const h = AP.hh = { pcs: [], mem: [], fol: [], g: c.group ? c.group.visible : null, v: c.view ? c.view.visible : null };
       const rec = solidRegions.get(mergeKey(c.i, c.j));
       if (rec){ for (const g of rec.geoms){ const pc = g.userData.pieceCells, P = g.userData.pcs; if (!pc || !P) continue;
           for (let i = 0; i < pc.length; i++) if (pc[i] === c){ const H = P.hide || (P.hide = new Uint8Array(P.n)); h.pcs.push([P, i, H[i]]); H[i] = 1; P.stamp = -1; } }
         for (const m of rec.members) if (m.userData.cell === c){ h.mem.push([m, m.visible]); m.visible = false; } }
       if (c.group) c.group.visible = false; if (c.view) c.view.visible = false;
+      // the building's own greenery (its roof and balcony plants, instanced with the rest of the city's): out with it, so nothing hangs in the air
+      { const v = new THREE.Vector3(), m4 = new THREE.Matrix4(), z0 = new THREE.Matrix4().makeScale(0, 0, 0), R = LOT*.47;
+        scene.traverse(o => { if (!o.isInstancedMesh || !o.userData.fol) return; let hit = false;
+          for (let i = 0; i < o.count; i++){ o.getMatrixAt(i, m4); v.setFromMatrixPosition(m4).applyMatrix4(o.matrixWorld);
+            if (Math.abs(v.x - c.x) < R && Math.abs(v.z - c.z) < R && v.y > .2){ h.fol.push([o, i, m4.clone()]); o.setMatrixAt(i, z0); hit = true; } }
+          if (hit) o.instanceMatrix.needsUpdate = true; }); }
+      // and the plot under it paved (the ground there is never drawn under a building: the sky showed through)
+      { const g = new THREE.Mesh(new THREE.PlaneGeometry(LOT*.9, LOT*.9), new THREE.MeshToonMaterial({ color: '#6a655f' })); g.rotation.x = -Math.PI/2; g.position.set(c.x, .015, c.z); g.receiveShadow = true; scene.add(g); h.pave = g; }
     } else { const h = AP.hh; if (!h) return; AP.hh = null;
       for (const [P, i, v] of h.pcs){ P.hide[i] = v; P.stamp = -1; } for (const [m, v] of h.mem) m.visible = v;
-      if (c.group && h.g !== null) c.group.visible = h.g; if (c.view && h.v !== null) c.view.visible = h.v; }
+      if (c.group && h.g !== null) c.group.visible = h.g; if (c.view && h.v !== null) c.view.visible = h.v;
+      for (const [o, i, m4] of h.fol){ o.setMatrixAt(i, m4); o.instanceMatrix.needsUpdate = true; }
+      if (h.pave){ scene.remove(h.pave); h.pave.geometry.dispose(); h.pave.material.dispose(); } }
   }
   // the depth pass, in the lab after each of its pictures: the lab's city and the flat drawn for depth alone from the lab's camera; where the city
   // is nearer, the lab's pixel is cleared (the game's picture under it shows)

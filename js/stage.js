@@ -359,7 +359,8 @@ const PLAY = (() => {
     if (!M){ if (MONI.cur){ MONI.cur = null; MONI.el.hidden = true; MONI.el.classList.remove('tr-keep'); } return; }
     if (MONI.cur !== M){ MONI.cur = M; MONI.shownLog = -1; MONI.el.hidden = false; MONI.el.classList.add('tr-keep'); }
     MONI.el.style.opacity = String(Math.min(1, ss((t - M.t0)/(M.fade || .3)), ss((M.t1 - t)/(M.fade || .3))));
-    document.getElementById('monName').textContent = M.name; document.getElementById('monSub').textContent = M.sub;
+    { let nm = M.name, sb = M.sub; for (const [tn, n2, s2] of M.names || []) if (t >= tn){ nm = n2; sb = s2 ?? sb; }   // (a name that comes in partway: the identity pulled)
+      document.getElementById('monName').textContent = nm; document.getElementById('monSub').textContent = sb; }
     const n = M.log.filter(l => t >= l[0]).length;
     if (n !== MONI.shownLog){ MONI.shownLog = n; const body = document.getElementById('monBody');
       body.innerHTML = n ? M.log.slice(0, n).map(([, stamp, text]) => '<div class="ml reveal"><time>' + esc(stamp) + '</time><span>' + esc(text) + '</span></div>').join('') : '';
@@ -517,13 +518,14 @@ const PLAY = (() => {
       fr.style.opacity = '1';
       if (!AP.bg && !AP.bgDone){ AP.bgDone = true; safe('real city', () => bgGame(true, st, B, w)); }
       if (AP.bg && !AP.late){ AP.late = true; safe('pixels', () => { pixOn(true); tiltOn(true); }); }
-      AP.punch = true;   // (the depth pass only on the room itself: the hologram has its own camera)
+      if (!(tz0 => tz0 >= (A.zoomFor || 1.8)*.7)(t - A.room)) AP.punch = true;   // (the depth pass until the camera has gone past what stands in front)
       if (AP.bg){ safe('sun', () => keyLight(true)); }
       // One take: out of the hologram into the real street, the camera going in on the flat (past what stands in front of it: the near clip follows
       // the zoom) while everything around it blurs away to plain grey (never the flat: always in focus); on the grey the camera swings round to the
       // lab's own view, the flat coming up out of the game's pixels to its own; a hologram grid spreads out on the ground; then the furnishing.
       const tz = t - A.room, ZD = A.zoomFor || 1.8, OE = ZD + (A.orbitFor || 1.6);
-      if (AP.bg && B && AP.z0 && tz < ZD){ const base = AP.camBase || (AP.camBase = camPose(B.cam, st.city)), u = ss(clamp01(tz/ZD)), z = AP.z0 + ((A.labZoomIn || AP.z0*1.6) - AP.z0)*u; AP.nearK = u;
+      if (AP.bg && B && AP.z0 && tz < ZD){ const base = AP.camBase || (AP.camBase = camPose(B.cam, st.city)), u = ss(clamp01(tz/ZD)), z = AP.z0 + ((A.labZoomIn || AP.z0*1.6) - AP.z0)*u; AP.nearK = ss(clamp01(tz/(ZD*.7)));
+        if (AP.nearK >= 1) AP.punch = false;   // (what stood in front is cut away by now: from here the flat is simply in front, while the blur goes on)
         if (Math.abs(B.zoom - z) > 1e-6){ B.zoom = z; B.camDirty = true; B.needs = true; } AP.camM = Object.assign({}, base, { zoom: base.zoom*AP.z0/z }); }
       if (tz < ZD) safe('grey', () => greyAt(ss(clamp01((tz - (A.greyFrom ?? .5))/Math.max(.1, ZD - (A.greyFrom ?? .5))))));
       else if (tz < OE){
@@ -664,9 +666,9 @@ const PLAY = (() => {
   // the near clip: as the camera goes in, everything nearer the camera than the flat's front is cut away (the game's camera, and the lab's copy of the
   // city in the depth pass, the same way), from 8 units in front of it to a quarter unit
   const nearOf = (pos, dir, M) => { const h = AP.home; if (!h) return null; const fp = h.fp || { w: 1.3, d: 2.2, ry: 0 }, c = Math.cos(fp.ry || 0), s = Math.sin(fp.ry || 0), p = new THREE.Vector3(); let mn = 1e9;
-    for (const sx of [-1, 1]) for (const sz of [-1, 1]) for (const y of [0, 1]){ const lx = sx*fp.w/2, lz = sz*fp.d/2; p.set(h.x + lx*c + lz*s, y, h.z - lx*s + lz*c); if (M) p.applyMatrix4(M); mn = Math.min(mn, p.sub(pos).dot(dir)); }
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) for (const y of [0, .3]){ const lx = sx*fp.w/2, lz = sz*fp.d/2; p.set(h.x + lx*c + lz*s, y, h.z - lx*s + lz*c); if (M) p.applyMatrix4(M); mn = Math.min(mn, p.sub(pos).dot(dir)); }   // (y to .3: the cut-down front walls, the nearest of the flat to the camera)
     return mn; };
-  const NEAR_FROM = 8, NEAR_TO = .25;
+  const NEAR_FROM = 8, NEAR_TO = .04;
   function nearClip(){
     if (AP.bg && AP.nearK > 0){ const dir = cam.getWorldDirection(new THREE.Vector3()), f = nearOf(cam.position, dir); if (f === null) return;
       if (AP.sc0 === undefined){ AP.sc0 = SC.mode; SC.mode = 'off'; }   // (the static cache draws with its own camera and the usual near plane: the frame drawn the old way meanwhile)

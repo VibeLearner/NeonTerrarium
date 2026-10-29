@@ -255,6 +255,9 @@ const yPlat = P.line.MT_Y + P.line.MT_PLAT_Y, TOP = STN.lift, DOOR = STN.door, I
   part('rider', 'passer-by', { shape: 'sweater beard', skin: 0, hair: 3, top: 5, acc: 2, bot: 0 }, k); }
 // people about the street on the way to the station (none on the lift)
 { const mid = pointAt(rway, lenOf(rway)*.55); crowd('st', mid[0], mid[1], 11, 10, 2, T.start - 4, 400, null, (x, z) => Math.hypot(x - CAB.x, z - CAB.z) > 1.6); }
+// and the streets round the station busy at golden hour, below the lift as the camera rides it up (none by its door, none on his way to it)
+{ const nearWay = (x, z) => { for (let d = Math.max(0, lenOf(rway) - 6); d <= lenOf(rway); d += .4){ const q = pointAt(rway, d); if (Math.hypot(x - q[0], z - q[1]) < .9) return true; } return false; };
+  crowd('lf', CAB.x, CAB.z, 13, 26, 7, T.start - 4, 400, null, (x, z) => Math.hypot(x - CAB.x, z - CAB.z) > 1.8 && !nearWay(x, z)); }
 
 const train = { k: 0, to: P.line.stops[P.line.stops.length - 1].k, open: r3(T.trainAt), close: r3(T.close), depart: r3(T.depart), v: 7.5, a: 2.2 };
 { const s0 = P.line.stops[0].s, s1 = P.line.stops[P.line.stops.length - 1].s, D = s1 - s0, ta = train.v/train.a, da = .5*train.a*ta*ta; T.arrive = T.depart + 2*ta + Math.max(0, (D - 2*da)/train.v); }
@@ -317,7 +320,8 @@ const shadowBox = [[0, 150], [r3(MK.dive), 150], [r3(MK.dive + .01), 0, 'hold']]
 
 /* ---------- the person cam ---------- */
 const monitor = [
-  { t0: MK.p[0] + .1, t1: MK.p[1], actor: 'deepa', name: 'DEEPA', sub: 'name from conversation', cam: 'CAM 12', clock: 'D1 10:00', yaw: r3(GV.y1 + .9), pitch: r3(48*DEG), fade: .3,
+  { t0: MK.p[0] + .1, t1: MK.p[1], actor: 'deepa', name: 'UNIDENTIFIED', sub: '', names: [[MK.p[0] + 2.0, 'DEEPA', 'name from conversation']],   // (her name up only once it is pulled from what the man shouts)
+    cam: 'CAM 12', clock: 'D1 10:00', yaw: r3(GV.y1 + .9), pitch: r3(48*DEG), fade: .3,
     log: [[MK.p[0] + .6, 'D1 10:00', 'Man yells from across the street: "Deepa!"'], [MK.p[0] + 2.0, 'D1 10:01', 'Identity pulled from conversation: Deepa.'],
           [MK.p[0] + 3.6, 'D1 10:02', 'Conversation: has she been keeping well, after everything that happened?']] },
   { t0: MK.p[1] + .1, t1: MK.door, actor: 'kwame', name: 'UNIDENTIFIED', sub: '', cam: 'CAM 07', clock: 'D1 10:07', yaw: r3(GV.y2 - .9), pitch: r3(48*DEG), fade: .5,

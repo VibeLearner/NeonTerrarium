@@ -15836,7 +15836,7 @@ function flyCam(cam,t){const c=camFor(cam),h=C.city,g=ease(ph(t,'glide')),gz=ph(
   const S0=h.holoStart,mid=S0?S0.tg.clone():new T.Vector3(h.center.x,(h.street+h.top)*.5,h.center.z).addScaledVector(h.streetDir,8),tg=mid.lerp(tg1,ease(Math.min(1,gz*1.15)));
   let f;if(S0){f=S0.dir.clone().lerp(fwd,g).normalize();const dr=C.trans?C.trans.drift:0;if(dr)f.applyQuaternion(_q.setFromAxisAngle(_y,.12*Math.sin(dr*.35)*(1-g)))}else{f=fwd.clone().applyQuaternion(_q.setFromAxisAngle(_y,-.6*(1-g)));f.y=lerp(Math.min(f.y,-.75),f.y,g);f.normalize()}
   c.position.copy(tg).addScaledVector(f,-(h.camBack||300));c.up.set(0,1,0);c.lookAt(tg);
-  if(c.isOrthographicCamera){const w1=(cam.right-cam.left)/cam.zoom,w0=S0?Math.max(S0.w,w1*8):Math.max(220,w1*8),wk=Math.exp(lerp(Math.log(w0),Math.log(w1),ease(gz)*.25+gz*.75));c.zoom=(cam.right-cam.left)/wk;c.updateProjectionMatrix()}
+  if(c.isOrthographicCamera){const w1=(cam.right-cam.left)/cam.zoom,w0=S0?(S0.exact?S0.w:Math.max(S0.w,w1*8)):Math.max(220,w1*8),wk=Math.exp(lerp(Math.log(w0),Math.log(w1),ease(gz)*.25+gz*.75));c.zoom=(cam.right-cam.left)/wk;c.updateProjectionMatrix()}
   else{c.fov=lerp(Math.min(80,cam.fov*3),cam.fov,g);c.position.copy(tg).addScaledVector(f,-lerp(260,cam.position.distanceTo(tg1),g));c.updateProjectionMatrix()}
   c.updateMatrixWorld(true);return c}
 // the transition's own clock: it runs freely through the city phase, then holds there (a slow drift) until the city is ready, then plays on

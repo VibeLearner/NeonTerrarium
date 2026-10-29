@@ -11,7 +11,7 @@ const FURN = (() => {
   // detail by distance from the home, in game units (x3.16 in the lab). The lab's backdrop is sharp only within about 45 m (14 units):
   // full detail to NEAR, clustered on a CG grid to MID, simple blocks (the clustered stand-in clustered again on a CG_FAR grid) beyond.
   // F.lightCity = false sends the city as before (full detail to 46, clustered beyond) to compare.
-  const SAVE_KEY = 'neonIsland.furnish', NEAR = 18, MID = 60, CG = .22, CG_FAR = .9, PAGE = 'furnish.html?v=2026-10-29a';
+  const SAVE_KEY = 'neonIsland.furnish', NEAR = 18, MID = 60, CG = .22, CG_FAR = .9, PAGE = 'furnish.html?v=2026-10-29b';
   const btn = document.getElementById('furnBtn'), hint = document.getElementById('modeHint');
   // The LIDAR Array unlocks Furnish pod (mega.js): the button shows once one has arrived, and only the homes in an array's range
   // can be picked. What the card shows of who lives there is what has been learned (lidar.js: the scan, the person cam, a trace

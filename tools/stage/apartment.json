@@ -249,6 +249,48 @@
      "k": 1.35,
      "on": true
     }
+   },
+   {
+    "id": 11,
+    "arch": "bathtub",
+    "seed": 390977,
+    "x": 0.5209,
+    "y": 0,
+    "z": 3.5,
+    "ry": 0,
+    "wh": 0,
+    "anc": "c",
+    "parent": 0,
+    "colors": {},
+    "light": null
+   },
+   {
+    "id": 12,
+    "arch": "bathtoilet",
+    "seed": 425078,
+    "x": 1.75,
+    "y": 0,
+    "z": 3.02,
+    "ry": 0,
+    "wh": 0,
+    "anc": "b",
+    "parent": 0,
+    "colors": {},
+    "light": null
+   },
+   {
+    "id": 13,
+    "arch": "hbbathsink",
+    "seed": 487512,
+    "x": 0.5,
+    "y": 0,
+    "z": 5,
+    "ry": 3.1416,
+    "wh": 0,
+    "anc": "b",
+    "parent": 0,
+    "colors": {},
+    "light": null
    }
   ]
  },

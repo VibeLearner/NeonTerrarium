@@ -471,6 +471,10 @@ const PLAY = (() => {
         if (first){
           if (!(st.ready && st.shown && !st.pendingHome)){ PC._debug.hold(H0); if (wait('the city')) return; }
           if (lw){ PC._debug.hold(H0); if (wait(lw)) return; }
+          // the hologram's first frame framed exactly as the game's camera was the moment before (furnish.html flyCam: holoStart.exact keeps its
+          // width as given, otherwise at least eight times the room's): the width the game camera shows, in lab metres (SCALE = 3/.95 there)
+          if (!AP.framed && st.city && st.city.holoStart){ const S0 = st.city.holoStart; AP.framed = true; AP.cityW = S0.w;
+            S0.w = 2*zoom*(innerWidth/Math.max(1, innerHeight))*(3/.95); S0.exact = true; }
           if (!AP.picked && B){ AP.picked = true;   // the lab's camera as the script has it (the whole flat in the frame), and the pieces that are set down later, hidden for now
             if (A.labZoom){ B.zoom = A.labZoom; B.camDirty = true; } if (A.labPan){ B.tx = A.labPan[0]; B.tz = A.labPan[1]; B.camDirty = true; }
             for (const d of A.drops || []){ const i = B.inst.get(d.id); if (i && i.pivot){ AP.hidden.push({ i, y: i.pivot.position.y, t: A.room + d.at }); i.pivot.visible = false; } else warn('apartment', 'no piece ' + d.id); } }
@@ -491,16 +495,29 @@ const PLAY = (() => {
     if (t < A.back){   // the hologram flies back out, to the game's view as it was left
       for (const d of AP.hidden){ d.i.pivot.visible = true; d.i.pivot.position.y = d.y; }
       if (!AP.rev){ AP.rev = true;
+        safe('holo frame', () => { const S0 = st && st.city && st.city.holoStart; if (S0 && AP.cityW){ S0.w = AP.cityW; S0.exact = true; } });   // (out to the whole city again: the framing the game camera takes behind it)
         if (st && !st.trans){ st.trans = { t0: performance.now(), vt: D_ - .01, last: performance.now(), drift: 0, gate: false, rm: false, frames: [], onDone: null, resolve(){}, skipped: false, lhDone: true, hold: D_ - .01 }; PC.transitioning = true; }
         FURN.hold = false;   // (the city drawn again underneath, from where the camera was left)
       }
-      if (st && st.trans){ st.trans.holding = false; PC._debug.hold(Math.min(D_ - .01, H0 + (D_ - H0)*(1 - holoCurve((t - A.unroom)/(A.back - A.unroom))))); }
-      fr.style.opacity = String(1 - ss(seg(t, A.back - A.fade, A.back)));
+      if (st && st.trans){ st.trans.holding = false; PC._debug.hold(Math.min(D_ - .01, H0 + (D_ - H0)*(1 - holoCurve(Math.min(1, (t - A.unroom)/(A.back - REVEAL - A.unroom)))))); }   // (out, and still, before the colour wave)
+      fr.style.opacity = '1'; reveal(fr, seg(t, A.back - REVEAL, A.back));
       return;
     }
     aptEnd();
   }
+  // Out of the hologram: no fade. From the middle of the picture (where the hologram looks, and the game camera behind it) a widening circle clears
+  // the hologram away and the city shows through in its own colours, a cyan wavefront glowing on its edge. The lab's frame masked, a ring drawn over it
+  const REVEAL = 2.2;
+  function reveal(fr, u){
+    const ring = E.ring || (E.ring = (() => { const d = document.createElement('div'); d.id = 'stRing'; d.style.cssText = 'position:absolute;left:50%;top:50%;border-radius:50%;pointer-events:none;opacity:0;border:2px solid rgba(120,255,240,.95);box-shadow:0 0 22px 6px rgba(56,232,224,.75),inset 0 0 26px 4px rgba(56,232,224,.55)'; document.getElementById('stOv').appendChild(d); return d; })());
+    if (u <= 0){ fr.style.webkitMaskImage = fr.style.maskImage = ''; ring.style.opacity = '0'; return; }
+    const e = u < .5 ? 4*u*u*u : 1 - Math.pow(-2*u + 2, 3)/2, R = Math.hypot(innerWidth, innerHeight)/2*1.12, r = e*R, f = Math.max(30, R*.09);   // (ease in and out: the wave gathers, sweeps, settles)
+    fr.style.webkitMaskImage = fr.style.maskImage = 'radial-gradient(circle at 50% 50%, transparent ' + r.toFixed(1) + 'px, #000 ' + (r + f).toFixed(1) + 'px)';
+    ring.style.width = ring.style.height = (2*(r + f*.5)).toFixed(1) + 'px'; ring.style.marginLeft = ring.style.marginTop = (-(r + f*.5)).toFixed(1) + 'px';
+    ring.style.opacity = String(Math.min(1, u*6)*(1 - ss(seg(u, .82, 1))));
+  }
   function aptEnd(why){
+    safe('reveal end', () => { if (FURN.frame) FURN.frame.style.webkitMaskImage = FURN.frame.style.maskImage = ''; if (E.ring) E.ring.style.opacity = '0'; });
     if (AP.closed) return; AP.closed = true;
     if (why) warn('apartment', why);
     safe('close', () => { const PC = labPC(), st = PC && PC._debug && PC._debug.state(); if (st && st.trans){ st.trans = null; PC.transitioning = false; }

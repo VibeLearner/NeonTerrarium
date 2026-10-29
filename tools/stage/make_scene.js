@@ -60,7 +60,7 @@ const part = (id, name, lk, keys, emotes = []) => { cast.push(Object.assign({ id
 
 /* ---------- the timeline ---------- */
 const GARDEN = { i0: -2, i1: 1, j0: -2, j1: 1 }, GC = { x: (GARDEN.i0 + GARDEN.i1)/2*LOT, z: (GARDEN.j0 + GARDEN.j1)/2*LOT };
-const MK = { built: 13.6, dive: 14.5, p: [17, 24], leave2: 28.6 };
+const MK = { built: 13.6, dive: 14.5, p: [17, 24], leave2: 23.2 };   // (leave2: Kwame sets off for home just before the camera turns to him)
 const GV = { pitch: 46*DEG, y1: .95, y2: -1.79 };   // the two person-cam views' yaw (the second looks east across the lawn, at the second person's front door)
 const HOME = { cell: [2, -1], door: P.doors.find(d => d.key === 'd:2,-1'), pod: '2,-1|0|1' };   // (a low home on the lawn's east side: its door faces the lawn)
 const STAND = HOME.door.stand, WALL = HOME.door.wall;
@@ -258,11 +258,22 @@ const yPlat = P.line.MT_Y + P.line.MT_PLAT_Y, TOP = STN.lift, DOOR = STN.door, I
 
 const train = { k: 0, to: P.line.stops[P.line.stops.length - 1].k, open: r3(T.trainAt), close: r3(T.close), depart: r3(T.depart), v: 7.5, a: 2.2 };
 { const s0 = P.line.stops[0].s, s1 = P.line.stops[P.line.stops.length - 1].s, D = s1 - s0, ta = train.v/train.a, da = .5*train.a*ta*ta; T.arrive = T.depart + 2*ta + Math.max(0, (D - 2*da)/train.v); }
-const lifts = [[0, [[0, CAB.y0], [r3(T.inCab), CAB.y0], [r3(T.atTop), CAB.y1, 'ss'], [r3(T.atTop + 2), CAB.y1], [r3(T.atTop + 5), CAB.y0, 'ss']]]];
+// at the end of the line: the doors open, he steps off, into the lift waiting at the top, down to the street and out of its door (+x: the game's
+// mtLiftSpot for that station), a few steps on
+const STN2 = P.line.stations.find(q => q.k === train.to), CAB2 = P.line.cabs.find(q => q.k === train.to), DOOR2 = STN2.door, INN2 = STN2.inn, LSTAND2 = [CAB2.x + .76, CAB2.z];
+const E2 = {}; { let tt = T.arrive + .8; E2.off = tt; E2.door = tt += .45; E2.inCab = tt += 1.0; E2.go = tt += .5; E2.down = tt += 3.0; E2.out = tt += .7; E2.away = tt += 2.2; }
+const lifts = [[0, [[0, CAB.y0], [r3(T.inCab), CAB.y0], [r3(T.atTop), CAB.y1, 'ss'], [r3(T.atTop + 2), CAB.y1], [r3(T.atTop + 5), CAB.y0, 'ss']]],
+  [train.to, [[0, CAB2.y1], [r3(E2.go), CAB2.y1], [r3(E2.down), CAB2.y0, 'ss']]]];
+{ const R = cast.find(c => c.id === 'rider'), y1 = yPlat, away = [LSTAND2[0] + 2.6, LSTAND2[1] + .2];
+  R.keys.push(K(E2.off - .01, INN2[0], INN2[1], 'idle', DOOR2[0] - INN2[0], DOOR2[1] - INN2[1], 0, y1), K(E2.off + .2, INN2[0], INN2[1], 'walk', DOOR2[0] - INN2[0], DOOR2[1] - INN2[1], 1, y1),
+    K(E2.door, DOOR2[0], DOOR2[1], 'walk', CAB2.x - DOOR2[0], CAB2.z - DOOR2[1], 1, y1), K(E2.inCab, CAB2.x, CAB2.z, 'idle', LSTAND2[0] - CAB2.x, 0, 1, y1));
+  for (let n = 1; n <= 8; n++){ const u = n/8; R.keys.push(K(E2.go + (E2.down - E2.go)*u, CAB2.x, CAB2.z, 'idle', 1, 0, 1, lerp(y1, CURB, ss(u)) + .02)); }   // down in the lift
+  R.keys.push(K(E2.out, LSTAND2[0], LSTAND2[1], 'walk', 1, 0, 1, CURB), K(E2.away, away[0], away[1], 'idle', 1, 0, 1, CURB)); }
+console.log('end of the line: off', E2.off.toFixed(2), 'down', E2.down.toFixed(2), 'out', E2.away.toFixed(2));
 console.log('T', T);
 
 /* ---------- the camera, the hour, the lights, the weather ---------- */
-const OUT = { t0: T.arrive + .5, dur: 9 }, TITLE = { t0: OUT.t0 + OUT.dur, dur: 8.5 };
+const OUT = { t0: E2.down + .6, dur: 9 }, TITLE = { t0: OUT.t0 + OUT.dur, dur: 8.5 };   // (the zoom out once he is down at the street)
 const camera = [];
 const C = (t, pose, e = 'lin') => camera.push([r3(t), pose, e]);
 for (let t = 0; t <= MK.dive + 1e-9; t += .25){ const u = ease(seg(t, .3, MK.built + .6));

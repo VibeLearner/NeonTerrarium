@@ -502,6 +502,8 @@ const PLAY = (() => {
         if (!AP.bgDone && AP.picked){ AP.bgDone = true; safe('real city', () => bgGame(true, st, B, w)); }
         if (AP.bg && !AP.late && t >= A.room - BG_IN){ AP.late = true; safe('pixels', () => { pixOn(true); tiltOn(true); }); }
         if (AP.bg) safe('sun', () => keyLight(true));   // (the sun on the flat from the start, steady: it shows only as the hologram resolves)
+        // and the lab's light worked out again for it before the hologram resolves: those steps showed as the room brightening in jumps (held: not filmed)
+        if (AP.bg && !(PC.paused && PC.paused())){ const PR = w.PodRender; if (PR && PR.lightPending && PR.lightPending() && wait('the light, with the sun on it')) return; }   // (only once the room is drawn under the hologram: until then the lab does no light work)
         // (the game's camera on the lab's, the one it is drawing the hologram with: the street behind moves with it, and what stands in front is cut from it)
         if (AP.bg && B && B.cam) safe('follow', () => { const p = camPose(B.cam, st.city); if (p) AP.camM = p; });   // (the room is drawn from the lab's own camera throughout: the hologram flies over it)
       }
@@ -699,14 +701,13 @@ const PLAY = (() => {
     const o = AP.orb; if (!o || !B) return; const a = o.a, b = o.b;
     B.az = a.az + wrapA(b.az - a.az)*u; B.pitch = a.pitch + (b.pitch - a.pitch)*u; B.zoom = Math.exp(Math.log(a.zoom) + (Math.log(b.zoom) - Math.log(a.zoom))*u);
     B.tx = a.tx + (b.tx - a.tx)*u; B.tz = a.tz + (b.tz - a.tz)*u; B.camDirty = true; B.needs = true; AP.pixK = u;
-    const key = AP.key, k0 = AP.key0, kS = AP.keyS; if (key && k0 && kS){ key.intensity = kS.i + (k0.i - kS.i)*u; key.color.copy(kS.c).lerp(k0.c, u); key.shadow.needsUpdate = true; }
   }
   // the lab's own view on the grey: its own frame shown (the copy at full size was the same picture), its own light, the grey and the grid under it
   function labOwn(){
-    pixOn(false); keyLight(false); AP.pixK = 0; greyAt(0); underOn(true);
+    pixOn(false); AP.pixK = 0; greyAt(0); underOn(true);   // (the sun stays on it: a change of light restarts the lab's picture, a flicker)
   }
   function labOwnOff(){
-    underOn(false);
+    underOn(false); keyLight(false);
     const w = labWin(); if (w){ const e = w.document.getElementById('stBgGame'); if (e) e.remove(); if (AP.bd0){ w.PodContext.backdrop = AP.bd0; AP.bd0 = null; } const B = labB(); if (B) B.needs = true; }
   }
   // under the lab's frame (it is see-through round the flat): plain grey, and on it the hologram grid

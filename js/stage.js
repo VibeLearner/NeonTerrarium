@@ -774,7 +774,15 @@ const PLAY = (() => {
     R.render = function (sc, c){
       if (sc === B.sc && c && c.isCamera && !P.busy) P.cam = c;   // (the camera it draws the flat with: the hologram's own while it flies)
       const r = prev.call(this, sc, c);
-      if (AP.bg && AP.punch && !P.busy && sc !== qs && R.getRenderTarget() === null) safe('depth pass', () => {
+      if (AP.pix && !P.busy && sc !== qs && R.getRenderTarget() === null) safe('pixels', () => pixCopy(R.domElement));
+      return r;
+    };
+    // the depth pass on the room's own picture, before the lab lays its hologram over it (PodContext.overlay comes last in each of its frames): the
+    // hologram stays over everything, and the street's things in front of the flat are in front of it from the first moment it shows
+    const PCo = w.PodContext, ov0 = PCo.overlay;
+    PCo.overlay = function (R2, cam2){ punch(); return ov0.call(this, R2, cam2); };
+    function punch(){
+      if (AP.bg && AP.punch && !P.busy) safe('depth pass', () => {
         P.busy = true; const save = { ac: R.autoClear, ca: R.getClearAlpha(), cc: R.getClearColor(P.cc).clone() };
         try {
           const s = R.getDrawingBufferSize(P.v2); for (const t of [P.a, P.b]) if (t.width !== s.x || t.height !== s.y) t.setSize(s.x, s.y);
@@ -789,9 +797,7 @@ const PLAY = (() => {
           R.setRenderTarget(null); R.autoClear = false; prev.call(R, qs, P.qc);
         } finally { R.setRenderTarget(null); R.autoClear = save.ac; R.setClearColor(save.cc, save.ca); P.busy = false; }
       });
-      if (AP.pix && !P.busy && sc !== qs && R.getRenderTarget() === null) safe('pixels', () => pixCopy(R.domElement));
-      return r;
-    };
+    }
   }
   function dropsHide(B){
     if (AP.hid) return; const A = SC_.apartment;

@@ -202,7 +202,8 @@ const PLAY = (() => {
         const k = keyed(D.keys.map(q => [q[0], q[1], q[7]]), G.t);
         // keys [t, x, y, z, yaw, light, red, easing]: each value eased to the next key
         const v = j => keyed(D.keys.map(q => [q[0], q[j], q[7]]), G.t);
-        return { x: v(1), y: v(2), z: v(3), yaw: v(4), light: v(5), red: v(6) };
+        const y = v(2); if (y > rest.y + .05) d.st.spin = 1;   // (its rotors at full speed whenever it is off its pad: mega.js spins them only for a drone not resting, and a scripted one never leaves 'rest')
+        return { x: v(1), y, z: v(3), yaw: v(4), light: v(5), red: v(6) };
       };
     }));
   }
@@ -458,6 +459,9 @@ const PLAY = (() => {
     // the lab stops its own frame loop when it thinks nothing is changing (or it is warming up behind the city): while the apartment is on, it draws every frame
     if (B && B.on && !B.raf) safe('lab loop', () => { const PB = w.PodBuilder; if (B.warmHold && PB.warmHold) PB.warmHold(false); if (!B.raf && PB.pauseRender) PB.pauseRender(false); if (!B.raf) warn('apartment', 'the lab loop would not start'); });
     const D_ = PC._debug.DUR || 3.05, st = PC._debug.state(), live = ov && ov.classList.contains('live');
+    // the pieces that are set down later, hidden the moment the home is built: before the lab works out its light, so it never lights the room with
+    // them in it (a lamp hidden after that lit the wardrobe, then left it dark, then lit it again as it came back)
+    if (!AP.hid && B && B.inst && B.inst.size && !safe('pending', () => w.PodBuilder.homePending())) dropsHide(B);
     if ((G.frame % 60 === 0 && AP.repF !== G.frame) || !AP.told){ AP.told = true; AP.repF = G.frame; safe('lab report', () => labReport(t, st, B, w, ov)); }
     // (held: the clock steps on, no frame is drawn or captured. Capped by real time, not steps: a fast machine takes many more steps a second)
     const wait = why => { AP.heldN++; if (AP.held0 == null) AP.held0 = Date.now(); if (Date.now() - AP.held0 > 240e3){ if (!AP.gaveUp){ AP.gaveUp = true; warn('apartment', 'waited 4 min for the lab (' + why + '): going on'); } return false; }
@@ -477,7 +481,7 @@ const PLAY = (() => {
             S0.w = 2*zoom*(innerWidth/Math.max(1, innerHeight))*(3/.95); S0.exact = true; }
           if (!AP.picked && B){ AP.picked = true;   // the lab's camera as the script has it (the whole flat in the frame), and the pieces that are set down later, hidden for now
             if (A.labZoom){ B.zoom = A.labZoom; B.camDirty = true; } if (A.labPan){ B.tx = A.labPan[0]; B.tz = A.labPan[1]; B.camDirty = true; }
-            for (const d of A.drops || []){ const i = B.inst.get(d.id); if (i && i.pivot){ AP.hidden.push({ i, y: i.pivot.position.y, t: A.room + d.at }); i.pivot.visible = false; } else warn('apartment', 'no piece ' + d.id); } }
+            dropsHide(B); }
         }
         PC._debug.hold(u);
       }
@@ -543,6 +547,11 @@ const PLAY = (() => {
     g.fillStyle = 'rgba(56,232,224,.35)'; g.fillRect(fs*2, fs*4.9, fs*14, 3); g.fillStyle = 'rgba(160,255,250,.95)'; g.fillRect(fs*2, fs*4.9, fs*14*pct/100, 3);
     g.textAlign = 'right'; g.fillStyle = 'rgba(160,255,250,.8)'; g.fillText('LIDAR > RGB  PASS 2/2', W - fs*2, H - fs*3.2); g.textAlign = 'left'; g.globalAlpha = 1;
     fr.style.clipPath = "path('" + (keep.length ? keep.join('') : 'M0 0z') + "')"; R.last = 'on';   // (a clip, not an image mask: applied the same frame, nothing to decode)
+  }
+  function dropsHide(B){
+    if (AP.hid) return; AP.hid = true; const A = SC_.apartment;
+    for (const d of A.drops || []){ const i = B.inst.get(d.id); if (i && i.pivot){ AP.hidden.push({ i, y: i.pivot.position.y, t: A.room + d.at }); i.pivot.visible = false; } else warn('apartment', 'no piece ' + d.id); }
+    safe('relight', () => { B.needs = true; const PR = labWin().PodRender; if (PR && PR.sceneChanged){ PR.sceneChanged('geometry', null); PR.sceneChanged('light', null); } });   // (the lab told its scene changed: light worked out again without them)
   }
   function aptEnd(why){
     safe('reveal end', () => { if (FURN.frame) FURN.frame.style.clipPath = ''; if (E.rv){ E.rv.fx.getContext('2d').clearRect(0, 0, E.rv.fx.width, E.rv.fx.height); } });

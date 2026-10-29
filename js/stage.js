@@ -357,7 +357,7 @@ const PLAY = (() => {
     document.getElementById('monName').textContent = M.name; document.getElementById('monSub').textContent = M.sub;
     const n = M.log.filter(l => t >= l[0]).length;
     if (n !== MONI.shownLog){ MONI.shownLog = n; const body = document.getElementById('monBody');
-      body.innerHTML = n ? M.log.slice(0, n).map(([, stamp, text]) => '<div class="ml reveal"><time>' + esc(stamp) + '</time><span>' + esc(text) + '</span></div>').join('') : '<p class="mon-empty">Nothing logged yet.</p>';
+      body.innerHTML = n ? M.log.slice(0, n).map(([, stamp, text]) => '<div class="ml reveal"><time>' + esc(stamp) + '</time><span>' + esc(text) + '</span></div>').join('') : '';
       body.scrollTop = body.scrollHeight; }
     // the feed: a camera of its own over the person, at the angle written for it
     const q = G.poseOf(M.actor); if (!q) return;

@@ -13,17 +13,24 @@ const FURN = (() => {
   // F.lightCity = false sends the city as before (full detail to 46, clustered beyond) to compare.
   const SAVE_KEY = 'neonIsland.furnish', NEAR = 18, MID = 60, CG = .22, CG_FAR = .9, PAGE = 'furnish.html?v=2026-10-25w';
   const btn = document.getElementById('furnBtn'), hint = document.getElementById('modeHint');
-  // The LIDAR Array unlocks Furnish pod (mega.js): the button shows once one has arrived, and only the homes in an array's range
+  // The LIDAR Array unlocks Scan pod (mega.js): the button shows once the array is unlocked, greyed out while none stands, and only the homes in an array's range
   // can be picked. What the card shows of who lives there is what has been learned (lidar.js: the scan, the person cam, a trace
   // home). #dev keeps it as it was: always there, every pod, the whole household.
   const DEV = location.hash.includes('dev');
   const hasArray = () => DEV || (typeof megasOfKind === 'function' && megasOfKind('lidar').length > 0);
   const inRange = r => DEV || (typeof lidarCovers === 'function' && lidarCovers(r.x, r.z));
   (function gate(){
-    const show = () => { const on = DEV || (typeof megaUnlockedKinds !== 'undefined' && megaUnlockedKinds.has('lidar')) || hasArray(); if (btn.hidden === on) btn.hidden = !on; };
+    const OK_TITLE = 'Scan a pod of a residential or luxury building in LIDAR range, and do up the apartment the scan reconstructs',
+      NO_TITLE = 'Needs a LIDAR Array standing: place one from the Buildings menu';
+    const show = () => {
+      const on = DEV || (typeof megaUnlockedKinds !== 'undefined' && megaUnlockedKinds.has('lidar')) || hasArray(); if (btn.hidden === on) btn.hidden = !on;
+      const live = hasArray();   // (unlocked but none standing, after the last one is cleared: greyed out, and picking stops)
+      if (btn.classList.contains('off') === live){ btn.classList.toggle('off', !live); btn.setAttribute('aria-disabled', !live); btn.title = live ? OK_TITLE : NO_TITLE; }
+      if (!live && F.pick) setPick(false);
+    };
     show(); setInterval(show, 1000);
     {   // (it's a scan of the pod, and the apartment a reconstruction from it; #dev too, which only skips needing an array in range)
-      btn.textContent = 'Scan pod'; btn.title = 'Scan a pod of a residential or luxury building in LIDAR range, and do up the apartment the scan reconstructs';
+      btn.textContent = 'Scan pod';
       for (const dt of document.querySelectorAll('dt')) if (dt.textContent === 'Furnish pod'){ dt.textContent = 'Scan pod'; if (dt.nextElementSibling) dt.nextElementSibling.textContent = 'Pick a pod (scroll or Up / Down), click to scan it'; }
     }
   })();

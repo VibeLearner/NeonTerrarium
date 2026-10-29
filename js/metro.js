@@ -168,7 +168,10 @@ function mtTargetAt(pk){
         l.tiles.push({ i, j }); const fits = [1, -1].some(sd => mtLiftOK(l, 0, sd)); l.tiles.pop();   // (tried with the plot added, then put back)
         if (!fits) why = 'the first station\'s lift has no room if the line goes this way';
       }
-      return { type: 'extend', l, i, j, ok: !why, why };
+      // (a plot beside the first station: a word on looping, as only the plot behind it closes a loop)
+      let note = '';
+      if (!why && n >= 3 && mtAdj(l.tiles[0], at)) note = mtLoopIn(l, i, j) ? 'next, click the first station to close the loop' : 'this comes in beside the first station from the side: a loop can only be closed from behind it';
+      return { type: 'extend', l, i, j, ok: !why, why, note };
     }
     // next to its first station (the other way from the line): the line carried on from there, the new plot its first station now
     // (the old first station, right beside the new one, turns to plain track: two stations can't stand side by side)
@@ -187,7 +190,9 @@ function mtTargetAt(pk){
 // Another line's end: joining the two (the line being built, if it's one of them, is the one that carries on)
 function mtJoinTarget(B, kB){
   const nB = B.tiles.length, tB = B.tiles[kB];
-  if (nB >= 4){ const o = kB === 0 ? nB - 1 : 0; if (mtAdj(B.tiles[o], tB)) return mtLoopTarget(B); }
+  if (nB >= 4){ const o = kB === 0 ? nB - 1 : 0; if (mtAdj(B.tiles[o], tB)){ const lp = mtLoopTarget(B);
+    // (its end beside the first station but come in from the side: no loop, so a click on that end still finishes the line there, or joins another line's end)
+    if (lp.ok || lp.why !== MT_LOOP_SIDE || kB === 0 || B.done) return lp; } }
   const c = [];
   for (const A of metros){ if (A === B || A.loop) continue; const nA = A.tiles.length;
     if (mtAdj(A.tiles[nA - 1], tB)) c.push({ A, aEnd: 'last' }); else if (nA > 1 && mtAdj(A.tiles[0], tB)) c.push({ A, aEnd: 'first' }); }
@@ -201,11 +206,15 @@ function mtJoinTarget(B, kB){
   const lost = [...keys].filter(q => !mtStationKeys(tmp).has(q)).length;
   return { type: 'join', l: A, A, aEnd, B, bEnd, k: kB, lost, ok: true, why: '' };
 }
-// the line's open end run into its first station, straight on: a loop. It needs a second station (a loop of one station goes nowhere)
+// the line's open end run into its first station, straight on: a loop. Only from behind the first station, the opposite way from where the line leaves it:
+// from the side, the track would have to turn on the station's plot, and stations stand on straight track. It needs a second station (a loop of one station goes nowhere)
+const MT_LOOP_SIDE = 'to close the loop, come into the first station from behind, the opposite way from where the line leaves it: not from the side';
+// is (i, j) the plot right behind line l's first station, where a loop comes in?
+const mtLoopIn = (l, i, j) => { const t0 = l.tiles[0], t1 = l.tiles[1]; return !!t1 && i === 2*t0.i - t1.i && j === 2*t0.j - t1.j; };
 function mtLoopTarget(l){
-  const n = l.tiles.length, e = l.tiles[n - 1], t0 = l.tiles[0], t1 = l.tiles[1];
+  const n = l.tiles.length, e = l.tiles[n - 1];
   let why = '';
-  if (t0.i - e.i !== t1.i - t0.i || t0.j - e.j !== t1.j - t0.j) why = 'to close the loop, run the line straight into the first station';
+  if (!mtLoopIn(l, e.i, e.j)) why = MT_LOOP_SIDE;
   const tmp = { tiles: [], st: [], sides: {} }; mtReshape(tmp, l.tiles, mtStationKeys(l), new Map(), true);
   if (!why && mtStops(tmp).length < 2) why = 'a loop needs a second station: add one along the line first';
   return { type: 'loop', l, k: 0, ok: !why, why };
@@ -836,7 +845,7 @@ function mtShowGhost(t){
 let mtLastPt = null;
 function mtHover(cx, cy){ mtLastPt = { x: cx, y: cy }; const t = mtTargetAt(mtPick(cx, cy)); mtShowGhost(t);
   const say = !t ? '' : !t.ok ? t.why : t.type === 'loop' ? 'click to close the loop: the train will go round and round'
-    : t.type === 'join' ? 'click to join the two lines into one' + (t.lost ? ' (a station right beside another becomes plain track)' : '') : '';
+    : t.type === 'join' ? 'click to join the two lines into one' + (t.lost ? ' (a station right beside another becomes plain track)' : '') : t.note || '';
   const el = $('modeHint'); el.textContent = say || ''; el.hidden = !say; }
 function mtClick(cx, cy){ const t = mtTargetAt(mtPick(cx, cy)); if (mtApply(t)) mtHover(cx, cy); }
 function mtRightClick(cx, cy){ const pk = mtPick(cx, cy); if (pk && pk.kind === 'mtTile'){ mtCutAt(pk.l, pk.k); mtHover(cx, cy); } }

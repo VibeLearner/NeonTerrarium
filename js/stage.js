@@ -445,6 +445,8 @@ const PLAY = (() => {
   const H0 = .3, holoCurve = x => { x = clamp01(x); return .55*x + .45*ss5(x); };
   function aptTick(t){
     const A = SC_ && SC_.apartment; if (!A || AP.closed || t < A.open) return;
+    // (the lab's room merges off for the film: a merge built while the pieces set down later were hidden could take them in and draw them all along)
+    if (!AP.on) safe('lab options', () => { const w0 = labWin(); if (w0) w0.__prAB = Object.assign({}, w0.__prAB || {}, { l2Merge: false }); });
     if (!AP.on){ AP.on = !!safe('open', () => FURN.openKey(A.pod)); if (!AP.on){ warn('apartment', 'did not open ' + A.pod); AP.closed = true; return; } say('apartment', A.pod); }
     const ov = document.getElementById('furnish'), fr = FURN.frame, PC = labPC(), B = labB(), w = labWin();
     if (!fr || !PC || !PC._debug) return aptEnd('the lab went away');
@@ -491,6 +493,8 @@ const PLAY = (() => {
             dropsHide(B); }
         }
         PC._debug.hold(u);
+        // the real city under the hologram for its last stretch, so it comes out of the hologram straight into the real street (never the lab's grey stand-in)
+        if (!AP.bgDone && AP.picked && t >= A.room - BG_IN){ AP.bgDone = true; safe('real city', () => bgGame(true, st, B, w)); }
       }
       fr.style.opacity = String(ss((t - A.open)/.6));
       return;
@@ -500,14 +504,18 @@ const PLAY = (() => {
       if (PC.transitioning && wait('the hologram to end')) return;
       if (!AP.roomOk){ const lw = labWait(); if (lw && wait('the room: ' + lw)) return; AP.roomOk = true; }
       fr.style.opacity = '1';
-      if (!AP.bg && !AP.bgDone){ AP.bgDone = true; safe('veil', () => veilFrom(B)); AP.bgT0 = t; safe('real city', () => bgGame(true, st, B, w)); }
-      safe('veil', () => veilAt(1 - ss((t - AP.bgT0)/.9)));   // (the lab's stand-in city fading into the real one: the same view, so only the look changes)
+      if (!AP.bg && !AP.bgDone){ AP.bgDone = true; safe('real city', () => bgGame(true, st, B, w)); }
+      AP.punch = true;   // (the depth pass only on the room itself: the hologram has its own camera)
+      // the camera in on the flat while the pieces are set down: the lab's zoom eased up, the game's matched to it (an orthographic view: the width shown goes as 1/zoom)
+      if (AP.bg && B && AP.z0){ const u = ss(clamp01((t - A.room - .3)/Math.max(.1, A.unroom - A.room - .6))), z = AP.z0 + ((A.labZoomIn || AP.z0*1.6) - AP.z0)*u;
+        if (Math.abs(B.zoom - z) > 1e-6){ B.zoom = z; B.camDirty = true; B.needs = true; } AP.camM.zoom = AP.camZ0*AP.z0/z; }
       for (const d of AP.hidden){ const u = (t - d.t)/.75; d.i.pivot.visible = u >= 0; if (u < 0) continue; const e = 1 - Math.pow(1 - Math.min(1, u), 3); d.i.pivot.position.y = d.y + .45*(1 - e); }
       return;
     }
     if (t < A.back){   // the hologram flies back out, to the game's view as it was left
       for (const d of AP.hidden){ d.i.pivot.visible = true; d.i.pivot.position.y = d.y; }
       if (AP.bg && t >= A.unroom + BG_OUT) safe('real city off', () => bgGame(false));   // (the hologram drawn over the real city first, then the lab's own city under it once the hologram covers it)
+      AP.punch = false;
       if (!AP.rev){ AP.rev = true;
         safe('holo frame', () => { const S0 = st && st.city && st.city.holoStart; if (S0 && AP.cityW){ S0.w = AP.cityW; S0.exact = true; } });   // (out to the whole city again: the framing the game camera takes behind it)
         if (st && !st.trans){ st.trans = { t0: performance.now(), vt: D_ - .01, last: performance.now(), drift: 0, gate: false, rm: false, frames: [], onDone: null, resolve(){}, skipped: false, lhDone: true, hold: D_ - .01 }; PC.transitioning = true; }
@@ -568,7 +576,7 @@ const PLAY = (() => {
       w = w || labWin(); B = B || labB(); st = st || labPC()._debug.state(); const city = st && st.city; if (!w || !B || !B.cam || !city || !city.M) return;
       const Mi = city.M.clone().invert(), cam = B.cam; cam.updateMatrixWorld(); const d = cam.getWorldDirection(new THREE.Vector3());
       const tg = cam.position.clone().add(d.clone().multiplyScalar(24)).applyMatrix4(Mi), dg = d.clone().transformDirection(Mi), sc = Math.hypot(city.M.elements[0], city.M.elements[8]);
-      AP.camM = { x: tg.x, y: tg.y, z: tg.z, yaw: Math.atan2(-dg.x, -dg.z), pitch: Math.asin(-dg.y), zoom: (cam.top - cam.bottom)/2/cam.zoom/sc };
+      AP.camM = { x: tg.x, y: tg.y, z: tg.z, yaw: Math.atan2(-dg.x, -dg.z), pitch: Math.asin(-dg.y), zoom: (cam.top - cam.bottom)/2/cam.zoom/sc }; AP.camZ0 = AP.camM.zoom; AP.z0 = B.zoom;
       const dc = w.document; if (!dc.getElementById('stBgGame')){ const e = dc.createElement('style'); e.id = 'stBgGame'; e.textContent = 'html,body,#bStage{background:transparent!important}#bSky{visibility:hidden!important}'; dc.head.appendChild(e); }
       const PC = w.PodContext; if (!AP.bd0){ AP.bd0 = PC.backdrop; PC.backdrop = () => null; }
       homeHide(true); FURN.hold = false; punchOn(w, B, city); AP.bg = true; B.needs = true;
@@ -579,14 +587,7 @@ const PLAY = (() => {
       const w2 = labWin(); if (w2){ const e = w2.document.getElementById('stBgGame'); if (e) e.remove(); if (AP.bd0){ w2.PodContext.backdrop = AP.bd0; AP.bd0 = null; } const B2 = labB(); if (B2) B2.needs = true; }
     }
   }
-  // the veil: the lab's last picture before the real city comes in (its stand-in city around the flat), between the game and the lab, fading out
-  const BG_OUT = .9;
-  function veilFrom(B){
-    const src = B && B.dr && B.dr.domElement; if (!src) return; let v = document.getElementById('stVeil');
-    if (!v){ v = document.createElement('canvas'); v.id = 'stVeil'; v.className = 'tr-keep'; v.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:49'; document.body.appendChild(v); }
-    v.width = src.width; v.height = src.height; v.getContext('2d').drawImage(src, 0, 0); v.style.opacity = '1'; v.style.display = '';
-  }
-  function veilAt(a){ const v = document.getElementById('stVeil'); if (!v) return; if (a <= 0){ v.style.display = 'none'; return; } v.style.display = ''; v.style.opacity = a.toFixed(4); }
+  const BG_OUT = .9, BG_IN = .9;   // (the real city brought in under the hologram this long before it ends, and kept under it this long as it goes)
   function homeHide(on){
     const A = SC_.apartment, k = String(A.pod).split('|')[0].split(',').map(Number), c = cells.get(ckey(k[0], k[1])); if (!c) return warn('apartment', 'no home plot ' + k);
     if (on){ if (AP.hh) return; const h = AP.hh = { pcs: [], mem: [], fol: [], g: c.group ? c.group.visible : null, v: c.view ? c.view.visible : null };
@@ -623,7 +624,7 @@ const PLAY = (() => {
     const prev = R.render;
     R.render = function (sc, c){
       const r = prev.call(this, sc, c);
-      if (AP.bg && !P.busy && sc !== qs && R.getRenderTarget() === null) safe('depth pass', () => {
+      if (AP.bg && AP.punch && !P.busy && sc !== qs && R.getRenderTarget() === null) safe('depth pass', () => {
         P.busy = true; const save = { ac: R.autoClear, ca: R.getClearAlpha(), cc: R.getClearColor(P.cc).clone() };
         try {
           const s = R.getDrawingBufferSize(P.v2); for (const t of [P.a, P.b]) if (t.width !== s.x || t.height !== s.y) t.setSize(s.x, s.y);
@@ -645,7 +646,7 @@ const PLAY = (() => {
   }
   function aptEnd(why){
     safe('reveal end', () => { if (FURN.frame) FURN.frame.style.clipPath = ''; if (E.rv){ E.rv.fx.getContext('2d').clearRect(0, 0, E.rv.fx.width, E.rv.fx.height); } });
-    if (AP.bg) safe('real city off', () => bgGame(false)); safe('veil', () => veilAt(0));
+    if (AP.bg) safe('real city off', () => bgGame(false));
     if (AP.closed) return; AP.closed = true;
     if (why) warn('apartment', why);
     safe('close', () => { const PC = labPC(), st = PC && PC._debug && PC._debug.state(); if (st && st.trans){ st.trans = null; PC.transitioning = false; }

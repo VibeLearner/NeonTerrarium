@@ -846,7 +846,7 @@ const PLAY = (() => {
     if (rendered){ if (G.redraw) G.redraw = false; else G.frame++; rendered = false; }
     prep();
   }
-  const PAUSE = ((/[&#]pauseat=([\d.,]+)/.exec(location.hash) || [])[1] || '').split(',').filter(Boolean).map(Number); window.__stageGo = () => { PAUSE.go = true; };
+  const PAUSE = ((/[&#]pauseat=([-\d.,]+)/.exec(location.hash) || [])[1] || '').split(',').filter(Boolean).map(Number); window.__stageGo = () => { PAUSE.go = true; };
   function prep(){
     const t = G.t = G.frame/FPS - PRE;   // (the script's time: it starts PRE seconds in, after the empty sky)
     G.held = false;

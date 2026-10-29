@@ -48,7 +48,7 @@ const TOUCH = (() => {
       if (c){ c.textContent = T.on ? '?' : 'Hover for controls'; if (T.on){ c.setAttribute('role', 'button'); c.setAttribute('aria-label', 'Controls'); } else { c.removeAttribute('role'); c.removeAttribute('aria-label'); } }
       if (hint && T.on){ const w = words(hint.textContent); if (w !== hint.textContent) hint.textContent = w; }
       const cb = $('puCityBtn'); if (cb) cb.textContent = T.on ? 'City' : 'City settings';   // (shorter labels in the dock)
-      const fb = $('furnBtn'); if (fb) fb.textContent = T.on ? 'Furnish' : 'Furnish pod';
+      const fb = $('furnBtn'); if (fb) fb.textContent = T.on ? 'Scan' : 'Scan pod';   // (it's Scan pod: furnish.js)
       if (T.on) flash(); else if (hint){ clearTimeout(fadeT); hint.classList.remove('tfade'); }
     };
 

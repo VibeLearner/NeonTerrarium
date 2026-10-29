@@ -344,7 +344,7 @@ const PLAY = (() => {
   const NEON = [[0, 0], [.05, 1], [.09, .15], [.15, 1], [.22, .35], [.27, 1], [.4, .7], [.46, 1]];
   const neonAt = u => { if (u < 0) return 0; let v = 0; for (const [k, a] of NEON) if (u >= k) v = a; return v; };
   function paint(t){
-    E.black.style.opacity = String(t < 0 ? 1 - ss(clamp01((t + PRE)/1)) : (keyed(SC_.black, t) ?? 0));   // (from black over the first second of the empty sky)
+    E.black.style.opacity = String(t < 0 ? 0 : (keyed(SC_.black, t) ?? 0));   // (the empty sky from the first frame, no fade)
     const T = SC_.title; if (T && E.tNeon){ E.tNeon.style.opacity = String(neonAt(t - T.neon)); E.tTerr.style.opacity = String(neonAt(t - T.terrarium)); }
     const B = (SC_.brackets || []).find(([a, b]) => t >= a && t < b); brackets(B ? G.poseOf(B[2]) : null);
   }

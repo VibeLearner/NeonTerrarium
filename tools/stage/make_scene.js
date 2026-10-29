@@ -307,7 +307,8 @@ C(OUT.t0 + OUT.dur, OUTP, 'ease');
 C(TITLE.t0 + TITLE.dur, Object.assign({}, OUTP, { yaw: r3(OUTP.yaw - .08) }));
 // the hour: morning held through the build, the garden and the apartment; golden hour from when the hologram starts back out (behind it) to the
 // train pulling out; night by the end of its run
-const hour = [[0, 10], [r3(MK.unroom), 10], [r3(MK.unroom + .01), 17.2, 'hold'], [r3(T.depart + .4), 17.2], [r3(T.arrive - .2), 22.2, 'ss']];
+const hour = [[0, 10], [r3(MK.unroom + 2), 10], [r3(MK.unroom + 2.01), 17.2, 'hold'],   // (+2: the real city has left the screen by then and the hologram covers it whole)
+  [r3(T.depart + .4), 17.2], [r3(T.arrive - .2), 22.2, 'ss']];
 // the lights: as the hour has them until the ride, off for the ride, then on one by one as the camera pulls back
 const lights = [[0, null], [r3(T.depart + 2), null], [r3(T.depart + 2.01), 0, 'hold'], [r3(OUT.t0 + 1.5), 0], [r3(OUT.t0 + 1.5 + 1/.11), 1]];
 const weather = [[r3(lerp(T.depart, T.arrive, .45)), 'rain', 6]];
@@ -327,7 +328,7 @@ const doors = [[HOME.door.key, [[0, 0], [r3(MK.atDoor - .1), 0], [r3(MK.atDoor +
 // the flat looked at from its far side towards the garden (the camera on the home's side, the lawn beyond it): the world yaw the game camera would
 // have for that (camera at target + (sin yaw, cos yaw)), which the stage turns into the lab's angle
 const HX = HOME.cell[0]*LOT, HZ = HOME.cell[1]*LOT, LAB_YAW = r3(Math.atan2(HX - GC.x, HZ - GC.z) - 1.06);   // (-1.06: from the street side, the one way in clear of the towers to its south, the lawn behind it)
-const apartment = APT ? Object.assign({ pod: HOME.pod, open: r3(MK.open), room: r3(MK.room), unroom: r3(MK.unroom), back: r3(MK.back), fade: .8, labYaw: LAB_YAW, labPitch: 60, labZoomMatched: .8, labZoomIn: 1.4 }, APT) : null;
+const apartment = APT ? Object.assign({ pod: HOME.pod, open: r3(MK.open), room: r3(MK.room), unroom: r3(MK.unroom), back: r3(MK.back), fade: .8, labYaw: LAB_YAW, labPitch: 60, labZoomMatched: .8, labZoomIn: 1.4, zoomFor: 1.4, dropsAfter: 1.5, dropsScale: .8 }, APT) : null;
 const end = r3(TITLE.t0 + TITLE.dur);
 
 const J = v => JSON.stringify(v);

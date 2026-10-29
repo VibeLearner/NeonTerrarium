@@ -270,7 +270,7 @@ const PLAY = (() => {
         window.FILM_SH_HALF = keyed(SC_ && SC_.shadowBox, G.t) || 0;
       });
       const r = _uc(dt);
-      if (rolling){ safe('paint', () => paint(G.t)); safe('monitor', () => monFrame(G.t)); if (AP.bg) safe('tilt', tiltAt); }   // (after the camera is placed: the brackets follow the person on screen, the feed draws this frame's people)
+      if (rolling){ safe('paint', () => paint(G.t)); safe('monitor', () => monFrame(G.t)); if (AP.bg) safe('tilt', tiltAt); safe('near', nearClip); }   // (after the camera is placed: the brackets follow the person on screen, the feed draws this frame's people)
       return r;
     }; }
 
@@ -509,7 +509,8 @@ const PLAY = (() => {
       AP.punch = true;   // (the depth pass only on the room itself: the hologram has its own camera)
       if (AP.bg){ safe('sun', () => keyLight(true)); }
       // the camera in on the flat while the pieces are set down: the lab's zoom eased up, the game's matched to it (an orthographic view: the width shown goes as 1/zoom)
-      if (AP.bg && B && AP.z0){ const u = ss(clamp01((t - A.room - .3)/Math.max(.1, A.unroom - A.room - .6))), z = AP.z0 + ((A.labZoomIn || AP.z0*1.6) - AP.z0)*u;
+      // first the camera goes in, past what stands in front of the flat (the near clip follows the zoom: it reads as the camera moving through them), then the furnishing
+      if (AP.bg && B && AP.z0){ const u = ss(clamp01((t - A.room)/(A.zoomFor || 1.4))), z = AP.z0 + ((A.labZoomIn || AP.z0*1.6) - AP.z0)*u; AP.nearK = u;
         if (Math.abs(B.zoom - z) > 1e-6){ B.zoom = z; B.camDirty = true; B.needs = true; } AP.camM.zoom = AP.camZ0*AP.z0/z; }
       for (const d of AP.hidden){ const u = (t - d.t)/.75; d.i.pivot.visible = u >= 0; if (u < 0) continue; const e = 1 - Math.pow(1 - Math.min(1, u), 3); d.i.pivot.position.y = d.y + .45*(1 - e); }
       return;
@@ -582,10 +583,10 @@ const PLAY = (() => {
       const dc = w.document; if (!dc.getElementById('stBgGame')){ const e = dc.createElement('style'); e.id = 'stBgGame'; e.textContent = 'html,body,#bStage{background:transparent!important}#bSky{visibility:hidden!important}'; dc.head.appendChild(e); }
       const PC = w.PodContext; if (!AP.bd0){ AP.bd0 = PC.backdrop; PC.backdrop = () => null; }
       AP.home = city.home; homeHide(true); FURN.hold = false; punchOn(w, B, city); AP.bg = true; B.needs = true;
-      AP.home = city.home; pixOn(true); tiltOn(true);
+      AP.home = city.home; pixOn(true); tiltOn(true); AP.ppl = [pplMesh.visible, ddMesh.visible]; pplMesh.visible = ddMesh.visible = false;   // (no one about while the flat is shown)
       say('apartment: the real city behind the flat', JSON.stringify(AP.camM));
     } else {
-      AP.bg = false; AP.camM = null; homeHide(false); pixOn(false); tiltOn(false); keyLight(false);
+      AP.bg = false; AP.camM = null; AP.nearK = 0; nearClip(); homeHide(false); pixOn(false); tiltOn(false); keyLight(false); if (AP.ppl){ pplMesh.visible = AP.ppl[0]; ddMesh.visible = AP.ppl[1]; AP.ppl = null; }
       const w2 = labWin(); if (w2){ const e = w2.document.getElementById('stBgGame'); if (e) e.remove(); if (AP.bd0){ w2.PodContext.backdrop = AP.bd0; AP.bd0 = null; } const B2 = labB(); if (B2) B2.needs = true; }
     }
   }
@@ -636,6 +637,18 @@ const PLAY = (() => {
       e.style.backdropFilter = f; e.style.webkitBackdropFilter = f; e.style.maskImage = m; e.style.webkitMaskImage = m; };
     set('stTilt1', Hh*.0018, pad, ramp); set('stTilt2', Hh*.0018, pad + ramp*.9, ramp*1.4);   // (two layers: the second adds to the first further out)
   }
+  // the near clip: as the camera goes in, everything nearer the camera than the flat's front is cut away (the game's camera, and the lab's copy of the
+  // city in the depth pass, the same way), from 8 units in front of it to a quarter unit
+  const nearOf = (pos, dir, M) => { const h = AP.home; if (!h) return null; const fp = h.fp || { w: 1.3, d: 2.2, ry: 0 }, c = Math.cos(fp.ry || 0), s = Math.sin(fp.ry || 0), p = new THREE.Vector3(); let mn = 1e9;
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) for (const y of [0, 1]){ const lx = sx*fp.w/2, lz = sz*fp.d/2; p.set(h.x + lx*c + lz*s, y, h.z - lx*s + lz*c); if (M) p.applyMatrix4(M); mn = Math.min(mn, p.sub(pos).dot(dir)); }
+    return mn; };
+  const NEAR_FROM = 8, NEAR_TO = .25;
+  function nearClip(){
+    if (AP.bg && AP.nearK > 0){ const dir = cam.getWorldDirection(new THREE.Vector3()), f = nearOf(cam.position, dir); if (f === null) return;
+      if (AP.sc0 === undefined){ AP.sc0 = SC.mode; SC.mode = 'off'; }   // (the static cache draws with its own camera and the usual near plane: the frame drawn the old way meanwhile)
+      cam.near = Math.max(NEAR, f - (NEAR_FROM + (NEAR_TO - NEAR_FROM)*AP.nearK)); cam.updateProjectionMatrix(); AP.nearOn = true; }
+    else if (AP.nearOn){ AP.nearOn = false; cam.near = NEAR; cam.updateProjectionMatrix(); if (AP.sc0 !== undefined){ SC.mode = AP.sc0; AP.sc0 = undefined; } }
+  }
   function homeHide(on){
     const A = SC_.apartment, k = String(A.pod).split('|')[0].split(',').map(Number), c = cells.get(ckey(k[0], k[1])); if (!c) return warn('apartment', 'no home plot ' + k);
     if (on){ if (AP.hh) return; const h = AP.hh = { pcs: [], mem: [], fol: [], g: c.group ? c.group.visible : null, v: c.view ? c.view.visible : null };
@@ -684,7 +697,10 @@ const PLAY = (() => {
         P.busy = true; const save = { ac: R.autoClear, ca: R.getClearAlpha(), cc: R.getClearColor(P.cc).clone() };
         try {
           const s = R.getDrawingBufferSize(P.v2); for (const t of [P.a, P.b]) if (t.width !== s.x || t.height !== s.y) t.setSize(s.x, s.y);
-          const k = B.cam.clone(); k.near = -400; k.far = 400; k.updateProjectionMatrix(); k.updateMatrixWorld(true);
+          const k = B.cam.clone(); k.near = -400; k.far = 400; k.updateMatrixWorld(true);
+          if (AP.nearK > 0){ const kd = k.getWorldDirection(new w.THREE.Vector3()), f = nearOf(new THREE.Vector3().copy(k.position), new THREE.Vector3().copy(kd), city.M), sc = Math.hypot(city.M.elements[0], city.M.elements[8]);
+            if (f !== null) k.near = f - (NEAR_FROM + (NEAR_TO - NEAR_FROM)*AP.nearK)*sc; }
+          k.updateProjectionMatrix();
           const pass = (scene, tgt) => { const om = scene.overrideMaterial, bg = scene.background; scene.overrideMaterial = P.om; scene.background = null;
             try { R.setRenderTarget(tgt); R.autoClear = true; R.setClearColor(0, 0); R.clear(); prev.call(R, scene, k); } finally { scene.overrideMaterial = om; scene.background = bg; } };
           pass(city.sc, P.a); pass(B.sc, P.b);
@@ -701,7 +717,7 @@ const PLAY = (() => {
     // (only the script's own home: the lab can still hold the last home it built for a moment after the pod opens, and its pieces have the same numbers)
     const ps = A.recipe && A.recipe.pieces; if (ps && (B.inst.size !== ps.length || ps.some(p => { const i = B.inst.get(p.id); return !i || i.arch !== p.arch || i.seed !== p.seed; }))) return;
     AP.hid = true;
-    for (const d of A.drops || []){ const i = B.inst.get(d.id); if (i && i.pivot){ AP.hidden.push({ i, y: i.pivot.position.y, t: A.room + d.at }); i.pivot.visible = false; } else warn('apartment', 'no piece ' + d.id); }
+    for (const d of A.drops || []){ const i = B.inst.get(d.id); if (i && i.pivot){ AP.hidden.push({ i, y: i.pivot.position.y, t: A.room + (A.dropsAfter || 0) + d.at*(A.dropsScale || 1) }); i.pivot.visible = false; } else warn('apartment', 'no piece ' + d.id); }
     safe('relight', () => { B.needs = true; const PR = labWin().PodRender; if (PR && PR.sceneChanged){ PR.sceneChanged('geometry', null); PR.sceneChanged('light', null); } });   // (the lab told its scene changed: light worked out again without them)
   }
   function aptEnd(why){

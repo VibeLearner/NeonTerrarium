@@ -37,7 +37,7 @@ function recipeOf(c){
 // The lines the plots sit under. Not part of one plot's recipe (a line is long), a copy of the highways and metros as plain data, made when they change, and
 // the indexes over them (what hwAt and mtAt answer). recipeGen swaps these in for the live ones while it runs.
 // (only the fields the builders read: the rest of a line is its drawn geometry, its cars and trains, which refer back to the line)
-const LINE_KEYS = ['id', 'lanes', 'done', 'side', 'dir0', 'st', 'sides'];
+const LINE_KEYS = ['id', 'lanes', 'done', 'loop', 'side', 'dir0', 'st', 'sides'];
 const lineOf = o => { const r = {}; for (const k of LINE_KEYS) if (o[k] !== undefined) r[k] = structuredClone(o[k]); r.tiles = o.tiles.map(t => ({ i: t.i, j: t.j, L: t.L })); return r; };
 function recipeWorldOf(hw, mt){
   const hi = new Map(), mi = new Map();

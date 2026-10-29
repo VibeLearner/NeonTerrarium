@@ -99,7 +99,7 @@ const homeW = way(pr2.A[0], pr2.A[1], STAND[0], STAND[1]), HOME_V = .9, Lh = len
 MK.door = MK.leave2 + Lh/HOME_V + .5; MK.open = MK.door + .4;
 const APTT = { holo: 5.4, furn: 5.4, back: 5.4 };
 MK.room = MK.open + APTT.holo; MK.unroom = MK.room + APTT.furn; MK.back = MK.unroom + APTT.back; MK.garden = MK.back; MK.square = MK.garden + 6.5;
-const sh = MK.square - 33.5, MG = { walk0: 31 + sh, stop: 35.6 + sh, reach: 36.0 + sh, rob1: 37.6 + sh, alarm: 35.3 + sh, copsGo: 37.9 + sh, pass: 38.9 + sh };
+const sh = MK.square - 33.5, MG = { walk0: 31 + sh, stop: 35.6 + sh, reach: 36.0 + sh, rob1: 37.6 + sh, alarm: 35.3 + sh, copsGo: 35.8 + sh, pass: 38.9 + sh };
 console.log('MK', MK, 'MG', MG);
 
 const pr1 = pair('p1', null, s1, -.6, 0);
@@ -131,7 +131,7 @@ const m0n = nodeNear(VSTOP[0] + pp[0]*3.6 - tc[0]*.8, VSTOP[1] + pp[1]*3.6 - tc[
 const mp = route(m0n, nodeNear(VSTOP[0], VSTOP[1])), mL = lenOf(mp), RUN = 1.7, hitD = Math.max(0, mL - .42), MHIT = pointAt(mp, hitD), tStrike = MG.reach - hitD/RUN;
 const STN = P.line.stations.find(s => s.k === 0), CAB = P.line.cabs.find(c => c.k === 0);
 const fd = [MHIT[0] - CAB.x, MHIT[1] - CAB.z], fl = Math.hypot(fd[0], fd[1]);
-const flee = way(MHIT[0], MHIT[1], MHIT[0] + fd[0]/fl*13, MHIT[1] + fd[1]/fl*13), fL = lenOf(flee), FLEE_V = 1.6, fleeEnd = MG.rob1 + fL/FLEE_V;
+const flee = way(MHIT[0], MHIT[1], MHIT[0] + fd[0]/fl*18, MHIT[1] + fd[1]/fl*18), fL = lenOf(flee), FLEE_V = 1.6, fleeEnd = MG.rob1 + fL/FLEE_V;
 const VW = .5;
 { // the victim: across the square, stopped dead, robbed, then hurrying on the way they were going
   const k = []; const d0 = Math.max(0, dC - (MG.stop - (MK.garden - 1))*VW);
@@ -148,11 +148,21 @@ const MUG = { flee, fL, fleeEnd };
   const end = flee[flee.length - 1]; k.push(K(fleeEnd + .01, end[0], end[1], 'idle', -fd[0], -fd[1]));
   part('mugger', 'mugger', { shape: 'graphic buzz', skin: 1, hair: 0, top: 0, acc: 0, bot: 1 }, k, [[fleeEnd + .3, 'sweat', 2.5]]); }
 const PDOOR = P.doors.find(d => d.mega === 'police' && Math.abs(d.wall[1] - 22.8) < .1 && d.wall[0] < -36);
-for (const n of [0, 1]){   // two officers out of the station and after him, on foot
-  const end = flee[flee.length - 1], to = [end[0] + (n ? .6 : -.6), end[1] + (n ? .3 : -.3)];
-  const cp = way(PDOOR.stand[0], PDOOR.stand[1], to[0], to[1]), tGo = MG.copsGo + n*.35, V = 1.9;
-  const k = [K(0, PDOOR.wall[0], PDOOR.wall[1], 'idle', -1, 0, 0), K(tGo, PDOOR.wall[0], PDOOR.wall[1], 'run', -1, 0, 0), K(tGo + .35, cp[0][0], cp[0][1], 'run')];
-  const w = walkKeys(cp, tGo + .35, V, 'run'); k.push(...w.keys.slice(1)); k.push(K(w.t + .01, to[0], to[1], 'idle', end[0] - to[0], end[1] - to[1]));
+for (const n of [0, 1]){   // two officers out of the station and after him, on foot: to where he stood, then along the very way he ran, behind him all the way
+  const tGo = MG.copsGo + n*.35, V = 2.6, VC = FLEE_V*1.08, GAP = 2.4 + n*.8;
+  // where they cut onto his way: the soonest point along it they can reach with him still GAP metres ahead of them when they get there
+  let best = null; for (let dj = 0; dj <= fL - 4; dj += .25){ const P = pointAt(flee, dj), cp = way(PDOOR.stand[0], PDOOR.stand[1], P[0], P[1]), tA = tGo + .35 + lenOf(cp)/V;
+    if (Math.min(fL, (tA - MG.rob1)*FLEE_V) < dj + GAP) continue; if (!best || tA < best.tA) best = { dj, cp, tA }; }
+  if (!best) throw new Error('cop ' + (n + 1) + ': nowhere to cut in behind him');
+  const cpA = best.cp.slice(0, -1).concat([pointAt(flee, best.dj)]);
+  const k = [K(0, PDOOR.wall[0], PDOOR.wall[1], 'idle', -1, 0, 0), K(tGo, PDOOR.wall[0], PDOOR.wall[1], 'run', -1, 0, 0), K(tGo + .35, cpA[0][0], cpA[0][1], 'run')];
+  const a = walkKeys(cpA, tGo + .35, V, 'run'); k.push(...a.keys.slice(1));
+  const stopD = Math.max(best.dj, fL - 2.2 - n*.9);   // (they pull up short of where he ends, still behind him, out of the picture by then)
+  const b = walkPart(flee, best.dj, stopD, a.t, VC, 'run'); k.push(...b.keys.slice(1));
+  const q = pointAt(flee, stopD), e = flee[flee.length - 1]; k.push(K(b.t + .01, q[0], q[1], 'idle', e[0] - q[0], e[1] - q[1]));
+  // the chase as written: never level with him (his place along the run against theirs, every tenth of a second)
+  for (let t = a.t; t <= b.t; t += .1){ const dm = Math.min(fL, Math.max(0, (t - MG.rob1)*FLEE_V)), dc = Math.min(stopD, best.dj + (t - a.t)*VC); if (dc > dm - 1) throw new Error('cop ' + (n + 1) + ' would catch up at ' + t.toFixed(1)); }
+  console.log('cop', n + 1, 'joins his run', best.dj, 'm along it at', a.t.toFixed(2), '(he left at', MG.rob1.toFixed(2) + ')', 'stops at', b.t.toFixed(2));
   part('cop' + (n + 1), 'officer', { role: 'cop' }, k);
 }
 // the drone: off its pad when the alarm goes, over the hold-up, its light red on the mugger, then on him as he runs
@@ -161,10 +171,19 @@ const drone = { station: 0, index: DR.k, keys: [] };
 { const R0 = DR.p, cruise = R0[1] + 1.2, low = CURB + 4.4, k = drone.keys, yawTo = (x, z, x2, z2) => r3(Math.atan2(x2 - x, z2 - z));
   const DK = (t, x, y, z, yw, light, red, e = 'lin') => k.push([r3(t), r2(x), r2(y), r2(z), yw, light, red, e]);
   const yw0 = yawTo(R0[0], R0[2], MHIT[0], MHIT[1]);
-  DK(0, R0[0], R0[1], R0[2], yw0, 0, 0); DK(MG.alarm, R0[0], R0[1], R0[2], yw0, 0, 0);
-  DK(MG.alarm + .8, R0[0], cruise, R0[2], yw0, .4, 0, 'ss');
-  DK(MG.reach + .3, MHIT[0], low, MHIT[1] - .4, yw0, 1, 0, 'ss');
-  DK(MG.reach + .9, MHIT[0], low, MHIT[1] - .4, yw0, 1, 1, 'ss');
+  // up off its pad while the camera is still away, then on patrol: slow circles over the square, its light low and white
+  const PC = [MHIT[0] + 2.6, MHIT[1] - 1.8], PR = 3.4, PV = 1.4, hi = low + 1.6, tUp = MK.back + .5, tPat = tUp + 3;
+  const pat = t => { const a = (t - tPat)*PV/PR + 2.2; return [PC[0] + Math.cos(a)*PR, PC[1] + Math.sin(a)*PR, r3(Math.atan2(-Math.sin(a), Math.cos(a)))]; };
+  DK(0, R0[0], R0[1], R0[2], yw0, 0, 0); DK(tUp, R0[0], R0[1], R0[2], yw0, 0, 0);
+  const p0 = pat(tPat); DK(tUp + 1.2, R0[0], cruise, R0[2], yw0, .3, 0, 'ss'); DK(tPat, p0[0], hi, p0[1], p0[2], .35, 0, 'ss');
+  for (let t = tPat + .25; t < MG.alarm - 1e-9; t += .25){ const q = pat(t); DK(t, q[0], hi, q[1], q[2], .35, 0); }
+  // the alarm: it breaks off, turns and glides over (about three metres a second at most), light full on it, then red
+  const pa = pat(MG.alarm); DK(MG.alarm, pa[0], hi, pa[1], pa[2], .35, 0);
+  const dOver = Math.hypot(pa[0] - MHIT[0], pa[1] - MHIT[1]), tOver = Math.min(MG.rob1 - .8, MG.alarm + Math.max(1.4, dOver/2.6));
+  DK(MG.alarm + .6, lerp(pa[0], MHIT[0], .12), hi, lerp(pa[1], MHIT[1] - .4, .12), yawTo(pa[0], pa[1], MHIT[0], MHIT[1]), .7, 0, 'ss');
+  DK(tOver, MHIT[0], low, MHIT[1] - .4, yawTo(pa[0], pa[1], MHIT[0], MHIT[1]), 1, 0, 'ss');
+  DK(Math.max(tOver + .4, MG.rob1 - .4), MHIT[0], low, MHIT[1] - .4, yawTo(pa[0], pa[1], MHIT[0], MHIT[1]), 1, 1, 'ss');
+  console.log('drone: patrol from', tPat.toFixed(2), 'glide', dOver.toFixed(1), 'm,', 'alarm', MG.alarm.toFixed(2), 'over him at', tOver.toFixed(2), '(he runs at', MG.rob1.toFixed(2) + ')');
   for (let t = MG.rob1; t <= fleeEnd + .01; t += .5){ const q = pointAt(flee, Math.min(fL, (t - MG.rob1)*FLEE_V)); DK(t, q[0], low, q[1] - .4, yawTo(MHIT[0], MHIT[1], q[0], q[1]), 1, 1); }
   const end = flee[flee.length - 1]; DK(fleeEnd + 60, end[0], low, end[1] - .4, k[k.length - 1][4], 1, 1); }
 

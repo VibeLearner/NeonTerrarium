@@ -11,13 +11,17 @@ const srv = http.createServer((q, r) => { const f = path.join(ROOT, decodeURICom
   const ctx = await b.newContext({ viewport: { width: +(process.env.W || 640), height: +(process.env.H || 360) } });
   await ctx.addInitScript({ path: path.join(ROOT, 'tools/trailer/shim.js') });
   const p = await ctx.newPage(); p.setDefaultTimeout(0);
+  const cdp = await ctx.newCDPSession(p);   // (pictures the way the recorder takes them: straight from the compositor)
+  const snap = async f => fs.writeFileSync(f, Buffer.from((await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true })).data, 'base64'));
   p.on('pageerror', e => console.log('ERR', e.message));
   p.on('console', m => { const s = m.text(); if (/\[stage\]|PodContext/.test(s)) console.log('  ', s.slice(0, 200)); });
   await p.goto(`http://127.0.0.1:${PORT}/index.html#stage&from=32`, { waitUntil: 'load', timeout: 0 });
   for (;;){ await p.evaluate(() => __step(2)); if (await p.evaluate(() => typeof PLAY !== 'undefined' && (PLAY.ready || PLAY.failed))) break; await p.waitForTimeout(15); }
   await p.evaluate(() => PLAY.start());
+  // TIMES="34,36,38": a picture at each film time on the way (as the recorder would see it), before the one at AT
+  for (const tt of (process.env.TIMES || '').split(',').filter(Boolean).map(Number)){ while (await p.evaluate(() => PLAY.state().t) < tt) await p.evaluate(() => __step(1)); await snap(path.join(OUT, 't-' + tt + '.png')); console.log('shot t', tt, JSON.stringify(await p.evaluate(() => PLAY.state().info))); }
   while (await p.evaluate(() => PLAY.state().t) < AT){ await p.evaluate(() => __step(1)); }
-  const shot = async n => { await p.evaluate(() => __step(3)); await p.screenshot({ path: path.join(OUT, n + '.png') }); console.log('shot', n); };
+  const shot = async n => { await p.evaluate(() => __step(3)); await snap(path.join(OUT, n + '.png')); console.log('shot', n); };
   await shot('a-as-is');
   const info = await p.evaluate(() => { const w = FURN.frame.contentWindow, B = w.PodBuilder._B; return { cw: B.cw, ch: B.ch, zoom: B.zoom, tx: B.tx, tz: B.tz, az: B.az, pitch: B.pitch, walls: B.walls, frame: [FURN.frame.clientWidth, FURN.frame.clientHeight], root: B.root && B.root.position.toArray(), cam: B.cam.position.toArray(), ctx: !!w.PodContext.active() }; });
   console.log(JSON.stringify(info));

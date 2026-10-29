@@ -258,6 +258,7 @@ const PLAY = (() => {
     updateCamera = function (dt){
       if (rolling) safe('frame', () => {
         camAt(G.t);
+        if (window.__CAM_OVR) Object.assign(CAMP, window.__CAM_OVR);   // (checking only: tools/stage/look.js tries other camera angles; never set in a recording)
         camGoal.set(CAMP.x, CAMP.y, CAMP.z); camT.copy(camGoal);
         yaw = yawT = CAMP.yaw; zoom = zoomT = CAMP.zoom; PITCH = pitchT = CAMP.pitch;
         const lv = keyed(SC_ && SC_.lights, G.t); if (lv !== null && lv !== undefined) LIGHTS_ON.value = lv;

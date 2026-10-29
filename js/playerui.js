@@ -1,7 +1,8 @@
 // Neon Terrarium: the player's interface, for the public build. Everything here only runs on the normal page: with #dev in the address the
 // page stays exactly as it was (the playground deck, fast forward, cloud saves, every render switch).
 // It rearranges what the other scripts made (moving their elements keeps their listeners), so the game code doesn't change:
-//  - Settings: a dialog in the middle, in tabs: Graphics (presets and a few plain choices), Sound, General, Advanced (every switch, in plain words)
+//  - Settings: a dialog in the middle, in two tabs: Game Settings (graphics presets and a few plain choices, sound, camera and building, starting over) and Advanced Settings
+//    (every switch, in plain words), with a foot pinned below both: where the city is kept, and back to the title screen
 //  - City settings: a small panel next to "Hover for controls": time and weather (both on their own by default), the new buildings' style
 //    sliders, and an Advanced tab with the look and the look editor
 //  - the music player folds away, the controls list is short, no fast forward, no cloud saves (cities are kept in this browser only)
@@ -39,7 +40,7 @@ const foot = deck.querySelector('.foot');
 const toTitle = $('toTitle');
 
 const head = el('header', { class: 'pu-head' }, el('h2', { text: 'Settings' }), el('button', { class: 'pu-x', 'aria-label': 'Close settings', text: '✕', onclick: () => closeDeck() }));
-const T = tabs([['gfx', 'Graphics'], ['sound', 'Sound'], ['general', 'General'], ['adv', 'Advanced']]);
+const T = tabs([['game', 'Game Settings'], ['adv', 'Advanced Settings']]);
 
 // --- Graphics: presets, then the few choices most players want
 const PRESETS = {
@@ -70,7 +71,7 @@ function which(){ const c = current(); for (const id in PRESETS){ const p = PRES
 const presetRow = el('div', { class: 'pu-presets', role: 'group', 'aria-label': 'Graphics preset' });
 const presetBtn = {};
 for (const id in PRESETS){ const p = PRESETS[id]; presetBtn[id] = el('button', { onclick: () => applyPreset(id) }, el('b', { text: p.name }), el('small', { text: p.note })); presetRow.append(presetBtn[id]); }
-const customNote = el('p', { class: 'note pu-custom', text: 'Custom: you have changed settings below or in Advanced.' });
+const customNote = el('p', { class: 'note pu-custom', text: 'Custom: you have changed settings below or in Advanced Settings.' });
 function markPreset(){ const w = which(); for (const id in presetBtn) presetBtn[id].classList.toggle('on', id === w); customNote.hidden = w !== 'custom'; }
 // the effects' switches aren't kept by the game itself: kept here, for the next visit
 function saveFx(){ if (!applying) lsSet(K + 'fx', JSON.stringify(Object.fromEntries(FX.map(f => [f, !!($(f) && $(f).checked)])))); }
@@ -86,23 +87,21 @@ const cloudBox = chipsRelabel('cloudChips', [['Low', 'Clouds refresh more slowly
 const zoomBox = chipsRelabel('zoomResChips', [['Standard', 'The same resolution at every zoom: the lightest'], ['Sharper', 'Up to 1.6 times the resolution when zoomed out'], ['Sharpest', 'Up to your screen\'s own resolution when zoomed out: the heaviest']]);
 const farLab = relabel('farView', 'Sharp view when zoomed out', 'Zoomed out, the city sharpens to your screen\'s resolution as the view comes to rest, so distant buildings stay distinct');
 const autoLab = relabel('autoPerf', 'Lower the resolution automatically when the game runs slow');
-T.panes.gfx.append(
-  group('Preset', presetRow, customNote),
+T.panes.game.append(
+  group('Graphics preset', presetRow, customNote),
   group('Pixel style', resBox),
   group('Clouds', cloudBox));
 
 // --- Sound: the game's own section
-if (soundSec){ const h = soundSec.querySelector('h2'); if (h) h.remove(); T.panes.sound.append(group(null, soundSec)); }
+if (soundSec){ const h = soundSec.querySelector('h2'); if (h) h.remove(); T.panes.game.append(group('Sound', soundSec)); }
 
-// --- General: back to the title, the camera's auto-turn, painting, clearing the island, and where the city is kept
+// --- the rest of Game Settings: the camera's auto-turn, painting, clearing the island
 const spinLab = relabel('spin', 'Slowly turn the view by itself');
 const paintLab = relabel('paint', 'Drag to build across several plots');
 const saveNote = el('p', { class: 'note pu-save', html: 'Your cities are saved automatically, <b>in this browser only</b> (its local storage, on this device). Clearing this site\'s data or browsing privately loses them. To keep a copy or move a city to another device, use <b>Export</b> in <b>Cities</b> on the title screen.' });
 if (islandSec){ const h = islandSec.querySelector('h2'); if (h) h.remove(); }
-T.panes.general.append(
-  group(null, toTitle),
+T.panes.game.append(
   group('Camera and building', el('div', { class: 'togs' }, spinLab, paintLab)),
-  group('Saving', saveNote),
   islandSec ? group('Start over', el('p', { class: 'note', text: 'Removes every building on this island. It can\'t be undone.' }), islandSec) : null);
 
 // --- Advanced: every switch, in plain words
@@ -115,6 +114,8 @@ const perfTogs = el('div', { class: 'togs pu-cols' },
   relabel('cap720', 'Limit apartments to 720p', 'Inside an apartment, never draw more pixels than a 720p screen: softer on a sharp screen, much lighter'));
 T.panes.adv.append(group('Effects', fxTogs), group('Distant view', el('div', { class: 'togs' }, farLab, autoLab)), group('Zoomed-out resolution', zoomBox), group('Performance', perfTogs));
 
+// the foot, pinned below both tabs: where the city is kept, then back to the title
+const puFoot = el('footer', { class: 'pu-foot' }, saveNote, toTitle);
 // the rest of the deck goes: the playground's render fold (emptied above), its footnote
 if (renderFold) renderFold.remove();
 if (foot) foot.remove();
@@ -145,16 +146,16 @@ if (timeSec){ const togs = timeSec.querySelector('.togs'), wind = $('wind') && $
   C.panes.city.append(group('Time', el('div', { class: 'togs' }, engineLab, cycleLab), ...timeKids), group('Weather', el('div', { class: 'togs' }, autoWxLab), wx, wind));
   if (togs){ togs.style.display = 'none'; cityPanel.append(togs); } }   // (the old Rain box stays in the page, hidden: the looks read it)
 if (buildSec){ const h = buildSec.querySelector('h2'); if (h) h.remove(); C.panes.city.append(group('New buildings', ...buildSec.children)); }
-// Advanced: the look (a colour mood for the whole city) and its editor
+// Advanced: the look (a color mood for the whole city) and its editor
 if (looksSec){ const lookPick = looksSec.querySelector('.lookpick'), ed = $('lookEdBtn');
-  C.panes.adv.append(group('Look', el('p', { class: 'note', text: 'A colour mood for the whole city. Auto follows the time of day and the weather.' }), lookPick, wxStatus), group('Look editor', el('p', { class: 'note', text: 'Make your own looks (Shift+L).' }), ed)); looksSec.remove(); }
+  C.panes.adv.append(group('Look', el('p', { class: 'note', text: 'A color mood for the whole city. Auto follows the time of day and the weather.' }), lookPick, wxStatus), group('Look editor', el('p', { class: 'note', text: 'Make your own looks (Shift+L).' }), ed)); looksSec.remove(); }
 if (timeSec) timeSec.remove(); if (buildSec) buildSec.remove();
 // next to "Hover for controls"
 const ctl = document.querySelector('.ctlwrap');
 if (ctl){ const row = el('div', { class: 'pu-ctlrow' }); ctl.parentNode.insertBefore(row, ctl); row.append(ctl, cityBtn); }
 document.querySelector('.zonebar').append(cityPanel);
 // (only now: until the city panel has taken its pieces, they have to stay in the page for getElementById to find them)
-deck.replaceChildren(head, T.bar, ...Object.values(T.panes));
+deck.replaceChildren(head, T.bar, ...Object.values(T.panes), puFoot);
 
 /* ---------- defaults for a new player: the day goes by itself, so does the weather ---------- */
 if (lsGet(K + 'cycle') === null) setBox('cycle', true); else setBox('cycle', lsGet(K + 'cycle') === '1');

@@ -2,7 +2,7 @@
 
 /* ---------- Settings: a dialog in the middle ---------- */
 html.pui .deck{top:50%!important;left:50%!important;right:auto!important;bottom:auto!important;transform:translate(-50%,-50%);width:min(560px,calc(100vw - 32px));
-  max-height:min(640px,calc(100vh - 48px));padding:0;gap:0;display:flex;flex-direction:column;overflow:hidden;z-index:40;
+  max-height:min(600px,calc(100vh - 48px));padding:0;gap:0;display:flex;flex-direction:column;overflow:hidden;z-index:40;
   border:1px solid var(--cyan);border-radius:0;background:rgba(10,16,32,.97);box-shadow:0 0 0 1px rgba(56,232,224,.15),0 18px 60px rgba(0,0,0,.6),0 0 24px rgba(56,232,224,.18);
   clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px)}
 html.pui .deck:not(.open){display:none}
@@ -45,6 +45,10 @@ html.pui .deck .pu-pane{flex:1;min-height:0}
 .pu-custom{color:var(--amber)}
 .pu-save b{color:var(--ink);font-weight:600}
 html.pui #toTitle{margin:0}
+/* the foot pinned below both tabs: where the city is kept, then back to the title (the panes above scroll) */
+.pu-foot{flex:none;display:grid;gap:10px;padding:12px 16px 16px;border-top:1px solid var(--line);background:rgba(56,232,224,.04)}
+.pu-foot .pu-save{margin:0}
+html.title-on .pu-foot{padding-bottom:12px}
 @media (max-width:560px){.pu-presets{grid-template-columns:repeat(2,1fr)}}
 
 /* ---------- City settings: next to "Hover for controls" ---------- */

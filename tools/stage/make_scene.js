@@ -98,7 +98,7 @@ const pr2 = pair('p2', null, s2, 2.3, 1);
 const homeW = way(pr2.A[0], pr2.A[1], STAND[0], STAND[1]), HOME_V = .9, Lh = lenOf(homeW);
 const WAIT_DOOR = 1.5;   // (Kwame stands at his door while it opens, long enough for the person cam's last line to be read)
 MK.atDoor = MK.leave2 + Lh/HOME_V; MK.door = MK.atDoor + WAIT_DOOR + .5; MK.open = MK.door + .4;
-const APTT = { holo: 5.4, furn: 5.4, back: 5.4 };
+const APTT = { holo: 5.4, furn: 9.0, back: 5.4 };   // (furn: in past the street and through the grey to the lab's own view (3 s), the three pieces set down, a moment to look)
 MK.room = MK.open + APTT.holo; MK.unroom = MK.room + APTT.furn; MK.back = MK.unroom + APTT.back; MK.garden = MK.back; MK.square = MK.garden + 6.5;
 const sh = MK.square - 33.5, MG = { walk0: 31 + sh, stop: 35.6 + sh, reach: 36.0 + sh, rob1: 37.6 + sh, alarm: 35.3 + sh, copsGo: 35.8 + sh, pass: 38.9 + sh };
 console.log('MK', MK, 'MG', MG);
@@ -328,7 +328,7 @@ const doors = [[HOME.door.key, [[0, 0], [r3(MK.atDoor - .1), 0], [r3(MK.atDoor +
 // the flat looked at from its far side towards the garden (the camera on the home's side, the lawn beyond it): the world yaw the game camera would
 // have for that (camera at target + (sin yaw, cos yaw)), which the stage turns into the lab's angle
 const HX = HOME.cell[0]*LOT, HZ = HOME.cell[1]*LOT, LAB_YAW = r3(Math.atan2(HX - GC.x, HZ - GC.z) - 1.06);   // (-1.06: from the street side, the one way in clear of the towers to its south, the lawn behind it)
-const apartment = APT ? Object.assign({ pod: HOME.pod, open: r3(MK.open), room: r3(MK.room), unroom: r3(MK.unroom), back: r3(MK.back), fade: .8, labYaw: LAB_YAW, labPitch: 60, labZoomMatched: .8, labZoomIn: 1.4, zoomFor: 1.4, dropsAfter: 1.5, dropsScale: .8 }, APT) : null;
+const apartment = APT ? Object.assign({ pod: HOME.pod, open: r3(MK.open), room: r3(MK.room), unroom: r3(MK.unroom), back: r3(MK.back), fade: .8, labYaw: LAB_YAW, labPitch: 60, labZoomMatched: .8, labZoomIn: 1.4, zoomFor: 1.8, greyFrom: .5, swapAt: 1.9, greyOff: [2.1, 3.0], dropsAfter: 3.3, dropsScale: 1 }, APT) : null;
 const end = r3(TITLE.t0 + TITLE.dur);
 
 const J = v => JSON.stringify(v);

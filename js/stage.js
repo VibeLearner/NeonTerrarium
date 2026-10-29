@@ -431,7 +431,7 @@ const PLAY = (() => {
     const B = labB(); if (!B || !B.dr || B.dr._stSharp) return;
     const R = B.dr, render = R.render.bind(R); R._stSharp = true;
     R.render = (sc, c) => { const m = sc && sc.children && sc.children[0] && sc.children[0].material, u = m && m.uniforms;
-      if (u && u.kMin && u.range && u.hazeK){ u.kMin.value = 0; u.range.value = 1e4; u.hazeK.value = Math.min(u.hazeK.value, .25); }   // (no depth blur on the city around the flat, a little of its haze kept)
+      if (u && u.kMin && u.range && u.hazeK && !AP.unsharp){ u.kMin.value = 0; u.range.value = 1e4; u.hazeK.value = Math.min(u.hazeK.value, .25); }   // (no depth blur on the city around the flat, a little of its haze kept)
       return render(sc, c); };
   }
   function labWait(){   // the home still being built, or its light not baked yet
@@ -488,6 +488,7 @@ const PLAY = (() => {
           if (!AP.picked && B){ AP.picked = true;   // the lab's camera as the script has it (the whole flat in the frame), and the pieces that are set down later, hidden for now
             // the flat seen from the way the game camera looked when he went in, so the city around it is where it was in the shot before: the lab turns
             // the city by th (unitMatrix: the flat's front to its north) and its camera sits at angle az the way the game's sits at its yaw, so az = yaw + th
+            AP.az0 = B.az; AP.pitch0 = B.pitch; AP.zoom0 = B.zoom;   // (the lab's own first view: the one it goes back to for the furnishing)
             const M = st.city && st.city.M; AP.az = M ? wrapA((A.labYaw ?? yaw) + Math.atan2(M.elements[8], M.elements[0])) : null;   // (labYaw: the script's chosen side, towards the garden)
             if (AP.az !== null){ B.az = AP.az; if (A.labPitch) B.pitch = A.labPitch; B.zoom = A.labZoomMatched || 1.12; B.tx = 0; B.tz = 0; B.camDirty = true; }
             else { if (A.labZoom){ B.zoom = A.labZoom; B.camDirty = true; } if (A.labPan){ B.tx = A.labPan[0]; B.tz = A.labPan[1]; B.camDirty = true; } }
@@ -508,10 +509,14 @@ const PLAY = (() => {
       if (!AP.bg && !AP.bgDone){ AP.bgDone = true; safe('real city', () => bgGame(true, st, B, w)); }
       AP.punch = true;   // (the depth pass only on the room itself: the hologram has its own camera)
       if (AP.bg){ safe('sun', () => keyLight(true)); }
-      // the camera in on the flat while the pieces are set down: the lab's zoom eased up, the game's matched to it (an orthographic view: the width shown goes as 1/zoom)
-      // first the camera goes in, past what stands in front of the flat (the near clip follows the zoom: it reads as the camera moving through them), then the furnishing
-      if (AP.bg && B && AP.z0){ const u = ss(clamp01((t - A.room)/(A.zoomFor || 1.4))), z = AP.z0 + ((A.labZoomIn || AP.z0*1.6) - AP.z0)*u; AP.nearK = u;
+      // Out of the hologram into the real street, the camera going in on the flat (past what stands in front of it: the near clip follows the zoom) while
+      // the whole picture blurs away to grey; under the grey the lab's own view comes back (its first angle and framing, its own soft city behind),
+      // and the grey clears off it. Then the furnishing.
+      const tz = t - A.room, ZD = A.zoomFor || 1.8, SW = A.swapAt || 1.9, GO = A.greyOff || [2.1, 3.0];
+      if (AP.bg && B && AP.z0 && tz < SW){ const u = ss(clamp01(tz/ZD)), z = AP.z0 + ((A.labZoomIn || AP.z0*1.6) - AP.z0)*u; AP.nearK = u;
         if (Math.abs(B.zoom - z) > 1e-6){ B.zoom = z; B.camDirty = true; B.needs = true; } AP.camM.zoom = AP.camZ0*AP.z0/z; }
+      if (tz >= SW && !AP.swapped){ AP.swapped = true; safe('old view', () => { if (AP.bg) bgGame(false); oldView(B, st); }); }
+      safe('grey', () => greyAt(tz < SW ? ss(clamp01((tz - (A.greyFrom ?? .5))/Math.max(.1, ZD - (A.greyFrom ?? .5)))) : 1 - ss(clamp01((tz - GO[0])/(GO[1] - GO[0])))));
       for (const d of AP.hidden){ const u = (t - d.t)/.75; d.i.pivot.visible = u >= 0; if (u < 0) continue; const e = 1 - Math.pow(1 - Math.min(1, u), 3); d.i.pivot.position.y = d.y + .45*(1 - e); }
       return;
     }
@@ -649,6 +654,21 @@ const PLAY = (() => {
       cam.near = Math.max(NEAR, f - (NEAR_FROM + (NEAR_TO - NEAR_FROM)*AP.nearK)); cam.updateProjectionMatrix(); AP.nearOn = true; }
     else if (AP.nearOn){ AP.nearOn = false; cam.near = NEAR; cam.updateProjectionMatrix(); if (AP.sc0 !== undefined){ SC.mode = AP.sc0; AP.sc0 = undefined; } }
   }
+  // the grey: the whole picture blurred and greyed (a layer over everything the film shows but its own overlays), from 0 to 1
+  function greyAt(a){
+    let e = document.getElementById('stGrey');
+    if (a <= 0){ if (e) e.style.display = 'none'; return; }
+    if (!e){ e = document.createElement('div'); e.id = 'stGrey'; e.className = 'tr-keep'; e.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:60'; document.body.appendChild(e); }
+    const b = 'blur(' + (innerHeight*.05*a).toFixed(2) + 'px)'; e.style.display = ''; e.style.backdropFilter = b; e.style.webkitBackdropFilter = b; e.style.background = 'rgba(112,116,124,' + (.88*a*a).toFixed(4) + ')';
+  }
+  // the lab's own view, as it was before the real city: its first angle and pitch, the script's framing (labZoom, labPan), its city soft behind
+  function oldView(B, st){
+    if (!B) return; AP.unsharp = true;
+    if (AP.az0 !== undefined){ B.az = AP.az0; B.pitch = AP.pitch0; }
+    const A = SC_.apartment; B.zoom = A.labZoom || AP.zoom0 || 1; const pn = A.labPan || [0, 0]; B.tx = pn[0]; B.tz = pn[1]; B.camDirty = true; B.needs = true;
+    FURN.hold = true;   // (the city not drawn under it: nothing of it shows)
+    if (st) st.dirty = true;   // (the lab's city behind drawn again from the new angle, with its own blur)
+  }
   function homeHide(on){
     const A = SC_.apartment, k = String(A.pod).split('|')[0].split(',').map(Number), c = cells.get(ckey(k[0], k[1])); if (!c) return warn('apartment', 'no home plot ' + k);
     if (on){ if (AP.hh) return; const h = AP.hh = { pcs: [], mem: [], fol: [], g: c.group ? c.group.visible : null, v: c.view ? c.view.visible : null };
@@ -722,7 +742,7 @@ const PLAY = (() => {
   }
   function aptEnd(why){
     safe('reveal end', () => { if (FURN.frame) FURN.frame.style.clipPath = ''; if (E.rv){ E.rv.fx.getContext('2d').clearRect(0, 0, E.rv.fx.width, E.rv.fx.height); } });
-    if (AP.bg) safe('real city off', () => bgGame(false));
+    if (AP.bg) safe('real city off', () => bgGame(false)); safe('grey', () => greyAt(0));
     if (AP.closed) return; AP.closed = true;
     if (why) warn('apartment', why);
     safe('close', () => { const PC = labPC(), st = PC && PC._debug && PC._debug.state(); if (st && st.trans){ st.trans = null; PC.transitioning = false; }

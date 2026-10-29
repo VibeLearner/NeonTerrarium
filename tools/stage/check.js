@@ -15,7 +15,7 @@ const srv = http.createServer((q, r) => { const f = path.join(ROOT, decodeURICom
   const p = await ctx.newPage(); p.setDefaultTimeout(0);
   const log = fs.createWriteStream(path.join(OUT, 'log.txt'));
   p.on('pageerror', e => { console.log('ERR', e.message); log.write('ERR ' + e.message + '\n'); });
-  p.on('console', m => { const s = m.text(); if (m.type() === 'error' || /\[stage\]/.test(s)){ console.log('  ', s.slice(0, 260)); log.write(s + '\n'); } });
+  p.on('console', m => { const s = m.text(); if (m.type() === 'error' || /\[stage\]/.test(s) || (process.env.LOGRE && new RegExp(process.env.LOGRE).test(s))){ console.log('  ', s.slice(0, 260)); log.write(s + '\n'); } });
   const cdp = await ctx.newCDPSession(p);
   const grab = async () => Buffer.from((await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true })).data, 'base64');
   await p.goto(`http://127.0.0.1:${PORT}/index.html#stage${process.env.JUMP ? '&from=' + process.env.JUMP : ''}`, { waitUntil: 'load', timeout: 0 });

@@ -496,7 +496,11 @@ const PLAY = (() => {
         }
         PC._debug.hold(u);
         // the real city under the hologram for its last stretch, so it comes out of the hologram straight into the real street (never the lab's grey stand-in)
-        if (!AP.bgDone && AP.picked && t >= A.room - BG_IN){ AP.bgDone = true; safe('real city', () => bgGame(true, st, B, w)); }
+        // the real street under the hologram from its first frame, its camera on the hologram's (so whatever stands in front of the flat is in front of
+        // it all the way, never drawn over it first); the game's pixels on the flat for the last stretch, the sun coming onto it
+        if (!AP.bgDone && AP.picked){ AP.bgDone = true; safe('real city', () => bgGame(true, st, B, w)); }
+        if (AP.bg && !AP.late && t >= A.room - BG_IN){ AP.late = true; safe('pixels', () => { pixOn(true); tiltOn(true); }); }
+        if (AP.bg && t >= A.room - BG_IN) safe('sun', () => keyLight(true, ss(clamp01((t - (A.room - BG_IN))/BG_IN))));
         // (the game's camera on the lab's, the one it is drawing the hologram with: the street behind moves with it, and what stands in front is cut from it)
         if (AP.bg && AP.pu && AP.pu.cam) safe('follow', () => { const p = camPose(AP.pu.cam, st.city); if (p) AP.camM = p; });
       }
@@ -509,6 +513,7 @@ const PLAY = (() => {
       if (!AP.roomOk){ const lw = labWait(); if (lw && wait('the room: ' + lw)) return; AP.roomOk = true; }
       fr.style.opacity = '1';
       if (!AP.bg && !AP.bgDone){ AP.bgDone = true; safe('real city', () => bgGame(true, st, B, w)); }
+      if (AP.bg && !AP.late){ AP.late = true; safe('pixels', () => { pixOn(true); tiltOn(true); }); }
       AP.punch = true;   // (the depth pass only on the room itself: the hologram has its own camera)
       if (AP.bg){ safe('sun', () => keyLight(true)); }
       // One take: out of the hologram into the real street, the camera going in on the flat (past what stands in front of it: the near clip follows
@@ -595,7 +600,7 @@ const PLAY = (() => {
       const dc = w.document; if (!dc.getElementById('stBgGame')){ const e = dc.createElement('style'); e.id = 'stBgGame'; e.textContent = 'html,body,#bStage{background:transparent!important}#bSky{visibility:hidden!important}'; dc.head.appendChild(e); }
       const PC = w.PodContext; if (!AP.bd0){ AP.bd0 = PC.backdrop; PC.backdrop = () => null; }
       AP.home = city.home; homeHide(true); FURN.hold = false; punchOn(w, B, city); AP.bg = true; AP.punch = true; B.needs = true;
-      AP.home = city.home; pixOn(true); tiltOn(true); AP.ppl = [pplMesh.visible, ddMesh.visible]; pplMesh.visible = ddMesh.visible = false;   // (no one about while the flat is shown)
+      AP.home = city.home; AP.ppl = [pplMesh.visible, ddMesh.visible]; pplMesh.visible = ddMesh.visible = false;   // (no one about while the flat is shown)
       say('apartment: the real city behind the flat', JSON.stringify(AP.camM));
     } else {
       AP.bg = false; AP.camM = null; AP.nearK = 0; nearClip(); homeHide(false); pixOn(false); tiltOn(false); keyLight(false); if (AP.ppl){ pplMesh.visible = AP.ppl[0]; ddMesh.visible = AP.ppl[1]; AP.ppl = null; }
@@ -625,13 +630,14 @@ const PLAY = (() => {
   }
   // 2. The flat lit by the game's sun: the lab's key light pointed the way the game's sun shines (through M, into the lab's turned city), in its colour, at
   // a strength that follows it (golden hour comes on during the room)
-  function keyLight(on){
+  const k0c = c => c.clone ? c.clone() : new THREE.Color(c);
+  function keyLight(on, k = 1){
     const B = labB(), w = labWin(); if (!B || !B.sc) return; let key = AP.key;
     if (!key){ B.sc.traverse(o => { if (!key && o.isDirectionalLight && (o.castShadow || o.userData.prKey)) key = o; }); if (!key) return; AP.key = key; AP.key0 = { i: key.intensity, c: key.color.clone(), p: key.position.clone() }; }
     if (!on){ const k0 = AP.key0; key.intensity = k0.i; key.color.copy(k0.c); key.position.copy(k0.p); key.updateMatrixWorld(); key.shadow.needsUpdate = true; AP.key = null; B.needs = true; return; }
     const city = w.PodContext._debug.state().city; if (!city || !city.M) return;
     const d = SUN_DIR.clone().transformDirection(city.M); key.position.copy(key.target.position).addScaledVector(d, 8); key.updateMatrixWorld(); key.target.updateMatrixWorld();
-    key.color.copy(sun.color); key.intensity = sun.intensity*.63; key.shadow.needsUpdate = true; B.needs = true;
+    key.color.copy(k0c(AP.key0.c)).lerp(sun.color, k); key.intensity = AP.key0.i + (sun.intensity*.63 - AP.key0.i)*k; key.shadow.needsUpdate = true; B.needs = true;
   }
   // 4. The blur by depth, as a tilted lens does it: sharp in the band the flat stands in (its top to its foot on the screen), softer above and below it
   // (further back and nearer the camera), in two steps. backdrop-filter blurs only the game's picture under it; the flat is drawn above.
@@ -714,10 +720,10 @@ const PLAY = (() => {
     const g = c.getContext('2d'); g.clearRect(0, 0, Wc, Hc); if (r <= 0) return;
     const cam = B.cam; cam.updateMatrixWorld(); const v = new THREE.Vector3(), N = 22, R = N*r, y = -.22;
     const P = (x, z) => { v.set(x, y, z).project(cam); return [(v.x + 1)/2*Wc, (1 - v.y)/2*Hc]; };
-    g.lineWidth = Math.max(1, devicePixelRatio);
+    g.lineWidth = Math.max(1.5, Hc/600); g.shadowColor = 'rgba(86,236,228,.9)'; g.shadowBlur = Hc/220;   // (thick enough and glowing a little: the recording keeps it)
     for (const ax of [0, 1]) for (let k = -N; k <= N; k++){
       const half = Math.sqrt(Math.max(0, R*R - k*k)); if (half <= 0) continue;
-      const STEP = 1; for (let s = -half; s < half; s += STEP){ const s2 = Math.min(half, s + STEP), m = (s + s2)/2, d = Math.hypot(k, m)/N, a = .32*(1 - d)*(1 - d);
+      const STEP = 1; for (let s = -half; s < half; s += STEP){ const s2 = Math.min(half, s + STEP), m = (s + s2)/2, d = Math.hypot(k, m)/N, a = .62*(1 - d)*(1 - d);
         if (a <= .004) continue; const p = ax ? P(k, s) : P(s, k), q = ax ? P(k, s2) : P(s2, k);
         g.strokeStyle = 'rgba(86,236,228,' + a.toFixed(3) + ')'; g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); g.stroke(); } }
     // the spreading edge, a little brighter

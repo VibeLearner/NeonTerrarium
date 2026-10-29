@@ -500,7 +500,7 @@ const PLAY = (() => {
         // the real street under the hologram from its first frame, its camera on the hologram's (so whatever stands in front of the flat is in front of
         // it all the way, never drawn over it first); the game's pixels on the flat for the last stretch, the sun coming onto it
         if (!AP.bgDone && AP.picked){ AP.bgDone = true; safe('real city', () => bgGame(true, st, B, w)); }
-        if (AP.bg && !AP.late && t >= A.room - BG_IN){ AP.late = true; safe('pixels', () => { pixOn(true); tiltOn(true); }); }
+        if (AP.bg && !AP.late){ AP.late = true; safe('pixels', () => { pixOn(true); tiltOn(true); }); }   // (the hologram in the game's pixels from its first frame: no change of look partway)
         if (AP.bg) safe('sun', () => keyLight(true));   // (the sun on the flat from the start, steady: it shows only as the hologram resolves)
         // and the lab's light worked out again for it before the hologram resolves: those steps showed as the room brightening in jumps (held: not filmed)
         if (AP.bg && !(PC.paused && PC.paused())){ const PR = w.PodRender; if (PR && PR.lightPending && PR.lightPending() && wait('the light, with the sun on it')) return; }   // (only once the room is drawn under the hologram: until then the lab does no light work)
@@ -627,8 +627,7 @@ const PLAY = (() => {
     const g = c.getContext('2d', { willReadFrequently: true }); g.clearRect(0, 0, wd, h); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(src, 0, 0, wd, h);
     if (k >= .999) return;   // (at full size the picture as the lab drew it)
     const im = g.getImageData(0, 0, wd, h), d = im.data, q = Math.max(1, Math.round(10*(1 - k)));
-    for (let i = 0; i < d.length; i += 4){ const a = d[i + 3]; if (a < 128){ d[i + 3] = 0; continue; }
-      const k = 255/a; for (let j = 0; j < 3; j++){ const v = Math.min(255, d[i + j]*k); d[i + j] = Math.min(255, Math.round(v/q)*q); } d[i + 3] = 255; }   // (premultiplied edges back to full colour, then stepped)
+    for (let i = 0; i < d.length; i += 4){ if (d[i + 3] < 250) continue; for (let j = 0; j < 3; j++) d[i + j] = Math.min(255, Math.round(d[i + j]/q)*q); }   // (solid pixels stepped; see-through ones, the hologram's glow, left as they are)
     g.putImageData(im, 0, 0);
   }
   // 2. The flat lit by the game's sun: the lab's key light pointed the way the game's sun shines (through M, into the lab's turned city), in its colour, at

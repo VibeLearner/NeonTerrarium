@@ -482,8 +482,8 @@ const PLAY = (() => {
           if (!AP.picked && B){ AP.picked = true;   // the lab's camera as the script has it (the whole flat in the frame), and the pieces that are set down later, hidden for now
             // the flat seen from the way the game camera looked when he went in, so the city around it is where it was in the shot before: the lab turns
             // the city by th (unitMatrix: the flat's front to its north) and its camera sits at angle az the way the game's sits at its yaw, so az = yaw + th
-            const M = st.city && st.city.M; AP.az = M ? wrapA(yaw + Math.atan2(M.elements[8], M.elements[0])) : null;
-            if (AP.az !== null){ B.az = AP.az; B.zoom = A.labZoomMatched || 1.12; B.tx = 0; B.tz = 0; B.camDirty = true; }
+            const M = st.city && st.city.M; AP.az = M ? wrapA((A.labYaw ?? yaw) + Math.atan2(M.elements[8], M.elements[0])) : null;   // (labYaw: the script's chosen side, towards the garden)
+            if (AP.az !== null){ B.az = AP.az; if (A.labPitch) B.pitch = A.labPitch; B.zoom = A.labZoomMatched || 1.12; B.tx = 0; B.tz = 0; B.camDirty = true; }
             else { if (A.labZoom){ B.zoom = A.labZoom; B.camDirty = true; } if (A.labPan){ B.tx = A.labPan[0]; B.tz = A.labPan[1]; B.camDirty = true; } }
             dropsHide(B); }
         }

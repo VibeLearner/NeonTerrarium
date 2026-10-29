@@ -324,7 +324,10 @@ const monitor = [
 const brackets = [[MK.p[0], MK.p[1], 'deepa'], [MK.p[1], MK.door - .6, 'kwame']];
 // the front door: opens as Kwame gets to it, shuts behind him
 const doors = [[HOME.door.key, [[0, 0], [r3(MK.atDoor - .1), 0], [r3(MK.atDoor + .7), 1, 'ss'], [r3(MK.door + .4), 1], [r3(MK.door + 1.2), 0, 'ss']]]];
-const apartment = APT ? Object.assign({ pod: HOME.pod, open: r3(MK.open), room: r3(MK.room), unroom: r3(MK.unroom), back: r3(MK.back), fade: .8 }, APT) : null;
+// the flat looked at from its far side towards the garden (the camera on the home's side, the lawn beyond it): the world yaw the game camera would
+// have for that (camera at target + (sin yaw, cos yaw)), which the stage turns into the lab's angle
+const HX = HOME.cell[0]*LOT, HZ = HOME.cell[1]*LOT, LAB_YAW = r3(Math.atan2(HX - GC.x, HZ - GC.z));
+const apartment = APT ? Object.assign({ pod: HOME.pod, open: r3(MK.open), room: r3(MK.room), unroom: r3(MK.unroom), back: r3(MK.back), fade: .8, labYaw: LAB_YAW, labPitch: 46 }, APT) : null;
 const end = r3(TITLE.t0 + TITLE.dur);
 
 const J = v => JSON.stringify(v);

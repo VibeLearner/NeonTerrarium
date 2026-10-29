@@ -14575,7 +14575,7 @@ function prCall(fn,...a){const R=window.PodRender;if(!B.prOn||!R||typeof R[fn]!=
 function notify(kind,obj){B.needs=true;prCall('sceneChanged',kind,obj||null)}
 
 /* ======================= 3. renderer, home shell, camera ======================= */
-function initRenderer(){if(B.dr)return;const c=$('bCanvas');const dr=new T.WebGLRenderer({canvas:c,antialias:true,alpha:true,premultipliedAlpha:true,powerPreference:'high-performance'});dr.setClearColor(0x000000,0);
+function initRenderer(){if(B.dr)return;const c=$('bCanvas');const dr=new T.WebGLRenderer({canvas:c,antialias:true,alpha:true,premultipliedAlpha:true,powerPreference:'high-performance',preserveDrawingBuffer:(()=>{try{return window.parent!==window&&!!window.parent.NT_STAGE}catch(e){return false}})()});dr.setClearColor(0x000000,0);
   dr.setPixelRatio(prFor(Math.max(2,$('bStage').clientWidth),Math.max(2,$('bStage').clientHeight)));// (see prFor: the screen's own ratio, up to PR_PIX pixels in all)
   dr.shadowMap.enabled=true;dr.shadowMap.type=T.PCFSoftShadowMap;dr.outputEncoding=T.sRGBEncoding;dr.toneMapping=T.ACESFilmicToneMapping;dr.toneMappingExposure=1.1;B.dr=dr;
   new ResizeObserver(()=>resize()).observe($('bStage'));resize()}

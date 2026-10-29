@@ -396,7 +396,9 @@ const PLAY = (() => {
   const labWin = () => { const f = FURN.frame; return f && f.contentWindow; };
   const labPC = () => { const w = labWin(); return w && w.PodContext; };
   const labB = () => { const w = labWin(); return w && w.PodBuilder && w.PodBuilder._B; };
-  function B_fit(w){ try { const B = w.PodBuilder && w.PodBuilder._B; if (B){ B.cw = 0; B.camDirty = true; B.needs = true; } w.dispatchEvent(new w.Event('resize')); } catch (e) {} }   // (the lab's picture sized to its window again, after the stage's own layout above)
+  // (the lab measures its picture again through its own pixCap, which zeroes the width and resizes at once: zeroing it and firing a window
+  // "resize" left it at 0 wide in a real Chrome, the camera with no frame, and every 3D thing in the lab unseen: the grey apartment on a Mac)
+  function B_fit(w){ try { const PB = w.PodBuilder, B = PB && PB._B; if (PB && PB.pixCap) PB.pixCap(); if (B){ B.camDirty = true; B.needs = true; } } catch (e) {} }   // (the lab's picture sized to its window again, after the stage's own layout above)
   // once a second while the apartment is on: what the lab is doing, in the log and the recorder's terminal (for finding out why a machine shows it grey)
   function labReport(t, st, B, w, ov){
     const gi = gl => { try { if (!gl) return 'no context'; if (gl.isContextLost()) return 'CONTEXT LOST'; const e = gl.getExtension('WEBGL_debug_renderer_info'); return e ? gl.getParameter(e.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER); } catch (x) { return 'err ' + x.message; } };
@@ -448,6 +450,7 @@ const PLAY = (() => {
     safe('lab', labClean); if (/[&#]sharp\b/.test(location.hash)) safe('sharp', labSharp);   // (off: on an Apple M2 it left the room one flat colour)
     if (/[&#]plainlab\b/.test(location.hash) && !AP.plain){ AP.plain = true; safe('plain', () => { w.PodBuilder.usePodRender(false); say('lab: PodRender off (plainlab)'); }); }
     if (B) B.needs = true;
+    if (B && (!B.cw || !B.ch)) safe('lab size', () => { w.PodBuilder.pixCap(); B.camDirty = true; warn('apartment', 'the lab had no picture size: measured again (' + B.cw + 'x' + B.ch + ')'); });
     // the lab stops its own frame loop when it thinks nothing is changing (or it is warming up behind the city): while the apartment is on, it draws every frame
     if (B && B.on && !B.raf) safe('lab loop', () => { const PB = w.PodBuilder; if (B.warmHold && PB.warmHold) PB.warmHold(false); if (!B.raf && PB.pauseRender) PB.pauseRender(false); if (!B.raf) warn('apartment', 'the lab loop would not start'); });
     const D_ = PC._debug.DUR || 3.05, st = PC._debug.state(), live = ov && ov.classList.contains('live');

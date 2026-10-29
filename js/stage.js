@@ -443,7 +443,10 @@ const PLAY = (() => {
     if (!fr || !PC || !PC._debug) return aptEnd('the lab went away');
     // the lab's own random numbers follow the frame too
     if (w) w.Math.random = rng(h32('lab', G.frame));
-    safe('lab', labClean); safe('sharp', labSharp);
+    // (checking switches in the address, for finding what the lab needs on a given machine: &nosharp leaves its own depth blur and haze as they are,
+    // &plainlab draws the room without PodRender's lighting)
+    safe('lab', labClean); if (!/[&#]nosharp\b/.test(location.hash)) safe('sharp', labSharp);
+    if (/[&#]plainlab\b/.test(location.hash) && !AP.plain){ AP.plain = true; safe('plain', () => { w.PodBuilder.usePodRender(false); say('lab: PodRender off (plainlab)'); }); }
     if (B) B.needs = true;
     // the lab stops its own frame loop when it thinks nothing is changing (or it is warming up behind the city): while the apartment is on, it draws every frame
     if (B && B.on && !B.raf) safe('lab loop', () => { const PB = w.PodBuilder; if (B.warmHold && PB.warmHold) PB.warmHold(false); if (!B.raf && PB.pauseRender) PB.pauseRender(false); if (!B.raf) warn('apartment', 'the lab loop would not start'); });

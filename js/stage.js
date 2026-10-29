@@ -270,7 +270,7 @@ const PLAY = (() => {
         window.FILM_SH_HALF = keyed(SC_ && SC_.shadowBox, G.t) || 0;
       });
       const r = _uc(dt);
-      if (rolling){ safe('paint', () => paint(G.t)); safe('monitor', () => monFrame(G.t)); }   // (after the camera is placed: the brackets follow the person on screen, the feed draws this frame's people)
+      if (rolling){ safe('paint', () => paint(G.t)); safe('monitor', () => monFrame(G.t)); if (AP.bg) safe('tilt', tiltAt); }   // (after the camera is placed: the brackets follow the person on screen, the feed draws this frame's people)
       return r;
     }; }
 
@@ -282,6 +282,7 @@ const PLAY = (() => {
     st.textContent = `
       html.tr-on body > *:not(#view):not(#stOv):not(#furnish):not(.tr-keep){visibility:hidden!important}
       html.tr-on .furnish-frame{transition:none!important}
+      html.tr-on .furnish-frame.st-pix{opacity:0!important}
       html.tr-on .furnish.derez::before, html.tr-on .furnish.derez::after{display:none!important}
       html.tr-on, html.tr-on *{cursor:none!important}
       html.tr-on #monitor.tr-keep{transform:scale(var(--monk,1.4));transform-origin:top right;top:3vh!important;right:2vh!important;max-height:calc(94vh/var(--monk,1.4))!important;overflow:hidden;transition:none!important;animation:none!important}
@@ -506,6 +507,7 @@ const PLAY = (() => {
       fr.style.opacity = '1';
       if (!AP.bg && !AP.bgDone){ AP.bgDone = true; safe('real city', () => bgGame(true, st, B, w)); }
       AP.punch = true;   // (the depth pass only on the room itself: the hologram has its own camera)
+      if (AP.bg){ safe('sun', () => keyLight(true)); }
       // the camera in on the flat while the pieces are set down: the lab's zoom eased up, the game's matched to it (an orthographic view: the width shown goes as 1/zoom)
       if (AP.bg && B && AP.z0){ const u = ss(clamp01((t - A.room - .3)/Math.max(.1, A.unroom - A.room - .6))), z = AP.z0 + ((A.labZoomIn || AP.z0*1.6) - AP.z0)*u;
         if (Math.abs(B.zoom - z) > 1e-6){ B.zoom = z; B.camDirty = true; B.needs = true; } AP.camM.zoom = AP.camZ0*AP.z0/z; }
@@ -579,15 +581,61 @@ const PLAY = (() => {
       AP.camM = { x: tg.x, y: tg.y, z: tg.z, yaw: Math.atan2(-dg.x, -dg.z), pitch: Math.asin(-dg.y), zoom: (cam.top - cam.bottom)/2/cam.zoom/sc }; AP.camZ0 = AP.camM.zoom; AP.z0 = B.zoom;
       const dc = w.document; if (!dc.getElementById('stBgGame')){ const e = dc.createElement('style'); e.id = 'stBgGame'; e.textContent = 'html,body,#bStage{background:transparent!important}#bSky{visibility:hidden!important}'; dc.head.appendChild(e); }
       const PC = w.PodContext; if (!AP.bd0){ AP.bd0 = PC.backdrop; PC.backdrop = () => null; }
-      homeHide(true); FURN.hold = false; punchOn(w, B, city); AP.bg = true; B.needs = true;
-      { const v = document.getElementById('view'); if (v){ AP.vf = v.style.filter; v.style.filter = 'blur(' + (innerHeight*.0026).toFixed(2) + 'px)'; } }   // (the city behind a little soft: the eye goes to the flat)
+      AP.home = city.home; homeHide(true); FURN.hold = false; punchOn(w, B, city); AP.bg = true; B.needs = true;
+      AP.home = city.home; pixOn(true); tiltOn(true);
       say('apartment: the real city behind the flat', JSON.stringify(AP.camM));
     } else {
-      AP.bg = false; AP.camM = null; homeHide(false); { const v = document.getElementById('view'); if (v) v.style.filter = AP.vf || ''; }
+      AP.bg = false; AP.camM = null; homeHide(false); pixOn(false); tiltOn(false); keyLight(false);
       const w2 = labWin(); if (w2){ const e = w2.document.getElementById('stBgGame'); if (e) e.remove(); if (AP.bd0){ w2.PodContext.backdrop = AP.bd0; AP.bd0 = null; } const B2 = labB(); if (B2) B2.needs = true; }
     }
   }
   const BG_OUT = .9, BG_IN = .9;   // (the real city brought in under the hologram this long before it ends, and kept under it this long as it goes)
+  // 1. The flat in the game's pixels: the lab's picture taken down to the size the game draws at (W x H lines), its edges made hard (alpha either in or
+  // out) and its colours stepped a little, then shown pixel for pixel over the game's own, upscaled the same way. The lab's own frame is hidden meanwhile.
+  function pixOn(on){
+    let c = document.getElementById('stFlat');
+    if (on){ if (!c){ c = document.createElement('canvas'); c.id = 'stFlat'; c.className = 'tr-keep'; c.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:51;image-rendering:pixelated';
+        document.body.appendChild(c); }
+      c.style.display = ''; AP.pix = true; if (FURN.frame) FURN.frame.classList.add('st-pix'); }
+    else { AP.pix = false; if (c){ c.style.display = 'none'; c.getContext('2d').clearRect(0, 0, c.width, c.height); } if (FURN.frame) FURN.frame.classList.remove('st-pix'); }
+  }
+  function pixCopy(src){
+    const c = document.getElementById('stFlat'); if (!c || !src.width) return;
+    if (c.width !== W || c.height !== H){ c.width = W; c.height = H; }
+    const g = c.getContext('2d', { willReadFrequently: true }); g.clearRect(0, 0, W, H); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(src, 0, 0, W, H);
+    const im = g.getImageData(0, 0, W, H), d = im.data, q = 10;
+    for (let i = 0; i < d.length; i += 4){ const a = d[i + 3]; if (a < 128){ d[i + 3] = 0; continue; }
+      const k = 255/a; for (let j = 0; j < 3; j++){ const v = Math.min(255, d[i + j]*k); d[i + j] = Math.min(255, Math.round(v/q)*q); } d[i + 3] = 255; }   // (premultiplied edges back to full colour, then stepped)
+    g.putImageData(im, 0, 0);
+  }
+  // 2. The flat lit by the game's sun: the lab's key light pointed the way the game's sun shines (through M, into the lab's turned city), in its colour, at
+  // a strength that follows it (golden hour comes on during the room)
+  function keyLight(on){
+    const B = labB(), w = labWin(); if (!B || !B.sc) return; let key = AP.key;
+    if (!key){ B.sc.traverse(o => { if (!key && o.isDirectionalLight && (o.castShadow || o.userData.prKey)) key = o; }); if (!key) return; AP.key = key; AP.key0 = { i: key.intensity, c: key.color.clone(), p: key.position.clone() }; }
+    if (!on){ const k0 = AP.key0; key.intensity = k0.i; key.color.copy(k0.c); key.position.copy(k0.p); key.updateMatrixWorld(); key.shadow.needsUpdate = true; AP.key = null; B.needs = true; return; }
+    const city = w.PodContext._debug.state().city; if (!city || !city.M) return;
+    const d = SUN_DIR.clone().transformDirection(city.M); key.position.copy(key.target.position).addScaledVector(d, 8); key.updateMatrixWorld(); key.target.updateMatrixWorld();
+    key.color.copy(sun.color); key.intensity = sun.intensity*.63; key.shadow.needsUpdate = true; B.needs = true;
+  }
+  // 4. The blur by depth, as a tilted lens does it: sharp in the band the flat stands in (its top to its foot on the screen), softer above and below it
+  // (further back and nearer the camera), in two steps. backdrop-filter blurs only the game's picture under it; the flat is drawn above.
+  function tiltOn(on){
+    for (const id of ['stTilt1', 'stTilt2']){ let e = document.getElementById(id);
+      if (on && !e){ e = document.createElement('div'); e.id = id; e.className = 'tr-keep'; e.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:' + (id === 'stTilt1' ? 48 : 49); document.body.appendChild(e); }
+      if (e) e.style.display = on ? '' : 'none'; }
+  }
+  function tiltAt(){
+    const h = AP.home; if (!h) return; const fp = h.fp || { w: 1.3, d: 2.2, ry: 0 };
+    let y0 = 1e9, y1 = -1e9; const v = new THREE.Vector3(), c = Math.cos(fp.ry || 0), s = Math.sin(fp.ry || 0);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) for (const y of [0, .8]){ const lx = sx*fp.w/2, lz = sz*fp.d/2;
+      v.set(h.x + lx*c + lz*s, y, h.z - lx*s + lz*c).project(cam); const py = (1 - v.y)/2*innerHeight; y0 = Math.min(y0, py); y1 = Math.max(y1, py); }
+    const Hh = innerHeight, pad = Hh*.02, ramp = Hh*.16, pc = x => (100*Math.max(0, Math.min(1, x/Hh))).toFixed(2) + '%';
+    const mask = (p, r) => 'linear-gradient(to bottom, #000 ' + pc(y0 - p - r) + ', transparent ' + pc(y0 - p) + ', transparent ' + pc(y1 + p) + ', #000 ' + pc(y1 + p + r) + ')';
+    const set = (id, px, p, r) => { const e = document.getElementById(id); if (!e) return; const f = 'blur(' + px.toFixed(2) + 'px)', m = mask(p, r);
+      e.style.backdropFilter = f; e.style.webkitBackdropFilter = f; e.style.maskImage = m; e.style.webkitMaskImage = m; };
+    set('stTilt1', Hh*.0018, pad, ramp); set('stTilt2', Hh*.0018, pad + ramp*.9, ramp*1.4);   // (two layers: the second adds to the first further out)
+  }
   function homeHide(on){
     const A = SC_.apartment, k = String(A.pod).split('|')[0].split(',').map(Number), c = cells.get(ckey(k[0], k[1])); if (!c) return warn('apartment', 'no home plot ' + k);
     if (on){ if (AP.hh) return; const h = AP.hh = { pcs: [], mem: [], fol: [], g: c.group ? c.group.visible : null, v: c.view ? c.view.visible : null };
@@ -604,11 +652,19 @@ const PLAY = (() => {
           if (hit) o.instanceMatrix.needsUpdate = true; }); }
       // and the plot under it paved (the ground there is never drawn under a building: the sky showed through)
       { const g = new THREE.Mesh(new THREE.PlaneGeometry(LOT*.9, LOT*.9), new THREE.MeshToonMaterial({ color: '#6a655f' })); g.rotation.x = -Math.PI/2; g.position.set(c.x, .015, c.z); g.receiveShadow = true; scene.add(g); h.pave = g; }
+      // 3. where the flat meets the ground, a soft dark edge (its own contact shadow): a blurred rectangle a little bigger than its footprint, under it
+      { const hm = AP.home, fp = (hm && hm.fp) || { w: 1.3, d: 2.2, ry: 0 }, m = .45, cv = document.createElement('canvas'); cv.width = cv.height = 128;
+        const x = cv.getContext('2d'), fx = 128*m/(fp.w + 2*m), fz = 128*m/(fp.d + 2*m); x.filter = 'blur(' + Math.round(Math.min(fx, fz)*.55) + 'px)'; x.fillStyle = '#fff'; x.fillRect(fx*.7, fz*.7, 128 - 1.4*fx, 128 - 1.4*fz);
+        const tx = new THREE.CanvasTexture(cv), cs = new THREE.Mesh(new THREE.PlaneGeometry(fp.w + 2*m, fp.d + 2*m), new THREE.MeshBasicMaterial({ map: tx, transparent: true, opacity: .55, depthWrite: false, color: 0x000000 }));
+        cs.material.alphaMap = tx; cs.material.map = null; cs.rotation.set(-Math.PI/2, 0, fp.ry || 0, 'YXZ'); cs.rotation.order = 'YXZ'; cs.rotation.y = fp.ry || 0; cs.rotation.x = -Math.PI/2;
+        cs.position.set(hm ? hm.x : c.x, .03, hm ? hm.z : c.z); cs.renderOrder = 1; scene.add(cs); h.cs = cs; }
+      shadowDirty = true;
     } else { const h = AP.hh; if (!h) return; AP.hh = null;
       for (const [P, i, v] of h.pcs){ P.hide[i] = v; P.stamp = -1; } for (const [m, v] of h.mem) m.visible = v;
       if (c.group && h.g !== null) c.group.visible = h.g; if (c.view && h.v !== null) c.view.visible = h.v;
       for (const [o, i, m4] of h.fol){ o.setMatrixAt(i, m4); o.instanceMatrix.needsUpdate = true; }
-      if (h.pave){ scene.remove(h.pave); h.pave.geometry.dispose(); h.pave.material.dispose(); } }
+      if (h.pave){ scene.remove(h.pave); h.pave.geometry.dispose(); h.pave.material.dispose(); }
+      if (h.cs){ scene.remove(h.cs); h.cs.geometry.dispose(); h.cs.material.alphaMap.dispose(); h.cs.material.dispose(); } shadowDirty = true; }
   }
   // the depth pass, in the lab after each of its pictures: the lab's city and the flat drawn for depth alone from the lab's camera; where the city
   // is nearer, the lab's pixel is cleared (the game's picture under it shows)
@@ -636,11 +692,15 @@ const PLAY = (() => {
           R.setRenderTarget(null); R.autoClear = false; prev.call(R, qs, P.qc);
         } finally { R.setRenderTarget(null); R.autoClear = save.ac; R.setClearColor(save.cc, save.ca); P.busy = false; }
       });
+      if (AP.pix && !P.busy && sc !== qs && R.getRenderTarget() === null) safe('pixels', () => pixCopy(R.domElement));
       return r;
     };
   }
   function dropsHide(B){
-    if (AP.hid) return; AP.hid = true; const A = SC_.apartment;
+    if (AP.hid) return; const A = SC_.apartment;
+    // (only the script's own home: the lab can still hold the last home it built for a moment after the pod opens, and its pieces have the same numbers)
+    const ps = A.recipe && A.recipe.pieces; if (ps && (B.inst.size !== ps.length || ps.some(p => { const i = B.inst.get(p.id); return !i || i.arch !== p.arch || i.seed !== p.seed; }))) return;
+    AP.hid = true;
     for (const d of A.drops || []){ const i = B.inst.get(d.id); if (i && i.pivot){ AP.hidden.push({ i, y: i.pivot.position.y, t: A.room + d.at }); i.pivot.visible = false; } else warn('apartment', 'no piece ' + d.id); }
     safe('relight', () => { B.needs = true; const PR = labWin().PodRender; if (PR && PR.sceneChanged){ PR.sceneChanged('geometry', null); PR.sceneChanged('light', null); } });   // (the lab told its scene changed: light worked out again without them)
   }

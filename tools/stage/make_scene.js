@@ -231,17 +231,21 @@ const SQT = { t0: MK.garden - 1, t1: 400 };
 crowd('sq', SC.x, SC.z, 10, 16, 6, SQT.t0, SQT.t1, { t0: tStrike + .4, t1: MG.rob1 + 2.4, x: MHIT[0], z: MHIT[1], r: 11 });
 
 /* ---------- the passer-by: past the hold-up, to the station, up the lift, onto the train ---------- */
-const RT = { speed: 1.3, intoCab: .5, lift: 3.0, toPlat: 1.6, trainIn: 2.6, doorsOpen: .7, board: 1.0, wait: .6, close: .7 };
+const RT = { speed: 1.3, intoCab: .7, lift: 3.0, toPlat: 1.6, trainIn: 2.6, doorsOpen: .7, board: 1.0, wait: .6, close: .7 };
 const by = NG.nodes[nodeNear(MHIT[0] + (CAB.x - MHIT[0])*.12, MHIT[1] + (CAB.z - MHIT[1])*.12 + .6)];
 const ax = -(CAB.z - MHIT[1]), az = CAB.x - MHIT[0], al = Math.hypot(ax, az) || 1;
 const fromN = NG.nodes[nodeNear(by[0] + ax/al*5, by[1] + az/al*5)];
-const leg1 = way(fromN[0], fromN[1], by[0], by[1]), leg2 = way(by[0], by[1], CAB.x, CAB.z), rway = leg1.concat(leg2.slice(1));
+// the lift's street door: on the side of the shaft facing along the track, +x here (the game's mtLiftSpot for this station: dout (1, 0), the door
+// r + .02 from the shaft's middle, where people stand to wait r + .34 out)
+const LDOOR = [CAB.x + .44, CAB.z], LSTAND = [CAB.x + .76, CAB.z];
+const leg1 = way(fromN[0], fromN[1], by[0], by[1]), leg2 = way(by[0], by[1], LSTAND[0], LSTAND[1]).slice(0, -1).concat([LSTAND]), rway = leg1.concat(leg2.slice(1));
 const T = {}; { const t0 = MG.pass - lenOf(leg1)/RT.speed; let tt = t0 + lenOf(rway)/RT.speed;
   T.start = t0; T.atLift = tt; T.inCab = tt += RT.intoCab; T.atTop = tt += RT.lift; T.onPlat = tt += RT.toPlat;
   T.trainAt = T.onPlat - .2; T.doorsOpen = T.trainAt + RT.doorsOpen; T.inTrain = T.doorsOpen + RT.board; T.close = T.inTrain + RT.wait; T.depart = T.close + RT.close; }
 const yPlat = P.line.MT_Y + P.line.MT_PLAT_Y, TOP = STN.lift, DOOR = STN.door, INN = STN.inn;
 { const k = [K(0, rway[0][0], rway[0][1], 'idle', rway[1][0] - rway[0][0], rway[1][1] - rway[0][1]), K(T.start, rway[0][0], rway[0][1], 'walk')];
   k.push(...walkKeys(rway, T.start, RT.speed).keys.slice(1));
+  k.push(K(T.atLift + .01, LSTAND[0], LSTAND[1], 'walk', CAB.x - LSTAND[0], 0), K(T.inCab - .05, CAB.x + .05, CAB.z, 'walk', CAB.x - LSTAND[0], 0));   // through its door, into the cab
   k.push(K(T.inCab, CAB.x, CAB.z, 'idle', DOOR[0] - CAB.x, DOOR[1] - CAB.z, 1, CURB));
   for (let n = 1; n <= 8; n++){ const u = n/8; k.push(K(T.inCab + (T.atTop - T.inCab)*u, CAB.x, CAB.z, 'idle', DOOR[0] - CAB.x, DOOR[1] - CAB.z, 1, lerp(CURB, yPlat, ss(u)) + .02)); }   // up in the lift
   k.push(K(T.onPlat, DOOR[0], DOOR[1], 'walk', DOOR[0] - TOP[0], DOOR[1] - TOP[1], 1, yPlat), K(T.doorsOpen, DOOR[0], DOOR[1], 'idle', INN[0] - DOOR[0], INN[1] - DOOR[1], 1, yPlat));
@@ -271,8 +275,11 @@ C(MG.alarm + .6, SQP);
 C(MG.alarm + 2.2, Object.assign({}, SQP, { y: 1.6, zoom: 10 }), 'ss');
 C(MG.pass - .4, Object.assign({}, SQP, { y: 1.6, zoom: 10 }));
 C(MG.pass + 2.2, { follow: 'rider', smooth: .8, dy: .4, yaw: r3(STREET.yaw), pitch: r3(35*DEG), zoom: 7.8 }, 'ease');
-C(T.depart + .3, { follow: 'rider', smooth: .8, dy: .4, yaw: r3(STREET.yaw), pitch: r3(35*DEG), zoom: 7.8 });
-C(T.depart + 2.5, { train: .5, yaw: r3(Math.PI), pitch: r3(11*DEG), zoom: 9.5 }, 'ease');
+// round to the platform side as he nears the lift (the lift's door, along the track, and the train's doors, on the platform side, both face this way)
+const LIFTV = { follow: 'rider', smooth: .8, dy: .4, yaw: .9, pitch: r3(33*DEG), zoom: 6.2 };
+C(T.atLift - 1.2, LIFTV, 'ss');
+C(T.depart + .3, LIFTV);
+C(T.depart + 3.4, { train: .5, yaw: r3(Math.PI), pitch: r3(11*DEG), zoom: 9.5 }, 'ss');
 C(OUT.t0, { train: .5, yaw: r3(Math.PI), pitch: r3(11*DEG), zoom: 9.5 });
 const OUTP = { x: r2(GC.x + 1.5*LOT), y: TARGET_Y, z: r2(GC.z + 1.5*LOT), yaw: r3(Math.PI - .5), zoom: 27, pitch: r3(31*DEG) };
 C(OUT.t0 + OUT.dur, OUTP, 'ease');

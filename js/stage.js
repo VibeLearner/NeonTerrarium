@@ -397,6 +397,14 @@ const PLAY = (() => {
   const labPC = () => { const w = labWin(); return w && w.PodContext; };
   const labB = () => { const w = labWin(); return w && w.PodBuilder && w.PodBuilder._B; };
   function B_fit(w){ try { const B = w.PodBuilder && w.PodBuilder._B; if (B){ B.cw = 0; B.camDirty = true; B.needs = true; } w.dispatchEvent(new w.Event('resize')); } catch (e) {} }   // (the lab's picture sized to its window again, after the stage's own layout above)
+  // once a second while the apartment is on: what the lab is doing, in the log and the recorder's terminal (for finding out why a machine shows it grey)
+  function labReport(t, st, B, w, ov){
+    const gi = gl => { try { if (!gl) return 'no context'; if (gl.isContextLost()) return 'CONTEXT LOST'; const e = gl.getExtension('WEBGL_debug_renderer_info'); return e ? gl.getParameter(e.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER); } catch (x) { return 'err ' + x.message; } };
+    const cvs = [...w.document.querySelectorAll('canvas')].map(c => { const r = c.getBoundingClientRect(), cs = w.getComputedStyle(c); return (c.id || c.className || 'canvas') + ' ' + c.width + 'x' + c.height + ' at ' + Math.round(r.width) + 'x' + Math.round(r.height) + (c.classList.contains('st-vis') ? ' SHOWN' : '') + (cs.display === 'none' ? ' display:none' : '') + ' op ' + cs.opacity; });
+    const fr = FURN.frame, fcs = getComputedStyle(fr), ocs = ov && getComputedStyle(ov);
+    say('lab', JSON.stringify({ t: +t.toFixed(2), gl: gi(B && B.dr && B.dr.getContext()), main: gi(renderer.getContext()), loop: !!(B && B.raf), drawnFrames: st && st.trans ? st.trans.frames.length : null, hold: st && st.trans ? st.trans.hold : null, prOn: !!(B && B.prOn), pieces: B && B.inst ? B.inst.size : 0,
+      frame: Math.round(fr.clientWidth) + 'x' + Math.round(fr.clientHeight) + ' op ' + fr.style.opacity + ' vis ' + fcs.visibility, overlay: ov ? (ov.className + ' ' + ocs.display + ' op ' + ocs.opacity + ' z ' + ocs.zIndex) : 'none', canvases: cvs }));
+  }
   function labClean(){
     const w = labWin(); if (!w || !w.document || !w.document.head) return;
     const d = w.document;
@@ -431,6 +439,7 @@ const PLAY = (() => {
     // the lab stops its own frame loop when it thinks nothing is changing (or it is warming up behind the city): while the apartment is on, it draws every frame
     if (B && B.on && !B.raf) safe('lab loop', () => { const PB = w.PodBuilder; if (B.warmHold && PB.warmHold) PB.warmHold(false); if (!B.raf && PB.pauseRender) PB.pauseRender(false); if (!B.raf) warn('apartment', 'the lab loop would not start'); });
     const D_ = PC._debug.DUR || 3.05, st = PC._debug.state(), live = ov && ov.classList.contains('live');
+    if ((G.frame % 60 === 0 && AP.repF !== G.frame) || !AP.told){ AP.told = true; AP.repF = G.frame; safe('lab report', () => labReport(t, st, B, w, ov)); }
     const wait = why => { if (++AP.heldN > 60*120){ if (AP.heldN === 60*120 + 1) warn('apartment', 'waited 120 s for the lab (' + why + '): going on'); return false; } G.held = true; G.info.aptWait = why; return true; };
     if (t < A.room){   // the hologram flies in
       const u = H0 + (D_ - H0)*holoCurve((t - A.open)/(A.room - A.open)), first = t - A.open < .5/FPS;

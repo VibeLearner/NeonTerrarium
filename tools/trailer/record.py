@@ -61,6 +61,7 @@ def main():
     ap.add_argument('--out', default=os.path.join(OUT, 'neon-terrarium-trailer.mp4'))
     ap.add_argument('--until', type=float, default=LEN, help='stop after this many seconds')
     ap.add_argument('--from', dest='start', type=float, default=0, help='start the film here (the trailer still plays from the top, the part before is just not captured)')
+    ap.add_argument('--jump', type=float, default=0, help='--film only, for testing a part: the city built at once and the film started at this many seconds (never for the real film)')
     ap.add_argument('--preview', action='store_true', help='a quick look: 30 fps, 1280 x 720, smaller file (the timing is the same as the real film)')
     ap.add_argument('--stills', action='store_true', help='only save stills at key moments (PNG) and stop')
     ap.add_argument('--headless', action='store_true', help='no browser window (some Macs draw WebGL slower or not at all headless)')
@@ -90,6 +91,9 @@ def main():
     if a.preview and not proj and not a.film and a.out == ap.get_default('out'): a.out = os.path.join(OUT, 'trailer-preview.mp4')
     every = 2 if a.preview else 1   # (a preview keeps every other frame: the trailer runs exactly the same, only half as many pictures are taken)
     first = int(round(a.start*FPS))
+    if a.film and a.jump:
+        HASH += f'&from={a.jump:g}'; a.start = max(a.start, a.jump); first = int(round(a.start*FPS))
+        if os.path.basename(a.out).startswith('neon-terrarium-film'): a.out = os.path.join(OUT, f'stage-test-from-{a.jump:g}s.mp4')
     if not shutil.which('ffmpeg') and not a.stills: sys.exit('ffmpeg is needed: brew install ffmpeg')
     from playwright.sync_api import sync_playwright
     os.makedirs(OUT, exist_ok=True)
@@ -109,7 +113,7 @@ def main():
             o = {'format': fmt, 'fromSurface': True, 'captureBeyondViewport': False}
             if fmt == 'jpeg': o['quality'] = quality or a.quality
             return base64.b64decode(cdp.send('Page.captureScreenshot', o)['data'])
-        page.on('console', lambda m: print('  page:', m.text[:300]) if m.text.startswith(('[trailer]', '[film]', '[stage]')) or m.type == 'error' else None)
+        page.on('console', lambda m: print('  page:', m.text[:1500]) if m.text.startswith(('[trailer]', '[film]', '[stage]')) or m.type == 'error' else None)
         page.on('pageerror', lambda e: print('  page error:', e))
         page.on('crash', lambda *_: print('  the page crashed (the graphics process may have run out of memory)'))
         url = f'http://127.0.0.1:{a.port}/index.html' + HASH
@@ -128,7 +132,7 @@ def main():
                 ctx.add_init_script(path=os.path.join(HERE, 'shim.js'))
                 if proj: ctx.add_init_script(script='if (window === window.top){ window.__DIR_CITY = ' + json.dumps(city) + '; window.__DIR_PROJ = ' + json.dumps(proj) + '; window.__DIR_BOOT = { mode: "play", at: 0 }; }')
                 page = ctx.new_page(); cdp = ctx.new_cdp_session(page)
-                page.on('console', lambda m: print('  page:', m.text[:300]) if m.text.startswith(('[trailer]', '[film]', '[stage]')) or m.type == 'error' else None)
+                page.on('console', lambda m: print('  page:', m.text[:1500]) if m.text.startswith(('[trailer]', '[film]', '[stage]')) or m.type == 'error' else None)
                 page.on('pageerror', lambda e: print('  page error:', e))
                 page.goto(url, wait_until='load'); navs.clear()
 
@@ -170,7 +174,7 @@ def main():
                                     '-vf', f'scale={size}:flags=lanczos', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', str(a.crf + (5 if a.preview else 0)), '-pix_fmt', 'yuv420p', '-r', str(fps), raw],
                                    stdin=subprocess.PIPE)
         t1 = time.time()
-        for f in range(frames):
+        for f in range(int(round(a.jump*FPS)) if a.film and a.jump else 0, frames):
             if a.film:   # one picture per frame the stage draws: while it waits (the apartment's lab working) the clock steps on and no picture is taken
                 n = 0; d0 = ev('PLAY.drawn')
                 while True:

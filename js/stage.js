@@ -240,7 +240,8 @@ const PLAY = (() => {
   function poseAt(p, t){
     const o = Object.assign({}, p);
     if (p.follow){ const P = CAST.get(p.follow); if (P){ const w = p.smooth ?? .6; let x = 0, z = 0, y = 0, n = 0;
-        for (let k = -5; k <= 5; k++){ const q = poseOf(P, t + k*w/5); x += q.x; z += q.z; y += q.y; n++; }
+        const tt = p.atT ?? t;   // (atT: on where they were at that moment, held)
+        for (let k = -5; k <= 5; k++){ const q = poseOf(P, tt + k*w/5); x += q.x; z += q.z; y += q.y; n++; }
         o.x = x/n + (p.dx || 0); o.z = z/n + (p.dz || 0); o.y = y/n + (p.dy ?? .5); } }
     if (p.train !== undefined){ const cp = LINE && LINE.train && LINE.train.cp && LINE.train.cp[1]; if (cp){ o.x = cp[0]; o.y = cp[1] + p.train; o.z = cp[2]; } }
     return o;
@@ -450,6 +451,9 @@ const PLAY = (() => {
     safe('lab', labClean); if (/[&#]sharp\b/.test(location.hash)) safe('sharp', labSharp);   // (off: on an Apple M2 it left the room one flat colour)
     if (/[&#]plainlab\b/.test(location.hash) && !AP.plain){ AP.plain = true; safe('plain', () => { w.PodBuilder.usePodRender(false); say('lab: PodRender off (plainlab)'); }); }
     if (B) B.needs = true;
+    // the lab's work light (its flat building light) off: the room lit by its own lamps and the day through its windows. Its own button, so the
+    // lab does everything it does for that (PodRender told, the light baked again); the bake is waited for before anything is shown (labWait)
+    if (B && B.work) safe('work light', () => { const bw = w.document.getElementById('bWork'); if (bw) bw.click(); else B.work = false; });
     if (B && (!B.cw || !B.ch)) safe('lab size', () => { w.PodBuilder.pixCap(); B.camDirty = true; warn('apartment', 'the lab had no picture size: measured again (' + B.cw + 'x' + B.ch + ')'); });
     // the lab stops its own frame loop when it thinks nothing is changing (or it is warming up behind the city): while the apartment is on, it draws every frame
     if (B && B.on && !B.raf) safe('lab loop', () => { const PB = w.PodBuilder; if (B.warmHold && PB.warmHold) PB.warmHold(false); if (!B.raf && PB.pauseRender) PB.pauseRender(false); if (!B.raf) warn('apartment', 'the lab loop would not start'); });

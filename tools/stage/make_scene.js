@@ -148,21 +148,24 @@ const MUG = { flee, fL, fleeEnd };
   const end = flee[flee.length - 1]; k.push(K(fleeEnd + .01, end[0], end[1], 'idle', -fd[0], -fd[1]));
   part('mugger', 'mugger', { shape: 'graphic buzz', skin: 1, hair: 0, top: 0, acc: 0, bot: 1 }, k, [[fleeEnd + .3, 'sweat', 2.5]]); }
 const PDOOR = P.doors.find(d => d.mega === 'police' && Math.abs(d.wall[1] - 22.8) < .1 && d.wall[0] < -36);
-for (const n of [0, 1]){   // two officers out of the station and after him, on foot: to where he stood, then along the very way he ran, behind him all the way
-  const tGo = MG.copsGo + n*.35, V = 2.6, VC = FLEE_V*1.08, GAP = 2.4 + n*.8;
-  // where they cut onto his way: the soonest point along it they can reach with him still GAP metres ahead of them when they get there
-  let best = null; for (let dj = 0; dj <= fL - 4; dj += .25){ const P = pointAt(flee, dj), cp = way(PDOOR.stand[0], PDOOR.stand[1], P[0], P[1]), tA = tGo + .35 + lenOf(cp)/V;
-    if (Math.min(fL, (tA - MG.rob1)*FLEE_V) < dj + GAP) continue; if (!best || tA < best.tA) best = { dj, cp, tA }; }
-  if (!best) throw new Error('cop ' + (n + 1) + ': nowhere to cut in behind him');
-  const cpA = best.cp.slice(0, -1).concat([pointAt(flee, best.dj)]);
-  const k = [K(0, PDOOR.wall[0], PDOOR.wall[1], 'idle', -1, 0, 0), K(tGo, PDOOR.wall[0], PDOOR.wall[1], 'run', -1, 0, 0), K(tGo + .35, cpA[0][0], cpA[0][1], 'run')];
-  const a = walkKeys(cpA, tGo + .35, V, 'run'); k.push(...a.keys.slice(1));
-  const stopD = Math.max(best.dj, fL - 2.2 - n*.9);   // (they pull up short of where he ends, still behind him, out of the picture by then)
-  const b = walkPart(flee, best.dj, stopD, a.t, VC, 'run'); k.push(...b.keys.slice(1));
+for (const n of [0, 1]){   // two officers come in from behind him, along the line he runs on: across the hold-up spot after he has left it, then on along his way, never level with him
+  const back = [-fd[0]/fl, -fd[1]/fl], V = 2.6, VC = FLEE_V*1.08, GAP = 4.5 + n*.9;
+  // they cross the hold-up spot when he is GAP metres down his way, and set off when the alarm goes (not before: nothing has happened yet):
+  // where they start is as far back along his line as that leaves them time to run
+  const tAt = MG.rob1 + GAP/FLEE_V, want = (tAt - (MG.alarm + .3 + n*.3))*V;
+  let cpA = null; for (let FAR = 4; FAR <= 30; FAR += .25){ const P0 = [MHIT[0] + back[0]*FAR + (n ? .5 : -.5)*back[1], MHIT[1] + back[1]*FAR - (n ? .5 : -.5)*back[0]], c = way(P0[0], P0[1], flee[0][0], flee[0][1]);
+    if (!cpA || Math.abs(lenOf(c) - want) < Math.abs(lenOf(cpA) - want)) cpA = c; }
+  const tGo = tAt - lenOf(cpA)/V;
+  const k = [K(0, cpA[0][0], cpA[0][1], 'idle', -back[0], -back[1]), K(tGo, cpA[0][0], cpA[0][1], 'run')];
+  const a = walkKeys(cpA, tGo, V, 'run'); k.push(...a.keys.slice(1));
+  const stopD = fL - 2.2 - n*.9;
+  const b = walkPart(flee, 0, stopD, a.t, VC, 'run'); k.push(...b.keys.slice(1));
   const q = pointAt(flee, stopD), e = flee[flee.length - 1]; k.push(K(b.t + .01, q[0], q[1], 'idle', e[0] - q[0], e[1] - q[1]));
-  // the chase as written: never level with him (his place along the run against theirs, every tenth of a second)
-  for (let t = a.t; t <= b.t; t += .1){ const dm = Math.min(fL, Math.max(0, (t - MG.rob1)*FLEE_V)), dc = Math.min(stopD, best.dj + (t - a.t)*VC); if (dc > dm - 1) throw new Error('cop ' + (n + 1) + ' would catch up at ' + t.toFixed(1)); }
-  console.log('cop', n + 1, 'joins his run', best.dj, 'm along it at', a.t.toFixed(2), '(he left at', MG.rob1.toFixed(2) + ')', 'stops at', b.t.toFixed(2));
+  // the chase as written: on his way they are always behind him, by a metre at the least
+  for (let t = a.t; t <= b.t; t += .1){ const dm = Math.min(fL, Math.max(0, (t - MG.rob1)*FLEE_V)), dc = Math.min(stopD, (t - a.t)*VC); if (dc > dm - 1) throw new Error('cop ' + (n + 1) + ' would catch up at ' + t.toFixed(1)); }
+  // and on their way in they never pass him: every point of their run in is farther from his escape than the hold-up spot is
+  for (const pt of cpA){ const along = (pt[0] - MHIT[0])*fd[0]/fl + (pt[1] - MHIT[1])*fd[1]/fl; if (along > .8) throw new Error('cop ' + (n + 1) + ' comes in ahead of the hold-up (' + along.toFixed(1) + ' m)'); }
+  console.log('cop', n + 1, 'leaves', tGo.toFixed(2), 'crosses the spot', a.t.toFixed(2), '(he left at', MG.rob1.toFixed(2) + ')', 'stops at', b.t.toFixed(2), 'from', lenOf(cpA).toFixed(1), 'm back');
   part('cop' + (n + 1), 'officer', { role: 'cop' }, k);
 }
 // the drone: off its pad when the alarm goes, over the hold-up, its light red on the mugger, then on him as he runs
@@ -171,21 +174,18 @@ const drone = { station: 0, index: DR.k, keys: [] };
 { const R0 = DR.p, cruise = R0[1] + 1.2, low = CURB + 4.4, k = drone.keys, yawTo = (x, z, x2, z2) => r3(Math.atan2(x2 - x, z2 - z));
   const DK = (t, x, y, z, yw, light, red, e = 'lin') => k.push([r3(t), r2(x), r2(y), r2(z), yw, light, red, e]);
   const yw0 = yawTo(R0[0], R0[2], MHIT[0], MHIT[1]);
-  // up off its pad while the camera is still away, then on patrol: slow circles over the square, its light low and white
-  const PC = [MHIT[0] + 2.6, MHIT[1] - 1.8], PR = 3.4, PV = 1.4, hi = low + 1.6, tUp = MK.back + .5, tPat = tUp + 3;
-  const pat = t => { const a = (t - tPat)*PV/PR + 2.2; return [PC[0] + Math.cos(a)*PR, PC[1] + Math.sin(a)*PR, r3(Math.atan2(-Math.sin(a), Math.cos(a)))]; };
-  DK(0, R0[0], R0[1], R0[2], yw0, 0, 0); DK(tUp, R0[0], R0[1], R0[2], yw0, 0, 0);
-  const p0 = pat(tPat); DK(tUp + 1.2, R0[0], cruise, R0[2], yw0, .3, 0, 'ss'); DK(tPat, p0[0], hi, p0[1], p0[2], .35, 0, 'ss');
-  for (let t = tPat + .25; t < MG.alarm - 1e-9; t += .25){ const q = pat(t); DK(t, q[0], hi, q[1], q[2], .35, 0); }
-  // the alarm: it breaks off, turns and glides over (about three metres a second at most), light full on it, then red
-  const pa = pat(MG.alarm); DK(MG.alarm, pa[0], hi, pa[1], pa[2], .35, 0);
-  const dOver = Math.hypot(pa[0] - MHIT[0], pa[1] - MHIT[1]), tOver = Math.min(MG.rob1 - .8, MG.alarm + Math.max(1.4, dOver/2.6));
-  DK(MG.alarm + .6, lerp(pa[0], MHIT[0], .12), hi, lerp(pa[1], MHIT[1] - .4, .12), yawTo(pa[0], pa[1], MHIT[0], MHIT[1]), .7, 0, 'ss');
-  DK(tOver, MHIT[0], low, MHIT[1] - .4, yawTo(pa[0], pa[1], MHIT[0], MHIT[1]), 1, 0, 'ss');
-  DK(Math.max(tOver + .4, MG.rob1 - .4), MHIT[0], low, MHIT[1] - .4, yawTo(pa[0], pa[1], MHIT[0], MHIT[1]), 1, 1, 'ss');
-  console.log('drone: patrol from', tPat.toFixed(2), 'glide', dOver.toFixed(1), 'm,', 'alarm', MG.alarm.toFixed(2), 'over him at', tOver.toFixed(2), '(he runs at', MG.rob1.toFixed(2) + ')');
-  for (let t = MG.rob1; t <= fleeEnd + .01; t += .5){ const q = pointAt(flee, Math.min(fL, (t - MG.rob1)*FLEE_V)); DK(t, q[0], low, q[1] - .4, yawTo(MHIT[0], MHIT[1], q[0], q[1]), 1, 1); }
-  const end = flee[flee.length - 1]; DK(fleeEnd + 60, end[0], low, end[1] - .4, k[k.length - 1][4], 1, 1); }
+  // off its pad while the apartment hides the city, to the start of a straight run; then one straight fly-by along the line he will run on, slowing
+  // to a stop right over the hold-up as it happens (no turn, no swoop: its speed eases off and nothing else changes), light on it, then red
+  const ux = fd[0]/fl, uz = fd[1]/fl, yw = r3(Math.atan2(ux, uz)), hi = low + .9, VD = 2.4, TB = 1.8;   // TB: the seconds it takes to slow from VD to a stop
+  const tArr = MG.reach + .2, sAt = t => t >= tArr ? 0 : t >= tArr - TB ? -VD*(tArr - t)*(tArr - t)/(2*TB) : -(VD*TB/2 + VD*(tArr - TB - t));
+  const tLine = MK.back - .6, s0 = sAt(tLine), L0 = [MHIT[0] + ux*s0, MHIT[1] - .4 + uz*s0];
+  DK(0, R0[0], R0[1], R0[2], yw0, 0, 0); DK(MK.open + 1, R0[0], R0[1], R0[2], yw0, 0, 0);
+  DK(MK.open + 2.2, R0[0], cruise, R0[2], yw0, .3, 0, 'ss'); DK(tLine - .5, L0[0], hi, L0[1], yw, .3, 0, 'ss'); DK(tLine, L0[0], hi, L0[1], yw, .3, 0);
+  for (let t = tLine + .25; t < tArr - 1e-9; t += .25){ const sv = sAt(t); DK(t, MHIT[0] + ux*sv, hi, MHIT[1] - .4 + uz*sv, yw, t > MG.alarm ? 1 : .3, 0); }
+  DK(tArr, MHIT[0], hi, MHIT[1] - .4, yw, 1, 0); DK(Math.max(tArr + .5, MG.reach + .7), MHIT[0], hi, MHIT[1] - .4, yw, 1, 1, 'ss'); DK(MG.rob1, MHIT[0], hi, MHIT[1] - .4, yw, 1, 1);
+  console.log('drone: on its line from', tLine.toFixed(2), (-s0).toFixed(1), 'm back, over the hold-up at', tArr.toFixed(2), '(alarm', MG.alarm.toFixed(2) + ', he runs at', MG.rob1.toFixed(2) + ')');
+  for (let t = MG.rob1 + .5; t <= fleeEnd + .01; t += .5){ const q = pointAt(flee, Math.min(fL, (t - MG.rob1)*FLEE_V)); DK(t, q[0], hi, q[1] - .4, yw, 1, 1); }
+  const end = flee[flee.length - 1]; DK(fleeEnd + 60, end[0], hi, end[1] - .4, k[k.length - 1][4], 1, 1); }
 
 // the square's crowd: people crossing it every way and standing about in twos and threes; when it happens they stop and stare
 const RC = rng(4401);
@@ -268,9 +268,17 @@ for (let t = 0; t <= MK.dive + 1e-9; t += .25){ const u = ease(seg(t, .3, MK.bui
 C(MK.p[0], { follow: 'deepa', smooth: .6, dy: .5, yaw: GV.y1, pitch: r3(GV.pitch), zoom: 4.4 }, 'ease');
 C(MK.p[1] - .3, { follow: 'deepa', smooth: .6, dy: .5, yaw: GV.y1, pitch: r3(GV.pitch), zoom: 4.4 });
 C(MK.p[1] + 2.2, { follow: 'kwame', smooth: .8, dy: .5, yaw: GV.y2, pitch: r3(GV.pitch), zoom: 4.4 }, 'ease');
-C(MK.garden, { follow: 'kwame', smooth: .8, dy: .5, yaw: GV.y2, pitch: r3(GV.pitch), zoom: 4.4 });
+C(MK.open, { follow: 'kwame', smooth: .8, dy: .5, yaw: GV.y2, pitch: r3(GV.pitch), zoom: 4.4 });
+// the hologram (furnish.html flyCam) starts, and so ends on the way back, looking where the game camera looked when it opened, as wide as the whole
+// city plus a plot each side (holoStart.w = 2*ext + 2*LOT, ext the farthest plot's centre from the middle). Behind the lab, the camera takes that same
+// framing, so when the hologram fades the game's view under it is the very picture it ended on
+const EXT = Math.max(...P.plots.map(q => Math.max(Math.abs(q[0]), Math.abs(q[1]))))*LOT, WIDEZ = r3((2*EXT + 2*LOT)/(2*16/9));
+const WIDE = { follow: 'kwame', atT: r3(MK.open), smooth: .8, dy: .5, yaw: GV.y2, pitch: r3(GV.pitch), zoom: WIDEZ };
+C(MK.open + .8, WIDE);
+C(MK.garden, WIDE);
+console.log('hologram framing: zoom', WIDEZ, '(city reach', EXT + ')');
 const SQP = { x: r2(MP[0]), y: r3(CURB + .5), z: r2(MP[1]), yaw: r3(STREET.yaw), pitch: r3(STREET.pitch), zoom: STREET.zoom };
-C(MK.square, Object.assign({ hump: 1.6 }, SQP), 'ease');
+C(MK.square, SQP, 'ease');   // (down from the whole city to the square: no hump, it starts out wide)
 C(MG.alarm + .6, SQP);
 C(MG.alarm + 2.2, Object.assign({}, SQP, { y: 1.6, zoom: 10 }), 'ss');
 C(MG.pass - .4, Object.assign({}, SQP, { y: 1.6, zoom: 10 }));
@@ -295,12 +303,11 @@ const shadowBox = [[0, 150], [r3(MK.dive), 150], [r3(MK.dive + .01), 0, 'hold']]
 
 /* ---------- the person cam ---------- */
 const monitor = [
-  { t0: MK.p[0] + .1, t1: MK.p[1], actor: 'deepa', name: 'DEEPA RAO', sub: 'name verified', cam: 'CAM 12', clock: 'D1 10:00', yaw: r3(GV.y1 + .9), pitch: r3(48*DEG), fade: .3,
-    log: [[MK.p[0] + .6, 'D1 10:00', 'Marcus calls across the lawn: "Deepa!"'], [MK.p[0] + 1.8, 'D1 10:01', 'Deepa complains to Marcus about the shift at the foundry.'],
-          [MK.p[0] + 3.0, 'D1 10:02', 'Marcus asks how a courier ever gets a day off. Deepa laughs.'], [MK.p[0] + 4.3, 'D1 10:03', 'Deepa and Marcus, same lawn, same hour. 5 days running.']] },
-  { t0: MK.p[1] + .1, t1: MK.door, actor: 'kwame', name: 'KWAME MENSAH', sub: 'name verified', cam: 'CAM 07', clock: 'D1 10:07', yaw: r3(GV.y2 - .9), pitch: r3(48*DEG), fade: .5,
-    log: [[MK.p[1] + .6, 'D1 10:07', 'Name tag on Kwame: "Kwame."'], [MK.p[1] + 1.8, 'D1 10:08', 'Kwame shows Eun a photo: the crew at the night market.'],
-          [MK.p[1] + 3.0, 'D1 10:09', 'Kwame lives at Block 12. Eun lives two doors down.'], [MK.p[1] + 4.3, 'D1 10:10', 'Kwame works as a line worker. Nights, mostly.']] }];
+  { t0: MK.p[0] + .1, t1: MK.p[1], actor: 'deepa', name: 'DEEPA', sub: 'name from conversation', cam: 'CAM 12', clock: 'D1 10:00', yaw: r3(GV.y1 + .9), pitch: r3(48*DEG), fade: .3,
+    log: [[MK.p[0] + .6, 'D1 10:00', 'Man yells from across the street: "Deepa!"'], [MK.p[0] + 2.0, 'D1 10:01', 'Identity pulled from conversation: Deepa'],
+          [MK.p[0] + 3.6, 'D1 10:02', 'Conversation: has she been keeping well, after everything that happened']] },
+  { t0: MK.p[1] + .1, t1: MK.door, actor: 'kwame', name: 'UNIDENTIFIED', sub: '', cam: 'CAM 07', clock: 'D1 10:07', yaw: r3(GV.y2 - .9), pitch: r3(48*DEG), fade: .5,
+    log: [[MK.door - .4, 'D1 10:09', 'Entered Block 12, residential tower']] }];
 const brackets = [[MK.p[0], MK.p[1], 'deepa'], [MK.p[1], MK.door - .6, 'kwame']];
 // the front door: opens as Kwame gets to it, shuts behind him
 const doors = [[HOME.door.key, [[0, 0], [r3(MK.door - 1.1), 0], [r3(MK.door - .5), 1, 'ss'], [r3(MK.door + .4), 1], [r3(MK.door + 1.2), 0, 'ss']]]];

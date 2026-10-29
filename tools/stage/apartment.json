@@ -22,15 +22,15 @@
     }
    ],
    "doorways": [
-    "57-58",
+    "44-45",
     "120-121"
    ],
    "door": {
-    "k": 103,
+    "k": 64,
     "side": "E"
    },
    "night": false,
-   "hh": 20261021,
+   "hh": 20261023,
    "variant": "small A",
    "pod": {
     "cell": [
@@ -42,62 +42,41 @@
     "zone": "low",
     "kind": "tower"
    },
-   "facade": {
-    "main": "N",
-    "tier": "small",
-    "band": false,
-    "faces": [
-     {
-      "side": "S",
-      "exterior": false,
-      "n": 0
-     },
-     {
-      "side": "N",
-      "exterior": true,
-      "n": 1
-     },
-     {
-      "side": "W",
-      "exterior": false,
-      "n": 0
-     },
-     {
-      "side": "E",
-      "exterior": false,
-      "n": 0
-     }
-    ]
+   "household": {
+    "seed": 20261023,
+    "label": "Household",
+    "relation": "single",
+    "n": 1
    }
   },
   "walls": "cutaway",
   "fin": {
    "floor": {
     "0": {
-     "arch": "hbfloorwave",
-     "seed": 178199
+     "arch": "fltatami",
+     "seed": 602115
     },
     "1": {
-     "arch": "hbfloorwave",
-     "seed": 178199
+     "arch": "fltatami",
+     "seed": 602115
     },
     "2": {
-     "arch": "flstone",
-     "seed": 482004
+     "arch": "hbfloorhex",
+     "seed": 461851
     }
    },
    "wall": {
     "0": {
-     "arch": "hbwallposter",
-     "seed": 702056
+     "arch": "wcbrick",
+     "seed": 571096
     },
     "1": {
-     "arch": "wcpod",
-     "seed": 723082
+     "arch": "wcwood",
+     "seed": 690881
     },
     "2": {
      "arch": "wcpod",
-     "seed": 334083
+     "seed": 882742
     }
    },
    "seg": {}
@@ -105,13 +84,13 @@
   "pieces": [
    {
     "id": 1,
-    "arch": "windrape",
-    "seed": 486457,
-    "x": 3.252,
+    "arch": "winsheer",
+    "seed": 842953,
+    "x": 5,
     "y": 0,
     "z": 0,
     "ry": 0,
-    "wh": 0.1,
+    "wh": 0,
     "anc": "b",
     "parent": 0,
     "colors": {},
@@ -119,156 +98,79 @@
    },
    {
     "id": 2,
-    "arch": "counter",
-    "seed": 51207,
-    "x": 5.4,
+    "arch": "winshoji",
+    "seed": 662440,
+    "x": 1.5,
     "y": 0,
-    "z": 0.35,
+    "z": 0,
     "ry": 0,
     "wh": 0,
+    "anc": "b",
     "parent": 0,
     "colors": {},
     "light": null
    },
    {
     "id": 3,
-    "arch": "platform",
-    "seed": 30311,
-    "x": 1.3,
+    "arch": "winshoji",
+    "seed": 816919,
+    "x": 0,
     "y": 0,
-    "z": 0.75,
-    "ry": 0,
+    "z": 1.75,
+    "ry": 1.5708,
     "wh": 0,
+    "anc": "b",
     "parent": 0,
     "colors": {},
     "light": null
    },
    {
     "id": 4,
-    "arch": "slab",
-    "seed": 77015,
-    "x": 4.7,
+    "arch": "winvalance",
+    "seed": 420369,
+    "x": 0,
     "y": 0,
-    "z": 1.5,
-    "ry": 0,
+    "z": 4,
+    "ry": 1.5708,
     "wh": 0,
+    "anc": "b",
     "parent": 0,
     "colors": {},
     "light": null
    },
    {
     "id": 5,
-    "arch": "retro",
-    "seed": 11811,
-    "x": 4.7,
+    "arch": "bathshower",
+    "seed": 267886,
+    "x": 1,
     "y": 0,
-    "z": 2.55,
+    "z": 5,
     "ry": 3.1416,
     "wh": 0,
+    "anc": "b",
     "parent": 0,
     "colors": {},
     "light": null
    },
    {
     "id": 6,
-    "arch": "floorlamp",
-    "seed": 7707,
-    "x": 6.05,
+    "arch": "bathtoilet",
+    "seed": 425078,
+    "x": 0.25,
     "y": 0,
-    "z": 2.6,
-    "ry": 0,
+    "z": 5,
+    "ry": 3.1416,
     "wh": 0,
+    "anc": "b",
     "parent": 0,
     "colors": {},
-    "light": {
-     "color": "#ffb067",
-     "k": 1.35,
-     "on": true
-    }
+    "light": null
    },
    {
     "id": 7,
-    "arch": "monstera",
-    "seed": 5505,
-    "x": 3.45,
-    "y": 0,
-    "z": 1.05,
-    "ry": 0,
-    "wh": 0,
-    "parent": 0,
-    "colors": {},
-    "light": null
-   },
-   {
-    "id": 8,
-    "arch": "floorlamp",
-    "seed": 8808,
-    "x": 2.55,
-    "y": 0,
-    "z": 0.45,
-    "ry": 0,
-    "wh": 0,
-    "parent": 0,
-    "colors": {},
-    "light": {
-     "color": "#ffb067",
-     "k": 1.35,
-     "on": true
-    }
-   },
-   {
-    "id": 9,
-    "arch": "pendant",
-    "seed": 9909,
-    "x": 4.6,
-    "y": 0,
-    "z": 4.2,
-    "ry": 0,
-    "wh": 0,
-    "parent": 0,
-    "colors": {},
-    "light": {
-     "color": "#ffb067",
-     "k": 1.35,
-     "on": true
-    }
-   },
-   {
-    "id": 10,
-    "arch": "pendant",
-    "seed": 1010,
-    "x": 1.0,
-    "y": 0,
-    "z": 4.0,
-    "ry": 0,
-    "wh": 0,
-    "parent": 0,
-    "colors": {},
-    "light": {
-     "color": "#ffb067",
-     "k": 1.35,
-     "on": true
-    }
-   },
-   {
-    "id": 11,
-    "arch": "bathtub",
-    "seed": 390977,
-    "x": 0.5209,
-    "y": 0,
-    "z": 3.5,
-    "ry": 0,
-    "wh": 0,
-    "anc": "c",
-    "parent": 0,
-    "colors": {},
-    "light": null
-   },
-   {
-    "id": 12,
-    "arch": "bathtoilet",
-    "seed": 425078,
-    "x": 1.75,
+    "arch": "hbbathsink",
+    "seed": 403238,
+    "x": 1.5,
     "y": 0,
     "z": 3.02,
     "ry": 0,
@@ -279,10 +181,268 @@
     "light": null
    },
    {
+    "id": 8,
+    "arch": "platform",
+    "seed": 577817,
+    "x": 0.515,
+    "y": 0,
+    "z": 2.98,
+    "ry": 3.1416,
+    "wh": 0,
+    "anc": "b",
+    "parent": 0,
+    "colors": {},
+    "light": null
+   },
+   {
+    "id": 9,
+    "arch": "livend",
+    "seed": 352833,
+    "x": 1.25,
+    "y": 0,
+    "z": 2.75,
+    "ry": 3.1416,
+    "wh": 0,
+    "anc": "c",
+    "parent": 0,
+    "colors": {},
+    "light": null
+   },
+   {
+    "id": 10,
+    "arch": "locker",
+    "seed": 664790,
+    "x": 2.5,
+    "y": 0,
+    "z": 0,
+    "ry": 0,
+    "wh": 0,
+    "anc": "b",
+    "parent": 0,
+    "colors": {},
+    "light": null
+   },
+   {
+    "id": 11,
+    "arch": "kitchenette",
+    "seed": 283033,
+    "x": 6.5,
+    "y": 0,
+    "z": 1.5,
+    "ry": 4.7124,
+    "wh": 0,
+    "anc": "b",
+    "parent": 0,
+    "colors": {},
+    "light": null
+   },
+   {
+    "id": 12,
+    "arch": "appdish",
+    "seed": 940575,
+    "x": 6.5,
+    "y": 0,
+    "z": 0.75,
+    "ry": 4.7124,
+    "wh": 0,
+    "anc": "b",
+    "parent": 0,
+    "colors": {},
+    "light": null
+   },
+   {
     "id": 13,
-    "arch": "hbbathsink",
-    "seed": 487512,
-    "x": 0.5,
+    "arch": "carseat",
+    "seed": 282561,
+    "x": 4,
+    "y": 0,
+    "z": 3.75,
+    "ry": 1.5708,
+    "wh": 0,
+    "anc": "c",
+    "parent": 0,
+    "colors": {},
+    "light": null
+   },
+   {
+    "id": 14,
+    "arch": "spool",
+    "seed": 430636,
+    "x": 5.5,
+    "y": 0,
+    "z": 4,
+    "ry": 1.5708,
+    "wh": 0,
+    "anc": "c",
+    "parent": 0,
+    "colors": {},
+    "light": null
+   },
+   {
+    "id": 15,
+    "arch": "cafe",
+    "seed": 247663,
+    "x": 4.5,
+    "y": 0,
+    "z": 1.5,
+    "ry": 3.1416,
+    "wh": 0,
+    "anc": "c",
+    "parent": 0,
+    "colors": {},
+    "light": null
+   },
+   {
+    "id": 16,
+    "arch": "shell",
+    "seed": 937805,
+    "x": 4.25,
+    "y": 0,
+    "z": 0.75,
+    "ry": 0,
+    "wh": 0,
+    "anc": "c",
+    "parent": 0,
+    "colors": {},
+    "light": null
+   },
+   {
+    "id": 17,
+    "arch": "pendant",
+    "seed": 931553,
+    "x": 4.25,
+    "y": 0,
+    "z": 1.75,
+    "ry": 1.5708,
+    "wh": 0,
+    "anc": "c",
+    "parent": 0,
+    "colors": {},
+    "light": {
+     "color": "#ffb067",
+     "k": 1.35,
+     "on": true
+    }
+   },
+   {
+    "id": 18,
+    "arch": "pendant",
+    "seed": 904053,
+    "x": 1.25,
+    "y": 0,
+    "z": 1.75,
+    "ry": 0,
+    "wh": 0,
+    "anc": "c",
+    "parent": 0,
+    "colors": {},
+    "light": {
+     "color": "#ffb067",
+     "k": 1.35,
+     "on": true
+    }
+   },
+   {
+    "id": 19,
+    "arch": "pendant",
+    "seed": 435438,
+    "x": 1.25,
+    "y": 0,
+    "z": 3.75,
+    "ry": 1.5708,
+    "wh": 0,
+    "anc": "c",
+    "parent": 0,
+    "colors": {},
+    "light": {
+     "color": "#ffb067",
+     "k": 1.35,
+     "on": true
+    }
+   },
+   {
+    "id": 20,
+    "arch": "fern",
+    "seed": 473774,
+    "x": 3.5,
+    "y": 0,
+    "z": 0.5,
+    "ry": 3.1416,
+    "wh": 0,
+    "anc": "c",
+    "parent": 0,
+    "colors": {},
+    "light": null
+   },
+   {
+    "id": 21,
+    "arch": "floorlamp",
+    "seed": 371687,
+    "x": 6.25,
+    "y": 0,
+    "z": 4.25,
+    "ry": 4.7124,
+    "wh": 0,
+    "anc": "c",
+    "parent": 0,
+    "colors": {},
+    "light": {
+     "color": "#ffb067",
+     "k": 1.35,
+     "on": true
+    }
+   },
+   {
+    "id": 22,
+    "arch": "hblightlamp",
+    "seed": 614145,
+    "x": 2.8175,
+    "y": 0,
+    "z": 2.75,
+    "ry": 4.7124,
+    "wh": 0,
+    "anc": "b",
+    "parent": 0,
+    "colors": {},
+    "light": {
+     "color": "#ffb067",
+     "k": 1.35,
+     "on": true
+    }
+   },
+   {
+    "id": 23,
+    "arch": "peg",
+    "seed": 647615,
+    "x": 0,
+    "y": 0,
+    "z": 0.5,
+    "ry": 1.5708,
+    "wh": 0,
+    "anc": "b",
+    "parent": 0,
+    "colors": {},
+    "light": null
+   },
+   {
+    "id": 24,
+    "arch": "hbmirhatch",
+    "seed": 615704,
+    "x": 0,
+    "y": 0,
+    "z": 3.25,
+    "ry": 1.5708,
+    "wh": 0,
+    "anc": "b",
+    "parent": 0,
+    "colors": {},
+    "light": null
+   },
+   {
+    "id": 25,
+    "arch": "stringlights",
+    "seed": 119548,
+    "x": 3,
     "y": 0,
     "z": 5,
     "ry": 3.1416,
@@ -290,21 +450,127 @@
     "anc": "b",
     "parent": 0,
     "colors": {},
+    "light": {
+     "color": "#ffb067",
+     "k": 1.35,
+     "on": true
+    }
+   },
+   {
+    "id": 26,
+    "arch": "mirwall",
+    "seed": 402481,
+    "x": 0.5,
+    "y": 0,
+    "z": 0,
+    "ry": 0,
+    "wh": 0,
+    "anc": "b",
+    "parent": 0,
+    "colors": {},
+    "light": null
+   },
+   {
+    "id": 27,
+    "arch": "rugrag",
+    "seed": 373720,
+    "x": 5,
+    "y": 0,
+    "z": 3.5,
+    "ry": 0,
+    "wh": 0,
+    "anc": "c",
+    "parent": 0,
+    "colors": {},
+    "light": null
+   },
+   {
+    "id": 28,
+    "arch": "rugrag",
+    "seed": 507375,
+    "x": 1.25,
+    "y": 0,
+    "z": 1.5,
+    "ry": 0,
+    "wh": 0,
+    "anc": "c",
+    "parent": 0,
+    "colors": {},
+    "light": null
+   },
+   {
+    "id": 29,
+    "arch": "rugbath",
+    "seed": 578357,
+    "x": 1,
+    "y": 0,
+    "z": 3.75,
+    "ry": 0,
+    "wh": 0,
+    "anc": "c",
+    "parent": 0,
+    "colors": {},
+    "light": null
+   },
+   {
+    "id": 30,
+    "arch": "lamp",
+    "seed": 176463,
+    "x": -0.155,
+    "y": 0.5,
+    "z": 0.3,
+    "ry": 0,
+    "wh": 0,
+    "anc": "c",
+    "parent": 8,
+    "colors": {},
+    "light": {
+     "color": "#ffb067",
+     "k": 1.35,
+     "on": true
+    }
+   },
+   {
+    "id": 31,
+    "arch": "clutdish",
+    "seed": 318465,
+    "x": -0.1144,
+    "y": 0.5277,
+    "z": 0,
+    "ry": 0,
+    "wh": 0,
+    "anc": "c",
+    "parent": 14,
+    "colors": {},
+    "light": null
+   },
+   {
+    "id": 32,
+    "arch": "clutcounter",
+    "seed": 251548,
+    "x": 0.1644,
+    "y": 0.5277,
+    "z": 0,
+    "ry": 0,
+    "wh": 0,
+    "anc": "c",
+    "parent": 14,
+    "colors": {},
     "light": null
    }
   ]
  },
  "drops": [
   {
-   "id": 7,
+   "id": 20,
    "at": 0.5
   },
   {
-   "id": 6,
+   "id": 21,
    "at": 1.9
   },
   {
-   "id": 5,
+   "id": 13,
    "at": 3.3
   }
  ],
@@ -312,5 +578,6 @@
  "labPan": [
   0.3,
   0.6
- ]
+ ],
+ "note": "The whole flat as Furnish pod furnished this pod itself (PodBuilder.furnishFor, household seed 20261023, same floor plan), kept as it came; all its lights warm. Three of its pieces start hidden and are set down in the film: the fern, the floor lamp, the car-seat sofa."
 }

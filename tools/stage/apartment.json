@@ -180,7 +180,11 @@
     "wh": 0,
     "parent": 0,
     "colors": {},
-    "light": null
+    "light": {
+     "color": "#ffb067",
+     "k": 1.35,
+     "on": true
+    }
    },
    {
     "id": 7,
@@ -206,7 +210,45 @@
     "wh": 0,
     "parent": 0,
     "colors": {},
-    "light": null
+    "light": {
+     "color": "#ffb067",
+     "k": 1.35,
+     "on": true
+    }
+   },
+   {
+    "id": 9,
+    "arch": "pendant",
+    "seed": 9909,
+    "x": 4.6,
+    "y": 0,
+    "z": 4.2,
+    "ry": 0,
+    "wh": 0,
+    "parent": 0,
+    "colors": {},
+    "light": {
+     "color": "#ffb067",
+     "k": 1.35,
+     "on": true
+    }
+   },
+   {
+    "id": 10,
+    "arch": "pendant",
+    "seed": 1010,
+    "x": 1.0,
+    "y": 0,
+    "z": 4.0,
+    "ry": 0,
+    "wh": 0,
+    "parent": 0,
+    "colors": {},
+    "light": {
+     "color": "#ffb067",
+     "k": 1.35,
+     "on": true
+    }
    }
   ]
  },

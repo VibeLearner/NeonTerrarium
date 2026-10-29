@@ -260,6 +260,7 @@ const PLAY = (() => {
     updateCamera = function (dt){
       if (rolling) safe('frame', () => {
         camAt(G.t);
+        if (AP.camM) Object.assign(CAMP, AP.camM);   // (the apartment in the real city: the game camera matched to the lab's, bgGame)
         if (window.__CAM_OVR) Object.assign(CAMP, window.__CAM_OVR);   // (checking only: tools/stage/look.js tries other camera angles; never set in a recording)
         camGoal.set(CAMP.x, CAMP.y, CAMP.z); camT.copy(camGoal);
         yaw = yawT = CAMP.yaw; zoom = zoomT = CAMP.zoom; PITCH = pitchT = CAMP.pitch;
@@ -497,12 +498,13 @@ const PLAY = (() => {
       if (PC.transitioning && wait('the hologram to end')) return;
       if (!AP.roomOk){ const lw = labWait(); if (lw && wait('the room: ' + lw)) return; AP.roomOk = true; }
       fr.style.opacity = '1';
+      if (!AP.bg) safe('real city', () => bgGame(true, st, B, w));
       for (const d of AP.hidden){ const u = (t - d.t)/.75; d.i.pivot.visible = u >= 0; if (u < 0) continue; const e = 1 - Math.pow(1 - Math.min(1, u), 3); d.i.pivot.position.y = d.y + .45*(1 - e); }
       return;
     }
     if (t < A.back){   // the hologram flies back out, to the game's view as it was left
       for (const d of AP.hidden){ d.i.pivot.visible = true; d.i.pivot.position.y = d.y; }
-      if (!AP.rev){ AP.rev = true;
+      if (!AP.rev){ AP.rev = true; if (AP.bg) safe('real city off', () => bgGame(false));
         safe('holo frame', () => { const S0 = st && st.city && st.city.holoStart; if (S0 && AP.cityW){ S0.w = AP.cityW; S0.exact = true; } });   // (out to the whole city again: the framing the game camera takes behind it)
         if (st && !st.trans){ st.trans = { t0: performance.now(), vt: D_ - .01, last: performance.now(), drift: 0, gate: false, rm: false, frames: [], onDone: null, resolve(){}, skipped: false, lhDone: true, hold: D_ - .01 }; PC.transitioning = true; }
         FURN.hold = false;   // (the city drawn again underneath, from where the camera was left)
@@ -552,6 +554,67 @@ const PLAY = (() => {
     g.textAlign = 'right'; g.fillStyle = 'rgba(160,255,250,.8)'; g.fillText('LIDAR > RGB  PASS 2/2', W - fs*2, H - fs*3.2); g.textAlign = 'left'; g.globalAlpha = 1;
     fr.style.clipPath = "path('" + (keep.length ? keep.join('') : 'M0 0z') + "')"; R.last = 'on';   // (a clip, not an image mask: applied the same frame, nothing to decode)
   }
+  // The room in the real city: behind the flat, the game itself draws the street, the garden and the towers from a camera matched to the lab's
+  // (both orthographic; the lab's city is the game's turned and scaled by M, so the lab camera taken back through M is the game camera), the home's
+  // own building left out of it (the flat stands on its plot, on the ground). The lab draws only the flat, on a clear background, and where the
+  // lab's copy of the city is nearer the camera than the flat (a billboard, a lamp, a tree in front), it leaves the flat out: the game's own
+  // thing shows there, so what is in front stays in front and what is behind stays behind.
+  function bgGame(on, st, B, w){
+    if (on){
+      w = w || labWin(); B = B || labB(); st = st || labPC()._debug.state(); const city = st && st.city; if (!w || !B || !B.cam || !city || !city.M) return;
+      const Mi = city.M.clone().invert(), cam = B.cam; cam.updateMatrixWorld(); const d = cam.getWorldDirection(new THREE.Vector3());
+      const tg = cam.position.clone().add(d.clone().multiplyScalar(24)).applyMatrix4(Mi), dg = d.clone().transformDirection(Mi), sc = Math.hypot(city.M.elements[0], city.M.elements[8]);
+      AP.camM = { x: tg.x, y: tg.y, z: tg.z, yaw: Math.atan2(-dg.x, -dg.z), pitch: Math.asin(-dg.y), zoom: (cam.top - cam.bottom)/2/cam.zoom/sc };
+      const dc = w.document; if (!dc.getElementById('stBgGame')){ const e = dc.createElement('style'); e.id = 'stBgGame'; e.textContent = 'html,body,#bStage{background:transparent!important}#bSky{visibility:hidden!important}'; dc.head.appendChild(e); }
+      const PC = w.PodContext; if (!AP.bd0){ AP.bd0 = PC.backdrop; PC.backdrop = () => null; }
+      homeHide(true); FURN.hold = false; punchOn(w, B, city); AP.bg = true; B.needs = true;
+      say('apartment: the real city behind the flat', JSON.stringify(AP.camM));
+    } else {
+      AP.bg = false; AP.camM = null; homeHide(false);
+      const w2 = labWin(); if (w2){ const e = w2.document.getElementById('stBgGame'); if (e) e.remove(); if (AP.bd0){ w2.PodContext.backdrop = AP.bd0; AP.bd0 = null; } const B2 = labB(); if (B2) B2.needs = true; }
+    }
+  }
+  function homeHide(on){
+    const A = SC_.apartment, k = String(A.pod).split('|')[0].split(',').map(Number), c = cells.get(ckey(k[0], k[1])); if (!c) return warn('apartment', 'no home plot ' + k);
+    if (on){ if (AP.hh) return; const h = AP.hh = { pcs: [], mem: [], g: c.group ? c.group.visible : null, v: c.view ? c.view.visible : null };
+      const rec = solidRegions.get(mergeKey(c.i, c.j));
+      if (rec){ for (const g of rec.geoms){ const pc = g.userData.pieceCells, P = g.userData.pcs; if (!pc || !P) continue;
+          for (let i = 0; i < pc.length; i++) if (pc[i] === c){ const H = P.hide || (P.hide = new Uint8Array(P.n)); h.pcs.push([P, i, H[i]]); H[i] = 1; P.stamp = -1; } }
+        for (const m of rec.members) if (m.userData.cell === c){ h.mem.push([m, m.visible]); m.visible = false; } }
+      if (c.group) c.group.visible = false; if (c.view) c.view.visible = false;
+    } else { const h = AP.hh; if (!h) return; AP.hh = null;
+      for (const [P, i, v] of h.pcs){ P.hide[i] = v; P.stamp = -1; } for (const [m, v] of h.mem) m.visible = v;
+      if (c.group && h.g !== null) c.group.visible = h.g; if (c.view && h.v !== null) c.view.visible = h.v; }
+  }
+  // the depth pass, in the lab after each of its pictures: the lab's city and the flat drawn for depth alone from the lab's camera; where the city
+  // is nearer, the lab's pixel is cleared (the game's picture under it shows)
+  function punchOn(w, B, city){
+    const R = B.dr, T = w.THREE; if (!R || !T || R._stPunch) return; R._stPunch = true;
+    const mk = () => { const t = new T.WebGLRenderTarget(2, 2); t.depthTexture = new T.DepthTexture(2, 2); t.depthTexture.type = T.UnsignedIntType; return t; };
+    const mat = new T.ShaderMaterial({ uniforms: { tC: { value: null }, tF: { value: null }, bias: { value: .0004 } },
+      vertexShader: 'varying vec2 v; void main(){ v = uv; gl_Position = vec4(position.xy, 0., 1.); }',
+      fragmentShader: 'uniform sampler2D tC, tF; uniform float bias; varying vec2 v; void main(){ float f = texture2D(tF, v).r, c = texture2D(tC, v).r; if (f >= .99999 || c >= f - bias) discard; gl_FragColor = vec4(0.); }',
+      depthTest: false, depthWrite: false, blending: T.NoBlending });
+    const q = new T.Mesh(new T.PlaneGeometry(2, 2), mat); q.frustumCulled = false; const qs = new T.Scene(); qs.add(q);
+    const P = AP.pu = { a: mk(), b: mk(), mat, qs, qc: new T.OrthographicCamera(-1, 1, 1, -1, 0, 1), om: new T.MeshBasicMaterial({ colorWrite: false }), v2: new T.Vector2(), cc: new T.Color(), busy: false };
+    const prev = R.render;
+    R.render = function (sc, c){
+      const r = prev.call(this, sc, c);
+      if (AP.bg && !P.busy && sc !== qs && R.getRenderTarget() === null) safe('depth pass', () => {
+        P.busy = true; const save = { ac: R.autoClear, ca: R.getClearAlpha(), cc: R.getClearColor(P.cc).clone() };
+        try {
+          const s = R.getDrawingBufferSize(P.v2); for (const t of [P.a, P.b]) if (t.width !== s.x || t.height !== s.y) t.setSize(s.x, s.y);
+          const k = B.cam.clone(); k.near = -400; k.far = 400; k.updateProjectionMatrix(); k.updateMatrixWorld(true);
+          const pass = (scene, tgt) => { const om = scene.overrideMaterial, bg = scene.background; scene.overrideMaterial = P.om; scene.background = null;
+            try { R.setRenderTarget(tgt); R.autoClear = true; R.setClearColor(0, 0); R.clear(); prev.call(R, scene, k); } finally { scene.overrideMaterial = om; scene.background = bg; } };
+          pass(city.sc, P.a); pass(B.sc, P.b);
+          mat.uniforms.tC.value = P.a.depthTexture; mat.uniforms.tF.value = P.b.depthTexture;
+          R.setRenderTarget(null); R.autoClear = false; prev.call(R, qs, P.qc);
+        } finally { R.setRenderTarget(null); R.autoClear = save.ac; R.setClearColor(save.cc, save.ca); P.busy = false; }
+      });
+      return r;
+    };
+  }
   function dropsHide(B){
     if (AP.hid) return; AP.hid = true; const A = SC_.apartment;
     for (const d of A.drops || []){ const i = B.inst.get(d.id); if (i && i.pivot){ AP.hidden.push({ i, y: i.pivot.position.y, t: A.room + d.at }); i.pivot.visible = false; } else warn('apartment', 'no piece ' + d.id); }
@@ -559,6 +622,7 @@ const PLAY = (() => {
   }
   function aptEnd(why){
     safe('reveal end', () => { if (FURN.frame) FURN.frame.style.clipPath = ''; if (E.rv){ E.rv.fx.getContext('2d').clearRect(0, 0, E.rv.fx.width, E.rv.fx.height); } });
+    if (AP.bg) safe('real city off', () => bgGame(false));
     if (AP.closed) return; AP.closed = true;
     if (why) warn('apartment', why);
     safe('close', () => { const PC = labPC(), st = PC && PC._debug && PC._debug.state(); if (st && st.trans){ st.trans = null; PC.transitioning = false; }

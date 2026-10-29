@@ -517,7 +517,8 @@ const PLAY = (() => {
       const fx = mk(); fx.id = 'stRecon'; fx.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none';
       document.getElementById('stOv').appendChild(fx); E.rv = { fx, last: null }; }
     const R = E.rv, g = R.fx.getContext('2d');
-    g.clearRect(0, 0, W, H);
+    if (R.fx.width !== W || R.fx.height !== H){ R.fx.width = W; R.fx.height = H; }   // (sized to the window as it is now: a stale size left old drawing uncleared)
+    g.clearRect(0, 0, R.fx.width, R.fx.height);
     if (u <= 0){ if (R.last !== 'off'){ fr.style.clipPath = ''; R.last = 'off'; } return; }
     const cols = Math.ceil(W/TILE), rows = Math.ceil(H/TILE), cx = (cols - 1)/2, cy = (rows - 1)/2, dMax = Math.hypot(cx, cy);
     // each tile's switch-over time: by its distance from the middle, a little ahead or behind by its own hash, in [.18, .9] of the pass

@@ -568,9 +568,10 @@ const PLAY = (() => {
       const dc = w.document; if (!dc.getElementById('stBgGame')){ const e = dc.createElement('style'); e.id = 'stBgGame'; e.textContent = 'html,body,#bStage{background:transparent!important}#bSky{visibility:hidden!important}'; dc.head.appendChild(e); }
       const PC = w.PodContext; if (!AP.bd0){ AP.bd0 = PC.backdrop; PC.backdrop = () => null; }
       homeHide(true); FURN.hold = false; punchOn(w, B, city); AP.bg = true; B.needs = true;
+      { const v = document.getElementById('view'); if (v){ AP.vf = v.style.filter; v.style.filter = 'blur(' + (innerHeight*.0026).toFixed(2) + 'px)'; } }   // (the city behind a little soft: the eye goes to the flat)
       say('apartment: the real city behind the flat', JSON.stringify(AP.camM));
     } else {
-      AP.bg = false; AP.camM = null; homeHide(false);
+      AP.bg = false; AP.camM = null; homeHide(false); { const v = document.getElementById('view'); if (v) v.style.filter = AP.vf || ''; }
       const w2 = labWin(); if (w2){ const e = w2.document.getElementById('stBgGame'); if (e) e.remove(); if (AP.bd0){ w2.PodContext.backdrop = AP.bd0; AP.bd0 = null; } const B2 = labB(); if (B2) B2.needs = true; }
     }
   }
@@ -584,9 +585,9 @@ const PLAY = (() => {
       if (c.group) c.group.visible = false; if (c.view) c.view.visible = false;
       // the building's own greenery (its roof and balcony plants, instanced with the rest of the city's): out with it, so nothing hangs in the air
       { const v = new THREE.Vector3(), m4 = new THREE.Matrix4(), z0 = new THREE.Matrix4().makeScale(0, 0, 0), R = LOT*.47;
-        scene.traverse(o => { if (!o.isInstancedMesh || !o.userData.fol) return; let hit = false;
+        scene.traverse(o => { const fol = !!o.userData.fol; if (!o.isInstancedMesh || !(fol || o.material.isMeshToonMaterial)) return; let hit = false; const Rr = fol ? R : LOT*.42;   // (and its door, frame and stoop)
           for (let i = 0; i < o.count; i++){ o.getMatrixAt(i, m4); v.setFromMatrixPosition(m4).applyMatrix4(o.matrixWorld);
-            if (Math.abs(v.x - c.x) < R && Math.abs(v.z - c.z) < R && v.y > .2){ h.fol.push([o, i, m4.clone()]); o.setMatrixAt(i, z0); hit = true; } }
+            if (Math.abs(v.x - c.x) < Rr && Math.abs(v.z - c.z) < Rr && (!fol || v.y > .2)){ h.fol.push([o, i, m4.clone()]); o.setMatrixAt(i, z0); hit = true; } }
           if (hit) o.instanceMatrix.needsUpdate = true; }); }
       // and the plot under it paved (the ground there is never drawn under a building: the sky showed through)
       { const g = new THREE.Mesh(new THREE.PlaneGeometry(LOT*.9, LOT*.9), new THREE.MeshToonMaterial({ color: '#6a655f' })); g.rotation.x = -Math.PI/2; g.position.set(c.x, .015, c.z); g.receiveShadow = true; scene.add(g); h.pave = g; }

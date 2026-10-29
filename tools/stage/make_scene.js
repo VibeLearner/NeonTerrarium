@@ -327,7 +327,7 @@ const doors = [[HOME.door.key, [[0, 0], [r3(MK.atDoor - .1), 0], [r3(MK.atDoor +
 // the flat looked at from its far side towards the garden (the camera on the home's side, the lawn beyond it): the world yaw the game camera would
 // have for that (camera at target + (sin yaw, cos yaw)), which the stage turns into the lab's angle
 const HX = HOME.cell[0]*LOT, HZ = HOME.cell[1]*LOT, LAB_YAW = r3(Math.atan2(HX - GC.x, HZ - GC.z) - 1.06);   // (-1.06: from the street side, the one way in clear of the towers to its south, the lawn behind it)
-const apartment = APT ? Object.assign({ pod: HOME.pod, open: r3(MK.open), room: r3(MK.room), unroom: r3(MK.unroom), back: r3(MK.back), fade: .8, labYaw: LAB_YAW, labPitch: 60, labZoomMatched: .66 }, APT) : null;
+const apartment = APT ? Object.assign({ pod: HOME.pod, open: r3(MK.open), room: r3(MK.room), unroom: r3(MK.unroom), back: r3(MK.back), fade: .8, labYaw: LAB_YAW, labPitch: 60, labZoomMatched: .8 }, APT) : null;
 const end = r3(TITLE.t0 + TITLE.dur);
 
 const J = v => JSON.stringify(v);

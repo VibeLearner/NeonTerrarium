@@ -98,13 +98,16 @@ function mtLiftSpot(l, k, side){
   const sx = t.i*LOT + rx*off, sz = t.j*LOT + rz*off;
   return { sx, sz, r, dx: dout[0], dz: dout[1], rx, rz, wall: { x: sx + dout[0]*(r + .02), z: sz + dout[1]*(r + .02) }, stand: { x: sx + dout[0]*(r + .34), z: sz + dout[1]*(r + .34) } };
 }
-function mtLiftOK(l, k, side){
+// (own: the side this station's lift already stands on. Its shaft is built into the plot and so into the plot's walking map, where it reads as in its
+//  own way: checking the walking map there sent the lift to the other side on every edit of the line, and back again on the next. So a lift that
+//  stands already only moves for something else: a sky building, another lift, a sky highway's deck, or a plot gone)
+function mtLiftOK(l, k, side, own = false){
   const S_ = mtLiftSpot(l, k, side), c = cells.get(ckey(Math.round(S_.stand.x/LOT), Math.round(S_.stand.z/LOT))), c2 = cells.get(ckey(Math.round(S_.sx/LOT), Math.round(S_.sz/LOT)));
   if (!c || !c2 || c.mega || c2.mega) return false;
-  if (!freeAt(cellGrid(c2), S_.sx, S_.sz)) return false;
+  if (!own && !freeAt(cellGrid(c2), S_.sx, S_.sz)) return false;
   for (const l2 of metros) for (const k2 of mtStops(l2)){ if (l2 === l && k2 === k) continue; const s2 = l2.sides && l2.sides[k2]; if (!s2) continue; const o = mtLiftSpot(l2, k2, s2); if (Math.hypot(o.sx - S_.sx, o.sz - S_.sz) < .8) return false; }
   if (mtShaftHitsHw(S_.sx, S_.sz, S_.r)) return false;   // (no sky highway's deck through the shaft)
-  return freeAt(cellGrid(c), S_.stand.x, S_.stand.z);
+  return own || freeAt(cellGrid(c), S_.stand.x, S_.stand.z);
 }
 const MT_SHAFT_TOP = MT_Y + 1.6;   // the top of a station's lift shaft, its cap and all
 // does any sky highway's deck (or its ramps) pass through a lift shaft at (x, z), below the shaft's top?
@@ -122,10 +125,10 @@ function mtEndLiftOK(i, j){
   for (const d of SIDES4){ const l = { tiles: [{ i, j }], dir0: d, sides: {}, st: [] }; for (const sd of [1, -1]) if (mtLiftOK(l, 0, sd)) return true; }
   return false;
 }
-// each stop's lift side: kept if it still fits, else whichever side fits (or none: a stop without a lift lets nobody off)
+// each stop's lift side: kept if nothing else is in its way (see mtLiftOK), else whichever side fits (or none: a stop without a lift lets nobody off)
 function mtSides(l){
   const old = l.sides || {}; l.sides = {};
-  for (const k of mtStops(l)){ let s = 0; for (const c of [old[k], 1, -1]) if (c && mtLiftOK(l, k, c)){ s = c; break; } l.sides[k] = s; }
+  for (const k of mtStops(l)){ let s = 0; if (old[k] && mtLiftOK(l, k, old[k], true)) s = old[k]; else for (const c of [1, -1]) if (mtLiftOK(l, k, c)){ s = c; break; } l.sides[k] = s; }
 }
 const mtLiftCell = (l, k) => { const s = l.sides && l.sides[k]; if (!s) return null; const L = mtLiftSpot(l, k, s); return [Math.round(L.sx/LOT), Math.round(L.sz/LOT)]; };
 // what a click would do in metro mode: { type: 'start'|'extend'|'prepend'|'reopen'|'finish'|'loop'|'join'|'stop'|'unstop'|'none', ok, why, ... }
@@ -210,10 +213,26 @@ function mtLoopTarget(l){
 
 /* ---------- making changes ---------- */
 function mtTouched(l){ const out = l.tiles.map(t => [t.i, t.j]); for (const k of mtStops(l)){ const c = mtLiftCell(l, k); if (c) out.push(c); } return out; }
+// what the metro puts on each plot (see mtFeet, mtKeepOut): its pillars, where they stand and which way they face, and the lift shafts, as one string per plot.
+// An edit rebuilds only the plots whose string changed: laying a line used to rebuild every plot under it on every click
+let MT_SIG = null;   // (as the plots were last built; null: not known, after loading or an edit made without mtCommit, so the next commit rebuilds all it is given)
+function mtPlotSig(){
+  const m = new Map(), add = (q, v) => m.set(q, (m.get(q) || '') + v + ';'), f = v => v.toFixed(3);
+  for (const l of metros){
+    l.tiles.forEach((t, k) => { const c = hwCenter(l, k, .5); add(ckey(t.i, t.j), 'p' + f(c.x) + ',' + f(c.z) + ',' + f(c.tx) + ',' + f(c.tz)); });
+    for (const k of mtStops(l)){ const s = l.sides && l.sides[k]; if (!s) continue; const L = mtLiftSpot(l, k, s); add(ckey(Math.round(L.sx/LOT), Math.round(L.sz/LOT)), 's' + f(L.sx) + ',' + f(L.sz) + ',' + L.dx + ',' + L.dz); }
+  }
+  return m;
+}
 function mtCommit(l, touched){
   mtReindex();
-  if (l){ mtSides(l); touched = touched.concat(mtTouched(l)); mtBuildView(l); mtResetTrain(l); }
-  const list = [...new Set(touched.map(([i, j]) => cells.get(ckey(i, j))).filter(Boolean))];
+  if (l){ mtSides(l); mtBuildView(l); mtResetTrain(l); }
+  const sig = mtPlotSig();
+  let keys;
+  if (MT_SIG){ keys = new Set(); for (const [q, v] of sig) if (MT_SIG.get(q) !== v) keys.add(q); for (const q of MT_SIG.keys()) if (!sig.has(q)) keys.add(q); }
+  else keys = new Set(touched.concat(l ? mtTouched(l) : []).map(([i, j]) => ckey(i, j)));
+  MT_SIG = sig;
+  const list = [...keys].map(q => cells.get(q)).filter(Boolean);
   refresh(list);   // its pillars and lift shafts stand on the plots (see mtFeet), so the walking paths go round them
   SC_DIRTY.unknown = true; shadowDirty = true;
 }
@@ -261,14 +280,14 @@ function mtCutAt(l, k, quiet){
   else { tiles = l.tiles.slice(0, k); keys.delete(mtTileKey(l.tiles[k - 1])); }   // (cut in the middle: the plot before the cut is the open end now, no station there yet)
   if (l.loop) keys.delete(mtTileKey(l.tiles[(k - 1 + n) % n]));   // (an opened loop: the plot before the cut is its open end)
   mtReshape(l, tiles, keys, sides); mtActive = l;
-  if (quiet){ mtReindex(); mtSides(l); mtBuildView(l); mtResetTrain(l); } else { mtCommit(l, touched); sfx.play('remove'); }
+  if (quiet){ MT_SIG = null; mtReindex(); mtSides(l); mtBuildView(l); mtResetTrain(l); } else { mtCommit(l, touched); sfx.play('remove'); }
   return touched;
 }
 function mtRemove(l, quiet){
   const touched = mtTouched(l);
   metros = metros.filter(q => q !== l); if (mtActive === l) mtActive = null;
   mtDropView(l); l.train = null;
-  if (!quiet){ mtCommit(null, touched); sfx.play('remove'); } else mtReindex();
+  if (!quiet){ mtCommit(null, touched); sfx.play('remove'); } else { MT_SIG = null; mtReindex(); }
   return touched;
 }
 // delete mode: a line's plots in the block go, and with them any station whose lift shaft stands in the block (in the middle of the line, it becomes plain
@@ -298,10 +317,11 @@ function mtRemoveArea(r){
     });
     if (mtActive && !metros.includes(mtActive)) mtActive = null;
   }
+  if (out.length) MT_SIG = null;
   mtReindex();
   return out;
 }
-function mtClearAll(){ for (const l of metros) mtDropView(l); metros = []; mtActive = null; mtReindex(); }
+function mtClearAll(){ for (const l of metros) mtDropView(l); metros = []; mtActive = null; MT_SIG = null; mtReindex(); }
 function mtSave(){ try { localStorage.setItem(MT_SAVE_KEY, JSON.stringify(metros.map(l => ({ id: l.id, done: l.done, loop: !!l.loop, st: l.st, sides: l.sides, t: l.tiles.map(t => [t.i, t.j]) })))); } catch (e) {} }
 function mtLoad(){
   mtClearAll();

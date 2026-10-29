@@ -641,7 +641,7 @@ const PLAY = (() => {
   function tick(){
     requestAnimationFrame(tick);
     if (!rolling || G.done) return;
-    if (rendered){ G.frame++; rendered = false; }
+    if (rendered){ if (G.redraw) G.redraw = false; else G.frame++; rendered = false; }
     prep();
   }
   const PAUSE = ((/[&#]pauseat=([\d.,]+)/.exec(location.hash) || [])[1] || '').split(',').filter(Boolean).map(Number); window.__stageGo = () => { PAUSE.go = true; };
@@ -653,7 +653,7 @@ const PLAY = (() => {
     safe('apartment', () => aptTick(t));
     if (G.held) return;
     // (#stage&pauseat=38,40: checking only, never recorded: stands still at each of those times until window.__stageGo() is called)
-    if (PAUSE.length && t >= PAUSE[0]){ if (!PAUSE.go){ G.held = true; G.info.paused = PAUSE[0]; return; } PAUSE.shift(); PAUSE.go = false; delete G.info.paused; }
+    if (PAUSE.length && t >= PAUSE[0]){ if (!PAUSE.go){ G.info.paused = PAUSE[0]; if (window.__stageDraw){ window.__stageDraw = 0; G.redraw = true; return; } G.held = true; return; } PAUSE.shift(); PAUSE.go = false; delete G.info.paused; }
     Math.random = rng(h32('frame', G.frame));   // (anything else that draws a random number this frame gets one from the frame's own stream)
     const h = keyed(SC_.hour, t); if (h !== null) S.hour = h;
     safe('doors', () => doorsAt(t));

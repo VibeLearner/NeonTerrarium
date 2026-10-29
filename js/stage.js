@@ -497,8 +497,10 @@ const PLAY = (() => {
         PC._debug.hold(u);
         // the real city under the hologram for its last stretch, so it comes out of the hologram straight into the real street (never the lab's grey stand-in)
         if (!AP.bgDone && AP.picked && t >= A.room - BG_IN){ AP.bgDone = true; safe('real city', () => bgGame(true, st, B, w)); }
+        // (the game's camera on the lab's, the one it is drawing the hologram with: the street behind moves with it, and what stands in front is cut from it)
+        if (AP.bg && AP.pu && AP.pu.cam) safe('follow', () => { const p = camPose(AP.pu.cam, st.city); if (p) AP.camM = p; });
       }
-      fr.style.opacity = String(ss((t - A.open)/.6));
+      fr.style.opacity = '1';   // (no fade in: the hologram's first frame is the shot before it)
       return;
     }
     if (t < A.unroom){   // the pieces set down one after another
@@ -509,21 +511,25 @@ const PLAY = (() => {
       if (!AP.bg && !AP.bgDone){ AP.bgDone = true; safe('real city', () => bgGame(true, st, B, w)); }
       AP.punch = true;   // (the depth pass only on the room itself: the hologram has its own camera)
       if (AP.bg){ safe('sun', () => keyLight(true)); }
-      // Out of the hologram into the real street, the camera going in on the flat (past what stands in front of it: the near clip follows the zoom) while
-      // the whole picture blurs away to grey; under the grey the lab's own view comes back (its first angle and framing, its own soft city behind),
-      // and the grey clears off it. Then the furnishing.
-      const tz = t - A.room, ZD = A.zoomFor || 1.8, SW = A.swapAt || 1.9, GO = A.greyOff || [2.1, 3.0];
-      if (AP.bg && B && AP.z0 && tz < SW){ const u = ss(clamp01(tz/ZD)), z = AP.z0 + ((A.labZoomIn || AP.z0*1.6) - AP.z0)*u; AP.nearK = u;
-        if (Math.abs(B.zoom - z) > 1e-6){ B.zoom = z; B.camDirty = true; B.needs = true; } AP.camM.zoom = AP.camZ0*AP.z0/z; }
-      if (tz >= SW && !AP.swapped){ AP.swapped = true; safe('old view', () => { if (AP.bg) bgGame(false); oldView(B, st); }); }
-      safe('grey', () => greyAt(tz < SW ? ss(clamp01((tz - (A.greyFrom ?? .5))/Math.max(.1, ZD - (A.greyFrom ?? .5)))) : 1 - ss(clamp01((tz - GO[0])/(GO[1] - GO[0])))));
+      // One take: out of the hologram into the real street, the camera going in on the flat (past what stands in front of it: the near clip follows
+      // the zoom) while everything around it blurs away to plain grey (never the flat: always in focus); on the grey the camera swings round to the
+      // lab's own view, the flat coming up out of the game's pixels to its own; a hologram grid spreads out on the ground; then the furnishing.
+      const tz = t - A.room, ZD = A.zoomFor || 1.8, OE = ZD + (A.orbitFor || 1.6);
+      if (AP.bg && B && AP.z0 && tz < ZD){ const base = AP.camBase || (AP.camBase = camPose(B.cam, st.city)), u = ss(clamp01(tz/ZD)), z = AP.z0 + ((A.labZoomIn || AP.z0*1.6) - AP.z0)*u; AP.nearK = u;
+        if (Math.abs(B.zoom - z) > 1e-6){ B.zoom = z; B.camDirty = true; B.needs = true; } AP.camM = Object.assign({}, base, { zoom: base.zoom*AP.z0/z }); }
+      if (tz < ZD) safe('grey', () => greyAt(ss(clamp01((tz - (A.greyFrom ?? .5))/Math.max(.1, ZD - (A.greyFrom ?? .5))))));
+      else if (tz < OE){
+        if (!AP.swapped){ AP.swapped = true; safe('street off', () => streetOff(B)); }
+        safe('grey', () => greyAt(1)); safe('orbit', () => orbitAt(B, ss(clamp01((tz - ZD)/(OE - ZD)))));
+      } else if (!AP.own){ AP.own = true; safe('lab view', () => { if (!AP.swapped){ AP.swapped = true; streetOff(B); } orbitAt(B, 1); labOwn(); }); }
+      if (AP.own) safe('grid', () => gridAt(B, ss(clamp01((tz - OE)/.8))));
       for (const d of AP.hidden){ const u = (t - d.t)/.75; d.i.pivot.visible = u >= 0; if (u < 0) continue; const e = 1 - Math.pow(1 - Math.min(1, u), 3); d.i.pivot.position.y = d.y + .45*(1 - e); }
       return;
     }
     if (t < A.back){   // the hologram flies back out, to the game's view as it was left
       for (const d of AP.hidden){ d.i.pivot.visible = true; d.i.pivot.position.y = d.y; }
       if (AP.bg && t >= A.unroom + BG_OUT) safe('real city off', () => bgGame(false));
-      if (AP.greyBg && t >= A.unroom + BG_OUT) safe('grey off', () => greyBg(false));   // (the grey kept under the hologram until it covers the picture)   // (the hologram drawn over the real city first, then the lab's own city under it once the hologram covers it)
+      if (AP.own && !AP.ownOff && t >= A.unroom + BG_OUT){ AP.ownOff = true; safe('grey off', () => labOwnOff()); }   // (the grey and its grid kept under the hologram until it covers the picture)   // (the grey kept under the hologram until it covers the picture)   // (the hologram drawn over the real city first, then the lab's own city under it once the hologram covers it)
       AP.punch = false;
       if (!AP.rev){ AP.rev = true;
         safe('holo frame', () => { const S0 = st && st.city && st.city.holoStart; if (S0 && AP.cityW){ S0.w = AP.cityW; S0.exact = true; } });   // (out to the whole city again: the framing the game camera takes behind it)
@@ -588,7 +594,7 @@ const PLAY = (() => {
       AP.camM = { x: tg.x, y: tg.y, z: tg.z, yaw: Math.atan2(-dg.x, -dg.z), pitch: Math.asin(-dg.y), zoom: (cam.top - cam.bottom)/2/cam.zoom/sc }; AP.camZ0 = AP.camM.zoom; AP.z0 = B.zoom;
       const dc = w.document; if (!dc.getElementById('stBgGame')){ const e = dc.createElement('style'); e.id = 'stBgGame'; e.textContent = 'html,body,#bStage{background:transparent!important}#bSky{visibility:hidden!important}'; dc.head.appendChild(e); }
       const PC = w.PodContext; if (!AP.bd0){ AP.bd0 = PC.backdrop; PC.backdrop = () => null; }
-      AP.home = city.home; homeHide(true); FURN.hold = false; punchOn(w, B, city); AP.bg = true; B.needs = true;
+      AP.home = city.home; homeHide(true); FURN.hold = false; punchOn(w, B, city); AP.bg = true; AP.punch = true; B.needs = true;
       AP.home = city.home; pixOn(true); tiltOn(true); AP.ppl = [pplMesh.visible, ddMesh.visible]; pplMesh.visible = ddMesh.visible = false;   // (no one about while the flat is shown)
       say('apartment: the real city behind the flat', JSON.stringify(AP.camM));
     } else {
@@ -608,9 +614,11 @@ const PLAY = (() => {
   }
   function pixCopy(src){
     const c = document.getElementById('stFlat'); if (!c || !src.width) return;
-    if (c.width !== W || c.height !== H){ c.width = W; c.height = H; }
-    const g = c.getContext('2d', { willReadFrequently: true }); g.clearRect(0, 0, W, H); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(src, 0, 0, W, H);
-    const im = g.getImageData(0, 0, W, H), d = im.data, q = 10;
+    const k = AP.pixK || 0, h = Math.round(H + (src.height - H)*k), wd = Math.round(h*src.width/src.height);   // (k: the swing round taking it up to the lab's own size)
+    if (c.width !== wd || c.height !== h){ c.width = wd; c.height = h; }
+    const g = c.getContext('2d', { willReadFrequently: true }); g.clearRect(0, 0, wd, h); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(src, 0, 0, wd, h);
+    if (k >= .999) return;   // (at full size the picture as the lab drew it)
+    const im = g.getImageData(0, 0, wd, h), d = im.data, q = Math.max(1, Math.round(10*(1 - k)));
     for (let i = 0; i < d.length; i += 4){ const a = d[i + 3]; if (a < 128){ d[i + 3] = 0; continue; }
       const k = 255/a; for (let j = 0; j < 3; j++){ const v = Math.min(255, d[i + j]*k); d[i + j] = Math.min(255, Math.round(v/q)*q); } d[i + 3] = 255; }   // (premultiplied edges back to full colour, then stepped)
     g.putImageData(im, 0, 0);
@@ -659,26 +667,61 @@ const PLAY = (() => {
   function greyAt(a){
     let e = document.getElementById('stGrey');
     if (a <= 0){ if (e) e.style.display = 'none'; return; }
-    if (!e){ e = document.createElement('div'); e.id = 'stGrey'; e.className = 'tr-keep'; e.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:60'; document.body.appendChild(e); }
-    const b = 'blur(' + (innerHeight*.05*a).toFixed(2) + 'px)'; e.style.display = ''; e.style.backdropFilter = b; e.style.webkitBackdropFilter = b; e.style.background = 'rgba(112,116,124,' + (.88*a*a).toFixed(4) + ')';
+    if (!e){ e = document.createElement('div'); e.id = 'stGrey'; e.className = 'tr-keep'; e.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:50'; document.body.appendChild(e); }
+    const b = 'blur(' + (innerHeight*.05*a).toFixed(2) + 'px)'; e.style.display = ''; e.style.backdropFilter = b; e.style.webkitBackdropFilter = b; e.style.background = 'rgba(112,116,124,' + (a*a).toFixed(4) + ')';   // (solid at 1: the same grey the furnishing sits on)
   }
-  // the lab's own view, as it was before the real city: its first angle and pitch, the script's framing (labZoom, labPan), its city soft behind
-  function oldView(B, st){
-    if (!B) return; AP.unsharp = true;
-    if (AP.az0 !== undefined){ B.az = AP.az0; B.pitch = AP.pitch0; }
-    if (SC_.apartment.labAz !== undefined) B.az = SC_.apartment.labAz;   // (turned so the flat lies wide across the frame: it fills more of it)
-    const A = SC_.apartment; B.zoom = A.labZoom || AP.zoom0 || 1; const pn = A.labPan || [0, 0]; B.tx = pn[0]; B.tz = pn[1]; B.camDirty = true; B.needs = true;
-    FURN.hold = true;   // (the city not drawn under it: nothing of it shows)
-    greyBg(true);
+  // the camera pose the game needs to see what a lab camera sees (both orthographic; the lab's city is the game's turned and scaled by M)
+  function camPose(cam, city){
+    if (!cam || !city || !city.M) return null; cam.updateMatrixWorld(); const Mi = city.M.clone().invert(), d = cam.getWorldDirection(new THREE.Vector3());
+    const tg = cam.position.clone().add(d.clone().multiplyScalar(24)).applyMatrix4(Mi), dg = d.clone().transformDirection(Mi), sc = Math.hypot(city.M.elements[0], city.M.elements[8]);
+    return { x: tg.x, y: tg.y, z: tg.z, yaw: Math.atan2(-dg.x, -dg.z), pitch: Math.asin(-dg.y), zoom: (cam.top - cam.bottom)/2/(cam.zoom || 1)/sc };
   }
-  // behind the flat for the furnishing, plain grey (the grey it came out of): no city, the lab's backdrop off
+  // the street gone (all grey by now): the game stops drawing and everything of it put back; the flat stays in its pixels and the sun for the swing round
+  function streetOff(B){
+    AP.bg = false; AP.punch = false; AP.camM = null; AP.nearK = 0; nearClip(); homeHide(false); tiltOn(false);
+    if (AP.ppl){ pplMesh.visible = AP.ppl[0]; ddMesh.visible = AP.ppl[1]; AP.ppl = null; }
+    FURN.hold = true;
+    const A = SC_.apartment, pn = A.labPan || [0, 0];
+    AP.orb = { a: { az: B.az, pitch: B.pitch, zoom: B.zoom, tx: B.tx, tz: B.tz }, b: { az: A.labAz ?? AP.az0 ?? B.az, pitch: AP.pitch0 ?? B.pitch, zoom: A.labZoom || AP.zoom0 || 1, tx: pn[0], tz: pn[1] } };
+    const key = AP.key; AP.keyS = key ? { i: key.intensity, c: key.color.clone() } : null;
+  }
+  // the swing round, u 0..1: the lab's camera to its own view, the flat's pixels to its own size, the sun's light to the room's own
+  function orbitAt(B, u){
+    const o = AP.orb; if (!o || !B) return; const a = o.a, b = o.b;
+    B.az = a.az + wrapA(b.az - a.az)*u; B.pitch = a.pitch + (b.pitch - a.pitch)*u; B.zoom = Math.exp(Math.log(a.zoom) + (Math.log(b.zoom) - Math.log(a.zoom))*u);
+    B.tx = a.tx + (b.tx - a.tx)*u; B.tz = a.tz + (b.tz - a.tz)*u; B.camDirty = true; B.needs = true; AP.pixK = u;
+    const key = AP.key, k0 = AP.key0, kS = AP.keyS; if (key && k0 && kS){ key.intensity = kS.i + (k0.i - kS.i)*u; key.color.copy(kS.c).lerp(k0.c, u); key.shadow.needsUpdate = true; }
+  }
+  // the lab's own view on the grey: its own frame shown (the copy at full size was the same picture), its own light, the grey and the grid under it
+  function labOwn(){
+    pixOn(false); keyLight(false); AP.pixK = 0; greyAt(0); underOn(true);
+  }
+  function labOwnOff(){
+    underOn(false);
+    const w = labWin(); if (w){ const e = w.document.getElementById('stBgGame'); if (e) e.remove(); if (AP.bd0){ w.PodContext.backdrop = AP.bd0; AP.bd0 = null; } const B = labB(); if (B) B.needs = true; }
+  }
+  // under the lab's frame (it is see-through round the flat): plain grey, and on it the hologram grid
   const GREY = '#70747c';
-  function greyBg(on){
-    const w = labWin(); if (!w) return; const d = w.document, PC = w.PodContext;
-    if (on){ if (!d.getElementById('stGreyBg')){ const e = d.createElement('style'); e.id = 'stGreyBg'; e.textContent = 'html,body,#bStage{background:' + GREY + '!important}#bSky{visibility:hidden!important}'; d.head.appendChild(e); }
-      if (!AP.gbd0){ AP.gbd0 = PC.backdrop; PC.backdrop = () => null; } AP.greyBg = true; }
-    else { const e = d.getElementById('stGreyBg'); if (e) e.remove(); if (AP.gbd0){ PC.backdrop = AP.gbd0; AP.gbd0 = null; } AP.greyBg = false; }
-    const B = labB(); if (B) B.needs = true;
+  function underOn(on){
+    for (const [id, z] of [['stUnder', 47], ['stGrid', 49]]){ let e = document.getElementById(id);
+      if (on && !e){ e = document.createElement(id === 'stGrid' ? 'canvas' : 'div'); e.id = id; e.className = 'tr-keep'; e.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:' + z + (id === 'stUnder' ? ';background:' + GREY : ''); document.body.appendChild(e); }
+      if (e) e.style.display = on ? '' : 'none'; }
+  }
+  // the grid: lines a metre apart on the lab's ground, drawn through its camera, spreading out from the flat (r 0..1) and fading with distance
+  function gridAt(B, r){
+    const c = document.getElementById('stGrid'); if (!c || !B || !B.cam) return;
+    const Wc = Math.round(innerWidth*devicePixelRatio), Hc = Math.round(innerHeight*devicePixelRatio); if (c.width !== Wc || c.height !== Hc){ c.width = Wc; c.height = Hc; }
+    const g = c.getContext('2d'); g.clearRect(0, 0, Wc, Hc); if (r <= 0) return;
+    const cam = B.cam; cam.updateMatrixWorld(); const v = new THREE.Vector3(), N = 22, R = N*r, y = -.22;
+    const P = (x, z) => { v.set(x, y, z).project(cam); return [(v.x + 1)/2*Wc, (1 - v.y)/2*Hc]; };
+    g.lineWidth = Math.max(1, devicePixelRatio);
+    for (const ax of [0, 1]) for (let k = -N; k <= N; k++){
+      const half = Math.sqrt(Math.max(0, R*R - k*k)); if (half <= 0) continue;
+      const STEP = 1; for (let s = -half; s < half; s += STEP){ const s2 = Math.min(half, s + STEP), m = (s + s2)/2, d = Math.hypot(k, m)/N, a = .32*(1 - d)*(1 - d);
+        if (a <= .004) continue; const p = ax ? P(k, s) : P(s, k), q = ax ? P(k, s2) : P(s2, k);
+        g.strokeStyle = 'rgba(86,236,228,' + a.toFixed(3) + ')'; g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); g.stroke(); } }
+    // the spreading edge, a little brighter
+    if (r < 1){ g.strokeStyle = 'rgba(160,255,250,' + (.5*(1 - r)).toFixed(3) + ')'; g.beginPath(); for (let i = 0; i <= 96; i++){ const a = i/96*Math.PI*2, p = P(Math.cos(a)*R, Math.sin(a)*R); if (i) g.lineTo(p[0], p[1]); else g.moveTo(p[0], p[1]); } g.stroke(); }
   }
   function homeHide(on){
     const A = SC_.apartment, k = String(A.pod).split('|')[0].split(',').map(Number), c = cells.get(ckey(k[0], k[1])); if (!c) return warn('apartment', 'no home plot ' + k);
@@ -723,12 +766,13 @@ const PLAY = (() => {
     const P = AP.pu = { a: mk(), b: mk(), mat, qs, qc: new T.OrthographicCamera(-1, 1, 1, -1, 0, 1), om: new T.MeshBasicMaterial({ colorWrite: false }), v2: new T.Vector2(), cc: new T.Color(), busy: false };
     const prev = R.render;
     R.render = function (sc, c){
+      if (sc === B.sc && c && c.isCamera && !P.busy) P.cam = c;   // (the camera it draws the flat with: the hologram's own while it flies)
       const r = prev.call(this, sc, c);
       if (AP.bg && AP.punch && !P.busy && sc !== qs && R.getRenderTarget() === null) safe('depth pass', () => {
         P.busy = true; const save = { ac: R.autoClear, ca: R.getClearAlpha(), cc: R.getClearColor(P.cc).clone() };
         try {
           const s = R.getDrawingBufferSize(P.v2); for (const t of [P.a, P.b]) if (t.width !== s.x || t.height !== s.y) t.setSize(s.x, s.y);
-          const k = B.cam.clone(); k.near = -400; k.far = 400; k.updateMatrixWorld(true);
+          const k = (P.cam || B.cam).clone(); k.near = -400; k.far = 400; k.updateMatrixWorld(true);
           if (AP.nearK > 0){ const kd = k.getWorldDirection(new w.THREE.Vector3()), f = nearOf(new THREE.Vector3().copy(k.position), new THREE.Vector3().copy(kd), city.M), sc = Math.hypot(city.M.elements[0], city.M.elements[8]);
             if (f !== null) k.near = f - (NEAR_FROM + (NEAR_TO - NEAR_FROM)*AP.nearK)*sc; }
           k.updateProjectionMatrix();
@@ -753,7 +797,7 @@ const PLAY = (() => {
   }
   function aptEnd(why){
     safe('reveal end', () => { if (FURN.frame) FURN.frame.style.clipPath = ''; if (E.rv){ E.rv.fx.getContext('2d').clearRect(0, 0, E.rv.fx.width, E.rv.fx.height); } });
-    if (AP.bg) safe('real city off', () => bgGame(false)); safe('grey', () => greyAt(0)); if (AP.greyBg) safe('grey off', () => greyBg(false));
+    if (AP.bg) safe('real city off', () => bgGame(false)); safe('grey', () => greyAt(0)); if (AP.own && !AP.ownOff){ AP.ownOff = true; safe('grey off', () => labOwnOff()); }
     if (AP.closed) return; AP.closed = true;
     if (why) warn('apartment', why);
     safe('close', () => { const PC = labPC(), st = PC && PC._debug && PC._debug.state(); if (st && st.trans){ st.trans = null; PC.transitioning = false; }

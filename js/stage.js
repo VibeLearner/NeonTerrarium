@@ -402,7 +402,7 @@ const PLAY = (() => {
     const gi = gl => { try { if (!gl) return 'no context'; if (gl.isContextLost()) return 'CONTEXT LOST'; const e = gl.getExtension('WEBGL_debug_renderer_info'); return e ? gl.getParameter(e.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER); } catch (x) { return 'err ' + x.message; } };
     const cvs = [...w.document.querySelectorAll('canvas')].map(c => { const r = c.getBoundingClientRect(), cs = w.getComputedStyle(c); return (c.id || c.className || 'canvas') + ' ' + c.width + 'x' + c.height + ' at ' + Math.round(r.width) + 'x' + Math.round(r.height) + (c.classList.contains('st-vis') ? ' SHOWN' : '') + (cs.display === 'none' ? ' display:none' : '') + ' op ' + cs.opacity; });
     const fr = FURN.frame, fcs = getComputedStyle(fr), ocs = ov && getComputedStyle(ov);
-    say('lab', JSON.stringify({ t: +t.toFixed(2), gl: gi(B && B.dr && B.dr.getContext()), main: gi(renderer.getContext()), loop: !!(B && B.raf), drawnFrames: st && st.trans ? st.trans.frames.length : null, hold: st && st.trans ? st.trans.hold : null, prOn: !!(B && B.prOn), pieces: B && B.inst ? B.inst.size : 0,
+    say('lab', JSON.stringify({ t: +t.toFixed(2), gl: gi(B && B.dr && B.dr.getContext()), main: gi(renderer.getContext()), loop: !!(B && B.raf), drawnFrames: st && st.trans ? st.trans.frames.length : null, hold: st && st.trans ? st.trans.hold : null, prOn: !!(B && B.prOn), pieces: B && B.inst ? B.inst.size : 0, wait: labWait(), city: st && st.city ? { building: !!st.city.building, geos: st.city.geos ? st.city.geos.length : 0 } : null, warm: safe('warm', () => w.PodRender.warmState()), light: safe('lw', () => w.PodRender.lightWhy()), drives: safe('drv', () => w.PodContext._prDriving()),
       frame: Math.round(fr.clientWidth) + 'x' + Math.round(fr.clientHeight) + ' op ' + fr.style.opacity + ' vis ' + fcs.visibility, overlay: ov ? (ov.className + ' ' + ocs.display + ' op ' + ocs.opacity + ' z ' + ocs.zIndex) : 'none', canvases: cvs }));
   }
   function labClean(){
@@ -423,6 +423,8 @@ const PLAY = (() => {
     const w = labWin(); if (!w) return false;
     try { const PB = w.PodBuilder, PR = w.PodRender, PC = w.PodContext;
       if (PB && PB.homePending && PB.homePending()) return 'build';
+      { const C = PC && PC._debug && PC._debug.state(); if (C && C.city && C.city.building) return 'the hologram city'; }   // (built a piece at a time between frames: a fast machine got past it with the hologram still empty)
+      { const ws = PR && PR.warmState && PR.warmState(); if (ws && !ws.broken && (!ws.finished || !ws.matReady || ws.queue)) return 'shaders'; }   // (the room's programs compile in the background on some graphics chips: until then it draws nothing)
       if (PB && PB.prOn && PB.prOn()) return !(PC._prDriving && PC._prDriving()) || (PR && PR.lightPending && PR.lightPending()) ? 'light' : false; } catch (e) {}
     return false;
   }
@@ -440,7 +442,9 @@ const PLAY = (() => {
     if (B && B.on && !B.raf) safe('lab loop', () => { const PB = w.PodBuilder; if (B.warmHold && PB.warmHold) PB.warmHold(false); if (!B.raf && PB.pauseRender) PB.pauseRender(false); if (!B.raf) warn('apartment', 'the lab loop would not start'); });
     const D_ = PC._debug.DUR || 3.05, st = PC._debug.state(), live = ov && ov.classList.contains('live');
     if ((G.frame % 60 === 0 && AP.repF !== G.frame) || !AP.told){ AP.told = true; AP.repF = G.frame; safe('lab report', () => labReport(t, st, B, w, ov)); }
-    const wait = why => { if (++AP.heldN > 60*120){ if (AP.heldN === 60*120 + 1) warn('apartment', 'waited 120 s for the lab (' + why + '): going on'); return false; } G.held = true; G.info.aptWait = why; return true; };
+    // (held: the clock steps on, no frame is drawn or captured. Capped by real time, not steps: a fast machine takes many more steps a second)
+    const wait = why => { AP.heldN++; if (AP.held0 == null) AP.held0 = Date.now(); if (Date.now() - AP.held0 > 240e3){ if (!AP.gaveUp){ AP.gaveUp = true; warn('apartment', 'waited 4 min for the lab (' + why + '): going on'); } return false; }
+      if (G.info.aptWait !== why) say('waiting for the lab:', why); G.held = true; G.info.aptWait = why; return true; };
     if (t < A.room){   // the hologram flies in
       const u = H0 + (D_ - H0)*holoCurve((t - A.open)/(A.room - A.open)), first = t - A.open < .5/FPS;
       if (!live && wait('the hologram')) return;
@@ -462,6 +466,7 @@ const PLAY = (() => {
     if (t < A.unroom){   // the pieces set down one after another
       if (st && st.trans){ PC._debug.hold(D_ + .01); return; }
       if (PC.transitioning && wait('the hologram to end')) return;
+      if (!AP.roomOk){ const lw = labWait(); if (lw && wait('the room: ' + lw)) return; AP.roomOk = true; }
       fr.style.opacity = '1';
       for (const d of AP.hidden){ const u = (t - d.t)/.75; d.i.pivot.visible = u >= 0; if (u < 0) continue; const e = 1 - Math.pow(1 - Math.min(1, u), 3); d.i.pivot.position.y = d.y + .45*(1 - e); }
       return;

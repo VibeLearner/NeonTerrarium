@@ -502,7 +502,7 @@ const PLAY = (() => {
         if (AP.bg && !AP.late && t >= A.room - BG_IN){ AP.late = true; safe('pixels', () => { pixOn(true); tiltOn(true); }); }
         if (AP.bg && t >= A.room - BG_IN) safe('sun', () => keyLight(true, ss(clamp01((t - (A.room - BG_IN))/BG_IN))));
         // (the game's camera on the lab's, the one it is drawing the hologram with: the street behind moves with it, and what stands in front is cut from it)
-        if (AP.bg && AP.pu && AP.pu.cam) safe('follow', () => { const p = camPose(AP.pu.cam, st.city); if (p) AP.camM = p; });
+        if (AP.bg && B && B.cam) safe('follow', () => { const p = camPose(B.cam, st.city); if (p) AP.camM = p; });   // (the room is drawn from the lab's own camera throughout: the hologram flies over it)
       }
       fr.style.opacity = '1';   // (no fade in: the hologram's first frame is the shot before it)
       return;
@@ -772,7 +772,6 @@ const PLAY = (() => {
     const P = AP.pu = { a: mk(), b: mk(), mat, qs, qc: new T.OrthographicCamera(-1, 1, 1, -1, 0, 1), om: new T.MeshBasicMaterial({ colorWrite: false }), v2: new T.Vector2(), cc: new T.Color(), busy: false };
     const prev = R.render;
     R.render = function (sc, c){
-      if (sc === B.sc && c && c.isCamera && !P.busy) P.cam = c;   // (the camera it draws the flat with: the hologram's own while it flies)
       const r = prev.call(this, sc, c);
       if (AP.pix && !P.busy && sc !== qs && R.getRenderTarget() === null) safe('pixels', () => pixCopy(R.domElement));
       return r;
@@ -786,7 +785,7 @@ const PLAY = (() => {
         P.busy = true; const save = { ac: R.autoClear, ca: R.getClearAlpha(), cc: R.getClearColor(P.cc).clone() };
         try {
           const s = R.getDrawingBufferSize(P.v2); for (const t of [P.a, P.b]) if (t.width !== s.x || t.height !== s.y) t.setSize(s.x, s.y);
-          const k = (P.cam || B.cam).clone(); k.near = -400; k.far = 400; k.updateMatrixWorld(true);
+          const k = B.cam.clone(); k.near = -400; k.far = 400; k.updateMatrixWorld(true);
           if (AP.nearK > 0){ const kd = k.getWorldDirection(new w.THREE.Vector3()), f = nearOf(new THREE.Vector3().copy(k.position), new THREE.Vector3().copy(kd), city.M), sc = Math.hypot(city.M.elements[0], city.M.elements[8]);
             if (f !== null) k.near = f - (NEAR_FROM + (NEAR_TO - NEAR_FROM)*AP.nearK)*sc; }
           k.updateProjectionMatrix();

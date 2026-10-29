@@ -522,7 +522,8 @@ const PLAY = (() => {
     }
     if (t < A.back){   // the hologram flies back out, to the game's view as it was left
       for (const d of AP.hidden){ d.i.pivot.visible = true; d.i.pivot.position.y = d.y; }
-      if (AP.bg && t >= A.unroom + BG_OUT) safe('real city off', () => bgGame(false));   // (the hologram drawn over the real city first, then the lab's own city under it once the hologram covers it)
+      if (AP.bg && t >= A.unroom + BG_OUT) safe('real city off', () => bgGame(false));
+      if (AP.greyBg && t >= A.unroom + BG_OUT) safe('grey off', () => greyBg(false));   // (the grey kept under the hologram until it covers the picture)   // (the hologram drawn over the real city first, then the lab's own city under it once the hologram covers it)
       AP.punch = false;
       if (!AP.rev){ AP.rev = true;
         safe('holo frame', () => { const S0 = st && st.city && st.city.holoStart; if (S0 && AP.cityW){ S0.w = AP.cityW; S0.exact = true; } });   // (out to the whole city again: the framing the game camera takes behind it)
@@ -667,7 +668,16 @@ const PLAY = (() => {
     if (AP.az0 !== undefined){ B.az = AP.az0; B.pitch = AP.pitch0; }
     const A = SC_.apartment; B.zoom = A.labZoom || AP.zoom0 || 1; const pn = A.labPan || [0, 0]; B.tx = pn[0]; B.tz = pn[1]; B.camDirty = true; B.needs = true;
     FURN.hold = true;   // (the city not drawn under it: nothing of it shows)
-    if (st) st.dirty = true;   // (the lab's city behind drawn again from the new angle, with its own blur)
+    greyBg(true);
+  }
+  // behind the flat for the furnishing, plain grey (the grey it came out of): no city, the lab's backdrop off
+  const GREY = '#70747c';
+  function greyBg(on){
+    const w = labWin(); if (!w) return; const d = w.document, PC = w.PodContext;
+    if (on){ if (!d.getElementById('stGreyBg')){ const e = d.createElement('style'); e.id = 'stGreyBg'; e.textContent = 'html,body,#bStage{background:' + GREY + '!important}#bSky{visibility:hidden!important}'; d.head.appendChild(e); }
+      if (!AP.gbd0){ AP.gbd0 = PC.backdrop; PC.backdrop = () => null; } AP.greyBg = true; }
+    else { const e = d.getElementById('stGreyBg'); if (e) e.remove(); if (AP.gbd0){ PC.backdrop = AP.gbd0; AP.gbd0 = null; } AP.greyBg = false; }
+    const B = labB(); if (B) B.needs = true;
   }
   function homeHide(on){
     const A = SC_.apartment, k = String(A.pod).split('|')[0].split(',').map(Number), c = cells.get(ckey(k[0], k[1])); if (!c) return warn('apartment', 'no home plot ' + k);
@@ -742,7 +752,7 @@ const PLAY = (() => {
   }
   function aptEnd(why){
     safe('reveal end', () => { if (FURN.frame) FURN.frame.style.clipPath = ''; if (E.rv){ E.rv.fx.getContext('2d').clearRect(0, 0, E.rv.fx.width, E.rv.fx.height); } });
-    if (AP.bg) safe('real city off', () => bgGame(false)); safe('grey', () => greyAt(0));
+    if (AP.bg) safe('real city off', () => bgGame(false)); safe('grey', () => greyAt(0)); if (AP.greyBg) safe('grey off', () => greyBg(false));
     if (AP.closed) return; AP.closed = true;
     if (why) warn('apartment', why);
     safe('close', () => { const PC = labPC(), st = PC && PC._debug && PC._debug.state(); if (st && st.trans){ st.trans = null; PC.transitioning = false; }

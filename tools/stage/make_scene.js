@@ -257,7 +257,9 @@ const yPlat = P.line.MT_Y + P.line.MT_PLAT_Y, TOP = STN.lift, DOOR = STN.door, I
 { const mid = pointAt(rway, lenOf(rway)*.55); crowd('st', mid[0], mid[1], 11, 10, 2, T.start - 4, 400, null, (x, z) => Math.hypot(x - CAB.x, z - CAB.z) > 1.6); }
 // and the streets round the station busy at golden hour, below the lift as the camera rides it up (none by its door, none on his way to it)
 { const nearWay = (x, z) => { for (let d = Math.max(0, lenOf(rway) - 6); d <= lenOf(rway); d += .4){ const q = pointAt(rway, d); if (Math.hypot(x - q[0], z - q[1]) < .9) return true; } return false; };
-  crowd('lf', CAB.x, CAB.z, 13, 26, 7, T.start - 4, 400, null, (x, z) => Math.hypot(x - CAB.x, z - CAB.z) > 1.8 && !nearWay(x, z)); }
+  // (the streets behind the lift as the camera sees it: it looks along -(sin .9, cos .9), so these lie that way from the lift, beyond it)
+  const bx = CAB.x - Math.sin(.9)*9, bz = CAB.z - Math.cos(.9)*9;
+  crowd('lf', bx, bz, 10, 28, 8, T.start - 4, 400, null, (x, z) => Math.hypot(x - CAB.x, z - CAB.z) > 3 && !nearWay(x, z)); }
 
 const train = { k: 0, to: P.line.stops[P.line.stops.length - 1].k, open: r3(T.trainAt), close: r3(T.close), depart: r3(T.depart), v: 7.5, a: 2.2 };
 { const s0 = P.line.stops[0].s, s1 = P.line.stops[P.line.stops.length - 1].s, D = s1 - s0, ta = train.v/train.a, da = .5*train.a*ta*ta; T.arrive = T.depart + 2*ta + Math.max(0, (D - 2*da)/train.v); }

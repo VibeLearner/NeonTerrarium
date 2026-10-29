@@ -501,7 +501,7 @@ const PLAY = (() => {
         // it all the way, never drawn over it first); the game's pixels on the flat for the last stretch, the sun coming onto it
         if (!AP.bgDone && AP.picked){ AP.bgDone = true; safe('real city', () => bgGame(true, st, B, w)); }
         if (AP.bg && !AP.late && t >= A.room - BG_IN){ AP.late = true; safe('pixels', () => { pixOn(true); tiltOn(true); }); }
-        if (AP.bg && t >= A.room - BG_IN) safe('sun', () => keyLight(true, ss(clamp01((t - (A.room - BG_IN))/BG_IN))));
+        if (AP.bg) safe('sun', () => keyLight(true));   // (the sun on the flat from the start, steady: it shows only as the hologram resolves)
         // (the game's camera on the lab's, the one it is drawing the hologram with: the street behind moves with it, and what stands in front is cut from it)
         if (AP.bg && B && B.cam) safe('follow', () => { const p = camPose(B.cam, st.city); if (p) AP.camM = p; });   // (the room is drawn from the lab's own camera throughout: the hologram flies over it)
       }
@@ -637,8 +637,10 @@ const PLAY = (() => {
     if (!key){ B.sc.traverse(o => { if (!key && o.isDirectionalLight && (o.castShadow || o.userData.prKey)) key = o; }); if (!key) return; AP.key = key; AP.key0 = { i: key.intensity, c: key.color.clone(), p: key.position.clone() }; }
     if (!on){ const k0 = AP.key0; key.intensity = k0.i; key.color.copy(k0.c); key.position.copy(k0.p); key.updateMatrixWorld(); key.shadow.needsUpdate = true; AP.key = null; B.needs = true; return; }
     const city = w.PodContext._debug.state().city; if (!city || !city.M) return;
-    const d = SUN_DIR.clone().transformDirection(city.M); key.position.copy(key.target.position).addScaledVector(d, 8); key.updateMatrixWorld(); key.target.updateMatrixWorld();
-    key.color.copy(k0c(AP.key0.c)).lerp(sun.color, k); key.intensity = AP.key0.i + (sun.intensity*.63 - AP.key0.i)*k; key.shadow.needsUpdate = true; B.needs = true;
+    // (set only when it changes: each change starts the lab's picture building up again, which showed as flicker)
+    const d = SUN_DIR.clone().transformDirection(city.M), pos = key.target.position.clone().addScaledVector(d, 8), col = k0c(AP.key0.c).lerp(sun.color, k), I = AP.key0.i + (sun.intensity*.63 - AP.key0.i)*k;
+    if (pos.distanceTo(key.position) < 1e-4 && Math.abs(I - key.intensity) < 1e-4 && Math.abs(col.r - key.color.r) + Math.abs(col.g - key.color.g) + Math.abs(col.b - key.color.b) < 1e-4) return;
+    key.position.copy(pos); key.updateMatrixWorld(); key.target.updateMatrixWorld(); key.color.copy(col); key.intensity = I; key.shadow.needsUpdate = true; B.needs = true;
   }
   // 4. The blur by depth, as a tilted lens does it: sharp in the band the flat stands in (its top to its foot on the screen), softer above and below it
   // (further back and nearer the camera), in two steps. backdrop-filter blurs only the game's picture under it; the flat is drawn above.

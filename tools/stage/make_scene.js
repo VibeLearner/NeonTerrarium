@@ -273,7 +273,7 @@ console.log('end of the line: off', E2.off.toFixed(2), 'down', E2.down.toFixed(2
 console.log('T', T);
 
 /* ---------- the camera, the hour, the lights, the weather ---------- */
-const OUT = { t0: E2.down + .6, dur: 9 }, TITLE = { t0: OUT.t0 + OUT.dur, dur: 8.5 };   // (the zoom out once he is down at the street)
+const OUT = { t0: T.arrive + .5, dur: 9 }, TITLE = { t0: OUT.t0 + OUT.dur, dur: 8.5 };   // (the zoom out as the train pulls in: he gets off and goes down while it plays)
 const camera = [];
 const C = (t, pose, e = 'lin') => camera.push([r3(t), pose, e]);
 for (let t = 0; t <= MK.dive + 1e-9; t += .25){ const u = ease(seg(t, .3, MK.built + .6));

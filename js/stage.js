@@ -505,19 +505,46 @@ const PLAY = (() => {
     }
     aptEnd();
   }
-  // Out of the hologram: no fade. From the middle of the picture (where the hologram looks, and the game camera behind it) a widening circle clears
-  // the hologram away and the city shows through in its own colours, a cyan wavefront glowing on its edge. The lab's frame masked, a ring drawn over it
-  const REVEAL = 2.2;
+  // Out of the hologram: a reconstruction. A scan bar runs down the hologram and lays a fine cyan data grid over it; then, from the middle outwards
+  // (each tile's moment fixed by where it is: no randomness), the picture is rebuilt a tile at a time, each tile flashing as the city in its own
+  // colours switches in under it; a readout counts the pass. The lab's frame is masked tile by tile (a canvas the size of the window, as a CSS mask);
+  // the grid, flashes, scan bar and readout are drawn on a canvas over it
+  const REVEAL = 2.6, TILE = 40;
+  const hash01 = (a, b) => { let h = Math.imul(a*73856093 ^ b*19349663, 2654435761) >>> 0; h ^= h >>> 15; h = Math.imul(h, 2246822519) >>> 0; h ^= h >>> 13; return (h >>> 0)/4294967296; };
   function reveal(fr, u){
-    const ring = E.ring || (E.ring = (() => { const d = document.createElement('div'); d.id = 'stRing'; d.style.cssText = 'position:absolute;left:50%;top:50%;border-radius:50%;pointer-events:none;opacity:0;border:2px solid rgba(120,255,240,.95);box-shadow:0 0 22px 6px rgba(56,232,224,.75),inset 0 0 26px 4px rgba(56,232,224,.55)'; document.getElementById('stOv').appendChild(d); return d; })());
-    if (u <= 0){ fr.style.webkitMaskImage = fr.style.maskImage = ''; ring.style.opacity = '0'; return; }
-    const e = u < .5 ? 4*u*u*u : 1 - Math.pow(-2*u + 2, 3)/2, R = Math.hypot(innerWidth, innerHeight)/2*1.12, r = e*R, f = Math.max(30, R*.09);   // (ease in and out: the wave gathers, sweeps, settles)
-    fr.style.webkitMaskImage = fr.style.maskImage = 'radial-gradient(circle at 50% 50%, transparent ' + r.toFixed(1) + 'px, #000 ' + (r + f).toFixed(1) + 'px)';
-    ring.style.width = ring.style.height = (2*(r + f*.5)).toFixed(1) + 'px'; ring.style.marginLeft = ring.style.marginTop = (-(r + f*.5)).toFixed(1) + 'px';
-    ring.style.opacity = String(Math.min(1, u*6)*(1 - ss(seg(u, .82, 1))));
+    const W = innerWidth, H = innerHeight;
+    if (!E.rv){ const mk = () => { const c = document.createElement('canvas'); c.width = W; c.height = H; return c; };
+      const fx = mk(); fx.id = 'stRecon'; fx.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none';
+      document.getElementById('stOv').appendChild(fx); E.rv = { fx, last: null }; }
+    const R = E.rv, g = R.fx.getContext('2d');
+    g.clearRect(0, 0, W, H);
+    if (u <= 0){ if (R.last !== 'off'){ fr.style.clipPath = ''; R.last = 'off'; } return; }
+    const cols = Math.ceil(W/TILE), rows = Math.ceil(H/TILE), cx = (cols - 1)/2, cy = (rows - 1)/2, dMax = Math.hypot(cx, cy);
+    // each tile's switch-over time: by its distance from the middle, a little ahead or behind by its own hash, in [.18, .9] of the pass
+    const tAt = (c, r) => .18 + .72*Math.min(1, Math.max(0, Math.hypot(c - cx, (r - cy)*1.15)/dMax*.86 + (hash01(c, r) - .5)*.22 + .07));
+    const scan = Math.min(1, u/.22);   // the scan bar's run down the screen, laying the grid as it goes
+    let done = 0; const keep = [];   // (the tiles still hologram: the lab's frame is clipped to them)
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++){
+      const t0 = tAt(c, r), x = c*TILE, y = r*TILE, k = (u - t0)/.09;   // k: 0..1 the tile's switch, its flash after
+      if (k >= .5) done++; else keep.push('M' + x + ' ' + y + 'h' + TILE + 'v' + TILE + 'h-' + TILE + 'z');   // (k >= .5: the city shows here now)
+      if (k > 0 && k < 2.2){ const a = k < .5 ? k*2 : Math.max(0, 1 - (k - .5)/1.7);   // the flash: up to the switch, then dying away over the colour
+        g.fillStyle = 'rgba(70,240,230,' + (a*.55).toFixed(3) + ')'; g.fillRect(x + 1, y + 1, TILE - 2, TILE - 2);
+        g.strokeStyle = 'rgba(190,255,250,' + (a*.95).toFixed(3) + ')'; g.lineWidth = 1.5; g.strokeRect(x + 1.5, y + 1.5, TILE - 3, TILE - 3); }
+      else if (k <= 0 && y < scan*H){ g.strokeStyle = 'rgba(56,232,224,' + (.22 + .2*hash01(r, c)).toFixed(3) + ')'; g.lineWidth = 1; g.strokeRect(x + .5, y + .5, TILE - 1, TILE - 1);   // the data grid, still hologram
+        if (hash01(c + 7, r) < .07){ g.fillStyle = 'rgba(56,232,224,.5)'; g.fillRect(x + 4, y + 4, 3, 3); } }
+    }
+    if (scan < 1){ const y = scan*H; const gr = g.createLinearGradient(0, y - 60, 0, y + 6); gr.addColorStop(0, 'rgba(56,232,224,0)'); gr.addColorStop(1, 'rgba(160,255,250,.85)');
+      g.fillStyle = gr; g.fillRect(0, y - 60, W, 66); g.fillStyle = 'rgba(230,255,255,.95)'; g.fillRect(0, y, W, 2); }
+    // the readout
+    const pct = Math.round(100*done/(cols*rows)), fade = 1 - Math.min(1, Math.max(0, (u - .9)/.1)), fs = Math.max(12, Math.round(H*.018));
+    g.globalAlpha = fade; g.font = '600 ' + fs + 'px "JetBrains Mono", monospace'; g.textBaseline = 'top';
+    g.fillStyle = 'rgba(160,255,250,.95)'; g.fillText('RECONSTRUCTING SCENE', fs*2, fs*2); g.fillText(String(pct).padStart(3, ' ') + '%', fs*2, fs*3.4);
+    g.fillStyle = 'rgba(56,232,224,.35)'; g.fillRect(fs*2, fs*4.9, fs*14, 3); g.fillStyle = 'rgba(160,255,250,.95)'; g.fillRect(fs*2, fs*4.9, fs*14*pct/100, 3);
+    g.textAlign = 'right'; g.fillStyle = 'rgba(160,255,250,.8)'; g.fillText('LIDAR > RGB  PASS 2/2', W - fs*2, H - fs*3.2); g.textAlign = 'left'; g.globalAlpha = 1;
+    fr.style.clipPath = "path('" + (keep.length ? keep.join('') : 'M0 0z') + "')"; R.last = 'on';   // (a clip, not an image mask: applied the same frame, nothing to decode)
   }
   function aptEnd(why){
-    safe('reveal end', () => { if (FURN.frame) FURN.frame.style.webkitMaskImage = FURN.frame.style.maskImage = ''; if (E.ring) E.ring.style.opacity = '0'; });
+    safe('reveal end', () => { if (FURN.frame) FURN.frame.style.clipPath = ''; if (E.rv){ E.rv.fx.getContext('2d').clearRect(0, 0, E.rv.fx.width, E.rv.fx.height); } });
     if (AP.closed) return; AP.closed = true;
     if (why) warn('apartment', why);
     safe('close', () => { const PC = labPC(), st = PC && PC._debug && PC._debug.state(); if (st && st.trans){ st.trans = null; PC.transitioning = false; }

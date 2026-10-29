@@ -194,6 +194,19 @@
     "parent": 0,
     "colors": {},
     "light": null
+   },
+   {
+    "id": 8,
+    "arch": "floorlamp",
+    "seed": 8808,
+    "x": 2.55,
+    "y": 0,
+    "z": 0.45,
+    "ry": 0,
+    "wh": 0,
+    "parent": 0,
+    "colors": {},
+    "light": null
    }
   ]
  },

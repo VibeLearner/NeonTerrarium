@@ -96,7 +96,8 @@ function pair(id, names, spot, ang, k, until){
 // the second pair: Kwame walks home when the talk is done; Eun waves him off
 const pr2 = pair('p2', null, s2, 2.3, 1);
 const homeW = way(pr2.A[0], pr2.A[1], STAND[0], STAND[1]), HOME_V = .9, Lh = lenOf(homeW);
-MK.door = MK.leave2 + Lh/HOME_V + .5; MK.open = MK.door + .4;
+const WAIT_DOOR = 1.5;   // (Kwame stands at his door while it opens, long enough for the person cam's last line to be read)
+MK.atDoor = MK.leave2 + Lh/HOME_V; MK.door = MK.atDoor + WAIT_DOOR + .5; MK.open = MK.door + .4;
 const APTT = { holo: 5.4, furn: 5.4, back: 5.4 };
 MK.room = MK.open + APTT.holo; MK.unroom = MK.room + APTT.furn; MK.back = MK.unroom + APTT.back; MK.garden = MK.back; MK.square = MK.garden + 6.5;
 const sh = MK.square - 33.5, MG = { walk0: 31 + sh, stop: 35.6 + sh, reach: 36.0 + sh, rob1: 37.6 + sh, alarm: 35.3 + sh, copsGo: 35.8 + sh, pass: 38.9 + sh };
@@ -107,7 +108,8 @@ part('deepa', 'Deepa Rao', look(0), pr1.talk(pr1.A, pr1.B, true, 200));
 part('marcus', 'Marcus Okafor', look(1), pr1.talk(pr1.B, pr1.A, false, 200));
 { const k = pr2.talk(pr2.A, pr2.B, true, MK.leave2); const w = walkKeys(homeW, MK.leave2, HOME_V);
   k.push(...w.keys.slice(1));   // home along the footway
-  k.push(K(w.t + .05, STAND[0], STAND[1], 'walk', WALL[0] - STAND[0], WALL[1] - STAND[1]), K(MK.door, WALL[0], WALL[1], 'walk', WALL[0] - STAND[0], WALL[1] - STAND[1], 0));   // in through the door
+  k.push(K(w.t + .05, STAND[0], STAND[1], 'idle', WALL[0] - STAND[0], WALL[1] - STAND[1]), K(w.t + .05 + WAIT_DOOR, STAND[0], STAND[1], 'walk', WALL[0] - STAND[0], WALL[1] - STAND[1]),
+    K(MK.door, WALL[0], WALL[1], 'walk', WALL[0] - STAND[0], WALL[1] - STAND[1], 0));   // at the door while it opens, then in through it
   part('kwame', 'Kwame Mensah', look(2), k); }
 { const k = pr2.talk(pr2.B, pr2.A, false, MK.leave2 - .4); const me = pr2.B;
   k.push(K(MK.leave2 - .4, me[0], me[1], 'wave', pr2.A[0] - me[0], pr2.A[1] - me[1]), K(MK.leave2 + 1.4, me[0], me[1], 'idle', STAND[0] - me[0], STAND[1] - me[1]));
@@ -304,13 +306,13 @@ const shadowBox = [[0, 150], [r3(MK.dive), 150], [r3(MK.dive + .01), 0, 'hold']]
 /* ---------- the person cam ---------- */
 const monitor = [
   { t0: MK.p[0] + .1, t1: MK.p[1], actor: 'deepa', name: 'DEEPA', sub: 'name from conversation', cam: 'CAM 12', clock: 'D1 10:00', yaw: r3(GV.y1 + .9), pitch: r3(48*DEG), fade: .3,
-    log: [[MK.p[0] + .6, 'D1 10:00', 'Man yells from across the street: "Deepa!"'], [MK.p[0] + 2.0, 'D1 10:01', 'Identity pulled from conversation: Deepa'],
-          [MK.p[0] + 3.6, 'D1 10:02', 'Conversation: has she been keeping well, after everything that happened']] },
+    log: [[MK.p[0] + .6, 'D1 10:00', 'Man yells from across the street: "Deepa!"'], [MK.p[0] + 2.0, 'D1 10:01', 'Identity pulled from conversation: Deepa.'],
+          [MK.p[0] + 3.6, 'D1 10:02', 'Conversation: has she been keeping well, after everything that happened?']] },
   { t0: MK.p[1] + .1, t1: MK.door, actor: 'kwame', name: 'UNIDENTIFIED', sub: '', cam: 'CAM 07', clock: 'D1 10:07', yaw: r3(GV.y2 - .9), pitch: r3(48*DEG), fade: .5,
-    log: [[MK.door - .4, 'D1 10:09', 'Entered Block 12, residential tower']] }];
+    log: [[MK.atDoor + .15, 'D1 10:09', 'Entered Block 12, residential tower.']] }];
 const brackets = [[MK.p[0], MK.p[1], 'deepa'], [MK.p[1], MK.door - .6, 'kwame']];
 // the front door: opens as Kwame gets to it, shuts behind him
-const doors = [[HOME.door.key, [[0, 0], [r3(MK.door - 1.1), 0], [r3(MK.door - .5), 1, 'ss'], [r3(MK.door + .4), 1], [r3(MK.door + 1.2), 0, 'ss']]]];
+const doors = [[HOME.door.key, [[0, 0], [r3(MK.atDoor - .1), 0], [r3(MK.atDoor + .7), 1, 'ss'], [r3(MK.door + .4), 1], [r3(MK.door + 1.2), 0, 'ss']]]];
 const apartment = APT ? Object.assign({ pod: HOME.pod, open: r3(MK.open), room: r3(MK.room), unroom: r3(MK.unroom), back: r3(MK.back), fade: .8 }, APT) : null;
 const end = r3(TITLE.t0 + TITLE.dur);
 

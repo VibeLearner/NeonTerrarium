@@ -574,10 +574,11 @@
    "at": 3.3
   }
  ],
- "labZoom": 0.9,
+ "labZoom": 0.97,
  "labPan": [
   0,
   0
  ],
- "note": "The whole flat as Furnish pod furnished this pod itself (PodBuilder.furnishFor, household seed 20261023, same floor plan), kept as it came; all its lights warm. Three of its pieces start hidden and are set down in the film: the fern, the floor lamp, the car-seat sofa."
+ "note": "The whole flat as Furnish pod furnished this pod itself (PodBuilder.furnishFor, household seed 20261023, same floor plan), kept as it came; all its lights warm. Three of its pieces start hidden and are set down in the film: the fern, the floor lamp, the car-seat sofa.",
+ "labAz": 0.35
 }

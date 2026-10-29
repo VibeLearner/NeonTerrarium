@@ -666,6 +666,7 @@ const PLAY = (() => {
   function oldView(B, st){
     if (!B) return; AP.unsharp = true;
     if (AP.az0 !== undefined){ B.az = AP.az0; B.pitch = AP.pitch0; }
+    if (SC_.apartment.labAz !== undefined) B.az = SC_.apartment.labAz;   // (turned so the flat lies wide across the frame: it fills more of it)
     const A = SC_.apartment; B.zoom = A.labZoom || AP.zoom0 || 1; const pn = A.labPan || [0, 0]; B.tx = pn[0]; B.tz = pn[1]; B.camDirty = true; B.needs = true;
     FURN.hold = true;   // (the city not drawn under it: nothing of it shows)
     greyBg(true);

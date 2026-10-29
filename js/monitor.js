@@ -327,8 +327,8 @@ const MON = (() => {
       obs.push('<div class="mo"><time>' + clockText(n.t) + '</time><span><b>' + (HOW[n.channel] || n.channel) + '</b> ' + esc(t) + ' <small>' + (n.verified ? 'verified' : 'unconfirmed') + '</small></span></div>');
     }
     parts.push('<h4>Observations</h4>' + (obs.length ? obs.join('') : '<p class="mon-empty">Nothing yet.</p>'));
-    // for testing: the truth the player isn't meant to have
-    const sp = STORY.sp(people.get(M.id)), deg = STORY.degreesOf();
+    // for testing: the truth the player isn't meant to have (not in the itch.io build: tools/itch/build.py sets self.ITCH)
+    const sp = self.ITCH ? null : STORY.sp(people.get(M.id)), deg = sp ? STORY.degreesOf() : null;
     if (sp){ const p = people.get(M.id);
       parts.push('<details class="mon-key"><summary>Answer key (for testing)</summary><p>' + esc(sp.first + ' ' + sp.last + (sp.nick ? ' ("' + sp.nick + '")' : '') + ', ' + sp.age + ', ' + sp.life + ' life') +
         '<br>' + esc((p.job ? 'works: ' + STORY.placeText(places.get(p.job)) : 'no job') + (STORY.isSick(M.id) ? ' · sick today' : '')) +

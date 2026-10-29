@@ -31,7 +31,7 @@ THREE = {
   'https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js': ('0.149.0', 'build/three.min.js'),
 }
 AUDIO = {'.mp3': ['-c:a', 'libmp3lame', '-b:a', '128k', '-f', 'mp3'], '.m4a': ['-c:a', 'libopus', '-b:a', '96k', '-f', 'mp4']}
-NO_DEV = ("<script>/* the itch.io build: no dev page */(function(){var d=function(){return /dev/.test(location.hash)};"
+NO_DEV = ("<script>/* the itch.io build: no dev page, and no testing aids (self.ITCH: monitor.js leaves out the answer key) */self.ITCH=true;(function(){var d=function(){return /dev/.test(location.hash)};"
           "if(d())history.replaceState(null,'',location.pathname+location.search);"
           "addEventListener('hashchange',function(){if(d())location.replace(location.pathname+location.search)});})();</script>")
 

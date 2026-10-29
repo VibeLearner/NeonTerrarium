@@ -518,14 +518,14 @@ const PLAY = (() => {
       fr.style.opacity = '1';
       if (!AP.bg && !AP.bgDone){ AP.bgDone = true; safe('real city', () => bgGame(true, st, B, w)); }
       if (AP.bg && !AP.late){ AP.late = true; safe('pixels', () => { pixOn(true); tiltOn(true); }); }
-      if (!(tz0 => tz0 >= (A.zoomFor || 1.8)*.7)(t - A.room)) AP.punch = true;   // (the depth pass until the camera has gone past what stands in front)
+      if (!(tz0 => tz0 >= (A.zoomFor || 1.8)*.9)(t - A.room)) AP.punch = true;   // (the depth pass until the camera has gone past what stands in front)
       if (AP.bg){ safe('sun', () => keyLight(true)); }
       // One take: out of the hologram into the real street, the camera going in on the flat (past what stands in front of it: the near clip follows
       // the zoom) while everything around it blurs away to plain grey (never the flat: always in focus); on the grey the camera swings round to the
       // lab's own view, the flat coming up out of the game's pixels to its own; a hologram grid spreads out on the ground; then the furnishing.
       const tz = t - A.room, ZD = A.zoomFor || 1.8, OE = ZD + (A.orbitFor || 1.6);
-      if (AP.bg && B && AP.z0 && tz < ZD){ const base = AP.camBase || (AP.camBase = camPose(B.cam, st.city)), u = ss(clamp01(tz/ZD)), z = AP.z0 + ((A.labZoomIn || AP.z0*1.6) - AP.z0)*u; AP.nearK = ss(clamp01(tz/(ZD*.7)));
-        if (AP.nearK >= 1) AP.punch = false;   // (what stood in front is cut away by now: from here the flat is simply in front, while the blur goes on)
+      if (AP.bg && B && AP.z0 && tz < ZD){ const base = AP.camBase || (AP.camBase = camPose(B.cam, st.city)), u = ss(clamp01(tz/ZD)), z = AP.z0 + ((A.labZoomIn || AP.z0*1.6) - AP.z0)*u; AP.nearK = ss(clamp01(tz/(ZD*.55))); AP.deepK = ss(clamp01((tz - ZD*.55)/(ZD*.35)));
+        if (AP.deepK >= 1) AP.punch = false;   // (what stood in front is cut away by now: from here the flat is simply in front, while the blur goes on)
         if (Math.abs(B.zoom - z) > 1e-6){ B.zoom = z; B.camDirty = true; B.needs = true; } AP.camM = Object.assign({}, base, { zoom: base.zoom*AP.z0/z }); }
       if (tz < ZD) safe('grey', () => greyAt(ss(clamp01((tz - (A.greyFrom ?? .5))/Math.max(.1, ZD - (A.greyFrom ?? .5))))));
       else if (tz < OE){
@@ -665,14 +665,23 @@ const PLAY = (() => {
   }
   // the near clip: as the camera goes in, everything nearer the camera than the flat's front is cut away (the game's camera, and the lab's copy of the
   // city in the depth pass, the same way), from 8 units in front of it to a quarter unit
-  const nearOf = (pos, dir, M) => { const h = AP.home; if (!h) return null; const fp = h.fp || { w: 1.3, d: 2.2, ry: 0 }, c = Math.cos(fp.ry || 0), s = Math.sin(fp.ry || 0), p = new THREE.Vector3(); let mn = 1e9;
-    for (const sx of [-1, 1]) for (const sz of [-1, 1]) for (const y of [0, .3]){ const lx = sx*fp.w/2, lz = sz*fp.d/2; p.set(h.x + lx*c + lz*s, y, h.z - lx*s + lz*c); if (M) p.applyMatrix4(M); mn = Math.min(mn, p.sub(pos).dot(dir)); }   // (y to .3: the cut-down front walls, the nearest of the flat to the camera)
+  const nearOf = (pos, dir, M, far) => { const h = AP.home; if (!h) return null; const fp = h.fp || { w: 1.3, d: 2.2, ry: 0 }, c = Math.cos(fp.ry || 0), s = Math.sin(fp.ry || 0), p = new THREE.Vector3(); let mn = 1e9;
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) for (const y of [0, .3]){ const lx = sx*fp.w/2, lz = sz*fp.d/2; p.set(h.x + lx*c + lz*s, y, h.z - lx*s + lz*c); if (M) p.applyMatrix4(M); const dd = p.sub(pos).dot(dir); mn = far ? (mn === 1e9 ? dd : Math.max(mn, dd)) : Math.min(mn, dd); }   // (y to .3: the cut-down front walls, the nearest of the flat to the camera)
     return mn; };
   const NEAR_FROM = 8, NEAR_TO = .04;
+  // where the near plane is, as a distance along the view from pos: in from 8 units in front of the flat to its front (nearK), then on through it to
+  // its back corner (deepK), so whatever stands anywhere in front of any of it is gone before the flat is let in front (the ground cut with it is
+  // under the blur by then)
+  function nearAt(pos, dir, M, k){
+    const f = nearOf(pos, dir, M); if (f === null) return null; const dk = window.__deepK ?? AP.deepK ?? 0;
+    let d = f - (NEAR_FROM + (NEAR_TO - NEAR_FROM)*AP.nearK)*k;
+    if (dk > 0){ const b = nearOf(pos, dir, M, true); d = (f - NEAR_TO*k) + (b - .05*k - (f - NEAR_TO*k))*dk; }
+    return d;
+  }
   function nearClip(){
     if (AP.bg && AP.nearK > 0){ const dir = cam.getWorldDirection(new THREE.Vector3()), f = nearOf(cam.position, dir); if (f === null) return;
       if (AP.sc0 === undefined){ AP.sc0 = SC.mode; SC.mode = 'off'; }   // (the static cache draws with its own camera and the usual near plane: the frame drawn the old way meanwhile)
-      cam.near = Math.max(NEAR, f - (NEAR_FROM + (NEAR_TO - NEAR_FROM)*AP.nearK)); cam.updateProjectionMatrix(); AP.nearOn = true; }
+      cam.near = Math.max(NEAR, nearAt(cam.position, dir, null, 1)); cam.updateProjectionMatrix(); AP.nearOn = true; }
     else if (AP.nearOn){ AP.nearOn = false; cam.near = NEAR; cam.updateProjectionMatrix(); if (AP.sc0 !== undefined){ SC.mode = AP.sc0; AP.sc0 = undefined; } }
   }
   // the grey: the whole picture blurred and greyed (a layer over everything the film shows but its own overlays), from 0 to 1
@@ -690,7 +699,7 @@ const PLAY = (() => {
   }
   // the street gone (all grey by now): the game stops drawing and everything of it put back; the flat stays in its pixels and the sun for the swing round
   function streetOff(B){
-    AP.bg = false; AP.punch = false; AP.camM = null; AP.nearK = 0; nearClip(); homeHide(false); tiltOn(false);
+    AP.bg = false; AP.punch = false; AP.camM = null; AP.nearK = 0; AP.deepK = 0; nearClip(); homeHide(false); tiltOn(false);
     if (AP.ppl){ pplMesh.visible = AP.ppl[0]; ddMesh.visible = AP.ppl[1]; AP.ppl = null; }
     FURN.hold = true;
     const A = SC_.apartment, pn = A.labPan || [0, 0];
@@ -792,7 +801,7 @@ const PLAY = (() => {
           const s = R.getDrawingBufferSize(P.v2); for (const t of [P.a, P.b]) if (t.width !== s.x || t.height !== s.y) t.setSize(s.x, s.y);
           const k = B.cam.clone(); k.near = -400; k.far = 400; k.updateMatrixWorld(true);
           if (AP.nearK > 0){ const kd = k.getWorldDirection(new w.THREE.Vector3()), f = nearOf(new THREE.Vector3().copy(k.position), new THREE.Vector3().copy(kd), city.M), sc = Math.hypot(city.M.elements[0], city.M.elements[8]);
-            if (f !== null) k.near = f - (NEAR_FROM + (NEAR_TO - NEAR_FROM)*AP.nearK)*sc; }
+            const nd = nearAt(new THREE.Vector3().copy(k.position), new THREE.Vector3().copy(kd), city.M, sc); if (nd !== null) k.near = nd; }
           k.updateProjectionMatrix();
           const pass = (scene, tgt) => { const om = scene.overrideMaterial, bg = scene.background; scene.overrideMaterial = P.om; scene.background = null;
             try { R.setRenderTarget(tgt); R.autoClear = true; R.setClearColor(0, 0); R.clear(); prev.call(R, scene, k); } finally { scene.overrideMaterial = om; scene.background = bg; } };

@@ -82,7 +82,7 @@ const LEDGER = (() => {
     return { pts, top, out: pts.length };
   }
   function transit(){
-    const metro = safe(() => metros.map((l, k) => ({ n: k + 1, riders: (l._riders || []).length, stops: (l.st || []).length + 2, tiles: (l.tiles || []).length })), []);
+    const metro = safe(() => metros.map((l, k) => ({ n: k + 1, riders: (l._riders || []).length, stops: typeof mtStops === 'function' ? mtStops(l).length : (l.st || []).length + 2, tiles: (l.tiles || []).length })), []);
     const air = safe(() => drones.filter(d => (d.phase && d.phase !== 'inside') || (d.state && d.state !== 'sit')).length, 0);
     return { hwRoutes: safe(() => highways.length, 0), hwCars: safe(() => hwCars.length, 0), metro, air, drones: safe(() => drones.length, 0) };
   }

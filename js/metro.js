@@ -2,13 +2,15 @@
 // glass roof), after the reference: a guideway on pillars, an overhead box girder carried on C-frames, green circuit
 // traces along it and MAGRAIL GREEN LINE boards; a three-car train, its windows and belt lines lit green, hanging from
 // the girder overhead on its magnets, floating clear of the deck (an upside-down maglev). Stations: platforms either side under a canopy, screen doors, a lift down to the street.
-// The train shuttles from end to end, stopping at every station, and lets visitors out at the ones with a lift.
+// The train shuttles from end to end (round and round a loop, always the same way), stopping at every station, and lets visitors out at the ones with a lift.
 // All game scripts share one scope and load in order (see index.html); this one after highway.js, whose line geometry
 // (hwDirs, hwCenter, hwSweep, hwSeg, hwFold, hwAlong) it shares.
 'use strict';
-// A line: { id, tiles: [{ i, j }], done, st: [k, ...] (the stops along the way; the two ends are stops of their own once
+// A line: { id, tiles: [{ i, j }], done, loop, st: [k, ...] (the stops along the way; the two ends are stops of their own once
 // it's finished), sides: { k: +1|-1|0 } (each stop's lift side, 0 for none) }. It's built like a highway: click a plot to
-// start (the first station), click next to its end to extend it, click the end piece to finish it (the last station).
+// start (the first station), click next to either end to extend it, click the end piece to finish it (the last station).
+// A line with a second station can be run back into its first station, straight on, closing it into a loop (loop: the last plot
+// runs on into the first, the train goes round and round one way); and an end can be run into another line's end, joining the two.
 const MT_SAVE_KEY = 'neonIsland.metros';
 const MT_Y = hwY(12);                            // the rail's height: level with the hydroponic farm's glass ridge (12 floors)
 const MT_W = 1.0, MT_DECK = .26, MT_GIRD = .32;  // the guideway: width, deck depth, the girder under it
@@ -29,16 +31,42 @@ function mtReindex(){ mtIndex = new Map(); for (const l of metros) l.tiles.forEa
 const mtAt = (i, j) => mtIndex.get(hwKey(i, j)) || [];
 const mtStraight = (l, k) => { const { din, dout } = hwDirs(l, k); return din[0] === dout[0] && din[1] === dout[1]; };
 // every stop along a line, in order: the first plot always, the middle ones, the last once finished
-function mtStops(l){ const n = l.tiles.length, s = new Set([0, ...l.st.filter(k => k > 0 && k < n - 1)]); if (l.done && n > 1) s.add(n - 1); return [...s].sort((a, b) => a - b); }
-const mtIsStop = (l, k) => k === 0 || (l.done && k === l.tiles.length - 1) || l.st.includes(k);
+function mtStops(l){ const n = l.tiles.length, s = new Set([0, ...l.st.filter(k => k > 0 && k < n - (l.loop ? 0 : 1))]); if (l.done && !l.loop && n > 1) s.add(n - 1); return [...s].sort((a, b) => a - b); }
+const mtIsStop = (l, k) => { const n = l.tiles.length; if (l.loop) k = ((k % n) + n) % n; return k === 0 || (l.done && !l.loop && k === n - 1) || l.st.includes(k); };
+const mtTileKey = t => t.i + ',' + t.j;
+const mtAdj = (a, b) => Math.abs(a.i - b.i) + Math.abs(a.j - b.j) === 1;
+// the stops along a line kept to the rules, whatever changed: on straight track, never right beside another stop (the ends included, round a loop's join too)
+function mtFixStops(l){
+  const n = l.tiles.length, endStop = l.done && !l.loop && n > 1, out = []; let last = 0;
+  for (const k of [...new Set(l.st)].sort((a, b) => a - b)){
+    if (k <= 0 || k > n - 1 || (!l.loop && k >= n - 1)) continue;
+    if (!mtStraight(l, k) || k - last < 2 || (endStop && n - 1 - k < 2) || (l.loop && n - k < 2)) continue;
+    out.push(k); last = k;
+  }
+  l.st = out;
+}
+// A line made over from a run of plots: which of them are stations goes by the plot (stationKeys), each one's lift side too (sideByKey; flip when the run
+// goes the other way round from before, the side being reckoned from the way the line runs). The first plot is always a station; the last is one, and the
+// line finished, when it was a station before (an end station stays one; a station in the middle that's now the end becomes the last station)
+function mtReshape(l, tiles, stationKeys, sideByKey, loop = false, flip = false){
+  const n = tiles.length;
+  l.tiles = tiles.map(t => ({ i: t.i, j: t.j })); l.loop = !!loop && n >= 4;
+  l.done = l.loop || (n > 1 && stationKeys.has(mtTileKey(tiles[n - 1])));
+  l.st = []; l.sides = {};
+  tiles.forEach((t, k) => { const q = mtTileKey(t); if (k > 0 && stationKeys.has(q)) l.st.push(k); const sd = sideByKey.get(q); if (sd !== undefined) l.sides[k] = flip ? -sd : sd; });
+  mtFixStops(l);
+}
+const mtStationKeys = l => new Set(mtStops(l).map(k => mtTileKey(l.tiles[k])));
+const mtSideKeys = (l, flip = false) => { const m = new Map(); for (const k in (l.sides || {})) if (l.tiles[k]) m.set(mtTileKey(l.tiles[k]), flip ? -l.sides[k] : l.sides[k]); return m; };
 // would a sky highway deck at height y clear the metro on the same plot (well under it, or well over it)?
 const mtHwClear = y => y + 1.25 <= MT_Y - MT_CLEAR || y - HW_CLEAR >= MT_TOP + .3;
 function mtSamples(l, step = .3){
   const out = [], n = l.tiles.length;
   for (let k = 0; k < n; k++){
     const len = mtStraight(l, k) ? LOT : PI*LOT/4, m = Math.max(4, Math.ceil(len/step));
-    for (let q = 0; q < m + (k === n - 1 ? 1 : 0); q++){ const u = q/m, c = hwCenter(l, k, u); out.push({ x: c.x, y: MT_Y, z: c.z, tx: c.tx, tz: c.tz, k, u }); }
+    for (let q = 0; q < m + (k === n - 1 && !l.loop ? 1 : 0); q++){ const u = q/m, c = hwCenter(l, k, u); out.push({ x: c.x, y: MT_Y, z: c.z, tx: c.tx, tz: c.tz, k, u }); }
   }
+  if (l.loop && out.length) out.push(Object.assign({}, out[0], { k: n, u: 0 }));   // (round to where it began: the last plot runs into the first)
   return out;
 }
 
@@ -100,44 +128,84 @@ function mtSides(l){
   for (const k of mtStops(l)){ let s = 0; for (const c of [old[k], 1, -1]) if (c && mtLiftOK(l, k, c)){ s = c; break; } l.sides[k] = s; }
 }
 const mtLiftCell = (l, k) => { const s = l.sides && l.sides[k]; if (!s) return null; const L = mtLiftSpot(l, k, s); return [Math.round(L.sx/LOT), Math.round(L.sz/LOT)]; };
-// what a click would do in metro mode: { type: 'start'|'extend'|'reopen'|'finish'|'stop'|'unstop'|'none', ok, why, ... } ('reopen': a finished line carried on from its end station)
+// what a click would do in metro mode: { type: 'start'|'extend'|'prepend'|'reopen'|'finish'|'loop'|'join'|'stop'|'unstop'|'none', ok, why, ... }
+// ('reopen': a finished line carried on from its end station; 'prepend': a line carried on from its first station, the other way; 'loop': its open end run
+// into its own first station; 'join': one line's end run into another line's end, the two made one)
 function mtTargetAt(pk){
   if (!pk) return null;
   if (pk.kind === 'mtTile'){
     const l = pk.l, k = pk.k, n = l.tiles.length;
-    if (!l.done && k === n - 1){
+    if (!l.loop && (k === 0 || k === n - 1)){ const j = mtJoinTarget(l, k); if (j) return j; }   // (an end, with this line's other end or another line's end right beside it)
+    if (!l.loop && !l.done && k === n - 1){
       if (n < 2) return { type: 'none', l, k, ok: false, why: 'extend it to the next plot first' };
       const why = [1, -1].some(sd => mtLiftOK(l, k, sd)) ? '' : 'no room here for the station\'s lift down to the street';   // (and ends at one)
       return { type: 'finish', l, k, ok: !why, why };
     }
-    if (k > 0 && k < n - 1){
+    if (l.loop ? k > 0 : (k > 0 && k < n - 1)){
       if (l.st.includes(k)) return { type: 'unstop', l, k, ok: true, why: '' };
       let why = !mtStraight(l, k) ? 'stations only go on straight track' : [k - 1, k + 1].some(q => mtIsStop(l, q)) ? 'too close to another station' : null;
       return { type: 'stop', l, k, ok: !why, why: why || '' };
     }
     return { type: 'none', l, k, ok: false, why: '' };
   }
-  const { i, j } = pk;
+  const { i, j } = pk, at = { i, j };
   for (const l of metros){
+    if (l.loop) continue;   // (a loop has no ends to carry on from)
     const n = l.tiles.length, e = l.tiles[n - 1];
-    if (Math.abs(e.i - i) + Math.abs(e.j - j) !== 1) continue;
-    const pv = l.tiles[n - 2]; if (pv && pv.i === i && pv.j === j) continue;
-    if (l.done){   // a finished line goes on from its end station, which stays as a station in the middle (stations sit on straight track, so the line carries on straight from it)
+    if (mtAdj(e, at)){
+      const pv = l.tiles[n - 2]; if (pv && pv.i === i && pv.j === j) continue;
+      if (l.done){   // a finished line goes on from its end station, which stays as a station in the middle (stations sit on straight track, so the line carries on straight from it)
+        let why = mtTileWhy(i, j);
+        const keep = !mtIsStop(l, n - 2);   // (right beside another station it can't stay one: it becomes plain track)
+        if (!why && keep && pv && (i - e.i !== e.i - pv.i || j - e.j !== e.j - pv.j)) why = 'the end station stays a station: carry the line on straight from it';
+        return { type: 'reopen', l, i, j, keep, ok: !why, why };
+      }
       let why = mtTileWhy(i, j);
-      const keep = !mtIsStop(l, n - 2);   // (right beside another station it can't stay one: it becomes plain track)
-      if (!why && keep && pv && (i - e.i !== e.i - pv.i || j - e.j !== e.j - pv.j)) why = 'the end station stays a station: carry the line on straight from it';
-      return { type: 'reopen', l, i, j, keep, ok: !why, why };
+      if (!why && n === 1){   // the first station's lift has to fit beside the track running this way
+        l.tiles.push({ i, j }); const fits = [1, -1].some(sd => mtLiftOK(l, 0, sd)); l.tiles.pop();   // (tried with the plot added, then put back)
+        if (!fits) why = 'the first station\'s lift has no room if the line goes this way';
+      }
+      return { type: 'extend', l, i, j, ok: !why, why };
     }
-    let why = mtTileWhy(i, j);
-    if (!why && n === 1){   // the first station's lift has to fit beside the track running this way
-      l.tiles.push({ i, j }); const fits = [1, -1].some(sd => mtLiftOK(l, 0, sd)); l.tiles.pop();   // (tried with the plot added, then put back)
-      if (!fits) why = 'the first station\'s lift has no room if the line goes this way';
+    // next to its first station (the other way from the line): the line carried on from there, the new plot its first station now
+    // (the old first station, right beside the new one, turns to plain track: two stations can't stand side by side)
+    const t0 = l.tiles[0], t1 = l.tiles[1];
+    if (n > 1 && (l === mtActive || !l.done) && mtAdj(t0, at) && !(t1.i === i && t1.j === j)){   // (a finished line only when it's the one being worked on: else a plot beside a station starts a new line, as before)
+      let why = mtTileWhy(i, j);
+      if (!why){ l.tiles.unshift({ i, j }); const fits = [1, -1].some(sd => mtLiftOK(l, 0, sd)); l.tiles.shift(); if (!fits) why = 'no room here for the new first station\'s lift down to the street'; }
+      return { type: 'prepend', l, i, j, ok: !why, why };
     }
-    return { type: 'extend', l, i, j, ok: !why, why };
   }
   let why = mtTileWhy(i, j);
   if (!why && !mtEndLiftOK(i, j)) why = 'no room here for the station\'s lift down to the street';   // (a line starts at a station people can get off at)
   return { type: 'start', i, j, ok: !why, why };
+}
+// An end plot k (first or last) of line B clicked: is an end of a line right beside it, to be run into it? Its own other end: closing it into a loop.
+// Another line's end: joining the two (the line being built, if it's one of them, is the one that carries on)
+function mtJoinTarget(B, kB){
+  const nB = B.tiles.length, tB = B.tiles[kB];
+  if (nB >= 4){ const o = kB === 0 ? nB - 1 : 0; if (mtAdj(B.tiles[o], tB)) return mtLoopTarget(B); }
+  const c = [];
+  for (const A of metros){ if (A === B || A.loop) continue; const nA = A.tiles.length;
+    if (mtAdj(A.tiles[nA - 1], tB)) c.push({ A, aEnd: 'last' }); else if (nA > 1 && mtAdj(A.tiles[0], tB)) c.push({ A, aEnd: 'first' }); }
+  if (!c.length) return null;
+  if (B === mtActive && !c.some(q => q.A === mtActive) && !B.done && kB === nB - 1) return null;   // (building this line, clicking its own end: that finishes it)
+  c.sort((x, y) => (y.A === mtActive) - (x.A === mtActive));
+  const { A, aEnd } = c[0], bEnd = kB === 0 ? 'first' : 'last';
+  const At = aEnd === 'last' ? A.tiles : A.tiles.slice().reverse(), Bt = bEnd === 'first' ? B.tiles : B.tiles.slice().reverse();
+  const keys = new Set([...mtStationKeys(A), ...mtStationKeys(B)]), tiles = At.concat(Bt);
+  const tmp = { tiles: [], st: [], sides: {} }; mtReshape(tmp, tiles, keys, new Map());
+  const lost = [...keys].filter(q => !mtStationKeys(tmp).has(q)).length;
+  return { type: 'join', l: A, A, aEnd, B, bEnd, k: kB, lost, ok: true, why: '' };
+}
+// the line's open end run into its first station, straight on: a loop. It needs a second station (a loop of one station goes nowhere)
+function mtLoopTarget(l){
+  const n = l.tiles.length, e = l.tiles[n - 1], t0 = l.tiles[0], t1 = l.tiles[1];
+  let why = '';
+  if (t0.i - e.i !== t1.i - t0.i || t0.j - e.j !== t1.j - t0.j) why = 'to close the loop, run the line straight into the first station';
+  const tmp = { tiles: [], st: [], sides: {} }; mtReshape(tmp, l.tiles, mtStationKeys(l), new Map(), true);
+  if (!why && mtStops(tmp).length < 2) why = 'a loop needs a second station: add one along the line first';
+  return { type: 'loop', l, k: 0, ok: !why, why };
 }
 
 /* ---------- making changes ---------- */
@@ -159,6 +227,19 @@ function mtApply(t){
   } else if (t.type === 'reopen'){
     const l = t.l, before = mtTouched(l), n = l.tiles.length;
     l.done = false; if (t.keep) l.st = [...l.st, n - 1]; l.tiles.push({ i: t.i, j: t.j }); mtActive = l; mtCommit(l, before);
+  } else if (t.type === 'prepend'){
+    const l = t.l, before = mtTouched(l), keys = mtStationKeys(l), sides = mtSideKeys(l);
+    keys.delete(mtTileKey(l.tiles[0]));   // (the old first station turns to plain track: the new plot beside it is the first station)
+    mtReshape(l, [{ i: t.i, j: t.j }].concat(l.tiles), keys, sides); mtActive = l; mtCommit(l, before);
+  } else if (t.type === 'loop'){
+    const l = t.l, before = mtTouched(l);
+    mtReshape(l, l.tiles, mtStationKeys(l), mtSideKeys(l), true); mtActive = l; mtCommit(l, before);
+  } else if (t.type === 'join'){
+    const A = t.A, B = t.B, before = mtTouched(A).concat(mtTouched(B)), keys = new Set([...mtStationKeys(A), ...mtStationKeys(B)]);
+    const sides = new Map([...mtSideKeys(A, t.aEnd !== 'last'), ...mtSideKeys(B, t.bEnd !== 'first')]);
+    const tiles = (t.aEnd === 'last' ? A.tiles : A.tiles.slice().reverse()).concat(t.bEnd === 'first' ? B.tiles : B.tiles.slice().reverse());
+    metros = metros.filter(q => q !== B); mtDropView(B); B.train = null; if (mtActive === B) mtActive = null;   // (its riders are sent on their way: see mtRiders)
+    mtReshape(A, tiles, keys, sides, false, false); mtActive = A; mtCommit(A, before);
   } else if (t.type === 'finish'){
     const l = t.l; l.done = true; mtActive = l; mtCommit(l, []);
   } else if (t.type === 'stop' || t.type === 'unstop'){
@@ -167,12 +248,19 @@ function mtApply(t){
   } else return false;
   sfx.play('place'); return true;
 }
-// right-click a metro plot: from its first plot the whole line goes; from anywhere further on, that plot and the rest of
-// the line beyond it go (the last station included), and what's left is open again to be extended
+// right-click a metro plot: its first plot alone goes (the next plot is the first station now, and the line can be carried on from there either way); its
+// last plot alone goes; from anywhere in the middle, that plot and the rest of the line beyond it go (the last station included), and what's left is open
+// again to be extended. On a loop, just that plot goes and the loop opens there: a line again, from the plot after it round to the plot before it
 function mtCutAt(l, k, quiet){
-  if (k === 0) return mtRemove(l, quiet);
-  const touched = mtTouched(l);
-  l.tiles = l.tiles.slice(0, k); l.st = l.st.filter(q => q < k - 1); l.done = false; mtActive = l;   // (the plot before the cut is the open end now: no station there yet)
+  const n = l.tiles.length;
+  if (n === 1) return mtRemove(l, quiet);
+  const touched = mtTouched(l), keys = mtStationKeys(l), sides = mtSideKeys(l);
+  let tiles;
+  if (l.loop) tiles = l.tiles.slice(k + 1).concat(l.tiles.slice(0, k));
+  else if (k === 0) tiles = l.tiles.slice(1);
+  else { tiles = l.tiles.slice(0, k); keys.delete(mtTileKey(l.tiles[k - 1])); }   // (cut in the middle: the plot before the cut is the open end now, no station there yet)
+  if (l.loop) keys.delete(mtTileKey(l.tiles[(k - 1 + n) % n]));   // (an opened loop: the plot before the cut is its open end)
+  mtReshape(l, tiles, keys, sides); mtActive = l;
   if (quiet){ mtReindex(); mtSides(l); mtBuildView(l); mtResetTrain(l); } else { mtCommit(l, touched); sfx.play('remove'); }
   return touched;
 }
@@ -183,19 +271,38 @@ function mtRemove(l, quiet){
   if (!quiet){ mtCommit(null, touched); sfx.play('remove'); } else mtReindex();
   return touched;
 }
-// delete mode: every metro line reaching into the block is cut there, as a right-click on that plot cuts it (that plot and the rest of the line beyond it go);
-// a station whose lift shaft stands in the block counts as reaching in. The plots it stood on are returned for the rebuild
+// delete mode: a line's plots in the block go, and with them any station whose lift shaft stands in the block (in the middle of the line, it becomes plain
+// track; an end station goes, plot and all). What's left of the line, in as many pieces as the block cuts it into, stays: each piece a line of its own (its
+// first plot a station), a piece ending at a station finished there, else open to be carried on. A loop the block cuts opens there. Returns the plots touched
 function mtRemoveArea(r){
   const out = [], inR = (i, j) => i >= r.i0 && i <= r.i1 && j >= r.j0 && j <= r.j1;
   for (const l of [...metros]){
-    let k = l.tiles.findIndex(t => inR(t.i, t.j));
-    for (const s of mtStops(l)){ const c = mtLiftCell(l, s); if (c && inR(c[0], c[1]) && (k < 0 || s < k)) k = s; }
-    if (k >= 0) out.push(...mtCutAt(l, k, true));
+    const n = l.tiles.length, gone = l.tiles.map(t => inR(t.i, t.j)), keys = mtStationKeys(l), sides = mtSideKeys(l);
+    for (const s of mtStops(l)){ const c = mtLiftCell(l, s); if (c && inR(c[0], c[1])){ if (s === 0 || (l.done && !l.loop && s === n - 1)) gone[s] = true; else keys.delete(mtTileKey(l.tiles[s])); } }
+    if (!gone.some(Boolean) && keys.size === mtStops(l).length) continue;
+    out.push(...mtTouched(l));
+    if (gone.every(Boolean)){ mtRemove(l, true); continue; }
+    // the runs of plots left, in order (a loop's from just after a plot that went, so a run isn't split at the join)
+    let order = [...Array(n).keys()];
+    if (l.loop && gone.some(Boolean)){ const g = gone.indexOf(true); order = order.slice(g + 1).concat(order.slice(0, g + 1)); }
+    const runs = []; let cur = [];
+    for (const k of order){ if (gone[k]){ if (cur.length) runs.push(cur); cur = []; } else cur.push(k); }
+    if (cur.length) runs.push(cur);
+    const stillLoop = l.loop && !gone.some(Boolean), T0 = l.tiles.slice();   // (the plots as they were: the first piece is made over in l itself)
+    runs.forEach((run, q) => {
+      const ln = q === 0 ? l : { id: mtNext++, tiles: [], done: false, st: [], sides: {} };
+      // (the plot before a gap is an open end, not a station, unless it was a station already)
+      mtReshape(ln, run.map(k => T0[k]), keys, sides, stillLoop);
+      if (q > 0) metros.push(ln);
+      mtReindex(); mtSides(ln); mtBuildView(ln); mtResetTrain(ln);
+    });
+    if (mtActive && !metros.includes(mtActive)) mtActive = null;
   }
+  mtReindex();
   return out;
 }
 function mtClearAll(){ for (const l of metros) mtDropView(l); metros = []; mtActive = null; mtReindex(); }
-function mtSave(){ try { localStorage.setItem(MT_SAVE_KEY, JSON.stringify(metros.map(l => ({ id: l.id, done: l.done, st: l.st, sides: l.sides, t: l.tiles.map(t => [t.i, t.j]) })))); } catch (e) {} }
+function mtSave(){ try { localStorage.setItem(MT_SAVE_KEY, JSON.stringify(metros.map(l => ({ id: l.id, done: l.done, loop: !!l.loop, st: l.st, sides: l.sides, t: l.tiles.map(t => [t.i, t.j]) })))); } catch (e) {} }
 function mtLoad(){
   mtClearAll();
   try {
@@ -203,7 +310,7 @@ function mtLoad(){
     if (Array.isArray(d)) for (const q of d){
       if (!q || !Array.isArray(q.t) || !q.t.length) continue;
       const tiles = q.t.map(([i, j]) => ({ i: i | 0, j: j | 0 })), n = tiles.length;
-      const l = { id: q.id | 0 || mtNext, tiles, done: !!q.done && n > 1, st: (Array.isArray(q.st) ? q.st : []).filter(k => k > 0 && k < n - 1), sides: q.sides && typeof q.sides === 'object' ? q.sides : {} };
+      const loop = !!q.loop && n >= 4 && mtAdj(tiles[0], tiles[n - 1]), l = { id: q.id | 0 || mtNext, tiles, loop, done: (!!q.done && n > 1) || loop, st: (Array.isArray(q.st) ? q.st : []).filter(k => k > 0 && k < n - (loop ? 0 : 1)), sides: q.sides && typeof q.sides === 'object' ? q.sides : {} };
       metros.push(l); mtNext = Math.max(mtNext, l.id + 1);
     }
   } catch (e) {}
@@ -240,7 +347,7 @@ function mtBuildView(l){
     // (no rail under the train: it hangs from the girder overhead, held up by its magnets alone)
     // the overhead girder: a dark box beam over the train, green circuit traces along both its faces. At a finished line's
     // ends it reaches a little past the station, over the end cars of a train standing there
-    if (l.done && n > 1) for (const [k, u, d] of [[0, 0, -1], [n - 1, 1, 1]]){
+    if (l.done && !l.loop && n > 1) for (const [k, u, d] of [[0, 0, -1], [n - 1, 1, 1]]){
       const c = hwCenter(l, k, u), F = T(c.x + c.tx*d*.4, MT_Y, c.z + c.tz*d*.4, Math.atan2(c.tx, c.tz));
       box(MTM.beam, F, 0, MT_OH + MT_OHT/2, 0, .46, MT_OHT, .8); box(MTM.beam2, F, 0, MT_OH + MT_OHT/2, d*.41, .5, MT_OHT + .04, .04);
       box(MTM.blue, F, 0, MT_OH - .004, 0, .14, .008, .8); box(MTM.green, F, 0, MT_OH + MT_OHT/2, d*.44, .3, .03, .012);
@@ -272,7 +379,7 @@ function mtBuildView(l){
     // the stations
     for (const k of stops) mtStation(l, k);
     // the ends of the line: buffer stops, hazard boards across the girder ends
-    for (const [k, u, back] of [[0, 0, true], [n - 1, 1, false]]){
+    if (!l.loop) for (const [k, u, back] of [[0, 0, true], [n - 1, 1, false]]){
       if (!l.done && k === n - 1 && n > 1){
         const F = under(mtFrame(l, k, 1), T(0, 0, -.1, 0));
         box(MTM.beam2, F, 0, MT_OH - .14, 0, .6, .26, .1); for (let x = -.24; x < .25; x += .12) box(M.hazard, F, x, MT_OH - .14, -.055, .06, .2, .012);   // a hazard board hung from the girder's open end
@@ -584,14 +691,14 @@ function updateMetros(dt, t){
       if (!busy || tr.dwell > .75) tr.dwell -= dt;
       tr.doors = Math.max(0, Math.min(1, tr.stopT/.7, tr.dwell/.7));
       if (tr.dwell <= 0){ tr.doors = 0;
-        if (tr.at + tr.dir < 0 || tr.at + tr.dir >= stops.length) tr.dir = -tr.dir;
-        tr.next = tr.at + tr.dir;
+        if (l.loop) tr.next = (tr.at + 1) % stops.length;   // (round a loop, always the same way)
+        else { if (tr.at + tr.dir < 0 || tr.at + tr.dir >= stops.length) tr.dir = -tr.dir; tr.next = tr.at + tr.dir; }
       }
     } else {
-      const goal = stops[tr.next].s, d = goal - tr.s, dist = Math.abs(d);
+      const goal = stops[tr.next].s, d = l.loop ? ((goal - tr.s) % P.len + P.len) % P.len : goal - tr.s, dist = Math.abs(d);   // (a loop: the way on round, past the join)
       const vCap = Math.sqrt(2*MT_ACC*Math.max(0, dist - .02));
       tr.v = Math.min(MT_VMAX, tr.v + MT_ACC*dt, vCap + .05);
-      const step = Math.min(dist, tr.v*dt); tr.s += Math.sign(d)*step;
+      const step = Math.min(dist, tr.v*dt); tr.s += Math.sign(d)*step; if (l.loop) tr.s = ((tr.s % P.len) + P.len) % P.len;
       if (dist - step < .005){
         tr.s = goal; tr.at = tr.next; tr.v = 0; tr.dwell = MT_DWELL + Math.random()*2; tr.stopT = 0;
         mtArrive(l, tr, stops[tr.at].k);   // the doors open: off, then on
@@ -600,8 +707,9 @@ function updateMetros(dt, t){
     // the cars: one ahead of the middle of the train, one behind, a cab at each end facing out
     let cur = 0;
     for (let q = 0; q < MT_CARS; q++){
-      const off = (q - (MT_CARS - 1)/2)*(MT_CL + MT_GAP), s = Math.max(0, Math.min(P.len, tr.s + off));
-      const a = Math.max(0, s - .25), b = Math.min(P.len, s + .25);
+      const off = (q - (MT_CARS - 1)/2)*(MT_CL + MT_GAP), wrap = v => ((v % P.len) + P.len) % P.len;
+      const s = l.loop ? wrap(tr.s + off) : Math.max(0, Math.min(P.len, tr.s + off));
+      const a = l.loop ? wrap(s - .25) : Math.max(0, s - .25), b = l.loop ? wrap(s + .25) : Math.min(P.len, s + .25);
       cur = hwAlong(P, s, cur, _mpos); const p0 = _mp0, p1 = _mp1; hwAlong(P, a, 0, p0); hwAlong(P, b, 0, p1);
       const yaw = Math.atan2(p1.x - p0.x, p1.z - p0.z), cab = q === 0 || q === MT_CARS - 1;
       _mdm.position.set(_mpos.x, _mpos.y + MT_LEV + .008*Math.sin(t*2.2 + l.id + q), _mpos.z);   // (floating: a slow bob on its magnets)
@@ -643,8 +751,8 @@ function mtPick(cx, cy){
   });
   // next to the open end of a line: the whole column over that plot counts, from the ground up to the rail (the metro runs at
   // one height, so pointing anywhere at the plot, its ground or its buildings, picks it; the ghost shows at the rail's height)
-  for (const l of metros){
-    const e = l.tiles[l.tiles.length - 1], pv = l.tiles[l.tiles.length - 2];
+  for (const l of metros) if (!l.loop) for (const [e, pv] of [[l.tiles[l.tiles.length - 1], l.tiles[l.tiles.length - 2]], [l.tiles[0], l.tiles[1]]]){   // (its open end, and its first station: a line carries on from either)
+    if (e === l.tiles[0] && (!pv || (l.done && l !== mtActive))) continue;
     for (const [a, b] of SIDES4){
       const i = e.i + a, j = e.j + b; if (pv && pv.i === i && pv.j === j) continue;
       _hbox.min.set(i*LOT - LOT/2, CURB - .05, j*LOT - LOT/2); _hbox.max.set(i*LOT + LOT/2, MT_Y + .4, j*LOT + LOT/2);
@@ -679,20 +787,24 @@ function mtHiShow(H, l, k0, k1, col){
   H.fill.visible = H.line.visible = true;
 }
 function mtHighlight(t){
-  if (t && t.l && (t.type === 'none' || t.type === 'stop' || t.type === 'unstop')){ const n = t.l.tiles.length;   // a built piece: it, and what a right-click would take with it
-    mtHiShow(hwHiA, t.l, t.k, t.k, t.type === 'stop' && t.ok ? 0x5aff7a : t.type === 'unstop' ? 0xffd04a : 0xff6a7a); mtHiShow(hwHiB, t.l, t.k + 1, n - 1, 0xff3a4a); return; }
+  if (t && t.l && (t.type === 'none' || t.type === 'stop' || t.type === 'unstop')){ const n = t.l.tiles.length;   // a built piece: it, and what a right-click would take with it (a loop's plot or an end plot: only itself)
+    mtHiShow(hwHiA, t.l, t.k, t.k, t.type === 'stop' && t.ok ? 0x5aff7a : t.type === 'unstop' ? 0xffd04a : 0xff6a7a);
+    if (t.l.loop || t.k === 0) mtHiShow(hwHiB, null); else mtHiShow(hwHiB, t.l, t.k + 1, n - 1, 0xff3a4a); return; }
+  if (t && t.type === 'loop'){ const n = t.l.tiles.length, col = t.ok ? 0x5aff7a : 0xff3a4a; mtHiShow(hwHiA, t.l, 0, 0, col); mtHiShow(hwHiB, t.l, n - 1, n - 1, col); return; }   // the first station and the end that runs into it
+  if (t && t.type === 'join'){ const nA = t.A.tiles.length, kA = t.aEnd === 'last' ? nA - 1 : 0; mtHiShow(hwHiA, t.A, kA, kA, 0x38e8e0); mtHiShow(hwHiB, t.B, t.k, t.k, 0x38e8e0); return; }   // the two ends that meet
+  if (t && t.type === 'prepend'){ mtHiShow(hwHiA, t.l, 0, 0, 0x38e8e0); mtHiShow(hwHiB, null); return; }
   if (t && t.type === 'finish'){ const n = t.l.tiles.length; mtHiShow(hwHiA, t.l, n - 1, n - 1, 0x5aff7a); mtHiShow(hwHiB, null); return; }
   if (t && (t.type === 'extend' || t.type === 'reopen')){ const n = t.l.tiles.length; mtHiShow(hwHiA, t.l, n - 1, n - 1, t.type === 'reopen' && t.keep ? 0x5aff7a : 0x38e8e0); mtHiShow(hwHiB, null); return; }   // the piece the next one joins on to (green: an end station that stays a station)
   mtHiShow(hwHiA, null); mtHiShow(hwHiB, null);
 }
 function mtShowGhost(t){
   mtHighlight(t);
-  if (!t || t.type === 'none' || t.type === 'stop' || t.type === 'unstop'){ hwGhost.g.visible = false; return; }
+  if (!t || t.type === 'none' || t.type === 'stop' || t.type === 'unstop' || t.type === 'loop' || t.type === 'join'){ hwGhost.g.visible = false; return; }
   const col = t.ok ? (t.type === 'finish' ? 0x5aff7a : 0x38e8e0) : 0xff3a4a;
   hwGhostMat.color.setHex(col); hwGhostLine.color.setHex(col);
   let x, z, len, ry, w = MT_W + .1, th = MT_DECK + MT_GIRD, y = MT_Y;
   if (t.type === 'start'){ x = t.i*LOT; z = t.j*LOT; len = LOT*.92; ry = 0; w = MT_W + 2*MT_PLAT; }
-  else if (t.type === 'extend' || t.type === 'reopen'){ const e = t.l.tiles[t.l.tiles.length - 1]; x = (e.i + t.i)*LOT/2 + (t.i - e.i)*LOT*.25; z = (e.j + t.j)*LOT/2 + (t.j - e.j)*LOT*.25; len = LOT*.95; ry = Math.atan2(t.i - e.i, t.j - e.j); }
+  else if (t.type === 'extend' || t.type === 'reopen' || t.type === 'prepend'){ const e = t.type === 'prepend' ? t.l.tiles[0] : t.l.tiles[t.l.tiles.length - 1]; x = (e.i + t.i)*LOT/2 + (t.i - e.i)*LOT*.25; z = (e.j + t.j)*LOT/2 + (t.j - e.j)*LOT*.25; len = LOT*.95; ry = Math.atan2(t.i - e.i, t.j - e.j); }
   else { const n = t.l.tiles.length, e = t.l.tiles[n - 1], { dout } = hwDirs(t.l, n - 1); x = e.i*LOT; z = e.j*LOT; len = LOT*.9; ry = Math.atan2(dout[0], dout[1]); w = MT_W + 2*MT_PLAT; th = MT_OH + .4; y = MT_Y + MT_OH; }
   hwGhost.deck.position.set(x, y - th/2, z); hwGhost.deck.rotation.y = ry; hwGhost.deck.scale.set(w, th, len);
   hwGhost.edge.position.copy(hwGhost.deck.position); hwGhost.edge.rotation.y = ry; hwGhost.edge.scale.copy(hwGhost.deck.scale);
@@ -703,7 +815,9 @@ function mtShowGhost(t){
 }
 let mtLastPt = null;
 function mtHover(cx, cy){ mtLastPt = { x: cx, y: cy }; const t = mtTargetAt(mtPick(cx, cy)); mtShowGhost(t);
-  const el = $('modeHint'), why = t && !t.ok ? t.why : ''; el.textContent = why || ''; el.hidden = !why; }
+  const say = !t ? '' : !t.ok ? t.why : t.type === 'loop' ? 'click to close the loop: the train will go round and round'
+    : t.type === 'join' ? 'click to join the two lines into one' + (t.lost ? ' (a station right beside another becomes plain track)' : '') : '';
+  const el = $('modeHint'); el.textContent = say || ''; el.hidden = !say; }
 function mtClick(cx, cy){ const t = mtTargetAt(mtPick(cx, cy)); if (mtApply(t)) mtHover(cx, cy); }
 function mtRightClick(cx, cy){ const pk = mtPick(cx, cy); if (pk && pk.kind === 'mtTile'){ mtCutAt(pk.l, pk.k); mtHover(cx, cy); } }
 function setMtMode(on, quiet){
@@ -731,13 +845,13 @@ const mtLines = () => metros.filter(l => l.train && l.stn && l.stn.size >= 2);
 const mtW = (st, x, z) => { const e = st.e; return [e[0]*x + e[8]*z + e[12], e[2]*x + e[8 + 2]*z + e[14]]; };
 const MT_WALK = d => d*1.3;                       // a walk through the streets, a little longer than the crow flies
 // what a ride from one station to another costs, as the walk it's worth: a little for the ride itself, more for the lifts and the wait
-const mtRideCost = (a, b) => Math.abs(a.s - b.s)*.25 + 8;
+const mtRideCost = (a, b, l) => (l && l.loop ? (((b.s - a.s) % mtPath(l).len) + mtPath(l).len) % mtPath(l).len : Math.abs(a.s - b.s))*.25 + 8;   // (round a loop: only the one way)
 // the cheapest way from (ax, az) to (bx, bz) by metro, or null: { l, a, b, cost }
 function mtBestRide(ax, az, bx, bz){
   let best = null;
   for (const l of mtLines()){ const S = [...l.stn.values()];
     for (const A of S){ const pa = mtW(A, 0, 0), wa = MT_WALK(Math.hypot(pa[0] - ax, pa[1] - az));
-      for (const B of S){ if (B === A) continue; const pb = mtW(B, 0, 0), c = wa + mtRideCost(A, B) + MT_WALK(Math.hypot(pb[0] - bx, pb[1] - bz));
+      for (const B of S){ if (B === A) continue; const pb = mtW(B, 0, 0), c = wa + mtRideCost(A, B, l) + MT_WALK(Math.hypot(pb[0] - bx, pb[1] - bz));
         if (!best || c < best.cost) best = { l, a: A, b: B, cost: c }; } } }
   return best;
 }
@@ -747,7 +861,7 @@ function mtReachFrom(ax, az){
   const arr = [];   // each station, and the least it costs to be standing there having come from (ax, az)
   for (const l of lines){ const S = [...l.stn.values()];
     for (const B of S){ let c = Infinity; const pb = mtW(B, 0, 0);
-      for (const A of S){ if (A === B) continue; const pa = mtW(A, 0, 0); c = Math.min(c, MT_WALK(Math.hypot(pa[0] - ax, pa[1] - az)) + mtRideCost(A, B)); }
+      for (const A of S){ if (A === B) continue; const pa = mtW(A, 0, 0); c = Math.min(c, MT_WALK(Math.hypot(pa[0] - ax, pa[1] - az)) + mtRideCost(A, B, l)); }
       arr.push([pb[0], pb[1], c]); } }
   return (x, z) => { let d = Math.hypot(x - ax, z - az); for (const [sx, sz, c] of arr) d = Math.min(d, (c + MT_WALK(Math.hypot(x - sx, z - sz)))/1.3); return d; };
 }
@@ -773,7 +887,7 @@ const mtRidersOf = l => pplList.filter(p => p.metro && p.metro.l === l);
 // still getting on or off this train?
 function mtBusy(l, tr){ for (const p of l._riders){ const m = p.metro; if (m && m.l === l && (m.st === 'board' || (m.st === 'alight' && m.t < 1.2))) return true; } return false; }
 // which way the train goes from stop i next (it turns back at the ends)
-const mtNextDir = (l, tr) => { const n = mtPath(l).stops.length; return tr.at + tr.dir < 0 || tr.at + tr.dir >= n ? -tr.dir : tr.dir; };
+const mtNextDir = (l, tr) => { if (l.loop) return 1; const n = mtPath(l).stops.length; return tr.at + tr.dir < 0 || tr.at + tr.dir >= n ? -tr.dir : tr.dir; };
 // the train has stopped at station k: those for here get off, then those waiting get on, as many as it has room for
 function mtArrive(l, tr, k){
   const st = l.stn && l.stn.get(k); if (!st) return;
@@ -787,7 +901,7 @@ function mtArrive(l, tr, k){
 function mtBoard(l, tr, k, first, q = 0){
   const st = l.stn && l.stn.get(k); if (!st) return;
   const dir = mtNextDir(l, tr), waiting = pplList.filter(p => p.metro && p.metro.l === l && p.metro.k === k && (p.metro.st === 'wait' || p.metro.st === 'toSpot'))
-    .filter(p => { const to = l.stn.get(p.metro.to); return to && Math.sign(to.i - st.i) === dir; }).sort((a, b) => b.metro.waited - a.metro.waited);
+    .filter(p => { const to = l.stn.get(p.metro.to); return to && (l.loop || Math.sign(to.i - st.i) === dir); })   // (round a loop the train gets everywhere).sort((a, b) => b.metro.waited - a.metro.waited);
   const single = mtLines().length <= 1;
   let room = MT_CAP - tr.load.length, b = 0;
   for (const p of waiting){

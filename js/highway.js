@@ -40,6 +40,7 @@ function hwSurface(c){ if (c.mega){ const m = megas.get(c.mega); return m && m.r
 function hwDirs(h, k){
   const T = h.tiles, n = T.length, t = T[k];
   const d = (a, b) => [Math.sign(b.i - a.i), Math.sign(b.j - a.j)];
+  if (h.loop && n > 2){ return { din: d(T[(k - 1 + n) % n], t), dout: d(t, T[(k + 1) % n]) }; }   // (a metro loop: the last plot runs on into the first)
   const dout = k < n - 1 ? d(t, T[k + 1]) : k > 0 ? d(T[k - 1], t) : (h.dir0 || [1, 0]);
   const din = k > 0 ? d(T[k - 1], t) : dout;
   return { din, dout };

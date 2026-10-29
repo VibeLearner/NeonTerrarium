@@ -390,7 +390,8 @@ const PLAY = (() => {
 
   /* ---------- doors: a building's front door opening and shutting, as written ---------- */
   function doorsAt(t){
-    for (const [key, keys] of SC_.doors || []){ const d = doorByKey.get(key); if (!d) continue; const v = keyed(keys, t);
+    for (const [key, keys] of SC_.doors || []){ const d = doorByKey.get(key); if (!d) continue; if (AP.hh && AP.hh.door === key) continue;   // (the home's own door: out of sight with its building while the flat stands there)
+      const v = keyed(keys, t);
       if (v !== null && Math.abs(v - d.open) > 1e-4){ d.open = v; const i = doorList.indexOf(d); if (i >= 0 && i < DOOR_MAX){ setPanel(i, d); doorPanel.instanceMatrix.needsUpdate = true; } } }
   }
 
@@ -731,7 +732,7 @@ const PLAY = (() => {
   }
   function homeHide(on){
     const A = SC_.apartment, k = String(A.pod).split('|')[0].split(',').map(Number), c = cells.get(ckey(k[0], k[1])); if (!c) return warn('apartment', 'no home plot ' + k);
-    if (on){ if (AP.hh) return; const h = AP.hh = { pcs: [], mem: [], fol: [], g: c.group ? c.group.visible : null, v: c.view ? c.view.visible : null };
+    if (on){ if (AP.hh) return; const h = AP.hh = { door: 'd:' + k[0] + ',' + k[1], pcs: [], mem: [], fol: [], g: c.group ? c.group.visible : null, v: c.view ? c.view.visible : null };
       const rec = solidRegions.get(mergeKey(c.i, c.j));
       if (rec){ for (const g of rec.geoms){ const pc = g.userData.pieceCells, P = g.userData.pcs; if (!pc || !P) continue;
           for (let i = 0; i < pc.length; i++) if (pc[i] === c){ const H = P.hide || (P.hide = new Uint8Array(P.n)); h.pcs.push([P, i, H[i]]); H[i] = 1; P.stamp = -1; } }

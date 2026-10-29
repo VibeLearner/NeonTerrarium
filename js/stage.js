@@ -92,7 +92,10 @@ const PLAY = (() => {
       // (the first stop's lift on the side the finished line has it, +1, from the start: as the line was laid a plot going up beside it turned it
       // round to the other side for a while and back, and it jumped between the two)
       const ms = mtSides; mtSides = l => { ms(l); if (l === metros[0] && l.sides) l.sides[0] = M.liftSide0 ?? 1; };
-      try { if (!k){ mtApply({ type: 'start', i, j, ok: true }); LINE = metros[metros.length - 1]; } else if (LINE) mtApply({ type: 'extend', l: LINE, i, j, ok: true }); }
+      try { if (!k){ mtApply({ type: 'start', i, j, ok: true }); LINE = metros[metros.length - 1]; } else if (LINE){   // (the game's extend, but only the new tile's plot built again: the game's own built the whole line's plots and the first stop's lift again at
+          // every tile, and the lift was gone for that frame; the finish builds them all again, as the game does)
+          const l = LINE; l.tiles.push({ i, j }); mtActive = l; mtReindex(); mtSides(l); mtBuildView(l); mtResetTrain(l);
+          const c = cells.get(ckey(i, j)); if (c) refresh([c]); SC_DIRTY.unknown = true; shadowDirty = true; } }
       finally { mtSides = ms; }
       if (LINE) LINE.train = null; }) }));   // (the game puts a train on the line at each tile: it waits until the line is finished)
     BUILD.push({ t: M.finish, name: 'metro finish', f: () => withSeed(h32('metro', M.seed, 'finish'), () => { if (LINE){ const ms = mtSides; mtSides = l => { ms(l); if (l === LINE && l.sides) l.sides[0] = M.liftSide0 ?? 1; }; try { mtApply({ type: 'finish', l: LINE, k: LINE.tiles.length - 1, ok: true }); } finally { mtSides = ms; } } }) });

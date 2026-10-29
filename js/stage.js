@@ -89,7 +89,10 @@ const PLAY = (() => {
     for (const [kind, i, j, w, h, t, seed] of CITY.megas) BUILD.push({ t, name: 'mega ' + kind, f: () => withSeed(seed, () => { const m = spawnMegaAt(kind, { i, j, w, h }); if (!m) warn('mega', kind + ' did not fit'); }) });
     const M = CITY.metro;
     M.tiles.forEach(([i, j, t], k) => BUILD.push({ t, name: 'metro', f: () => withSeed(h32('metro', M.seed, k), () => {
-      if (!k){ mtApply({ type: 'start', i, j, ok: true }); LINE = metros[metros.length - 1]; } else if (LINE) mtApply({ type: 'extend', l: LINE, i, j, ok: true });
+      if (!k){ mtApply({ type: 'start', i, j, ok: true }); LINE = metros[metros.length - 1]; }
+      else if (LINE){   // (the game's extend, but only the new tile's plot built again: the game's own did the whole line and the first stop's lift every tile, and the lift came and went as the line was laid)
+        const l = LINE; l.tiles.push({ i, j }); mtActive = l; mtReindex(); mtSides(l); mtBuildView(l); mtResetTrain(l);
+        const c = cells.get(ckey(i, j)); if (c) refresh([c]); SC_DIRTY.unknown = true; shadowDirty = true; }
       if (LINE) LINE.train = null; }) }));   // (the game puts a train on the line at each tile: it waits until the line is finished)
     BUILD.push({ t: M.finish, name: 'metro finish', f: () => withSeed(h32('metro', M.seed, 'finish'), () => { if (LINE){ mtApply({ type: 'finish', l: LINE, k: LINE.tiles.length - 1, ok: true }); } }) });
     BUILD.sort((a, b) => a.t - b.t);

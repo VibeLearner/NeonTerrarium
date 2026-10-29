@@ -583,12 +583,6 @@ const PLAY = (() => {
     }
     if (scan < 1){ const y = scan*H; const gr = g.createLinearGradient(0, y - 60, 0, y + 6); gr.addColorStop(0, 'rgba(56,232,224,0)'); gr.addColorStop(1, 'rgba(160,255,250,.85)');
       g.fillStyle = gr; g.fillRect(0, y - 60, W, 66); g.fillStyle = 'rgba(230,255,255,.95)'; g.fillRect(0, y, W, 2); }
-    // the readout
-    const pct = Math.round(100*done/(cols*rows)), fade = 1 - Math.min(1, Math.max(0, (u - .9)/.1)), fs = Math.max(12, Math.round(H*.018));
-    g.globalAlpha = fade; g.font = '600 ' + fs + 'px "JetBrains Mono", monospace'; g.textBaseline = 'top';
-    g.fillStyle = 'rgba(160,255,250,.95)'; g.fillText('RECONSTRUCTING SCENE', fs*2, fs*2); g.fillText(String(pct).padStart(3, ' ') + '%', fs*2, fs*3.4);
-    g.fillStyle = 'rgba(56,232,224,.35)'; g.fillRect(fs*2, fs*4.9, fs*14, 3); g.fillStyle = 'rgba(160,255,250,.95)'; g.fillRect(fs*2, fs*4.9, fs*14*pct/100, 3);
-    g.textAlign = 'right'; g.fillStyle = 'rgba(160,255,250,.8)'; g.fillText('LIDAR > RGB  PASS 2/2', W - fs*2, H - fs*3.2); g.textAlign = 'left'; g.globalAlpha = 1;
     fr.style.clipPath = "path('" + (keep.length ? keep.join('') : 'M0 0z') + "')"; R.last = 'on';   // (a clip, not an image mask: applied the same frame, nothing to decode)
   }
   // The room in the real city: behind the flat, the game itself draws the street, the garden and the towers from a camera matched to the lab's

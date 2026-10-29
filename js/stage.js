@@ -518,6 +518,7 @@ const PLAY = (() => {
     if (rendered){ G.frame++; rendered = false; }
     prep();
   }
+  const PAUSE = ((/[&#]pauseat=([\d.,]+)/.exec(location.hash) || [])[1] || '').split(',').filter(Boolean).map(Number); window.__stageGo = () => { PAUSE.go = true; };
   function prep(){
     const t = G.t = G.frame/FPS;
     G.held = false;
@@ -525,6 +526,8 @@ const PLAY = (() => {
     safe('drones', () => droneSetup());
     safe('apartment', () => aptTick(t));
     if (G.held) return;
+    // (#stage&pauseat=38,40: checking only, never recorded: stands still at each of those times until window.__stageGo() is called)
+    if (PAUSE.length && t >= PAUSE[0]){ if (!PAUSE.go){ G.held = true; G.info.paused = PAUSE[0]; return; } PAUSE.shift(); PAUSE.go = false; delete G.info.paused; }
     Math.random = rng(h32('frame', G.frame));   // (anything else that draws a random number this frame gets one from the frame's own stream)
     const h = keyed(SC_.hour, t); if (h !== null) S.hour = h;
     safe('doors', () => doorsAt(t));

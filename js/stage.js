@@ -191,6 +191,7 @@ const PLAY = (() => {
       i++; };
     for (const p of CAST.values()){
       const q = poseOf(p, t); if (q.alpha <= .002) continue;
+      if (!cells.has(ckey(Math.round(q.x/LOT), Math.round(q.z/LOT)))) continue;   // (no one stands where nothing is built yet: they hung in the empty sky)
       const sd = q.fx*_camR.x + q.fz*_camR.z, flip = Math.abs(sd) > 1e-3 ? (sd < 0 ? -1 : 1) : 1;
       emit(q.x, q.y, q.z, p.code, frameOf(p, q, t), flip, Math.min(1, q.alpha), q.fx, q.fz);
       for (const [te, kind, secs] of p.emotes) if (t >= te && t < te + secs && q.alpha > .9) emit(q.x, q.y + .8*PPL_S, q.z, ROW_EMO, EMO[kind] ?? 0, 1, 2);

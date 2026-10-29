@@ -548,6 +548,7 @@ const PLAY = (() => {
     prep(); say('rolling'); return true;
   };
   G.state = () => ({ ready: G.ready, playing: G.playing, done: G.done, held: G.held, t: G.t, frame: G.frame, drawn: G.drawn, info: G.info, log: G.log.slice(-30) });
-  addEventListener('load', () => { setup().then(() => requestAnimationFrame(tick)).catch(e => { warn('setup', e); G.failed = String(e && e.message || e); }); });
+  // (#stage&play: starts by itself once ready, at the machine's own pace, for watching in an ordinary browser window: never how the film is recorded)
+  addEventListener('load', () => { setup().then(() => { requestAnimationFrame(tick); if (/[&#]play\b/.test(location.hash)) G.start(); }).catch(e => { warn('setup', e); G.failed = String(e && e.message || e); }); });
   return G;
 })();

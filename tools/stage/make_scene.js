@@ -317,7 +317,8 @@ const hour = [[0, 10], [r3(MK.unroom + 2), 10], [r3(MK.unroom + 2.01), 17.2, 'ho
 // the lights: as the hour has them until the ride, off for the ride, then on one by one as the camera pulls back
 const lights = [[0, null], [r3(T.depart + 2), null], [r3(T.depart + 2.01), 0, 'hold'], [r3(OUT.t0 + 1.5), 0], [r3(OUT.t0 + 1.5 + 1/.11), 1]];
 const weather = [[r3(lerp(T.depart, T.arrive, .45)), 'rain', 6]];
-const black = [[0, 1], [1, 0, 'ss'], [r3(TITLE.t0), 0], [r3(TITLE.t0 + 1.4), .4, 'ss'], [r3(TITLE.t0 + TITLE.dur - .8), .4], [r3(TITLE.t0 + TITLE.dur), 1, 'ss']];
+const PRE = 2;   // (seconds of empty sky before anything is built: the stage runs the script from -PRE, fading in from black over the first second of it)
+const black = [[0, 0], [r3(TITLE.t0), 0], [r3(TITLE.t0 + 1.4), .4, 'ss'], [r3(TITLE.t0 + TITLE.dur - .8), .4], [r3(TITLE.t0 + TITLE.dur), 1, 'ss']];
 const shadowBox = [[0, 150], [r3(MK.dive), 150], [r3(MK.dive + .01), 0, 'hold']];
 
 /* ---------- the person cam ---------- */
@@ -356,6 +357,7 @@ window.STAGE_KEYS = window.STAGE_KEYS || {};
 ${APT ? "// the apartment, as Furnish pod finds a pod's saved home (the stage answers the game's question for it: saveguard.js)\nwindow.STAGE_KEYS['neonIsland.furnish'] = " + J(J({ v: 1, homes: { [HOME.pod]: { at: '2026-10-28T00:00:00.000Z', zone: 'low', kind: 'tower', n: APT.recipe.pieces.length, recipe: APT.recipe } } })) + ';' : ''}
 const STAGE_SCENE = {
   end: ${end},
+  pre: ${PRE},
   marks: ${J({ MK, MG: Object.fromEntries(Object.entries(MG).map(([k, v]) => [k, r3(v)])), T: Object.fromEntries(Object.entries(T).map(([k, v]) => [k, r3(v)])), out: OUT, title: TITLE })},
   title: { neon: ${r3(TITLE.t0 + .5)}, terrarium: ${r3(TITLE.t0 + .9)} },
   hour: ${J(hour)},

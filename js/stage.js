@@ -116,6 +116,7 @@ const PLAY = (() => {
   // A frame is drawn for every frame number in turn. G.held (the apartment's lab still working) holds the number where it is: the game skips
   // that frame and the recorder takes no picture, so the film goes on exactly where it stopped.
   const FPS = 60, SC_ = typeof STAGE_SCENE !== 'undefined' ? STAGE_SCENE : null;
+  const PRE = (SC_ && SC_.pre) || 0;   // (seconds of empty sky before the script's time 0)
   let rolling = false, rendered = false;
   G.frameNow = () => {   // (main.js, each frame: the time to draw it at, or null to skip it)
     if (!rolling || G.held) return null;
@@ -342,7 +343,7 @@ const PLAY = (() => {
   const NEON = [[0, 0], [.05, 1], [.09, .15], [.15, 1], [.22, .35], [.27, 1], [.4, .7], [.46, 1]];
   const neonAt = u => { if (u < 0) return 0; let v = 0; for (const [k, a] of NEON) if (u >= k) v = a; return v; };
   function paint(t){
-    E.black.style.opacity = String(keyed(SC_.black, t) ?? 0);
+    E.black.style.opacity = String(t < 0 ? 1 - ss(clamp01((t + PRE)/1)) : (keyed(SC_.black, t) ?? 0));   // (from black over the first second of the empty sky)
     const T = SC_.title; if (T && E.tNeon){ E.tNeon.style.opacity = String(neonAt(t - T.neon)); E.tTerr.style.opacity = String(neonAt(t - T.terrarium)); }
     const B = (SC_.brackets || []).find(([a, b]) => t >= a && t < b); brackets(B ? G.poseOf(B[2]) : null);
   }
@@ -847,7 +848,7 @@ const PLAY = (() => {
   }
   const PAUSE = ((/[&#]pauseat=([\d.,]+)/.exec(location.hash) || [])[1] || '').split(',').filter(Boolean).map(Number); window.__stageGo = () => { PAUSE.go = true; };
   function prep(){
-    const t = G.t = G.frame/FPS;
+    const t = G.t = G.frame/FPS - PRE;   // (the script's time: it starts PRE seconds in, after the empty sky)
     G.held = false;
     while (fired < EV.length && EV[fired].t <= t){ const e = EV[fired++]; safe(e.name, e.f); }
     safe('drones', () => droneSetup());
@@ -876,11 +877,11 @@ const PLAY = (() => {
   }
   G.start = () => {
     if (!G.ready || rolling) return false;
-    G.frame = 0; rendered = false; G.t = 0; rolling = true; G.playing = true;
+    G.frame = 0; rendered = false; G.t = -PRE; rolling = true; G.playing = true;
     last = 1000 - 1000/FPS;   // (main.js: the first frame is one frame after this)
     cloudMat.uniforms.cloudOff.value.set(0, 0); clouds.rotation.y = 0; comp.uniforms.rainT.value = 0;   // (what the frames add up from: from nothing)
     const jm = /[&#]from=([\d.]+)/.exec(location.hash);   // (#stage&from=<seconds>: checking only, never recorded: the city up to then built at once and the film started there)
-    if (jm){ G.frame = Math.round(+jm[1]*FPS); prep(); while (anims.length) endAnim(0); finishSync(); say('jumped to', jm[1]); }
+    if (jm){ G.frame = Math.round((+jm[1] + PRE)*FPS); prep(); while (anims.length) endAnim(0); finishSync(); say('jumped to', jm[1]); }
     prep(); say('rolling'); return true;
   };
   G.state = () => ({ ready: G.ready, playing: G.playing, done: G.done, held: G.held, t: G.t, frame: G.frame, drawn: G.drawn, info: G.info, log: G.log.slice(-30) });

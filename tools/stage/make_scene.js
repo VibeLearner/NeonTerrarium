@@ -320,7 +320,7 @@ const monitor = [
     log: [[MK.p[0] + .6, 'D1 10:00', 'Man yells from across the street: "Deepa!"'], [MK.p[0] + 2.0, 'D1 10:01', 'Identity pulled from conversation: Deepa.'],
           [MK.p[0] + 3.6, 'D1 10:02', 'Conversation: has she been keeping well, after everything that happened?']] },
   { t0: MK.p[1] + .1, t1: MK.door, actor: 'kwame', name: 'UNIDENTIFIED', sub: '', cam: 'CAM 07', clock: 'D1 10:07', yaw: r3(GV.y2 - .9), pitch: r3(48*DEG), fade: .5,
-    log: [[MK.atDoor + .15, 'D1 10:09', 'Entered Block 12, residential tower.']] }];
+    log: [[MK.atDoor + .15, 'D1 10:09', 'Entered apartment block 12.']] }];
 const brackets = [[MK.p[0], MK.p[1], 'deepa'], [MK.p[1], MK.door - .6, 'kwame']];
 // the front door: opens as Kwame gets to it, shuts behind him
 const doors = [[HOME.door.key, [[0, 0], [r3(MK.atDoor - .1), 0], [r3(MK.atDoor + .7), 1, 'ss'], [r3(MK.door + .4), 1], [r3(MK.door + 1.2), 0, 'ss']]]];

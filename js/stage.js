@@ -427,7 +427,7 @@ const PLAY = (() => {
     const B = labB(); if (!B || !B.dr || B.dr._stSharp) return;
     const R = B.dr, render = R.render.bind(R); R._stSharp = true;
     R.render = (sc, c) => { const m = sc && sc.children && sc.children[0] && sc.children[0].material, u = m && m.uniforms;
-      if (u && u.kMin && u.range && u.hazeK){ u.kMin.value = 0; u.range.value = 1e6; u.hazeK.value = Math.min(u.hazeK.value, .25); }
+      if (u && u.kMin && u.range && u.hazeK){ u.kMin.value = 0; u.range.value = 1e4; u.hazeK.value = Math.min(u.hazeK.value, .25); }   // (no depth blur on the city around the flat, a little of its haze kept)
       return render(sc, c); };
   }
   function labWait(){   // the home still being built, or its light not baked yet
@@ -449,7 +449,7 @@ const PLAY = (() => {
     if (w) w.Math.random = rng(h32('lab', G.frame));
     // (checking switches in the address, for finding what the lab needs on a given machine: &sharp takes out its depth blur and haze (off by default: it broke the room on a Mac),
     // &plainlab draws the room without PodRender's lighting)
-    safe('lab', labClean); if (/[&#]sharp\b/.test(location.hash)) safe('sharp', labSharp);   // (off: on an Apple M2 it left the room one flat colour)
+    safe('lab', labClean); if (!/[&#]nosharp\b/.test(location.hash)) safe('sharp', labSharp);   // (the city behind the flat in focus. Once blamed for a grey room on a Mac: that was the lab drawn 0 wide, B_fit)
     if (/[&#]plainlab\b/.test(location.hash) && !AP.plain){ AP.plain = true; safe('plain', () => { w.PodBuilder.usePodRender(false); say('lab: PodRender off (plainlab)'); }); }
     if (B) B.needs = true;
     // the lab's work light (its flat building light) off: the room lit by its own lamps and the day through its windows. Its own button, so the

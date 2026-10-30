@@ -39,7 +39,10 @@ const TUI = (() => {
   };
   const chip = el('button', 'trestore', 'Restore'); chip.type = 'button'; chip.hidden = true; document.body.appendChild(chip);
   let chipSnap = null, chipT = 0;
-  U.offerRestore = snap => { chipSnap = snap; chip.hidden = false; clearTimeout(chipT); chipT = setTimeout(() => { chip.hidden = true; chipSnap = null; }, 5000); };
+  // (it sits just above the zone card, the card's own size, owner Oct 30: placed from the card's box each time it shows)
+  const placeChip = () => { const z = document.querySelector('.zones > .tcur .zone, .zones > .zone.tcur, .zones .zone.on') || document.querySelector('.zones .zone'), r = z && z.getBoundingClientRect();
+    if (!r || !r.width) return; chip.style.left = Math.round(r.left) + 'px'; chip.style.width = Math.round(r.width) + 'px'; chip.style.height = Math.round(r.height) + 'px'; chip.style.bottom = Math.round(innerHeight - r.top + 8) + 'px'; };
+  U.offerRestore = snap => { chipSnap = snap; chip.hidden = false; placeChip(); clearTimeout(chipT); chipT = setTimeout(() => { chip.hidden = true; chipSnap = null; }, 5000); };
   chip.addEventListener('click', () => { const s = chipSnap; chip.hidden = true; chipSnap = null; clearTimeout(chipT); if (s && restore(s)){ U.buzz(12); dispatchEvent(new CustomEvent('nt:restore')); } });
   function restore(s){
     try {
@@ -167,6 +170,15 @@ const TUI = (() => {
     const kids = [grp('Text size', chips), grp('Display', el('div', 'togs'), ), grp('Help', el('div', 'togs'), replay), grp('Building', el('div', 'togs'))];
     kids[1].querySelector('.togs').append(clean, calm); kids[2].querySelector('.togs').append(tips); kids[3].querySelector('.togs').append(erase, hap);
     pane.append(...kids);
+    // Performance: phone mode (touch.js) on its own for weaker phones, or always, or never
+    if (self.PHONE){
+      const st = el('p', 'note'), say = () => { st.textContent = PHONE.on ? 'Phone mode is on' + (PHONE.why ? ' (' + PHONE.why + ')' : '') + ': a steady 30 frames a second and lighter effects.' : 'Phone mode is off: the full picture, as fast as this device draws it.'; };
+      const pc = el('div', 'chips'), cur = PHONE.pref;
+      for (const [v, n] of [['auto', 'Auto'], ['on', 'Always'], ['off', 'Never']]){ const b = el('button', v === cur ? 'on' : '', n); b.type = 'button';
+        b.addEventListener('click', () => { ls.set('perf', v); for (const x of pc.children) x.classList.toggle('on', x === b); if (v === 'on') PHONE.start(); if (v === 'off') ls.set('weak', '0');
+          st.textContent = 'Changes fully the next time the game opens.'; }); pc.append(b); }
+      say(); pane.append(grp('Performance', pc, st, el('p', 'note', 'Auto turns phone mode on for weaker phones and tablets, or when the game runs slow here.')));
+    }
     // full screen: Android can ask for it; an iPhone can't from a page, but a home screen icon opens the game full screen
     const ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     if (!ios && document.documentElement.requestFullscreen){ const fs = el('button', 'wide', 'Full screen'); fs.type = 'button';
@@ -183,6 +195,29 @@ const TUI = (() => {
     }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iface); else iface();
+
+  /* ---------- Auto: timing a stretch of play ---------- */
+  // Once in a city (past the title, loaded, nothing over it, the page in view): about four seconds of frames. If the middle frame takes over 25 ms
+  // (under about 40 a second) this device is noted as a weaker one and phone mode starts now (touch.js PHONE.start). Checked again a minute later,
+  // in case the city has grown, until it's on.
+  if (self.PHONE && PHONE.pref === 'auto' && !PHONE.on && !/[?&]phone=/.test(location.search)){
+    let samples = [], last = 0, restUntil = 0;
+    const calm = () => !(typeof TITLE !== 'undefined' && TITLE.on) && !(typeof LOADP !== 'undefined' && LOADP.on) && !document.hidden && !root.classList.contains('gp-open') &&
+      !(typeof OVERSEER !== 'undefined' && OVERSEER.hold) && !(typeof PRECINCT !== 'undefined' && PRECINCT.hold) && !(typeof FURN !== 'undefined' && FURN.hold);
+    (function tick(now){
+      if (PHONE.on) return; requestAnimationFrame(tick);
+      if (now < restUntil || !calm()){ last = 0; return; }
+      if (last){ const d = now - last; if (d < 250) samples.push(d); } last = now;
+      if (samples.length < 240) return;
+      const s = samples.sort((a, b) => a - b), med = s[s.length >> 1]; samples = [];
+      if (med > 25){ ls.set('weak', '1'); PHONE.why = 'timed ' + Math.round(1000/med) + ' frames a second'; PHONE.start(); }
+      else restUntil = now + 60000;
+    })(performance.now());
+  }
+
+  /* ---------- the title screen can't be zoomed (Safari pinches through touch-action, so its gesture is stopped too) ---------- */
+  for (const ev of ['gesturestart', 'gesturechange']) document.addEventListener(ev, e => { if (typeof TITLE !== 'undefined' && TITLE.on) e.preventDefault(); }, { passive: false });
+  document.addEventListener('touchmove', e => { if (e.touches.length > 1 && typeof TITLE !== 'undefined' && TITLE.on) e.preventDefault(); }, { passive: false });
 
   /* ---------- Cities: Export makes a share sheet on an iPhone ---------- */
   if (/iP(hone|ad|od)/.test(navigator.userAgent)) new MutationObserver(() => { for (const b of document.querySelectorAll('button[data-do="export"]')) if (b.textContent === 'Export') b.textContent = 'Export (share)'; })

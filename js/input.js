@@ -237,7 +237,7 @@ function pointerMove(e){
   const dx = e.clientX - p.x, dy = e.clientY - p.y, tilt = () => { if (tiltMode) pitchT = clamp(pitchT + dy*.006, PITCH_MIN, PITCH_MAX); };
   ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (!act) return;
-  if (act.kind === 'pinch'){ if (ptrs.size === 2){
+  if (act.kind === 'pinch'){ if (titleUp()) return; if (ptrs.size === 2){
     // two fingers on a touch screen: dragged up or down together (the gap and the angle between them nearly unchanged) they tilt the view, as in
     // Google Maps; anything else pinches, twists and pans as before. Which one is decided once the fingers have moved a little, and kept.
     if (act.touch && !act.mode){ const m = pmid(), d = pdist(); let da = pang() - (act.a0 ?? act.ang); if (da > PI) da -= 2*PI; if (da < -PI) da += 2*PI;
@@ -308,7 +308,9 @@ function endPtr0(e){
 }
 canvas.addEventListener('pointerup', endPtr); canvas.addEventListener('pointercancel', endPtr);
 canvas.addEventListener('pointerleave', () => { MON.hoverAt(null); if (!ptrs.size){ hover.visible = hoverFill.visible = hoverStrip.visible = false; showMegaGhost(null); hwGhost.g.visible = false; hwHighlight(null); } });
-canvas.addEventListener('wheel', e => { e.preventDefault(); zoomT = clamp(zoomT*(1+Math.sign(e.deltaY)*.1), 5, 60); }, { passive:false });
+// (no zooming while the title screen is up: its view of the city is set by the title, owner Oct 30)
+const titleUp = () => typeof TITLE !== 'undefined' && TITLE.on;
+canvas.addEventListener('wheel', e => { e.preventDefault(); if (titleUp()) return; zoomT = clamp(zoomT*(1+Math.sign(e.deltaY)*.1), 5, 60); }, { passive:false });
 const PAN_KEYS = ['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'];
 let LAST_INPUT = performance.now();   // (rest when idle: main.js)
 for (const ev of ['pointerdown', 'pointermove', 'wheel', 'keydown', 'touchstart']) addEventListener(ev, () => { LAST_INPUT = performance.now(); }, { passive: true, capture: true });

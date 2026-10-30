@@ -156,10 +156,29 @@ const TOUCH = (() => {
 //  - the title screen without its live lighting, and its pictures as lossless WebP (title.js)
 // Off by default until it has been looked at on a phone: ?phone=1 in the address turns it on (on any device, to check it), ?phone=0 off.
 // Once it's checked, DEFAULT_ON = true gives it to every touch device.
+// On by itself only on weaker phones and tablets (owner, Oct 30): a touch device whose graphics chip is a mid-range or older one (Adreno under 730,
+// Mali G-series under 700, PowerVR), or with 4 GB of memory or less, or one that touchui.js has already timed running slow (under about 40 frames a
+// second in a city: touch:nt.weak). A flagship (Adreno 730 and up, Immortalis, Xclipse, Apple) is left alone. Settings, Interface, Performance can
+// force it on or off (touch:nt.perf: auto, on, off); ?phone=1 or ?phone=0 in the address wins over everything, for checking.
 var PHONE = self.PHONE = (() => {
-  const DEFAULT_ON = false;
-  const q = /[?&]phone=([01])\b/.exec(location.search);
-  const on = q ? q[1] === '1' : DEFAULT_ON && TOUCH.on;
+  const g = k => { try { return localStorage.getItem('touch:nt.' + k); } catch (e) { return null; } };
+  const q = /[?&]phone=([01])\b/.exec(location.search), pref = g('perf') || 'auto';
+  let gpu = '', why = '';
+  const weak = () => {
+    if (g('weak') === '1'){ why = 'timed slow'; return true; }
+    if (navigator.deviceMemory && navigator.deviceMemory <= 4){ why = navigator.deviceMemory + ' GB'; return true; }
+    try { const cv = document.createElement('canvas'), gl = cv.getContext('webgl'), d = gl && gl.getExtension('WEBGL_debug_renderer_info');
+      gpu = d ? String(gl.getParameter(d.UNMASKED_RENDERER_WEBGL)) : ''; const lose = gl && gl.getExtension('WEBGL_lose_context'); if (lose) lose.loseContext(); } catch (e) {}
+    let m;
+    if ((m = /Adreno[^0-9]*(\d{3})/i.exec(gpu)) && +m[1] < 730){ why = 'Adreno ' + m[1]; return true; }
+    if ((m = /Mali-G(\d{2,3})/i.exec(gpu)) && +m[1] < 700){ why = 'Mali-G' + m[1]; return true; }
+    if (/PowerVR/i.test(gpu)){ why = 'PowerVR'; return true; }
+    return false;
+  };
+  const on = q ? q[1] === '1' : !TOUCH.on ? false : pref === 'on' ? true : pref === 'off' ? false : weak();
   if (on) document.documentElement.classList.add('phone');
-  return { on, fps: 30, maxPlots: 500, pplDrawn: 400, turnMinPx: 2, sdV0: 2, lastDraw: -1e9 };
+  return { on, pref, gpu, why, fps: 30, maxPlots: 500, pplDrawn: 400, turnMinPx: 2, sdV0: 2, lastDraw: -1e9,
+    // (turned on while playing, after a slow stretch: the frame cap, the lighter bloom and the cheaper turns start at once; the rest from the next visit)
+    start(){ if (this.on) return; this.on = true; document.documentElement.classList.add('phone');
+      try { if (typeof PERF !== 'undefined'){ PERF.vs = 1000/this.fps; } if (typeof FARV !== 'undefined') FARV.ema = 1000/this.fps; if (typeof SD !== 'undefined'){ SD.v0 = this.sdV0; SD.cursorPx = 0; } } catch (e) {} } };
 })();

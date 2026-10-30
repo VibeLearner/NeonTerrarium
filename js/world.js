@@ -952,7 +952,7 @@ function* buildStackGen(c){
       if (s0 !== null) bl.push([s0, tops[k], k, k]); else { bl[bl.length - 1][1] = tops[k]; bl[bl.length - 1][3] = k; } });
     c.podBlocks = bl;
     for (const [s0, , k0] of bl) podBrackets(c, s0, c.sections[k0].zone);
-  } else if (c.lift) liftScaffold(c, c.lift.y);
+  } else if (c.lift){ KEEP_FINE++; try { liftScaffold(c, c.lift.y); } finally { KEEP_FINE--; } }   // (its thin legs kept at every zoom: core.js KEEP_FINE)
   rooftopBoard(c, y);
   steamVent(c);
 }

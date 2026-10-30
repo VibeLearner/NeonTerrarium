@@ -19,6 +19,9 @@ const BOOTH = (() => {
   const NP = 12, AP = 16;   // pads you play; the autopilot may reach four above them
   const KEYS = ['KeyQ', 'KeyW', 'KeyE', 'KeyR', 'KeyT', 'KeyY', 'KeyU', 'KeyI', 'KeyO', 'KeyP', 'BracketLeft', 'BracketRight'];
   const KLAB = ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '[', ']'];
+  // on a touch screen there are no computer keys: each pad shows its place in the chord playing now instead (1 is the chord's root)
+  const TCH = typeof TOUCH !== 'undefined' && TOUCH.on;
+  const DEG = ['1', '♭2', '2', '♭3', '3', '4', '♯4', '5', '♭6', '6', '♭7', '7'];
   const VOICES = [
     { id: 'glass', name: 'Night glass', sub: 'soft electric piano' },
     { id: 'pluck', name: 'Gutter pluck', sub: 'plucked string' },
@@ -506,6 +509,28 @@ const BOOTH = (() => {
 
   // ---------- the panel: tabs, setup, keys, the loop picture, the shelf ----------
   const keysEl = [];
+  // the DELETE chip a held note gets on a touch screen (the Booth's loop, and a rewired loop's strip on the Console): one chip, just
+  // above the note, inside the note's own block so it scrolls with it. Any other touch puts it away.
+  let rollSel = null;   // (the held note on the Booth's loop, drawn in yellow)
+  const noteChip = (() => {
+    let chip = null, cur = null;
+    const hide = () => { if (!cur) return; const h = cur.onHide; cur = null; if (chip) chip.hidden = true; if (h) h(); };
+    function show(cv, n, view, kill, onHide){
+      hide();
+      if (!chip){ chip = document.createElement('button'); chip.type = 'button'; chip.className = 'gb gdel'; chip.textContent = 'Delete'; chip.setAttribute('aria-label', 'Delete this note');
+        chip.addEventListener('click', e => { e.stopPropagation(); if (cur) cur.kill(cur.n); hide(); });
+        root.addEventListener('pointerdown', e => { if (cur && e.target !== chip) hide(); }, true); }
+      const sec = cv.closest('.gp'); if (chip.parentNode !== sec) sec.appendChild(chip);
+      // where the note is drawn (the same sums as drawRoll)
+      const W = cv.clientWidth, H = cv.clientHeight, b0 = view ? view.b0 : 0, span = view ? view.span : L(), lo = view ? view.lo : 0, rowH = (H - 34)/(view ? view.hi - view.lo + 1 : AP);
+      const x = (n.b + n.d/2 - b0)/span*W, y = H - 6 - (n.i - lo + 1)*rowH;
+      const cr = cv.getBoundingClientRect(), sr = sec.getBoundingClientRect(), ox = cr.left - sr.left + sec.scrollLeft, oy = cr.top - sr.top + sec.scrollTop;
+      const below = y < 52;   // (no room above a note near the top: the chip goes under it)
+      chip.classList.toggle('below', below); chip.style.left = clamp(ox + x, 56, sec.clientWidth - 56) + 'px'; chip.style.top = (oy + (below ? y + rowH : y)) + 'px';
+      chip.hidden = false; cur = { n, kill, onHide };
+    }
+    return { show, hide };
+  })();
   function buildUI(){
     const sel = $('g-boothProg'), src = $('g-progressionSelect');
     const n = Math.min(PROGS.length, src ? src.options.length : PROGS.length);
@@ -550,18 +575,34 @@ const BOOTH = (() => {
     // the pads
     const kb = $('bKeys');
     for (let i = 0; i < NP; i++){
-      const k = document.createElement('button'); k.className = 'bkey'; k.innerHTML = '<b></b><small>' + KLAB[i] + '</small>'; k.setAttribute('aria-label', 'Pad ' + (i + 1));
+      const k = document.createElement('button'); k.className = 'bkey'; k.innerHTML = '<b></b><small>' + (TCH ? '' : KLAB[i]) + '</small>'; k.setAttribute('aria-label', 'Pad ' + (i + 1));
       k.addEventListener('pointerdown', e => { e.preventDefault(); k.setPointerCapture(e.pointerId); noteDown(i); });
       const up = () => noteUp(i); k.addEventListener('pointerup', up); k.addEventListener('pointercancel', up); k.addEventListener('lostpointercapture', up);
       kb.appendChild(k); keysEl.push(k);
     }
     // right-click a note on the loop picture to delete it (from whichever layer it's in)
+    const rollNoteAt = (x, y) => { const c = $('bRoll'), r = c.getBoundingClientRect(), H = r.height, rowH = (H - 24 - 10)/AP;
+      const b = (x - r.left)/r.width*L(), i = Math.floor((H - 6 - (y - r.top))/rowH);
+      for (let li = S.layers.length - 1; li >= 0; li--){ const n = S.layers[li].find(n => n.i === i && b >= n.b - .05 && b <= n.b + n.d + .05); if (n) return n; }
+      return null; };
+    const rollDel = n => { for (let li = S.layers.length - 1; li >= 0; li--){ const lay = S.layers[li], k = lay.indexOf(n);
+      if (k >= 0){ lay.splice(k, 1); if (!lay.length) S.layers.splice(li, 1); apCache.clear(); store(); status(); return; } } };
     $('bRoll').addEventListener('contextmenu', e => {
-      e.preventDefault(); const c = $('bRoll'), r = c.getBoundingClientRect(), H = r.height, rowH = (H - 24 - 10)/AP;
-      const b = (e.clientX - r.left)/r.width*L(), i = Math.floor((H - 6 - (e.clientY - r.top))/rowH);
-      for (let li = S.layers.length - 1; li >= 0; li--){ const lay = S.layers[li], k = lay.findIndex(n => n.i === i && b >= n.b - .05 && b <= n.b + n.d + .05);
-        if (k >= 0){ lay.splice(k, 1); if (!lay.length) S.layers.splice(li, 1); apCache.clear(); store(); status(); return; } }
+      e.preventDefault(); if (TCH) return;   // (a finger holds the note instead: below)
+      const n = rollNoteAt(e.clientX, e.clientY); if (n) rollDel(n);
     });
+    // on a touch screen: press and hold a note to pick it, then DELETE on the chip above it
+    if (TCH){ const c = $('bRoll'); let lp = null;
+      c.addEventListener('pointerdown', e => { if (e.pointerType === 'mouse') return; clearTimeout(lp && lp.t);
+        lp = { x: e.clientX, y: e.clientY, id: e.pointerId, t: setTimeout(() => { const n = rollNoteAt(lp.x, lp.y); lp = null; if (!n) return;
+          rollSel = n; noteChip.show(c, n, null, rollDel, () => { rollSel = null; }); }, 500) }; });
+      c.addEventListener('pointermove', e => { if (lp && e.pointerId === lp.id && Math.hypot(e.clientX - lp.x, e.clientY - lp.y) > 10){ clearTimeout(lp.t); lp = null; } });
+      const off = () => { if (lp){ clearTimeout(lp.t); lp = null; } }; c.addEventListener('pointerup', off); c.addEventListener('pointercancel', off);
+      root.querySelector('.b-roll .gkey').lastElementChild.innerHTML = '<b>HOLD</b> a note to delete it';
+      c.title = 'The loop: chords along the top, your notes in cyan, the autopilot\'s in pink, the playhead in yellow. Press and hold a note to delete it.';
+      root.querySelector('.b-keys .ghint2').textContent = 'Every pad is a note that fits the chord playing now; they retune when the chord changes. The mark under each note is its place in the chord (1 is the root).';
+      $('bSongBtn').title = "Pick a song from this device. It's analyzed here and never leaves it.";
+    }
     $('bPlay').addEventListener('click', () => playing ? stop() : start(false));
     $('bRec').addEventListener('click', record);
     $('bUndo').addEventListener('click', () => { if (S.layers.length){ S.layers.pop(); apCache.clear(); store(); status(); } });
@@ -627,6 +668,7 @@ const BOOTH = (() => {
     keysEl.forEach((k, i) => {
       const m = P.m[i]; if (m === undefined) return; const nm = P.names[m % 12] + (Math.floor(m/12) - 1);
       const b = k.querySelector('b'); if (b.textContent !== nm){ b.textContent = nm; k.classList.remove('retune'); void k.offsetWidth; k.classList.add('retune'); }
+      if (TCH){ const s = k.querySelector('small'), d = P.rootPc == null ? '' : DEG[((m % 12) - P.rootPc + 120) % 12]; if (s.textContent !== d) s.textContent = d; }
       k.classList.toggle('core', P.core.has(m % 12)); k.classList.toggle('root', m % 12 === P.rootPc);
     });
     const tag = $('bChordTag'); if (tag){ const nx = playing ? chordOf(curBar() + 1) : null; tag.textContent = 'NOW ' + ch.name + (nx && nx !== ch ? ' · NEXT ' + nx.name : ''); }
@@ -680,7 +722,7 @@ const BOOTH = (() => {
   let raf = 0, lastKeyBar = -2;
   function frame(){
     raf = 0; if (mode !== 'booth' || !GRIDPANEL.open) return;
-    drawRoll();
+    drawRoll(undefined, rollSel);
     const b = curBar(); if (b !== lastKeyBar && !playing){ lastKeyBar = b; drawKeys(chordOf(b)); }
     if (playing){ const tag = $('bChordTag'), ch = chordOf(b), nx = chordOf(b + 1); const t = 'NOW ' + ch.name + (nx !== ch ? ' · NEXT ' + nx.name : ''); if (tag.textContent !== t) tag.textContent = t; }
     if (rec) status();
@@ -886,13 +928,13 @@ const BOOTH = (() => {
   }
   // the note strip on the Console's carrier chart, while a shelf loop is on the broadcast; a rewired copy can be reshaped on it
   function stripShow(on){
-    const st = $('gStrip'); if (!st) return; st.hidden = !on;
+    const st = $('gStrip'); if (!st) return; st.hidden = !on; noteChip.hide();
     root.querySelectorAll('.a-chart .gchord, .a-chart .gpads, .a-chart .gpills').forEach(e => { e.hidden = on; });
     if (on){ const rw = bc && bc.mode === 'rewire';
       $('gStripMode').textContent = (rw ? 'REWIRED // ' : 'AS LOGGED // ') + (bc ? bc.name : '') + (S.prog === 'song' && S.song ? ` // BARS ${S.song.start + 1}-${S.song.start + S.len}` : '');
-      $('gStripSave').hidden = !rw;
-      $('gStripHint').textContent = rw ? 'Cyan: your notes · green: changed by you or the Grid · drag, stretch, click to add, double-click to remove' : 'As recorded · Neuro-phrase on: the Grid answers · Auto-governor on: the settings drift';
-      $('gStripCv').title = rw ? 'Drag a note to move it, drag its right end to stretch it, click an empty spot to add one, double-click (or Delete) to remove it. With the Neuro-phrase on, the Grid drifts it somewhere new. The shelf copy stays as it was.'
+      $('gStripSave').hidden = !rw; st.classList.toggle('rw', !!rw);
+      $('gStripHint').textContent = rw ? 'Cyan: your notes · green: changed by you or the Grid · ' + (TCH ? 'drag, stretch, tap to add, hold to remove' : 'drag, stretch, click to add, double-click to remove') : 'As recorded · Neuro-phrase on: the Grid answers · Auto-governor on: the settings drift';
+      $('gStripCv').title = rw ? (TCH ? 'Drag a note to move it, drag its right end to stretch it, tap an empty spot to add one, press and hold a note to remove it.' : 'Drag a note to move it, drag its right end to stretch it, click an empty spot to add one, double-click (or Delete) to remove it.') + ' With the Neuro-phrase on, the Grid drifts it somewhere new. The shelf copy stays as it was.'
         : 'Your notes as recorded. Turn on the Neuro-phrase layer and the Grid answers them; with the auto-governor on, the settings drift as it plays.';
       stripZ = 1; stripB0 = 0; syncZoom(); feelUI(); lastPing = -99;
       if (!stripRaf) stripRaf = requestAnimationFrame(stripFrame); }
@@ -929,10 +971,15 @@ const BOOTH = (() => {
       const p = at2(e), h = hit(p); stripDrag = true;
       if (h){ const n = h.n; pin(n); drag = { n, kind: h.part, db: p.b - n.b, di: p.i - n.i, end: n.b + n.d }; bc.sel = n; cv.style.cursor = h.part === 'move' ? 'grabbing' : 'ew-resize'; }
       else { const nn = { b: Math.floor(p.b*4)/4, d: 1, i: p.i, v: .8 }; fit(nn); pin(nn); S.layers[0].push(nn); drag = { n: nn, kind: 'end' }; bc.sel = nn; cv.style.cursor = 'ew-resize'; }
+      // a finger: the note stays put until it has moved 10 px, and held still on a note it was already on, the note is picked for the DELETE chip
+      if (TCH && e.pointerType !== 'mouse'){ drag.slop = { x: e.clientX, y: e.clientY };
+        if (h){ const d0 = drag; d0.lp = setTimeout(() => { if (drag !== d0 || !d0.slop) return; drag = null; stripDrag = false; const v = stripView();
+          noteChip.show(cv, d0.n, v, del, null); }, 500); } }
       apCache.clear();
     });
     cv.addEventListener('pointermove', e => {
       if (!drag){ if (bc && bc.mode === 'rewire'){ const h = hit(at2(e)); cv.style.cursor = h ? CUR[h.part] : 'crosshair'; } else cv.style.cursor = 'default'; return; }
+      if (drag.slop){ if (Math.hypot(e.clientX - drag.slop.x, e.clientY - drag.slop.y) < 10) return; drag.slop = null; clearTimeout(drag.lp); }
       const p = at2(e), n = drag.n;
       if (drag.kind === 'move'){ n.b = p.b - drag.db; n.i = clamp(p.i - drag.di, 0, AP - 1); }
       else if (drag.kind === 'start'){ const nb = clamp(Math.round(p.b*4)/4, Math.floor((drag.end - .01)/4)*4, drag.end - .25); n.b = nb; n.d = drag.end - nb; }
@@ -941,7 +988,7 @@ const BOOTH = (() => {
       fit(n);
       if (stripZ > 1){ const r = cv.getBoundingClientRect(), v = stripView(); if (e.clientX > r.right - 12) setStripB0(v.b0 + .25); else if (e.clientX < r.left + 12) setStripB0(v.b0 - .25); }   // (dragging past an edge scrolls)
     });
-    const end = () => { stripDrag = false; if (!drag) return; pin(drag.n); drag = null; S.layers[0].sort((a, b) => a.b - b.b); apCache.clear(); cv.style.cursor = 'crosshair'; };
+    const end = () => { stripDrag = false; if (!drag) return; clearTimeout(drag.lp); pin(drag.n); drag = null; S.layers[0].sort((a, b) => a.b - b.b); apCache.clear(); cv.style.cursor = 'crosshair'; };
     cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
     // zoom: buttons on the side (and Ctrl + wheel), a scrollbar under the strip (and the wheel) to move along the loop
     const zoomTo = (z, centre) => { const v = stripView(), c = centre ?? v.b0 + v.span/2; stripZ = clamp(z, 1, 8); const sp = L()/stripZ; setStripB0(c - sp/2); syncZoom(); };
@@ -957,8 +1004,8 @@ const BOOTH = (() => {
       if (e.ctrlKey){ const p = at2(e); zoomTo(stripZ*(e.deltaY < 0 ? 2 : .5), p.b); return; }
       if (stripZ > 1) setStripB0(stripView().b0 + Math.sign(e.deltaY || e.deltaX)*stripView().span*.15); }, { passive: false });
     const del = n => { const lay = S.layers[0] || [], k = lay.indexOf(n); if (k >= 0){ lay.splice(k, 1); apCache.clear(); } if (bc) bc.sel = null; };
-    cv.addEventListener('dblclick', e => { if (!bc || bc.mode !== 'rewire') return; const n = hit(at2(e)); if (n) del(n); });
-    cv.addEventListener('contextmenu', e => { if (!bc || bc.mode !== 'rewire') return; e.preventDefault(); const n = hit(at2(e)); if (n) del(n); });
+    cv.addEventListener('dblclick', e => { if (!bc || bc.mode !== 'rewire' || TCH) return; const n = hit(at2(e)); if (n) del(n); });   // (a finger holds the note instead)
+    cv.addEventListener('contextmenu', e => { if (!bc || bc.mode !== 'rewire') return; e.preventDefault(); if (TCH) return; const n = hit(at2(e)); if (n) del(n); });
     addEventListener('keydown', e => { if (bc && bc.mode === 'rewire' && bc.sel && GRIDPANEL.open && mode === 'console' && (e.key === 'Delete' || e.key === 'Backspace') && !(e.target && e.target.tagName === 'INPUT')){ e.preventDefault(); del(bc.sel); } }, true);
     $('gStripEnd').addEventListener('click', () => { const sel = $('g-progressionSelect'); sel.value = lastPattern; sel.dispatchEvent(new Event('change', { bubbles: true })); });
     $('gStripSave').addEventListener('click', () => {
@@ -974,7 +1021,7 @@ const BOOTH = (() => {
 
   // ---------- modes: the Console (the broadcast) or the Booth ----------
   function setMode(m){
-    mode = m; root.querySelectorAll('.gtab').forEach(t => { const on = t.dataset.mode === m; t.classList.toggle('on', on); t.setAttribute('aria-selected', on ? 'true' : 'false'); });
+    mode = m; noteChip.hide(); if (GRIDPANEL.closePlate) GRIDPANEL.closePlate(); root.querySelectorAll('.gtab').forEach(t => { const on = t.dataset.mode === m; t.classList.toggle('on', on); t.setAttribute('aria-selected', on ? 'true' : 'false'); });
     const main = root.querySelector('.gmain'), bo = $('gBooth');
     main.hidden = m === 'booth'; bo.hidden = m !== 'booth';
     if (m === 'booth'){ const bt = root.querySelector('.gtab.beckon'); if (bt){ bt.classList.remove('beckon'); try { localStorage.setItem('neonIsland.boothSeen', '1'); } catch (e){} }
@@ -982,7 +1029,7 @@ const BOOTH = (() => {
     else { stop(); music.setBooth(false); }
   }
   B.panelOpened = () => { if (mode === 'booth') setMode('booth'); };
-  B.panelClosed = () => { if (mode === 'booth'){ stop(); music.setBooth(false); } };
+  B.panelClosed = () => { noteChip.hide(); if (mode === 'booth'){ stop(); music.setBooth(false); } };
   // the computer keys: Q to ] are the pads, Space plays and stops, Enter records (not while typing a name)
   addEventListener('keydown', e => {
     if (mode !== 'booth' || !GRIDPANEL.open) return;

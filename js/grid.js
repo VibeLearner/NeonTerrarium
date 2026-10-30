@@ -287,7 +287,9 @@ const music = (() => {
     }
     P.show = () => {
       if (P.open || busy) return; busy = true;
-      const reduce = false;   // (the game's animations play whatever the device's reduce-motion setting says: owner's choice, Oct 30)
+      // (the game's animations play whatever the device's reduce-motion setting says: owner's choice, Oct 30. Only the player's own
+      //  Settings, reduce motion or Clean signal, skip the glitch curtain and the decoding titles)
+      const hc = document.documentElement.classList, reduce = hc.contains('nt-calm') || hc.contains('nt-clean');
       if (reduce){ openNow(); busy = false; const b = $q('gpClose'); if (b) b.focus({ preventScroll: true }); return; }
       canvas.classList.add('gp-glitch'); setTimeout(() => canvas.classList.remove('gp-glitch'), 340);
       addEventListener('keydown', swallow, true);
@@ -305,11 +307,13 @@ const music = (() => {
     P.hide = () => {
       if (!P.open) return; P.open = false; GRIDPANEL.open = false; GRIDPANEL.hold = false;
       if (typeof BOOTH !== 'undefined') BOOTH.panelClosed();
+      if (PNL.closePlate) PNL.closePlate();   // (the touch screen's explanation plate, grid_panel.js)
       el.classList.remove('open'); document.documentElement.classList.remove('gp-open'); removeEventListener('keydown', keyH, true); removeEventListener('resize', sizeCanvases);
     };
     $q('gpClose').addEventListener('click', () => P.hide());
     const curve = $q('gpCurve'), barsCv = $q('gpBars');
     function sizeCanvases(){ for (const c of [curve, barsCv]){ if (!c) continue; const w = Math.max(200, Math.floor(c.clientWidth)), h = Math.floor(c.clientHeight); if (c.width !== w) c.width = w; if (h >= 40 && c.height !== h) c.height = h; } }   // (the panel's layout sets their size: they fill their block)
+    el.addEventListener('gpsection', sizeCanvases);   // (on a touch screen the console shows one section at a time: the trace is sized when its section comes up)
     // what the panel says about the broadcast, a few times a second
     let slow = 0;
     P.draw = (t, dt) => {

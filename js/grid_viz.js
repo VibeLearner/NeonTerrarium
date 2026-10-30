@@ -296,8 +296,11 @@ const GRIDVIZ = (() => {
       const K = { r, kv: svg.querySelector('.kv'), kp: svg.querySelector('.kp'), last: null }; knobs.push(K);
       // drag up or down on the dial (150 px is the whole sweep; Shift for fine)
       let drag = null;
-      svg.addEventListener('pointerdown', e => { e.preventDefault(); svg.setPointerCapture(e.pointerId); drag = { y: e.clientY, v: +r.value }; k.classList.add('drag'); r.focus({ preventScroll: true }); });
-      svg.addEventListener('pointermove', e => { if (!drag) return; const span = +r.max - +r.min, d = (drag.y - e.clientY)/(e.shiftKey ? 600 : 150)*span; setVal(r, drag.v + d); });
+      // (a finger first has to move 10 px before the dial turns: a tap, a double tap or a hold for the plate never nudges it, grid_panel.js)
+      svg.addEventListener('pointerdown', e => { e.preventDefault(); svg.setPointerCapture(e.pointerId); drag = { y: e.clientY, v: +r.value, slop: typeof TOUCH !== 'undefined' && TOUCH.on && e.pointerType !== 'mouse' }; k.classList.add('drag'); r.focus({ preventScroll: true }); });
+      svg.addEventListener('pointermove', e => { if (!drag || GRIDPANEL.lp) return;
+        if (drag.slop){ if (Math.abs(drag.y - e.clientY) < 10) return; drag.slop = false; drag.y = e.clientY; }
+        const span = +r.max - +r.min, d = (drag.y - e.clientY)/(e.shiftKey ? 600 : 150)*span; setVal(r, drag.v + d); });
       const end = () => { drag = null; k.classList.remove('drag'); };
       svg.addEventListener('pointerup', end); svg.addEventListener('pointercancel', end);
     });

@@ -253,7 +253,7 @@ const TITLE = (() => {
   const furnReady = () => { try { return typeof FURN === 'undefined' || !FURN.warmed || FURN.warmed(); } catch (e) { return true; } };
   // (a city with nothing built yet has nobody to wait for: a new one, or one just started)
   const builtNone = () => { try { for (const c of cells.values()) if (c.sections.length || c.mega) return false; return true; } catch (e) { return false; } };
-  // (touch: the screen doesn't wait for the Scan pod page; a phone loads it on the first Scan tap, see furnish.js. It does wait for the merges and the
+  // (the screen doesn't wait for the Scan pod page: a computer prepares it behind the title, a phone on the first Scan tap, see furnish.js. It does wait for the merges and the
   //  cool-down, as on a computer: letting them run behind the open city made the first seconds of play hitch, owner Oct 30)
   const TOUCH_T = typeof TOUCH !== 'undefined' && TOUCH.on;
   const cityReady = () => { try { return (typeof LOADP === 'undefined' || (!LOADP.on && !(LOADP.cool > 0))) && (typeof pplReady === 'undefined' || pplReady || builtNone()); } catch (e) { return true; } };
@@ -275,7 +275,7 @@ const TITLE = (() => {
   let shutR = null, shutCam = null, shutScene = null;
   function drawShutter(now){
     // the shutter is the loading screen: it opens once the city has loaded and the Furnish page is warm (its shaders compiled), so neither costs anything later
-    if (openFrom === null && shutR && now - shownAt > 900){ const ok = settled(now); if ((ok && (TOUCH_T || furnReady() || now - shownAt > 60000)) || stalled(now)){ openFrom = now + 300; T.openAt = openFrom; } }   // (never stuck shut: 60 s at most for the Furnish warm-up once the city has loaded, and a load that stops getting anywhere for 20 s)
+    if (openFrom === null && shutR && now - shownAt > 900){ const ok = settled(now); if (ok || stalled(now)){ openFrom = now + 300; T.openAt = openFrom; } }   // (never stuck shut: a load that stops getting anywhere for 20 s. No wait for the Scan pod page, owner Oct 30: on a computer's first visit that was 24 of 29 s; it goes on getting ready behind the title)
     const tt = openFrom === null ? 0 : Math.max(0, Math.min(1, (now - openFrom)/3200)); OPEN = reduced ? (openFrom === null ? 0 : 1) : tt*tt*(3 - 2*tt);
     // the room is dark while it's shut (only what light leaks in, and its own lamps), and the daylight comes up with the plates
     const lit = .3 + .7*Math.pow(OPEN, .8); DIM = lit; if (Math.abs(lit - (drawShutter.lit || 0)) > .004){ drawShutter.lit = lit; const f = lit >= .999 ? '' : 'brightness(' + lit.toFixed(3) + ') saturate(' + (.7 + .3*lit).toFixed(3) + ')'; for (const el of (RTMODE ? [shutCv, stage.querySelector('.t-live')] : [imRoom, imGlass, imOff, shutCv, stage.querySelector('.t-live')])) if (el) el.style.filter = f; }

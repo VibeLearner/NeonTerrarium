@@ -83,7 +83,10 @@ const TOUCH = (() => {
         zones.insertBefore(bh, zones.firstChild); if (zs.length) zs[zs.length - 1].after(th); else zones.appendChild(th);
         bar.appendChild(bl); bar.appendChild(tl); bh.classList.add('tside'); th.classList.add('tside'); syncHeads();
       } else {
-        parts.forEach((n, k) => { n.classList.remove('tside'); n.hidden = false; homes[k].parent.insertBefore(n, homes[k].next && homes[k].next.parentNode === homes[k].parent ? homes[k].next : null); });
+        // (back home, only if they were ever moved: on a computer this runs at load and must change nothing. It used to show both lists: the
+        //  Buildings and Transport menus came up open on every load, owner Oct 30. The heads' hidden is theirs again; the lists keep their own)
+        if (!bh.classList.contains('tside')) return;
+        parts.forEach((n, k) => { n.classList.remove('tside'); if (k < 2) n.hidden = false; homes[k].parent.insertBefore(n, homes[k].next && homes[k].next.parentNode === homes[k].parent ? homes[k].next : null); });
       }
     };
     // Controls: a tap opens the box, the ✕ (or a tap on the city) closes it

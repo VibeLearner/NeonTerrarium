@@ -2946,6 +2946,7 @@ function load(){
     if (!Array.isArray(d) || !d.length) return false;
     for (const [i,j,secs,st,gr,lf,bl,lv,wl] of d){ const c = newCell(i, j, (secs || []).filter(s => s && ZONES[s.zone])); c.style = st || DEFAULT_STYLE; c.green = GREEN_MODES.includes(gr) ? gr : 'some'; if (lf > 0 && c.sections.length){ c.lift = Array.isArray(lv) ? { y: lf, v: 2, d: lv } : { y: lf }; if (Array.isArray(bl)){ const b2 = bl.filter(s => s && ZONES[s.zone]); if (b2.length) c.below = b2; } } if (wl && wl.z && ZONES[wl.z] && !c.sections.length) c.wall = { zone: wl.z, n: Math.max(0, wl.n | 0), gate: !!wl.g, seed: wl.s | 0 }; cells.set(ckey(i,j), c); }
     hwLoad(); mtLoad();   // (before the plots are built: the highways' and the metro's pillars stand on them)
+    if (typeof renderBmenu === 'function') renderBmenu();   // (a city with highways or a metro has Transit, whatever its megastructures: it was hidden when they loaded after the menu was drawn)
     try { for (const m of JSON.parse(localStorage.getItem(MEGA_SAVE_KEY) || '[]')) { const mm = placeMega(m.kind, m.i, m.j, m.seed, m.w, m.h, m.levels, m.id || null); if (mm && m.centre) mm.centre = m.centre; if (mm && Number.isInteger(m.rot)) mm.rot = ((m.rot % 4) + 4) % 4; if (mm && Number.isInteger(m.si) && Number.isInteger(m.sj)){ mm.si = m.si; mm.sj = m.sj; } } } catch (e) {}
     return true;
   } catch (e) { return false; }

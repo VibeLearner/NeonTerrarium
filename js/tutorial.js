@@ -6,7 +6,7 @@
 // Later, one-line tips appear the first time something new turns up (a megastructure's holo-tag, the music player, Scan), while Tips is on.
 'use strict';
 const TUT = (() => {
-  const U = { replay(){}, tips(){} };
+  const U = { replay(){}, tips(){}, replayHw(){}, replayMt(){}, miniOn(){ return false; } };
   if (typeof TOUCH === 'undefined' || !TOUCH.on) return U;
   const KEY = 'touch:nt.tut', TIPKEY = 'touch:nt.tipsSeen';
   const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k) || 'null') || d; } catch (e) { return d; } };
@@ -23,7 +23,7 @@ const TUT = (() => {
   const BEATS = [
     { id: 'pan', say: 'Drag to look around', at: center, ghost: 'drag', ev: 'pan' },
     { id: 'zoom', say: 'Pinch to zoom', at: center, ghost: 'pinch', ev: 'zoom' },
-    { id: 'zone', say: 'Swipe the zone card, or tap it', at: () => rectOf(zoneCard()), ghost: 'swipe', test: () => !!S.zone },
+    { id: 'zone', say: 'Swipe the zone card up or down, or tap it', at: () => rectOf(zoneCard()), ghost: 'up', test: () => !!S.zone },
     { id: 'build', say: 'Tap anywhere on the platform to build', at: center, ghost: 'tap', ev: 'build', need: () => !!S.zone, pre: 'Pick a zone first' },
     { id: 'trim', say: 'Build, then tap it again, quickly: one floor', at: atFresh, ghost: 'tap2', ev: 'trim' },
     { id: 'resize', say: 'Build, tap it again and drag up: its height', at: atFresh, ghost: 'up', ev: 'resize' },
@@ -92,9 +92,65 @@ const TUT = (() => {
     { id: 'people', find: () => typeof megasOfKind === 'function' && megasOfKind('police').length ? document.getElementById('view') : null, say: 'Tap someone in the street to watch them' },
   ];
   setInterval(() => {
-    if (!tipsOn() || on || !st.done || !ready() || !tipEl.hidden) return;
+    if (!tipsOn() || on || X.on || !st.done || !ready() || !tipEl.hidden) return;
     for (const t of TIPS){ if (seen[t.id]) continue; const e = t.find(); if (!e) continue; seen[t.id] = 1; save(TIPKEY, seen); tip(t.say, e === document.getElementById('view') ? null : e); break; }
   }, 2500);
   U.tips = v => { if (!v) tipEl.hidden = true; };
+
+  // The transit tutorials (owner, Oct 30: in place of the Instructions panels, which touch screens no longer show). The first time the player turns on
+  // highway mode, and the first time metro mode, a few beats in the same style: an operator's note with a small ghost of the gesture, Skip, no dimming,
+  // each beat done anywhere. They wait for the city to say each step was done (a piece added, the height changed, a line finished), pause while the
+  // mode is off and carry on when it's back, and keep their shown and done counts in this browser (touch:nt.tutHw, touch:nt.tutMt).
+  // Replayed from Settings, Interface (touchui.js), which turns the mode on.
+  const hwOpen = () => typeof highways !== 'undefined' ? highways.filter(h => !h.done) : [], tilesOf = a => a.reduce((n, l) => n + l.tiles.length, 0);
+  const mtOpen = () => typeof metros !== 'undefined' ? metros.filter(l => !l.done && !l.loop) : [];
+  const doneOf = a => a.filter(l => l.done).length;
+  // each beat: arm() takes a note of how things stand when it's shown, and returns the test that says it's done
+  const MINI = {
+    hw: { key: 'touch:nt.tutHw', name: 'SKY HIGHWAY', mode: () => typeof hwMode !== 'undefined' && hwMode, end: 'Hold a piece to cut the road back.', beats: [
+      { id: 'start', say: 'Tap a plot to start a highway', ghost: 'tap', arm: () => { const n = highways.length; return () => highways.length > n || hwOpen().some(h => h === hwActive); } },
+      { id: 'height', say: 'Tap \u2212 or + below to set the height', ghost: 'tap', arm: () => { const L = hwLevel; return () => hwLevel !== L; } },
+      { id: 'extend', say: 'Tap just ahead of the end, in the air, to extend it', ghost: 'tap', arm: () => { const n = tilesOf(hwOpen()); return () => tilesOf(hwOpen()) > n; } },
+      { id: 'finish', say: 'Tap the last piece to add the drop-off', ghost: 'tap', arm: () => { const n = doneOf(highways); return () => doneOf(highways) > n; } },
+    ] },
+    mt: { key: 'touch:nt.tutMt', name: 'METRO', mode: () => typeof mtMode !== 'undefined' && mtMode, end: 'Tap a straight piece to add a station. Hold a piece to cut the line back.', beats: [
+      { id: 'start', say: 'Tap a plot to start a line at its first station', ghost: 'tap', arm: () => { const n = metros.length; return () => metros.length > n || mtOpen().some(l => l === mtActive); } },
+      { id: 'extend', say: 'Tap just ahead of the end, in the air, to extend it', ghost: 'tap', arm: () => { const n = tilesOf(metros); return () => tilesOf(metros) > n; } },
+      { id: 'finish', say: 'Tap the last piece to finish it with a station', ghost: 'tap', arm: () => { const n = doneOf(metros); return () => doneOf(metros) > n; } },
+    ] },
+  };
+  for (const m of Object.values(MINI)) m.st = load(m.key, { done: false, beats: {} });
+  const xov = document.createElement('div'); xov.className = 'ttut ttut-x'; xov.hidden = true;
+  xov.innerHTML = '<div class="tt-note"><div class="tt-demo"><div class="tt-ghost"><i></i><i></i></div></div><div class="tt-txt"><small></small><b></b></div><button type="button">Skip</button></div>';
+  document.body.appendChild(xov);
+  const xg = xov.querySelector('.tt-ghost'), xsay = xov.querySelector('b'), xstep = xov.querySelector('small');
+  const X = { on: false, m: null, k: 0, test: null };
+  const xmark = (m, id, what) => { const b = m.st.beats[id] || (m.st.beats[id] = { shown: 0, done: 0 }); b[what]++; save(m.key, m.st); };
+  function xshow(){
+    const m = X.m, b = m.beats[X.k]; if (!b){ xfinish(false); return; }
+    xmark(m, b.id, 'shown'); X.test = b.arm();
+    xsay.textContent = b.say; xstep.textContent = '// ' + m.name + ' ' + (X.k + 1) + ' / ' + m.beats.length; xg.className = 'tt-ghost g-' + b.ghost;
+  }
+  function xfinish(skipped){
+    const m = X.m; X.on = false; X.m = null; X.test = null; xov.hidden = true; if (!m) return;
+    m.st.done = true; m.st.skipped = !!skipped; save(m.key, m.st);
+    if (!skipped) tip(m.end, null, 5200);
+  }
+  xov.querySelector('button').addEventListener('click', () => xfinish(true));
+  setInterval(() => {
+    if (X.on){
+      const m = X.m; xov.hidden = !m.mode();   // (the mode off: the note waits, and comes back with it)
+      if (!xov.hidden && X.test && X.test()){ xmark(m, m.beats[X.k].id, 'done'); X.k++; if (X.k >= m.beats.length) xfinish(false); else xshow(); }
+      if (!xov.hidden || !Object.values(MINI).some(o => o !== m && !o.st.done && o.mode())) return;
+      X.on = false; X.m = null; X.test = null;   // (the other mode turned on, with its tutorial still to come: this one starts over next time)
+    }
+    if (on || !ready()) return;   // (never over the main tutorial)
+    for (const m of Object.values(MINI)) if (!m.st.done && m.mode()){ X.on = true; X.m = m; X.k = 0; tipEl.hidden = true; xov.hidden = false; xshow(); break; }
+  }, 250);
+  const xreplay = (m, go) => () => { if (X.on) xfinish(true); m.st.done = false; save(m.key, m.st);
+    setTimeout(() => { if (typeof hwUnlocked === 'function' && hwUnlocked()) go(); }, 400); };
+  U.replayHw = xreplay(MINI.hw, () => { if (typeof setHwMode === 'function' && !hwMode) setHwMode(true); });
+  U.replayMt = xreplay(MINI.mt, () => { if (typeof setMtMode === 'function' && !mtMode) setMtMode(true); });
+  U.miniOn = () => X.on;
   return U;
 })();

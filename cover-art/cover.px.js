@@ -126,46 +126,58 @@ const SKYBASE = fb.slice()
 const cloudLayer = () => new Uint8Array(W * H).fill(255)
 const drawInto = (buf, fn) => { const s = fb; fb = buf; fn(); fb = s }
 const bank = (o) => {
-  const { x0, x1, base, env, seed } = o
+  const { base, env, seed } = o
   const R = (k, a = 0) => ih(seed, k, a)
-  const envY = (x) => lerpPoly(env, x)
-  const top = Math.floor(Math.min(...env.map((p) => p[1]))) - 24
+  const sc = o.scale ?? 1
+  const xs = env.map((p) => p[0]), x0 = Math.min(...xs), x1 = Math.max(...xs), ytop = Math.min(...env.map((p) => p[1]))
+  const poly = [...env, [env[env.length - 1][0], base + 30], [env[0][0], base + 30]]
+  const inside = (x, y) => { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [ax, ay] = poly[i], [bx, by] = poly[j]; if ((ay > y) !== (by > y) && x < ((bx - ax) * (y - ay)) / (by - ay) + ax) c = !c } return c }
+  const segDist = (x, y) => { let m = 1e9; for (let i = 0; i + 1 < env.length; i++) { const [ax, ay] = env[i], [bx, by] = env[i + 1], dx = bx - ax, dy = by - ay, t = clamp(((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy || 1), 0, 1); m = Math.min(m, Math.hypot(x - ax - t * dx, y - ay - t * dy)) } return m }
   const discs = []
   const add = (x, y, r, d, warm) => discs.push({ x: Math.round(x), y: Math.round(y), r, d, warm })
-  const sp = o.sp ?? 13
-  // the body: big discs packed on a jittered grid under the skyline
-  for (let gy = top; gy < base; gy += sp * 0.8) for (let gx = x0 - 6; gx <= x1 + 6; gx += sp) {
+  const sp = (o.sp ?? 13) * sc
+  // the body: big discs packed on a jittered grid, kept inside the outline
+  for (let gy = ytop; gy < base; gy += sp * 0.8) for (let gx = x0; gx <= x1; gx += sp) {
     const x = gx + (R(1, gx * 7 + Math.round(gy)) - 0.5) * sp, y = gy + (R(2, gx * 5 + Math.round(gy)) - 0.5) * sp
-    const r = sp * (0.7 + 0.3 * R(3, gx + Math.round(gy) * 3))
-    if (y - r * 0.4 < envY(x) || x < x0 - 4 || x > x1 + 4) continue
+    if (!inside(x, y) || y > base - 2) continue
+    const r = Math.min(sp * (0.7 + 0.3 * R(3, gx + Math.round(gy) * 3)), segDist(x, y) + 3)
+    if (r < 4) continue
     add(x, y, r, 0, false)
   }
-  // scalloped edge: discs along the skyline, then children on their upper arcs, smaller and smaller
-  const spawn = (p, depth) => {
+  // the outline: scalloped discs all the way round (top and both sides), each throwing smaller billows outward
+  const spawn = (p, depth, ang) => {
     if (p.r < 3.2 || depth > 3) return
     const n = 3 + Math.floor(R(10 + depth, p.x * 3 + p.y) * 3)
     for (let k = 0; k < n; k++) {
-      const th = -Math.PI * (0.06 + 0.88 * ((k + R(11 + depth, p.x + p.y * 7 + k)) / n))
+      const th = ang + (((k + R(11 + depth, p.x + p.y * 7 + k)) / n) - 0.5) * Math.PI * 0.95
       const r = p.r * (0.42 + 0.26 * R(12 + depth, p.x * 5 + p.y + k))
       const c = { x: Math.round(p.x + Math.cos(th) * p.r * 0.86), y: Math.round(p.y + Math.sin(th) * p.r * 0.86), r, d: depth + 1, warm: p.warm }
-      discs.push(c); spawn(c, depth + 1)
+      discs.push(c); spawn(c, depth + 1, ang)
     }
   }
-  const step = 8
-  for (let x = x0; x <= x1; x += step * (0.7 + 0.6 * R(20, x))) {
-    const r = 8 + 8 * R(21, Math.round(x))
-    const p = { x: Math.round(x), y: Math.round(envY(x) + r * 0.55), r, d: 1, warm: R(22, Math.round(x)) < (o.warmP ?? 1) }
-    if (p.y > base - 4) continue
-    discs.push(p); spawn(p, 1)
+  for (let i = 0; i + 1 < env.length; i++) {
+    const [ax, ay] = env[i], [bx, by] = env[i + 1], len = Math.hypot(bx - ax, by - ay)
+    if (len < 1) continue
+    let nx = (by - ay) / len, ny = -(bx - ax) / len
+    const mx = (ax + bx) / 2, my = (ay + by) / 2
+    if (inside(mx + nx * 3, my + ny * 3)) { nx = -nx; ny = -ny }
+    for (let t = 0; t < len; t += (6 + 5 * R(20, i * 31 + Math.round(t))) * sc) {
+      const r = (7 + 8 * R(21, i * 17 + Math.round(t))) * sc
+      const px = ax + ((bx - ax) * t) / len, py = ay + ((by - ay) * t) / len
+      const p = { x: Math.round(px - nx * r * 0.55), y: Math.round(py - ny * r * 0.55), r, d: 1, warm: R(22, i * 13 + Math.round(t)) < (o.warmP ?? 1) }
+      if (p.y > base - 6) continue
+      discs.push(p); spawn(p, 1, Math.atan2(ny, nx))
+    }
   }
-  // detached fragments near the lit tops
+  for (const [x, y, r] of o.peaks ?? []) { const p = { x, y, r, d: 1, warm: true }; discs.push(p); spawn(p, 1, -Math.PI / 2) }
   for (let i = 0; i < (o.frag ?? 8); i++) {
-    const x = x0 + R(30, i) * (x1 - x0), r = 1.2 + 1.8 * R(31, i)
-    discs.push({ x: Math.round(x), y: Math.round(envY(x) - 5 - R(32, i) * 14), r, d: 5, warm: true, frag: true })
+    const k = Math.floor(R(30, i) * (env.length - 1)), t = R(33, i)
+    const x = env[k][0] + (env[k + 1][0] - env[k][0]) * t, y = env[k][1] + (env[k + 1][1] - env[k][1]) * t
+    discs.push({ x: Math.round(x + (R(34, i) - 0.5) * 16), y: Math.round(y - 6 - R(32, i) * 12), r: 1.2 + 1.8 * R(31, i), d: 5, warm: true, frag: true })
   }
-  const bx0 = x0 - 8, bx1 = x1 + 8, bw = bx1 - bx0 + 1, bh = base + 2 - top + 1
+  const top = Math.floor(ytop) - Math.ceil(30 * sc) - 20
+  const bx0 = Math.floor(x0) - 24, bx1 = Math.ceil(x1) + 24, bw = bx1 - bx0 + 1, bh = base + 2 - top + 1
   const own = new Int32Array(bw * bh).fill(-1)
-  // paint order: body, then edge discs, then children by depth (so smaller billows end up in front)
   const order = discs.map((d, i) => i).sort((p, q) => discs[p].d - discs[q].d || discs[p].y - discs[q].y)
   const rb = (x) => base + ((x >> 2) % 3 === 0 ? -1 : 0)
   order.forEach((di, rank) => {
@@ -179,24 +191,22 @@ const bank = (o) => {
   })
   const at = (x, y) => (x < bx0 || x > bx1 || y < top || y >= top + bh ? -1 : own[(y - top) * bw + (x - bx0)])
   const tone = new Int8Array(bw * bh).fill(-1)
-  const hw = (x1 - x0) / 2, cxm = (x0 + x1) / 2, ytop = Math.min(...env.map((p) => p[1])), hh = base - ytop
+  const hh = Math.max(20, base - ytop), bfade = clamp(hh * 0.35, 12, 34), wd = Math.max(20, x1 - x0)
   for (let y = top; y < top + bh; y++) for (let x = bx0; x <= bx1; x++) {
     const k = at(x, y); if (k < 0) continue
     const d = discs[k]
     const nx = (x + 0.5 - d.x) / d.r, ny = (y + 0.5 - d.y) / d.r
     const l = -0.78 * nx - 0.68 * ny
-    const u = (x - x0) / (x1 - x0), v = (y - ytop) / hh
+    const u = (x - x0) / wd, v = (y - ytop) / hh
     let s = (o.lift ?? 1.4) - 1.95 * u - 0.85 * v + 0.46 * l * (d.d >= 1 ? 1.1 : 0.8) - (o.shade ?? 0)
     if (d.warm && !d.frag) s += o.warmLift ?? 0
-    // tucked under a billow in front: a shadow
     for (const [ax, ay] of [[0, -1], [-1, -1], [0, -2], [-1, -2], [-2, -1], [1, -2]]) { const kk = at(x + ax, y + ay); if (kk >= 0 && discs[kk].rank > d.rank) { s -= 0.32; break } }
-    s -= 0.9 * clamp((y - (base - 34)) / 34, 0, 1)
-    if (d.frag) s = Math.max(s, 0.8)
+    s -= 0.9 * clamp((y - (base - bfade)) / bfade, 0, 1)
+    if (d.frag) s = Math.max(s, 0.8 - (o.shade ?? 0) * 0.6)
     const th = [0.95, 0.62, 0.3, 0.0, -0.3, -0.6]
     let t = 6; for (let j = 0; j < 6; j++) if (s > th[j]) { t = j; break }
     tone[(y - top) * bw + (x - bx0)] = t
   }
-  // clean up: a pixel that most of its neighbours disagree with joins them, so every tone is a solid cluster
   for (let pass = 0; pass < 2; pass++) {
     const nt = tone.slice()
     for (let y = top + 1; y < top + bh - 1; y++) for (let x = bx0 + 1; x < bx1; x++) {
@@ -210,24 +220,27 @@ const bank = (o) => {
   }
   for (let y = top; y < top + bh; y++) for (let x = bx0; x <= bx1; x++) { const t = tone[(y - top) * bw + (x - bx0)]; if (t >= 0) put(x, y, CRAMP[t]) }
 }
-const LAYERS = { back: cloudLayer(), mid: cloudLayer(), front: cloudLayer() }
-// a smaller bank behind the middle of the city
-drawInto(LAYERS.back, () => bank({ x0: 232, x1: 452, base: 330, env: [[232, 300], [262, 262], [300, 222], [330, 168], [362, 150], [398, 164], [425, 205], [452, 270]], seed: 41, sp: 12, frag: 6 }))
-// the hero cloud: a huge tower behind the city on the right, up behind the hero tower and the billboard
-drawInto(LAYERS.mid, () => bank({ x0: 318, x1: 650, base: 380, env: [[318, 300], [350, 240], [392, 190], [430, 120], [470, 52], [510, 6], [556, -6], [600, 8], [650, 30]], seed: 42, sp: 15, frag: 12 }))
-// a low, cool bank along the bottom left, with a few warm lit tops
-drawInto(LAYERS.front, () => bank({ x0: -8, x1: 262, base: 508, env: [[-8, 346], [30, 352], [70, 368], [120, 388], [180, 410], [230, 438], [262, 462]], seed: 43, sp: 13, shade: 0.55, lift: 1.1, warmP: 0.3, warmLift: 0.8, frag: 5 }))
-// two or three small, calm fragments in the clear sky, well away from the letters
-drawInto(LAYERS.back, () => { for (const [x, y, w] of [[306, 70, 6], [322, 96, 4], [300, 132, 5]]) { hlineK(x, y, w, "b"); hlineK(x + 1, y - 1, w - 2, "a"); hlineK(x + 1, y + 1, w - 2, "c") } })
+// five separate clouds, each its own layer so each drifts on its own; [buffer, amplitude, phase]
+const CLOUDS = []
+const cloudAt = (amp, ph, o) => { const buf = cloudLayer(); drawInto(buf, () => bank(o)); CLOUDS.push([buf, amp, ph]) }
+// E: a small, faint fragment between B and the title, clear of the tagline
+cloudAt(1.2, 5.3, { base: 148, env: [[292, 148], [294, 140], [302, 132], [314, 128], [326, 132], [334, 142], [336, 148]], seed: 55, scale: 0.55, shade: 0.85, frag: 2 })
+// C: a small, high cloud near the top centre
+cloudAt(1.8, 3.0, { base: 64, env: [[298, 64], [298, 52], [306, 38], [322, 24], [342, 18], [362, 26], [376, 42], [384, 64]], seed: 56, scale: 0.7, shade: 0.2, frag: 3 })
+// B: a medium cloud behind the middle of the city
+cloudAt(1.0, 1.8, { base: 310, env: [[296, 310], [298, 262], [306, 214], [322, 176], [346, 154], [376, 148], [404, 160], [424, 190], [434, 236], [434, 310]], seed: 57, sp: 12, shade: 0.4, frag: 5 })
+// A: the tall tower behind and right of the hero tower, cropped by the right edge
+cloudAt(1.4, 0.5, { base: 340, env: [[528, 340], [526, 262], [530, 196], [544, 136], [562, 88], [586, 54], [614, 40], [646, 46], [676, 78], [690, 130], [694, 340]], seed: 58, sp: 14, frag: 10 })
+// D: the low cool bank at the bottom left, bumpy, with two warm billows poking up
+cloudAt(1.6, 4.2, { base: 508, env: [[-10, 508], [-10, 372], [6, 360], [20, 348], [38, 356], [54, 344], [72, 352], [90, 366], [108, 356], [128, 372], [152, 384], [178, 396], [206, 412], [234, 432], [262, 458], [264, 508]], seed: 59, sp: 13, shade: 0.55, lift: 1.1, warmP: 0.25, warmLift: 0.8, frag: 4, peaks: [[34, 345, 10], [108, 352, 9]] })
 const composeSky = (f, out) => {
   const t = (2 * Math.PI * f) / FRAMES
-  const dxs = [Math.round(1.2 * Math.sin(t)), Math.round(1.7 * Math.sin(t + 1)), Math.round(2.2 * Math.sin(t + 2))]
-  const Ls = [LAYERS.back, LAYERS.mid, LAYERS.front]
+  const dxs = CLOUDS.map(([, amp, ph]) => Math.round(amp * Math.sin(t + ph)))
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const i = y * W + x
     if (CITY[i]) continue
     let v = SKYBASE[i]
-    for (let l = 0; l < 3; l++) { const sx = x - dxs[l]; if (sx >= 0 && sx < W) { const c = Ls[l][y * W + sx]; if (c !== 255) v = c } }
+    for (let l = 0; l < CLOUDS.length; l++) { const sx = x - dxs[l]; if (sx >= 0 && sx < W) { const c = CLOUDS[l][0][y * W + sx]; if (c !== 255) v = c } }
     out[i] = v
   }
 }
@@ -1972,7 +1985,7 @@ const scanlines = () => {
 
 const DRONES = [[318, 128, 12, 3, 0, "x"], [205, 262, 10, 2, 5, "n"], [405, 52, 14, 3, 9, "x"]]
 const LANTERNS = [[278, 268, 3], [335, 226, 17], [420, 218, 31], [470, 206, 9], [365, 200, 40]]
-const SPARKLES = [[292, 26, 3], [308, 102, 2], [212, 232, 2]]
+const SPARKLES = [[430, 52, 3], [346, 96, 2], [456, 178, 2]]
 const drawLife = (f) => {
   const t = (2 * Math.PI * f) / FRAMES
   // four-point sparkle stars that slowly swell and shrink

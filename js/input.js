@@ -150,6 +150,7 @@ const freshNear = (x, y) => FRESH && performance.now() - FRESH.t < FRESH_MS && M
 const freshOk = f => cells.get(ckey(f.c.i, f.c.j)) === f.c && f.c.sections[f.c.sections.length - 1] === f.sec && !f.c.lift;
 const tEmit = (name, d) => { try { dispatchEvent(new CustomEvent('nt:' + name, { detail: d })); } catch (e) {} };   // (for the touch tutorial: tutorial.js)
 function freshBuild(x, y){
+  { const pk = typeof TUI !== 'undefined' ? pickAt(x, y) : null; if (pk && pk.c && pk.c.mega && megas.has(pk.c.mega) && TUI.megaTap(megas.get(pk.c.mega))) return; }   // (a tap on a megastructure shows its screen's button, never builds)
   const t = targetOf(pickAt(x, y));
   const key = t && t.after === undefined ? (t.type === 'empty' ? ckey(t.i, t.j) : (t.type === 'up' || t.type === 'onto') && t.c && !t.c.mega && !t.c.lift ? ckey(t.c.i, t.c.j) : null) : null;
   const before = key && cells.get(key) ? cells.get(key).sections.length : 0;
@@ -300,8 +301,8 @@ function endPtr0(e){
     if (act.kind === 'touch' && !act.moved && tapWaits()){ clearTimeout(act.timer); if (typeof TUI !== 'undefined') TUI.ring(null); if (!(typeof LOADP !== 'undefined' && LOADP.on)) freshBuild(e.clientX, e.clientY); }
     else if (act.kind === 'touch' && !act.moved){ clearTimeout(act.timer); if (typeof TUI !== 'undefined') TUI.ring(null);
       if (hwMode) hwClick(e.clientX, e.clientY); else if (mtMode) mtClick(e.clientX, e.clientY); else if (megaPick) placeMegaHere(e.clientX, e.clientY);
-      else { const pk = !S.zone && typeof TUI !== 'undefined' ? pickAt(e.clientX, e.clientY) : null;   // (no zone picked: a tap on a megastructure opens its card)
-        if (pk && pk.c && pk.c.mega && megas.has(pk.c.mega)) TUI.peek(megas.get(pk.c.mega)); else { act.done = new Set(); paintAt(e.clientX, e.clientY); } } }
+      else { const pk = !S.zone && typeof TUI !== 'undefined' ? pickAt(e.clientX, e.clientY) : null;   // (no zone picked: a tap on a megastructure shows its button, or its card)
+        if (pk && pk.c && pk.c.mega && megas.has(pk.c.mega)) TUI.megaTap(megas.get(pk.c.mega)); else { act.done = new Set(); paintAt(e.clientX, e.clientY); } } }
   }
   ptrs.delete(e.pointerId);
   if (!ptrs.size){ dragging = false; act = null; }

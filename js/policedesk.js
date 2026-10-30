@@ -156,7 +156,9 @@ const PRECINCT = (() => {
     const now = clock(), day0 = Math.floor(now/1440);
     const calls = R.calls.slice().sort((a, b) => b.c - a.c);
     const today = calls.filter(c => Math.floor(c.c/1440) === day0);
-    const recent = calls.filter(c => now - c.c < 3*1440);
+    // (owner, Oct 30: a place that has been knocked down drops off the map, and out of the sectors' counts, with its calls)
+    const there = c => safe(() => { if (c.x == null || c.z == null) return true; const p = cells.get(ckey(Math.round(c.x/LOT), Math.round(c.z/LOT))); return !!p && (p.sections.length > 0 || !!(p.mega && megas.has(p.mega)) || !!p.wall); }, true);
+    const recent = calls.filter(c => now - c.c < 3*1440 && there(c));
     const bySec = new Map(), byHour = new Array(24).fill(0);
     for (const c of recent){ bySec.set(c.sec, (bySec.get(c.sec) || 0) + 1); byHour[Math.floor((c.c % 1440)/60)]++; }
     const hot = [...bySec.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6);

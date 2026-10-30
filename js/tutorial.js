@@ -86,7 +86,7 @@ const TUT = (() => {
     clearTimeout(tipT); tipT = setTimeout(() => { tipEl.hidden = true; }, ms);
   }
   const TIPS = [
-    { id: 'tag', find: () => [...document.querySelectorAll('.tholo')].find(e => e.style.visibility !== 'hidden' && e.getBoundingClientRect().width), say: 'Tap a tag to open its screen' },
+    { id: 'tag', find: () => [...document.querySelectorAll('.tholo.ton')].find(e => e.getBoundingClientRect().width), say: 'Tap the button to open its screen' },
     { id: 'music', find: () => { const g = document.getElementById('gridDeck'); return g && !g.hidden && g.getBoundingClientRect().width ? g : null; }, say: 'The Grid is broadcasting. Tap the player for more' },
     { id: 'scan', find: () => { const b = document.getElementById('furnBtn'); return b && !b.hidden && b.getBoundingClientRect().width ? b : null; }, say: 'Scan reads a pod: tap it, then a home' },
     { id: 'people', find: () => typeof megasOfKind === 'function' && megasOfKind('police').length ? document.getElementById('view') : null, say: 'Tap someone in the street to watch them' },

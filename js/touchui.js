@@ -1,15 +1,15 @@
 // Neon Terrarium: the touch screen's own pieces (claude/mobile-ui-plan.md). Nothing here runs with a mouse and keyboard: the desktop page is untouched.
 //  - the hold ring under a finger about to remove something, and the Restore chip that puts the last removal back (input.js asks for both)
-//  - a megastructure's card (a tap on it with no zone picked, or on its holo-tag): its name, a line in the log's voice, ACCESS for the ones with a
-//    screen of their own (the Acoustic Panel, the Data Spire, the Precinct desk) and TURN
-//  - holo-tags over the megastructures that have a screen, so they can be found and opened without a double click
+//  - a tap on a megastructure with a screen of its own (the Acoustic Panel, the Data Spire, the Precinct desk) shows its button over it for 5 s;
+//    the button opens the screen. A tap on any other megastructure opens its card: its name, a line in the log's voice, and TURN
+//  - text the interface cuts short scrolls to show the rest
 //  - a TURN chip while a megastructure is being placed, a recenter button once the view has wandered off the city, an exit chip for erase mode
 //  - the Interface tab of Settings (playerui.js makes the tab): text size, Clean signal, reduce motion, haptics, tips, the tutorial, erase mode, full screen
 //  - press and hold anything that explains itself in a hover tooltip (a title) and the explanation shows on a plate; Settings' rows get an "i" too
 //  - small vibrations on a build and a removal (Android; a setting)
 'use strict';
 const TUI = (() => {
-  const U = { buzz(){}, ring(){}, snapCell(){ return null; }, offerRestore(){}, peek(){}, eraseChip(){} };
+  const U = { buzz(){}, ring(){}, snapCell(){ return null; }, offerRestore(){}, peek(){}, megaTap(){ return false; }, eraseChip(){} };
   if (typeof TOUCH === 'undefined' || !TOUCH.on) return U;
   const $ = id => document.getElementById(id);
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
@@ -39,9 +39,13 @@ const TUI = (() => {
   };
   const chip = el('button', 'trestore', 'Restore'); chip.type = 'button'; chip.hidden = true; document.body.appendChild(chip);
   let chipSnap = null, chipT = 0;
-  // (it sits just above the zone card, the card's own size, owner Oct 30: placed from the card's box each time it shows)
+  // (it sits just above the zone card, the Perimeter button's size, owner Oct 30: placed from their boxes each time it shows)
   const placeChip = () => { const z = document.querySelector('.zones > .tcur .zone, .zones > .zone.tcur, .zones .zone.on') || document.querySelector('.zones .zone'), r = z && z.getBoundingClientRect();
-    if (!r || !r.width) return; chip.style.left = Math.round(r.left) + 'px'; chip.style.width = Math.round(r.width) + 'px'; chip.style.height = Math.round(r.height) + 'px'; chip.style.bottom = Math.round(innerHeight - r.top + 8) + 'px'; };
+    if (!r || !r.width) return;
+    const col = z.closest('.zcol'), pe = (col && col.querySelector('.perim')) || document.querySelector('.zones .perim'), pr = pe && pe.getBoundingClientRect();
+    const w = pr && pr.width ? pr.width : r.width, h = pr && pr.height ? pr.height : 15;
+    chip.style.left = Math.round(r.left + (r.width - w)/2) + 'px'; chip.style.width = Math.round(w) + 'px'; chip.style.height = Math.round(h) + 'px';
+    const top = col ? col.getBoundingClientRect().top : r.top; chip.style.bottom = Math.round(innerHeight - top + 8) + 'px'; };
   U.offerRestore = snap => { chipSnap = snap; chip.hidden = false; placeChip(); clearTimeout(chipT); chipT = setTimeout(() => { chip.hidden = true; chipSnap = null; }, 5000); };
   chip.addEventListener('click', () => { const s = chipSnap; chip.hidden = true; chipSnap = null; clearTimeout(chipT); if (s && restore(s)){ U.buzz(12); dispatchEvent(new CustomEvent('nt:restore')); } });
   function restore(s){
@@ -82,24 +86,41 @@ const TUI = (() => {
   card.querySelector('.tp-turn').addEventListener('click', () => { if (peekM && typeof turnMega === 'function'){ if (turnMega(peekM)) U.buzz(12); } });
   // (a press on the city closes the card)
   $('view').addEventListener('pointerdown', () => { if (!card.hidden) closePeek(); }, true);
-  // the tags: one per megastructure with a screen, over its middle, moved each frame with transform only
-  const tags = new Map(), _v = new THREE.Vector3();
+  // the tags: one per megastructure with a screen, over its middle, moved each frame with transform only. Hidden until the megastructure is tapped
+  // (owner, Oct 30: tapping builds, so the buttons don't hover all the time): a tap shows its button for 5 s, then it fades. Tapping the button opens
+  // the screen straight away; while that screen (or any other) is open no button shows, and once it's closed the button comes back for 5 s and fades
+  const SHOW_MS = 5000, tags = new Map(), _v = new THREE.Vector3();
   function syncTags(){
     for (const [id, t] of tags) if (!megas.has(id)){ t.el.remove(); tags.delete(id); }
     for (const m of megas.values()){ if (!SCREEN[m.kind] || tags.has(m.id)) continue;
-      const b = el('button', 'tholo'); b.type = 'button'; b.innerHTML = '<i></i><span>' + SCREEN[m.kind][0] + '</span>'; b.addEventListener('click', () => U.peek(m));
-      document.body.appendChild(b); tags.set(m.id, { el: b, m }); }
+      const b = el('button', 'tholo'); b.type = 'button'; b.innerHTML = '<i></i><span>' + SCREEN[m.kind][0] + '</span>';
+      const t = { el: b, m, until: 0, opened: false };
+      b.addEventListener('click', () => { if (!megas.has(m.id)) return; t.opened = true; t.until = 0; U.buzz(8); SCREEN[m.kind][1](m); });
+      document.body.appendChild(b); tags.set(m.id, t); }
   }
-  let tagRect = null; addEventListener('resize', () => { tagRect = null; });
+  U.megaTap = m => {
+    if (!m || !megas.has(m.id)) return false;
+    if (!SCREEN[m.kind]) return U.peek(m);   // (no screen to open: its card, with TURN)
+    syncTags(); const t = tags.get(m.id); if (!t) return U.peek(m);
+    for (const o of tags.values()) if (o !== t) o.until = 0;   // (one at a time)
+    t.until = performance.now() + SHOW_MS; U.buzz(6); dispatchEvent(new CustomEvent('nt:peek', { detail: m.kind })); return true;
+  };
+  let tagRect = null, wasBusy = false; addEventListener('resize', () => { tagRect = null; });
   function placeTags(){
     if (!tags.size) return;
-    const busy = root.classList.contains('gp-open') || (typeof OVERSEER !== 'undefined' && OVERSEER.hold) || (typeof PRECINCT !== 'undefined' && PRECINCT.hold) || (typeof FURN !== 'undefined' && FURN.hold) || (typeof TITLE !== 'undefined' && TITLE.on);
+    const busy = root.classList.contains('gp-open') || (typeof OVERSEER !== 'undefined' && OVERSEER.hold) || (typeof PRECINCT !== 'undefined' && PRECINCT.hold) || (typeof FURN !== 'undefined' && FURN.hold) || (typeof TITLE !== 'undefined' && TITLE.on) ||
+      !!document.querySelector('#gridPanel.open, #tsheet:not([hidden])') || !card.hidden;
+    const now = performance.now();
+    // a screen opened from a button has closed: the button again, for 5 s
+    if (wasBusy && !busy) for (const t of tags.values()) if (t.opened){ t.opened = false; t.until = now + SHOW_MS; }
+    wasBusy = busy;
     const r = tagRect || (tagRect = $('view').getBoundingClientRect());
     for (const t of tags.values()){
-      const m = t.m; let top = m.top || 6; _v.set((m.i + (m.w - 1)/2)*LOT, top + 1.5, (m.j + (m.h - 1)/2)*LOT).project(cam);
-      const on = !busy && _v.z < 1 && Math.abs(_v.x) < 1.05 && Math.abs(_v.y) < 1.05;
-      if (t.on !== on){ t.on = on; t.el.style.visibility = on ? '' : 'hidden'; }
-      if (on){ const x = Math.round(r.left + (_v.x*.5 + .5)*r.width), y = Math.round(r.top + (1 - (_v.y*.5 + .5))*r.height);
+      const want = !busy && now < t.until;
+      if (want){ const m = t.m; let top = m.top || 6; _v.set((m.i + (m.w - 1)/2)*LOT, top + 1.5, (m.j + (m.h - 1)/2)*LOT).project(cam); }
+      const on = want && _v.z < 1 && Math.abs(_v.x) < 1.6 && Math.abs(_v.y) < 1.6;   // (a tall one's top off the screen: its button held at the edge, below)
+      if (t.on !== on){ t.on = on; t.el.classList.toggle('ton', on); }
+      if (on){ const sa = 54, x = Math.round(Math.max(r.left + 50, Math.min(r.right - 50, r.left + (_v.x*.5 + .5)*r.width))), y = Math.round(Math.max(r.top + sa + 40, Math.min(r.bottom - 160, r.top + (1 - (_v.y*.5 + .5))*r.height)));
         if (x !== t.x || y !== t.y){ t.x = x; t.y = y; t.el.style.transform = 'translate(' + x + 'px,' + y + 'px) translate(-50%,-100%)'; } }
     }
   }
@@ -121,7 +142,7 @@ const TUI = (() => {
   let lastSlow = 0;
   (function loop(now){
     requestAnimationFrame(loop);
-    try { placeTags(); turnChip.hidden = !megaPick; } catch (e) {}
+    try { placeTags(); turnChip.hidden = !megaPick; } catch (e) { if (!loop.w){ loop.w = 1; console.warn("touchui tags", e); } }
     if (now - lastSlow > 1000){ lastSlow = now; try { syncTags(); wander(); } catch (e) {} }
   })(performance.now());
 
@@ -225,5 +246,33 @@ const TUI = (() => {
 
   /* ---------- #dev: three fingers toggle the performance overlay ---------- */
   if (location.hash.includes('dev')) addEventListener('touchstart', e => { if (e.touches.length === 3 && typeof PH !== 'undefined') PH.toggle(); }, { passive: true });
+  /* ---------- text that doesn't fit scrolls (owner, Oct 30) ---------- */
+  // Any one-line text the interface cuts short (it ends in "…": text-overflow ellipsis, or a no-wrap line with its overflow hidden) slides
+  // slowly along to show the rest, pauses, and slides back. The music player's title is the main one. Found once and again when the page changes
+  // (never by reading every element's style each frame); checked for fitting every 1.5 s; moved with text-indent, so no element's words are touched
+  (() => {
+    const cand = new Set(); let scanT = 0;
+    const cut = e => { const cs = getComputedStyle(e); return (cs.textOverflow === 'ellipsis' || (cs.whiteSpace === 'nowrap' && cs.overflowX === 'hidden')) && cs.display !== 'inline'; };
+    function scan(){ scanT = 0; cand.clear();
+      for (const e of document.body.querySelectorAll('*')){ if (e.closest('canvas,svg,script,style,iframe,.title')) continue; let txt = false; for (const n of e.childNodes) if (n.nodeType === 3 && n.nodeValue.trim()){ txt = true; break; } if (txt && cut(e)) cand.add(e); } }
+    // (again when new elements arrive, not when a number or a line of text changes; at most every 4 s)
+    let lastScan = 0;
+    new MutationObserver(ms => { if (scanT) return; if (!ms.some(m => [...m.addedNodes].some(n => n.nodeType === 1))) return;
+      scanT = setTimeout(() => { lastScan = performance.now(); scan(); }, Math.max(1200, 4000 - (performance.now() - lastScan))); }).observe(document.body, { childList: true, subtree: true });
+    setTimeout(scan, 2000);
+    setInterval(() => {
+      for (const e of cand){
+        if (!e.isConnected){ cand.delete(e); continue; }
+        const vis = e.offsetParent !== null || getComputedStyle(e).position === 'fixed';
+        const was = e.classList.contains('tmq'); let over = 0;
+        if (vis && e.clientWidth > 0){ const cs = getComputedStyle(e), rg = document.createRange(); rg.selectNodeContents(e);   // (the words' own width: the slide's text-indent doesn't change it)
+          const k = e.getBoundingClientRect().width/(e.offsetWidth || 1) || 1;   // (a scaled panel: back to the element's own pixels)
+          over = rg.getBoundingClientRect().width/k - (e.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)); }
+        if (over > 2){ const px = Math.round(over + 6); if (!was || e.style.getPropertyValue('--mq') !== -px + 'px'){ e.style.setProperty('--mq', -px + 'px'); e.style.setProperty('--mqt', Math.max(6, 4 + px/22).toFixed(1) + 's'); e.classList.add('tmq'); } }
+        else if (was){ e.classList.remove('tmq'); e.style.removeProperty('--mq'); e.style.removeProperty('--mqt'); }
+      }
+    }, 1500);
+  })();
+
   return U;
 })();

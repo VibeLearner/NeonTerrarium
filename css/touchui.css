@@ -17,9 +17,9 @@ html.touch .tring.on .fg{animation:tRingFill var(--ms,400ms) linear forwards}
 html.touch .trestore:not([hidden]),html.touch .tchip:not([hidden]){display:flex;align-items:center;justify-content:center;position:fixed;z-index:6;min-height:44px;min-width:88px;padding:0 14px;
   font-family:var(--font-pixel);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#fff;background:rgba(10,16,32,.94);border:1px solid var(--cyan);border-radius:0;
   box-shadow:0 0 12px rgba(56,232,224,.35);touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none}
-html.touch .trestore{min-width:0;min-height:0;padding:0 8px;box-sizing:border-box;font-size:11px;border-color:#ffb347;color:#ffd9a0;box-shadow:none;
-  clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)}   /* (placed and sized by touchui.js: just above the zone card, its size) */
-html.touch .trestore::before{content:"\21BA";margin-right:8px;font-size:15px}
+html.touch .trestore,html.touch .trestore:not([hidden]){min-width:0;min-height:0;padding:0 6px;box-sizing:border-box;font-size:7.5px;letter-spacing:.08em;line-height:1;border-color:#ffb347;color:#ffd9a0;box-shadow:none}   /* (placed and sized by touchui.js: just above the zone card, the Perimeter button's size) */
+html.touch .trestore::before{content:"\21BA";margin-right:4px;font-size:10px}
+html.touch .trestore::after{content:"";position:absolute;inset:-14px -6px}   /* (a finger-sized touch area round the small button) */
 html.touch .tturn{right:max(10px, env(safe-area-inset-right,0px));bottom:calc(150px + env(safe-area-inset-bottom,0px))}
 html.touch .tcenter{left:max(10px, env(safe-area-inset-left,0px));bottom:calc(150px + env(safe-area-inset-bottom,0px))}
 html.touch .terase{left:50%;transform:translateX(-50%);top:calc(52px + env(safe-area-inset-top,0px));border-color:#ff4a5a;color:#ffb3ba}
@@ -43,7 +43,9 @@ html.touch .tpeek .tp-b button[hidden]{display:none}
 .tholo{display:none}
 html.touch .tholo{display:flex;align-items:center;gap:6px;position:fixed;left:0;top:0;z-index:2;min-height:36px;padding:0 10px;font-family:var(--font-pixel);font-size:11px;letter-spacing:.12em;
   color:#e9fbff;background:rgba(6,14,26,.86);border:1px solid rgba(90,232,255,.75);border-radius:0;box-shadow:0 0 10px rgba(90,232,255,.35);touch-action:manipulation;
-  -webkit-tap-highlight-color:transparent;user-select:none;will-change:transform}
+  -webkit-tap-highlight-color:transparent;user-select:none;will-change:transform;
+  opacity:0;visibility:hidden;pointer-events:none;transition:opacity .6s ease,visibility 0s linear .6s}
+html.touch .tholo.ton{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .2s ease}   /* (shown when its megastructure is tapped, fading out after 5 s: touchui.js) */
 html.touch .tholo::before{content:"";position:absolute;inset:-5px -4px}   /* (44 px to a finger) */
 html.touch .tholo::after{content:"";position:absolute;left:50%;bottom:-7px;width:1px;height:7px;background:rgba(90,232,255,.75)}
 html.touch .tholo i{width:7px;height:7px;background:#5ae8ff;box-shadow:0 0 6px #5ae8ff}
@@ -143,3 +145,7 @@ html.pui.touch .pu-group .togs,html.pui.touch .pu-group .togs.pu-cols{grid-templ
 /* ---------- the title screen can't be zoomed (owner, Oct 30): no pinch or double-tap zoom on it; the Cities list still scrolls ---------- */
 html.touch .title,html.touch .title *{touch-action:none}
 html.touch .title .t-panel,html.touch .title .t-panel *{touch-action:pan-y}
+
+/* text the interface cuts short slides along to show the rest (touchui.js adds .tmq where it doesn't fit) */
+html.touch .tmq{text-overflow:clip!important;animation:tmq var(--mqt,8s) linear infinite}
+@keyframes tmq{0%,18%{text-indent:0}50%,68%{text-indent:var(--mq,0)}100%{text-indent:0}}

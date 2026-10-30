@@ -345,7 +345,7 @@ html.touch .zone .zin{min-width:0;padding:5px 9px 4px;gap:1px}
 html.touch .zone b{font-size:10.5px;letter-spacing:.08em}
 html.touch .zone small{font-size:7.5px;letter-spacing:.04em}
 html.touch .rot.del{width:32px;height:32px;font-size:13px}
-html.touch .trow{display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap}
+html.touch .trail{display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap}
 html.touch .bmenu{position:static;display:flex;gap:6px;width:auto}
 html.touch .bmenu[hidden]{display:none}
 html.touch .tmenu{display:block}
@@ -535,8 +535,8 @@ html.touch .zonebar{bottom:calc(8px + env(safe-area-inset-bottom,0px));gap:5px}
 html.touch .zonebar > #modeHint{position:absolute;left:50%;bottom:calc(100% + 6px);transform:translateX(-50%);width:max-content;max-width:calc(100vw - 24px);
   font-size:10px;line-height:1.35;padding:3px 9px;pointer-events:none;transition:opacity .6s ease}
 html.touch #modeHint.tfade{opacity:0}
-html.touch .trow{gap:5px;flex-wrap:nowrap}
-html.touch .trow .bmenu{gap:5px}
+html.touch .trail{gap:5px;flex-wrap:nowrap}
+html.touch .trail .bmenu{gap:5px}
 html.touch .bmenu-head,html.touch .pu-citybtn,html.touch .ctlhover{height:28px;padding:0 9px;font-size:9.5px;line-height:1;display:flex;align-items:center}
 html.touch .bmenu-head{gap:7px}
 html.touch .pu-ctlrow{gap:5px}
@@ -626,7 +626,7 @@ html.touch .t-menu button:active::before{opacity:1}
 html.touch .mon-pin .x{opacity:1}   /* (the unpin ✕ showed only on hover) */
 /* the dock: a 44 px row of buttons, a 56 px zone card with 44 px arrows, clear of the home bar and the screen's sides */
 html.touch .zonebar{bottom:calc(8px + env(safe-area-inset-bottom,0px));max-width:calc(100% - 16px - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px))}
-html.touch .trow{gap:6px}
+html.touch .trail{gap:6px}
 html.touch .bmenu-head,html.touch .pu-citybtn{height:44px;padding:0 10px;font-size:11px}
 html.touch .ctlhover{width:44px;height:44px;font-size:15px}
 html.touch .rot.del{width:44px;height:44px;font-size:15px}
@@ -679,3 +679,120 @@ html.touch #monClose{width:44px;height:44px}
 /* the big screens' closes (their own styles are added by overseer.js, policedesk.js and grid_panel.js; these win on touch) */
 html.touch #spire .close,html.touch #prec .close,html.touch #gridPanel .gx{min-height:44px;min-width:44px;font-size:12px;padding:0 14px}
 html.touch #tClose{min-height:44px;min-width:64px;font-size:12px}
+/* ---------- phones and tablets, round four (Oct 30): the menus as a rail, the big screens fitted to a phone ---------- */
+/* the menus (Buildings, Transport, City, Controls): a rail at the right edge above the dock, one button under another; each list opens beside it */
+html.touch .trail{position:fixed;z-index:4;right:max(8px, env(safe-area-inset-right,0px));bottom:calc(140px + env(safe-area-inset-bottom,0px));
+  width:112px;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-end;gap:6px;flex-wrap:nowrap}
+html.tland .trail{bottom:calc(86px + env(safe-area-inset-bottom,0px));gap:4px}
+html.touch .trail .bmenu,html.touch .trail .tmenu,html.touch .trail .pu-ctlrow{display:flex;flex-direction:column;align-items:stretch;gap:6px;width:100%}
+html.tland .trail .bmenu,html.tland .trail .tmenu,html.tland .trail .pu-ctlrow{gap:4px}
+html.touch .trail .bmenu[hidden],html.touch .trail .tmenu[hidden]{display:none}
+html.touch .trail .ctlwrap{display:flex;width:100%}
+html.touch .trail .bmenu-head,html.touch .trail .pu-citybtn,html.touch .trail .ctlhover{width:100%;height:44px;margin:0;padding:0 10px;justify-content:space-between;
+  font-family:var(--font-pixel);font-size:11px;letter-spacing:.08em;text-transform:uppercase;background:rgba(10,16,32,.9);box-sizing:border-box}
+html.touch .trail .pu-citybtn,html.touch .trail .ctlhover{justify-content:center;border:1px solid rgba(56,232,224,.55);color:var(--cyan)}
+html.touch .trail .pu-citybtn.on,html.touch .trail .ctlwrap.open .ctlhover{background:rgba(56,232,224,.18);color:#fff;border-color:var(--cyan)}
+/* the lists and Controls: a panel to the left of the rail, its foot level with the rail's */
+html.touch .trail .bmenu-list,html.touch .trail .ctlpanel{position:fixed;left:max(8px, env(safe-area-inset-left,0px));right:calc(126px + env(safe-area-inset-right,0px));
+  bottom:calc(140px + env(safe-area-inset-bottom,0px));width:auto;min-width:0;max-width:420px;margin-left:auto;transform:none;
+  max-height:calc(100vh - 210px);max-height:calc(100dvh - 210px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));overflow:auto;overscroll-behavior:contain}
+html.tland .trail .bmenu-list,html.tland .trail .ctlpanel{bottom:calc(86px + env(safe-area-inset-bottom,0px));max-height:calc(100vh - 150px);max-height:calc(100dvh - 150px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px))}
+html.touch .trail .bmenu-list{grid-auto-flow:row;grid-template-rows:none;grid-template-columns:minmax(0,1fr);grid-auto-columns:auto;align-content:start;padding:6px;background:rgba(6,9,20,.94);border:1px solid var(--line)}
+html.touch .trail .tmenu .bmenu-list{grid-template-columns:minmax(0,1fr)}
+html.touch .trail .ctlpanel,html.touch .trail .ctlwrap:hover .ctlpanel,html.touch .trail .ctlhover:focus + .ctlpanel{opacity:0;pointer-events:none;transform:translateY(6px)}
+html.touch .trail .ctlwrap.open .ctlpanel{opacity:1;pointer-events:auto;transform:translateY(0)}
+html.touch .trail .ctlpanel dl.touchonly{grid-template-columns:minmax(0,1fr);gap:2px}
+html.touch .trail .ctlpanel dl.touchonly dt{color:var(--cyan);margin-top:8px}
+html.touch .trail .ctlpanel dl.touchonly dd{margin:0}
+/* the rail steps away while City settings or Settings are open (they're full width) */
+html.touch body:has(#puCity:not([hidden])) .trail,html.touch body.deck-open .trail{visibility:hidden}
+/* the hint stays clear of the rail */
+html.touch .zonebar > #modeHint{max-width:calc(100vw - 2*130px - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px));min-width:180px}
+@media (max-width:440px){html.touch .zonebar > #modeHint{max-width:calc(100vw - 24px)}}
+/* the gear in the middle of its button (the button's hidden word was a second grid cell that pushed it up) */
+html.touch .deck-toggle{display:flex;align-items:center;justify-content:center}
+
+/* ---------- the big screens on a phone: everything in one scrolling column, the close always on screen at the top ---------- */
+/* the Acoustic Panel */
+html.touch #gridPanel{padding:calc(8px + env(safe-area-inset-top,0px)) max(10px, env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(10px, env(safe-area-inset-left,0px));gap:6px}
+html.touch #gridPanel .gtop{flex-wrap:wrap;white-space:normal;overflow:visible;row-gap:6px}
+html.touch #gridPanel .gtabs{order:-2;margin-left:0}
+html.touch #gridPanel .gtab{min-height:44px;padding:0 14px}
+html.touch #gridPanel .gx{order:-1;margin-left:auto;min-height:44px}
+html.touch #gridPanel .gname{display:none}
+html.touch #gridPanel .gchip{font-size:12px}
+html.touch #gridPanel .gbot{flex-wrap:wrap;white-space:normal;row-gap:2px;font-size:12px}
+@media (max-width:760px){
+  html.touch #gridPanel .gmain{display:flex;flex-direction:column;gap:10px;overflow-y:auto;overscroll-behavior:contain}
+  html.touch #gridPanel .gmain > .gp{flex:none;overflow:visible;min-height:0}
+  html.touch #gridPanel .gp{padding:30px 12px 14px}
+  html.touch #gridPanel .gp > .gtag{display:none}
+  html.touch #gridPanel .gp > h3{right:14px;overflow:hidden;text-overflow:ellipsis}
+  html.touch #gridPanel .gclock{flex:none;min-height:0;flex-wrap:wrap;align-items:stretch}
+  html.touch #gridPanel .gorb{flex:1 1 140px;min-height:140px}
+  html.touch #gridPanel .gside{width:auto;flex:1 1 150px}
+  html.touch #gridPanel .gstrip{flex:none}
+  html.touch #gridPanel .gs{grid-template-columns:minmax(0,1fr) 56px;grid-template-areas:"n o" "r r";row-gap:2px}
+  html.touch #gridPanel .gs > span{grid-area:n} html.touch #gridPanel .gs > output{grid-area:o} html.touch #gridPanel .gs > input{grid-area:r}
+  html.touch #gridPanel .gmix{grid-template-columns:minmax(0,1fr)}
+  html.touch #gridPanel .mrow{grid-template-columns:minmax(0,1fr) auto}
+}
+html.touch #gridPanel .gb{min-height:44px}
+html.touch #gridPanel input[type=range]{height:44px}   /* (the drawn handle stays 10 x 20: the bar around it takes the finger) */
+html.touch #gridPanel .gpill{min-height:36px}
+/* the Data Spire */
+@media (max-width:760px){
+  html.touch #spire{display:block;overflow-y:auto;overscroll-behavior:contain;padding:0 max(10px, env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(10px, env(safe-area-inset-left,0px));font-size:12px}
+  html.touch #spire > *,html.touch #spire .col,html.touch #spire .bot{display:block;width:auto;margin-bottom:10px}
+  html.touch #spire .col > .pn,html.touch #spire .bot > .pn{margin-bottom:10px}
+  html.touch #spire .pn{min-height:0;overflow:visible;width:auto}
+  html.touch #spire .top{position:sticky;top:0;z-index:5;height:auto;min-height:56px;flex-wrap:wrap;gap:4px 12px;padding:calc(6px + env(safe-area-inset-top,0px)) 0 6px;background:var(--bg)}
+  html.touch #spire .top::after{width:100%}
+  html.touch #spire .top .mid{margin:0;order:3;width:100%;gap:10px}
+  html.touch #spire .top .mid span{font-size:11px}
+  html.touch #spire .brand small{display:none}
+  html.touch #spire .top{padding-right:96px}
+  html.touch #spire .brand .hd{font-size:18px}
+  html.touch #spire .pn > .tab .m{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  html.touch #spire .pn > .tab code,html.touch #spire .pn > .tab .hd{white-space:nowrap;flex:none}
+  html.touch #spire .spark{height:auto;min-height:30px;grid-template-columns:70px minmax(0,1fr) 56px}
+  html.touch #spire .pn > .tab{height:26px}
+  html.touch #spire .pn > .tab code{font-size:11px}
+  html.touch #spire .pn > .tab .hd{font-size:12px}
+  html.touch #spire .pn > .tab .m{font-size:11px}
+  html.touch #spire .pn{padding-top:32px}
+  html.touch #spire .kv,html.touch #spire .bar,html.touch #spire .spark,html.touch #spire .inc .t1,html.touch #spire .empty{font-size:12px}
+  html.touch #spire .unit,html.touch #spire .inc .t2,html.touch #spire .inc .w,html.touch #spire .legend,html.touch #spire .spark em{font-size:11px}
+  html.touch #spire .bar.wide{grid-template-columns:110px minmax(0,1fr) 34px}
+  html.touch #spire .map{height:60vh;height:60dvh}
+}
+/* the Precinct desk */
+@media (max-width:1000px){
+  html.touch #prec{grid-template-columns:minmax(0,1fr);grid-template-rows:auto;overflow-y:auto;overscroll-behavior:contain;font-size:12px;
+    padding:0 max(8px, env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(8px, env(safe-area-inset-left,0px))}
+  html.touch #prec > *{min-width:0}
+  html.touch #prec .top{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));margin-top:env(safe-area-inset-top,0px);padding-right:0}
+  html.touch #prec .top > div{white-space:normal;padding:4px 8px;border-bottom:1px solid var(--faint)}
+  html.touch #prec .top > div:first-child{padding-right:96px;grid-column:1/-1}
+  html.touch #prec .top .clk{font-size:16px}
+  html.touch #prec .top .sp{display:none}
+  html.touch #prec .top small,html.touch #prec th,html.touch #prec .lg,html.touch #prec .pn > .h{font-size:11px}
+  html.touch #prec .pn > .h{height:24px}
+  html.touch #prec .pn{padding-top:28px}
+  html.touch #prec .map{height:52vh;height:52dvh}
+  html.touch #prec .map canvas{top:24px;height:calc(100% - 24px)}
+  html.touch #prec .bt{grid-template-columns:minmax(0,1fr)}
+  html.touch #prec .rt{grid-template-columns:minmax(0,1fr)}
+  html.touch #prec .pn:not(.map){min-height:120px}
+}
+/* the Data Spire's and the Precinct desk's close: pinned to the top right of the screen, whatever is scrolled, and without the keyboard hint */
+@media (max-width:760px){
+  html.touch #spire .close{position:fixed;z-index:20;top:calc(8px + env(safe-area-inset-top,0px));right:max(8px, env(safe-area-inset-right,0px));margin:0;
+    min-height:44px;min-width:80px;padding:0 14px;font-size:0;background:var(--bg)}
+  html.touch #spire .close::after{content:'CLOSE';font-size:12px;letter-spacing:.22em}
+}
+@media (max-width:1000px){
+  html.touch #prec .close{position:fixed;z-index:20;top:calc(8px + env(safe-area-inset-top,0px));right:max(8px, env(safe-area-inset-right,0px));margin:0;
+    min-height:44px;min-width:80px;padding:0 14px;font-size:0;background:var(--bg)}
+  html.touch #prec .close::after{content:'CLOSE';font-size:12px;letter-spacing:.22em}
+}

@@ -45,7 +45,7 @@ const TOUCH = (() => {
     const relabel = () => {
       for (const dt of document.querySelectorAll('.hwhelp dt[data-mouse]')) dt.textContent = T.on ? dt.dataset.touch : dt.dataset.mouse;
       const c = document.querySelector('.ctlhover');
-      if (c){ c.textContent = T.on ? '?' : 'Hover for controls'; if (T.on){ c.setAttribute('role', 'button'); c.setAttribute('aria-label', 'Controls'); } else { c.removeAttribute('role'); c.removeAttribute('aria-label'); } }
+      if (c){ c.textContent = T.on ? 'Controls' : 'Hover for controls'; if (T.on){ c.setAttribute('role', 'button'); c.setAttribute('aria-label', 'Controls'); } else { c.removeAttribute('role'); c.removeAttribute('aria-label'); } }
       if (hint && T.on){ const w = words(hint.textContent); if (w !== hint.textContent) hint.textContent = w; }
       const cb = $('puCityBtn'); if (cb) cb.textContent = T.on ? 'City' : 'City settings';   // (shorter labels in the dock)
       const fb = $('furnBtn'); if (fb) fb.textContent = T.on ? 'Scan' : 'Scan pod';   // (it's Scan pod: furnish.js)
@@ -60,7 +60,8 @@ const TOUCH = (() => {
     let row = null;
     const dock = () => {
       if (!bar || !zones || !bm) return;
-      if (T.on){ if (!row){ row = document.createElement('div'); row.className = 'trow'; } bar.insertBefore(row, zones); row.appendChild(bm); if (unit) row.appendChild(unit); }
+      // (the row is a rail of its own at the right edge, above the dock: kept out of the dock, whose transform would pin its lists to the dock)
+      if (T.on){ if (!row){ row = document.createElement('div'); row.className = 'trail'; row.setAttribute('role', 'toolbar'); row.setAttribute('aria-label', 'Menus'); } document.body.appendChild(row); row.appendChild(bm); if (unit) row.appendChild(unit); }
       else if (row){ home.parent.insertBefore(bm, home.next); if (unit) ctlHome.parent.insertBefore(unit, ctlHome.next); row.remove(); }
     };
     // Controls: a tap opens the box, the ✕ (or a tap on the city) closes it

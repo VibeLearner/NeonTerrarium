@@ -1665,6 +1665,9 @@ function farTrack(now){
   FARV.below = slow ? FARV.below + 1 : 0; FARV.above = FARV.far && !slow ? FARV.above + 1 : 0; FARV.since++;
   const kT = FARV.far ? (sp < FARV.v0*.3 ? 1 : .5) : 0;
   if (!FARV.far) FARV.k = 0;
+  // On a touch screen the far view keeps one size, moving or still: stepping up as a turn ended showed as the city popping sharp (owner, Oct 30).
+  // The sharp view, moving or still (phone mode, touch.js: the moving size, moving or still), so there is nothing to switch when a turn starts or ends.
+  else if (typeof TOUCH !== 'undefined' && TOUCH.on) FARV.k = self.PHONE && PHONE.on ? 0 : 1;
   else if (FARV.k > 0 && FARV.above >= 3){ FARV.k = 0; FARV.since = 0; }
   else if (kT > FARV.k && FARV.below >= 8 && FARV.since >= 10){ FARV.k = Math.min(kT, FARV.k + .5); FARV.since = 0; }
   const wasSharp = FARV.sharp; FARV.sharp = FARV.k >= 1;

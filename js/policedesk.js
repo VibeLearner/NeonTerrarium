@@ -301,7 +301,7 @@ const PRECINCT = (() => {
         <div class="dim">LAST ACTIVITY ${f.last ? tc(f.last.c) + ' · ' + esc(String(f.last.place || '').toUpperCase()) + ' · ' + sector(f.last.x, f.last.z) : 'NONE LOGGED'}</div>
         ${f.lead ? `<div class="ld">LEAD <em>${esc(f.lead.when)}</em> · ${esc(f.lead.where)}${f.lead.who ? ' · ' + esc(String(f.lead.desc).toUpperCase()) + `<button data-watch="${esc(f.lead.who)}">WATCH</button>` : ''}</div>` : ''}</div>`).join('')
       || '<div class="empty">No case files open. When a case opens, its file shows here: coded, with its stage, the last logged activity and the next lead.</div>');
-    charts();
+    try { charts(); } catch (e){ console.warn('desk charts', e); }   // (a chart that can't draw never keeps the desk from opening, or from closing)
   }
   function dom(){
     const d = D;
@@ -404,7 +404,7 @@ const PRECINCT = (() => {
         list.forEach((q, k) => { const bh = (H - T - Bm)*q.way.length/mx, X0 = L + k*bw + bw*.2; x.fillStyle = q.mode === 'CHASE' ? GR.red : q.way.length ? GR.ink : GR.faint; x.fillRect(X0, H - Bm - Math.max(dp, bh), bw*.6, Math.max(dp, bh));
           x.fillStyle = GR.dim; x.textAlign = 'center'; x.fillText(q.id.slice(-2), X0 + bw*.3, H - 2*dp); });
         x.textAlign = 'right'; x.fillStyle = GR.dim; x.fillText(String(mx), L - 3*dp, T + 6*dp); x.save(); x.translate(6*dp, H/2); x.rotate(-Math.PI/2); x.textAlign = 'center'; x.fillText('WPT', 0, 0); x.restore();
-        const cx = W - gw/2, cy = H/2, r = gw/2 - 6*dp, f = d.dr.cov;
+        const cx = W - gw/2, cy = H/2, r = Math.max(1, gw/2 - 6*dp), f = d.dr.cov;   // (at least a pixel: a short chart on a phone gave a negative radius, which threw and left the desk stuck open)
         x.strokeStyle = GR.faint; x.lineWidth = 5*dp; x.beginPath(); x.arc(cx, cy, r, 0, 7); x.stroke();
         x.strokeStyle = GR.hi; x.beginPath(); x.arc(cx, cy, r, -Math.PI/2, -Math.PI/2 + f*Math.PI*2); x.stroke(); x.lineWidth = dp;
         for (let k = 0; k < 24; k++){ const a = k/24*Math.PI*2; x.strokeStyle = GR.dim; x.beginPath(); x.moveTo(cx + Math.cos(a)*(r + 5*dp), cy + Math.sin(a)*(r + 5*dp)); x.lineTo(cx + Math.cos(a)*(r + (k % 6 ? 7 : 10)*dp), cy + Math.sin(a)*(r + (k % 6 ? 7 : 10)*dp)); x.stroke(); }
@@ -417,7 +417,7 @@ const PRECINCT = (() => {
   function drawSec(el, t){
     const q = el._sec; if (!q) return; if (!el._fit){ el._fit = fitCanvas(el); } const [x, W, H, dp] = el._fit; x.clearRect(0, 0, W, H);
     const bx = q.bx, ni = bx.i1 - bx.i0 + 1, nj = bx.j1 - bx.j0 + 1, hb = 10*dp, s = Math.min((W - 8*dp)/(ni*LOT), (H - hb - 8*dp)/(nj*LOT)), ox = W/2 - (bx.i0 + bx.i1)/2*LOT*s, oz = (H - hb)/2 - (bx.j0 + bx.j1)/2*LOT*s, P = (a, b) => [ox + a*s, oz + b*s];
-    const cx = W/2, cy = (H - hb)/2, rr = Math.min(W, H - hb)/2 - 3*dp;
+    const cx = W/2, cy = (H - hb)/2, rr = Math.max(1, Math.min(W, H - hb)/2 - 3*dp);
     x.strokeStyle = GR.faint; x.lineWidth = dp; x.beginPath(); x.arc(cx, cy, rr, 0, 7); x.stroke(); x.beginPath(); x.arc(cx, cy, rr*.5, 0, 7); x.stroke();
     x.beginPath(); x.moveTo(cx - rr, cy); x.lineTo(cx + rr, cy); x.moveTo(cx, cy - rr); x.lineTo(cx, cy + rr); x.stroke();
     safe(() => { for (let i = bx.i0; i <= bx.i1; i++) for (let j = bx.j0; j <= bx.j1; j++){ const c = cells.get(ckey(i, j)); if (!c) continue; const [a, b] = P(c.x - LOT/2 + .3, c.z - LOT/2 + .3), w = (LOT - .6)*s, lv = c.mega ? 3 : c.sections.length;

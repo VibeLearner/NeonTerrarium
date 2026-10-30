@@ -19,11 +19,13 @@ const PAL = {
   // neon trim: hot pink, magenta, yellow
   H: "#ff4fb0", M: "#e02fd0", Y: "#ffd23a",
   // plants, terracotta pots; helipad dark, stone tile, grout
-  g: "#4fae5a", e: "#2e7a4a", T: "#c4602e", D: "#2a2438", S: "#8a6a5a", s: "#6a4a44",
+  g: "#3f7046", e: "#2f5a3c", T: "#c4602e", D: "#2a2438", S: "#8a6a5a", s: "#6a4a44",
   // title: coral, purple, mint, ink, pale pink
   C: "#ff4a6e", X: "#3b1a5c", G: "#3dffcf", I: "#170f3a", J: "#f7c6d6",
   // star cream, pale pink-white, red lights
   F: "#fff0d0", W: "#ffe6ee", x: "#ff3b4a",
+  // dim window light: amber, brown-orange, teal, soft purple; dusk violet haze; helipad ochre
+  m: "#c9803a", j: "#a8603a", t: "#4fb8c8", z: "#8a6ad0", Q: "#61298a", Z: "#8a6a3a",
 }
 pal(PAL)
 const KEYS = Object.keys(PAL).join("")
@@ -31,12 +33,16 @@ const IDX = {}
 for (let i = 0; i < KEYS.length; i++) IDX[KEYS[i]] = i
 
 let fb = new Uint8Array(W * H)
+let recordCity = false, curLevel = 0
+const DEPTH = new Uint8Array(W * H), CITY = new Uint8Array(W * H)
 const inb = (x, y) => x >= 0 && x < W && y >= 0 && y < H
 const put = (x, y, k) => {
   if (!inb(x, y)) return
   const i = IDX[k]
   if (i === undefined) throw new Error("no palette key " + k)
-  fb[y * W + x] = i
+  const p = y * W + x
+  fb[p] = i
+  if (recordCity) { CITY[p] = 1; DEPTH[p] = curLevel }
 }
 const get = (x, y) => (inb(x, y) ? KEYS[fb[y * W + x]] : null)
 const rectK = (x, y, w, h, k) => { for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) put(x + i, y + j, k) }
@@ -146,6 +152,45 @@ const cellOK = (a, b) => {
   return cx >= 138 && cx <= 690 && cy >= backLine(cx) && cy <= 575
 }
 
+// ---------------------------------------------------------------- distance haze and a grounding gradient
+// every pixel a building paints remembers how far back it stands (DEPTH, in 1/20ths of a blend toward
+// the dusk violet); after the city is drawn each colour is blended and snapped back onto the palette
+const KEYRGB = {}
+for (const k of KEYS) { const hx = PAL[k]; KEYRGB[k] = [parseInt(hx.slice(1, 3), 16), parseInt(hx.slice(3, 5), 16), parseInt(hx.slice(5, 7), 16)] }
+const SNAP = [...KEYS].filter((k) => !"CXGIJabcdFW".includes(k))
+const nearestKey = (r, g, b) => {
+  let best = "0", bd = 1e9
+  for (const k of SNAP) { const c = KEYRGB[k]; const d = (c[0] - r) ** 2 + (c[1] - g) ** 2 + (c[2] - b) ** 2; if (d < bd) { bd = d; best = k } }
+  return best
+}
+const levelFor = (yBase) => {
+  const f = yBase >= 500 ? 0 : yBase >= 470 ? 0.3 * (500 - yBase) / 30 : 0.3 + 0.2 * clamp((470 - yBase) / 140, 0, 1)
+  return Math.round(f * 20)
+}
+const hazeCache = new Map()
+const hazeKey = (k, level) => {
+  if (!level) return k
+  const ck2 = level * 128 + IDX[k]
+  let r = hazeCache.get(ck2)
+  if (!r) { const f = level / 20, c = KEYRGB[k], v = KEYRGB.Q; r = nearestKey(c[0] * (1 - f) + v[0] * f, c[1] * (1 - f) + v[1] * f, c[2] * (1 - f) + v[2] * f); hazeCache.set(ck2, r) }
+  return r
+}
+const darkCache = new Map()
+const darkKey = (k, amt) => {
+  const ck2 = Math.round(amt * 10) * 128 + IDX[k]
+  let r = darkCache.get(ck2)
+  if (!r) { const a = Math.round(amt * 10) / 10, c = KEYRGB[k], v = KEYRGB.w; r = nearestKey(c[0] * (1 - a) + v[0] * a, c[1] * (1 - a) + v[1] * a, c[2] * (1 - a) + v[2] * a); darkCache.set(ck2, r) }
+  return r
+}
+const GROUND_Y = 440
+const grounded = (x, y, k) => {
+  if (y < GROUND_Y) return k
+  const t = (y - GROUND_Y) / (H - GROUND_Y)
+  return bay(x, y) < Math.min(1, t * 1.15) ? darkKey(k, 0.12 + 0.33 * t) : k
+}
+// what a raw key becomes at (x, y) once the haze and the gradient are on it
+const FK = (x, y, k) => { const i = y * W + x; const kk = hazeKey(k, DEPTH[i]); return CITY[i] ? grounded(x, y, kk) : kk }
+
 // ---------------------------------------------------------------- glow
 const EMIT = new Set("yohnvVNHMYWFxg")
 const glowAround = (pts, k, reach = 2, sink) => {
@@ -207,7 +252,7 @@ function isoBox(a0, b0, w, d, h, z0, fn) {
 const FAMS = [
   { top: "B", L: "K", R: "k" }, { top: "R", L: "r", R: "u" }, { top: "P", L: "p", R: "q" }, { top: "O", L: "L", R: "l" },
 ]
-const TRIMC = ["H", "n", "Y", "H", "M", "n", "H", "Y", "h"]
+const TRIMC = ["H", "H", "H", "H", "M", "M", "M", "n", "n", "n", "Y"]
 
 const PLANT = [".g.g.", "ggegg", ".TTT."]
 const BUSH = ["..ggg..", ".ggegg.", "ggeggeg", ".TTTTT."]
@@ -233,7 +278,7 @@ const pod = (x, y, rx, hgt, wk) => {
   }
   const wy = y - Math.round(hgt * 0.45), wr = Math.max(3, rx - 1), wh = Math.max(3, Math.round(hgt * 0.3))
   for (let j = -wh; j <= wh; j++) for (let i = -wr; i <= wr; i++) {
-    if ((i * i) / (wr * wr) + (j * j) / (wh * wh) <= 1.0) put(x + i, wy + j, wk === "n" ? (j < -wh / 3 ? "W" : "n") : (i < -wr / 3 && j < 0 ? "h" : j > wh / 2 ? "o" : "y"))
+    if ((i * i) / (wr * wr) + (j * j) / (wh * wh) <= 1.0) put(x + i, wy + j, wk === "n" ? (j < -wh / 3 ? "n" : "t") : (i < -wr / 3 && j < -wh / 3 ? "y" : j > wh / 2 ? "j" : "m"))
   }
   hlineK(x - rx, y, rx * 2 + 1, "q")
 }
@@ -270,15 +315,22 @@ const glyph3 = (seed) => { const rows = []; for (let j = 0; j < 3; j++) { let r 
 // ---------------------------------------------------------------- a stack of cantilevered floor plates
 function paneKey(o, side, col, f, pr, pc, lit) {
   const id = o.id
-  const q = ih(id * 131 + col, f * 7 + (side === "L" ? 1 : 2), 11)
-  if (!lit) return q < 0.08 ? "o" : "D"
-  if (q > 0.93) return "D"
-  if (o.glass === "white") return pr < pc - 1 ? (q < 0.25 ? "h" : "F") : "h"
+  if (o.bright) {
+    const q = ih(id * 131 + col, f * 7 + (side === "L" ? 1 : 2), 11)
+    if (!lit) return q < 0.08 ? "o" : "D"
+    if (q > 0.93) return "D"
+    if (o.glass === "white") return pr < pc - 1 ? (q < 0.25 ? "h" : "F") : "h"
+    const t = ih(id + col * 3, f, 5)
+    if (t < 0.05) return "v"
+    if (t < 0.08) return "V"
+    if (t < 0.16) return pr === 0 ? "h" : "y"
+    return pr < pc - 1 ? (t < 0.55 ? "o" : "y") : "o"
+  }
+  if (!lit) return "w"
   const t = ih(id + col * 3, f, 5)
-  if (t < 0.05) return "v"
-  if (t < 0.08) return "V"
-  if (t < 0.16) return pr === 0 ? "h" : "y"
-  return pr < pc - 1 ? (t < 0.55 ? "o" : "y") : "o"
+  if (t < 0.125) return t < 0.06 ? "t" : "z"          // about 1 in 8 is cool
+  if (t < 0.3) return pr === 1 ? "y" : "m"             // gold only as a small scattered spark
+  return side === "L" ? (t < 0.65 ? "m" : "j") : "j"
 }
 function stack(o) {
   const { a, b, w, d, n, fh, fam, id } = o
@@ -291,23 +343,24 @@ function stack(o) {
     const grow = o.over && f >= n * 0.45 ? o.over : 0
     const A = a + dx / 16 - grow, B = b - dx / 16 - grow, Wd = w + 2 * grow, Dd = d + 2 * grow
     const ins = 0.22, hb = fh - 2
-    const lit = ih(id, f, 3) < (o.litP ?? 0.55)
+    const fq = ih(id, f, 3), ff = fq < 0.3 ? 0.35 : fq < 0.7 ? 1.0 : 1.6      // some floors dark, some busier
     const mk = (side) => (u, r, wW, h, x, y) => {
       const base = side === "L" ? fam.L : fam.R
       if (r === 0) return side === "L" ? fam.R : "w"
       if (r === h - 1 || u < 1 || u > wW - 2) return base
       const pos = (u - 1) % (o.pw + 1)
-      if (pos === o.pw) return "D"
+      if (pos === o.pw) return o.bright ? "D" : "w"
       const col = Math.floor((u - 1) / (o.pw + 1)), pr = r - 1, pc = h - 2
+      const lit = o.bright ? fq < (o.litP ?? 0.8) : (col % 4 !== 3 && ih(id * 131 + col, f * 7 + (side === "L" ? 1 : 2), 17) < 0.4 * ff)
       const k = paneKey(o, side, col, f, pr, pc, lit)
       const wid = (id * 2 + (side === "L" ? 0 : 1)) * 65536 + col * 64 + (f & 63)
       let rec = REC.win.get(wid)
-      if (!rec) { rec = { pts: [], lit: "yohnvVNFh".includes(k) }; REC.win.set(wid, rec) }
+      if (!rec) { rec = { pts: [], lit: "yohnvVNFhmjtz".includes(k) }; REC.win.set(wid, rec) }
       rec.pts.push([x, y, k])
       return k
     }
     isoBox(A + ins, B + ins, Wd - 2 * ins, Dd - 2 * ins, hb, z, { L: mk("L"), R: mk("R") })
-    const trimOn = last ? true : ih(id, f, 9) < (o.trimP ?? 0.4)
+    const trimOn = o.trimAll ? (last ? true : ih(id, f, 9) < (o.trimP ?? 0.4)) : (o.trimB && f >= n - 2)
     const trimC = (f % 4 === 2 ? o.trims[1] : o.trims[0])
     const rec = { pts: [], glow: [] }
     const roofFn = last && o.roofFn
@@ -354,8 +407,8 @@ function cylinder(o) {
   const pk = (x, rr) => Math.floor((Math.asin(clamp((x - cx) / rr, -1, 1)) + Math.PI / 2) / (Math.PI / ncol))
   for (let f = 0; f < n; f++) {
     const last = f === n - 1
-    const lit = ih(id, f, 3) < 0.55, hb = fh - 2, rb = 0.88
-    const trimC = o.trims[f % 3 === 2 ? 1 : 0]
+    const fq = ih(id, f, 3), ff = fq < 0.3 ? 0.35 : fq < 0.7 ? 1.0 : 1.6, hb = fh - 2, rb = 0.88
+    const trimC = o.trims[0], trimOn = o.trimB && f >= n - 2
     for (let x = Math.ceil(cx - rx * rb); x <= Math.floor(cx + rx * rb); x++) {
       const t = (x + 0.5 - cx) / (rx * rb)
       if (Math.abs(t) >= 1) continue
@@ -371,8 +424,8 @@ function cylinder(o) {
         else if (r < hb - 1) {
           if (mull) k = "w"
           else {
-            const q = ih(id * 131 + col, f * 7, 11)
-            k = lit && q < 0.92 ? (t > 0.4 ? "o" : r < hb - 2 ? "y" : "o") : "D"
+            const q = ih(id * 131 + col, f * 7, 17), tt = ih(id + col * 3, f, 5)
+            k = col % 4 !== 3 && q < 0.4 * ff ? (tt < 0.125 ? "t" : tt < 0.3 && r === 2 ? "y" : tt > 0.65 || t > 0.4 ? "j" : "m") : "w"
           }
         }
         put(x, y, k)
@@ -388,8 +441,8 @@ function cylinder(o) {
       put(x, yw - 2, t < 0.3 ? fam.top : fam.L); put(x, yw - 1, t < 0.1 ? fam.L : fam.R)
       for (let y = Math.round(yTopC - dy); y <= Math.round(yTopC + dy) - 1; y++) {
         const low = y === Math.round(yTopC + dy) - 1
-        const k = low ? trimC : fam.top
-        if (low) rec.pts.push([x, y, trimC, fam.top])
+        const k = low && trimOn ? trimC : fam.top
+        if (low && trimOn) rec.pts.push([x, y, trimC, fam.top])
         put(x, y, last && o.roofK ? (low ? trimC : o.roofK) : k)
       }
     }
@@ -449,22 +502,25 @@ const drawBuilding = (bd) => {
   const fam = FAMS[Math.floor(ih(id, 1, 3) * 4)]
   const fh = ih(id, 2, 3) < 0.5 ? 8 : 7
   const n = Math.max(2, Math.round(H0 / fh))
-  const trims = [TRIMC[Math.floor(ih(id, 5, 3) * TRIMC.length)], TRIMC[Math.floor(ih(id, 6, 3) * TRIMC.length)]]
+  const accent = TRIMC[Math.floor(ih(id, 5, 3) * TRIMC.length)]
+  const trims = [accent, accent]
+  const trimB = ih(id, 52, 3) < 0.35
+  curLevel = levelFor(PYs(a0 + w, b0 + d))
   const roofType = ih(id, 7, 3)
   const big = w >= 2 && d >= 2
   const isCyl = big && ih(id, 8, 3) < 0.13
-  const pw = ih(id, 9, 3) < 0.5 ? 4 : 6
+  const pw = ih(id, 9, 3) < 0.5 ? 2 : 3
   if (isCyl) {
     const R = Math.min(w, d) * 0.5 * 0.92
     const rx = 11.3 * R * (ih(id, 10, 3) < 0.35 ? 1.5 : 1), ry = 5.66 * R
     const cx = PXs(a0 + w / 2, b0 + d / 2), cy0 = PYs(a0 + w / 2, b0 + d / 2)
-    const top = cylinder({ cx, cy0, rx, ry, n, fh, fam, id, trims, roofK: roofType < 0.5 ? "D" : null })
+    const top = cylinder({ cx, cy0, rx, ry, n, fh, fam, id, trims, trimB, roofK: roofType < 0.5 ? "D" : null })
     const [tx, ty] = top.top
-    if (roofType < 0.5) { hlineK(tx - 3, ty, 7, "Y"); vlineK(tx, ty - 3, 7, "Y"); put(tx - 4, ty - 2, "n"); put(tx + 4, ty - 2, "H") }
+    if (roofType < 0.5) { hlineK(tx - 3, ty, 7, "Z"); vlineK(tx, ty - 3, 7, "Z") }
     else pod(tx, ty + 2, Math.max(4, Math.round(rx * 0.4)), 10, "y")
   } else {
     // the roof: helipad, paved terrace, garden, pod or plain clutter
-    const kind = big && roofType < 0.26 ? "heli" : roofType < 0.4 ? "terrace" : roofType < 0.54 ? "garden" : roofType < 0.7 ? "pod" : "plain"
+    const kind = big && roofType < 0.1 ? "heli" : roofType < 0.2 ? "terrace" : roofType < 0.27 ? "garden" : roofType < 0.45 ? "pod" : "plain"
     const roofFn = (x, y, i) => {
       if (i.low || i.up) return null
       if (kind === "heli") return i.side ? "q" : (bay(x, y) < 0.1 ? "p" : "D")
@@ -476,13 +532,13 @@ const drawBuilding = (bd) => {
       a: a0, b: b0, w, d, n, fh, fam, id, trims, pw,
       twist: ih(id, 11, 3) < 0.4 ? 2 + Math.floor(ih(id, 12, 3) * 2) : 0,
       over: ih(id, 13, 3) < 0.3 ? 0.22 : 0,
-      litP: 0.3 + 0.45 * ih(id, 50, 3), trimP: 0.16 + 0.3 * ih(id, 51, 3), plantP: 0.5, roofFn, roofPlants: kind === "garden",
+      trimB, plantP: 0.5, roofFn, roofPlants: kind === "garden",
     })
     const rb = st.roofBox
     const [cx, cy] = rb.pt(a0 + w / 2, b0 + d / 2)
-    if (H0 >= 150 && ih(id, 90, 3) < 0.55) screenPanel(cx - 13, cy - 1, 26, 15, ["M", "n", "V", "N"][Math.floor(ih(id, 91, 3) * 4)])
+    if (H0 >= 150 && ih(id, 90, 3) < 0.3) screenPanel(cx - 13, cy - 1, 26, 15, ["M", "n", "V", "N"][Math.floor(ih(id, 91, 3) * 4)])
     if (kind === "heli") {
-      for (let j = 0; j < 7; j++) for (let i = 0; i < 5; i++) if (HGLYPH[j][i] !== ".") put(cx - 2 + i, cy - 3 + j, "Y")
+      for (let j = 0; j < 7; j++) for (let i = 0; i < 5; i++) if (HGLYPH[j][i] !== ".") put(cx - 2 + i, cy - 3 + j, "Z")
       for (const [px, py, k] of [[a0, b0, "n"], [a0 + w, b0, "H"], [a0 + w, b0 + d, "n"], [a0, b0 + d, "H"]]) {
         const [qx, qy] = rb.pt(px, py); const sx = Math.sign(cx - qx), sy = Math.sign(cy - qy)
         put(qx + 2 * sx, qy + 2 * sy, k); put(qx + 3 * sx, qy + 2 * sy, k)
@@ -510,7 +566,7 @@ const drawBuilding = (bd) => {
         else if (t < 0.4) antenna(px, py, 8 + Math.floor(ih(id, 100 + i, 6) * 9), id * 4 + i)
         else if (t < 0.52) spr(px, py, AC)
         else if (t < 0.6) spr(px, py, DISH)
-        else if (t < 0.78) screenPanel(px - 7, py, 14 + 2 * Math.floor(ih(id, 110 + i, 6) * 3), 8, ["n", "V", "N"][Math.floor(ih(id, 111 + i, 6) * 3)])
+        else if (t < 0.69) screenPanel(px - 7, py, 14 + 2 * Math.floor(ih(id, 110 + i, 6) * 3), 8, ["n", "V", "N"][Math.floor(ih(id, 111 + i, 6) * 3)])
         else if (t < 0.92) spr(px, py, BUSH)
         else spr(px, py, PLANT)
       }
@@ -519,12 +575,12 @@ const drawBuilding = (bd) => {
   // neon on the walls: boxy two-line shop signs, strips and icons, a zigzag stair on some towers
   const m = { a: a0, b: b0, w, d, z: 0, h: n * fh }
   const wk = [fam.L, fam.R, "w"]
-  const nsign = H0 > 30 && ih(id, 24, 3) < 0.8 ? 1 + (ih(id, 25, 3) < 0.4 ? 1 : 0) : 0
+  const nsign = H0 > 30 && ih(id, 24, 3) < 0.4 ? 1 + (ih(id, 25, 3) < 0.2 ? 1 : 0) : 0
   for (let s = 0; s < nsign; s++) {
     const side = ih(id, 26 + s, 3) < 0.65 ? "L" : "R"
     const wW = Math.round(8 * (side === "L" ? w : d))
     if (wW < 10) continue
-    const col = SIGNC[Math.floor(ih(id, 27 + s, 3) * SIGNC.length)]
+    const col = accent
     const kind = ih(id, 28 + s, 3)
     const cells = []
     const at = (u, r, k) => { const [x, y] = wallXY(side, m, u, r); cells.push([x, y, k]) }
@@ -545,7 +601,7 @@ const drawBuilding = (bd) => {
       const len = Math.min(m.h - 12, 8 + Math.floor(ih(id, 33 + s, 3) * 10))
       const u0 = 1 + 2 * Math.floor(ih(id, 34 + s, 3) * Math.floor(Math.max(1, wW - 6) / 2))
       const r0 = rr(6, m.h - len - 6, 35 + s)
-      for (let r = 0; r < len; r++) { at(u0, r0 + r, col); at(u0 + 1, r0 + r, r % 4 === 0 ? "W" : col) }
+      for (let r = 0; r < len; r++) { at(u0, r0 + r, col); at(u0 + 1, r0 + r, r % 3 === 0 ? "W" : col) }
     } else {
       const ic = ICON[["ring", "arrow", "bolt"][Math.floor(ih(id, 36 + s, 3) * 3)]]
       const u0 = 3 + 2 * Math.floor(ih(id, 37 + s, 3) * Math.floor(Math.max(1, wW - 12) / 2))
@@ -554,9 +610,9 @@ const drawBuilding = (bd) => {
     }
     addSign(cells, col, wk)
   }
-  if (m.h > 80 && ih(id, 45, 3) < 0.4) {
+  if (m.h > 80 && ih(id, 45, 3) < 0.2) {
     // neon zigzag exterior stair up the lit side
-    const col = ["H", "n", "Y"][Math.floor(ih(id, 46, 3) * 3)]
+    const col = accent
     const wL = Math.round(8 * w)
     const cells = []
     const flights = Math.floor((m.h - 12) / fh)
@@ -578,18 +634,19 @@ const drawBuilding = (bd) => {
 let TOWER_MASK = null, TOWER_POST = null
 const drawTower = () => {
   const pre = fb.slice()
+  curLevel = 0
   const F = { brick: FAMS[1], brown: FAMS[0], plum: FAMS[2], orange: FAMS[3] }
   // a stepped, wide base with plants
-  stack({ a: 90, b: 21, w: 4, d: 4, n: 3, fh: 8, fam: F.brick, id: 9901, trims: ["H", "n"], pw: 6, litP: 0.8, plantP: 0.7 })
+  stack({ a: 90, b: 21, w: 4, d: 4, n: 3, fh: 8, fam: F.brick, id: 9901, bright: true, trimAll: true, trims: ["H", "n"], pw: 6, litP: 0.8, plantP: 0.7 })
   // the white-lit body, windows in pale rows
-  stack({ a: 90.3, b: 21.3, w: 3.4, d: 3.4, z0: 24, n: 13, fh: 8, fam: F.brown, id: 9902, trims: ["h", "Y"], pw: 4, litP: 0.95, plantP: 0.55, glass: "white" })
+  stack({ a: 90.3, b: 21.3, w: 3.4, d: 3.4, z0: 24, n: 13, fh: 8, fam: F.brown, id: 9902, bright: true, trimAll: true, trims: ["h", "Y"], pw: 4, litP: 0.95, plantP: 0.55, glass: "white" })
   // a twisting stack of thick plates, white and yellow floor lines
-  stack({ a: 90.75, b: 21.75, w: 2.5, d: 2.5, z0: 128, n: 10, fh: 9, fam: F.plum, id: 9903, trims: ["h", "Y"], pw: 4, litP: 0.55, plantP: 0.3, twist: 3 })
+  stack({ a: 90.75, b: 21.75, w: 2.5, d: 2.5, z0: 128, n: 10, fh: 9, fam: F.plum, id: 9903, bright: true, trimAll: true, trims: ["h", "Y"], pw: 4, litP: 0.55, plantP: 0.3, twist: 3 })
   // a warm brown block with a lit crown line
-  stack({ a: 91, b: 22, w: 2, d: 2, z0: 218, n: 4, fh: 10, fam: F.orange, id: 9904, trims: ["Y", "H"], pw: 4, litP: 0.85, plantP: 0.2 })
+  stack({ a: 91, b: 22, w: 2, d: 2, z0: 218, n: 4, fh: 10, fam: F.orange, id: 9904, bright: true, trimAll: true, trims: ["Y", "H"], pw: 4, litP: 0.85, plantP: 0.2 })
   // a dark stack with cyan and pink trims
-  stack({ a: 91, b: 22, w: 2, d: 2, z0: 258, n: 12, fh: 9, fam: F.plum, id: 9905, trims: ["n", "H"], pw: 4, litP: 0.5, trimP: 0.7, plantP: 0.15, twist: 2 })
-  const st = stack({ a: 91.2, b: 22.2, w: 1.6, d: 1.6, z0: 366, n: 2, fh: 9, fam: F.brown, id: 9906, trims: ["n", "Y"], pw: 4, litP: 0.95 })
+  stack({ a: 91, b: 22, w: 2, d: 2, z0: 258, n: 12, fh: 9, fam: F.plum, id: 9905, bright: true, trimAll: true, trims: ["n", "H"], pw: 4, litP: 0.5, trimP: 0.7, plantP: 0.15, twist: 2 })
+  const st = stack({ a: 91.2, b: 22.2, w: 1.6, d: 1.6, z0: 366, n: 2, fh: 9, fam: F.brown, id: 9906, bright: true, trimAll: true, trims: ["n", "Y"], pw: 4, litP: 0.95 })
   const [cx, cy] = st.roofBox.pt(92, 23)
   // crown: an antenna with a red tip, and a small screen on a frame
   vlineK(cx + 6, cy - 16, 16, "q")
@@ -616,7 +673,24 @@ for (const bd of blds) bd.h = heightOf(bd)
 const order = blds.map((b) => ({ t: "b", b, k: b.a0 + b.w + b.b0 + b.d, k2: b.a0 + b.w }))
 order.push({ t: "T", k: 119, k2: 94 })
 order.sort((p, q) => p.k - q.k || p.k2 - q.k2)
-for (const e of order) { if (e.t === "T") drawTower(); else drawBuilding(e.b) }
+recordCity = true
+for (const e of order) { if (e.t === "T") drawTower(); else drawBuilding(e.b); curLevel = 0 }
+
+const stillAt = (x, y, k) => get(x, y) === k
+// keep only the records whose pixels survived being painted over by nearer buildings
+REC.stars = REC.stars.filter(([x, y]) => stillAt(x, y, "F"))
+for (const s of REC.signs) { s.pts = s.pts.filter(([x, y, k]) => stillAt(x, y, k)); s.glow = s.glow.filter(([x, y, k]) => stillAt(x, y, k)) }
+REC.signs = REC.signs.filter((s) => s.pts.length >= 4)
+for (const s of REC.trims) { s.pts = s.pts.filter(([x, y, k]) => stillAt(x, y, k)); s.glow = s.glow.filter(([x, y, k]) => stillAt(x, y, k)) }
+REC.trims = REC.trims.filter((s) => s.pts.length >= 8)
+for (const t of REC.tips) t.pts = t.pts.filter(([x, y, k]) => stillAt(x, y, k))
+REC.tips = REC.tips.filter((t) => t.pts.length >= 1)
+const WINS = [...REC.win.values()].map((r) => ({ lit: r.lit, pts: r.pts.filter(([x, y, k]) => stillAt(x, y, k)) })).filter((r) => r.pts.length >= 3)
+
+
+// the haze and the grounding gradient, now that the records hold the raw colours
+recordCity = false
+for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = y * W + x; if (CITY[i]) fb[i] = IDX[FK(x, y, KEYS[fb[i]])] }
 
 // ================================================================ title: the letters are Archivo Black outlines
 // rasterized once from the supplied SVG (8x, box filtered, thresholded at 50%) and kept as row runs
@@ -736,28 +810,18 @@ for (let y = 14; y < 90; y++) for (let x = 14; x < 280; x++) {
 // ---------------------------------------------------------------- what is still is now done
 const BASE = fb.slice()
 for (let i = 0; i < W * H; i++) if (TOWER_MASK[i] && BASE[i] !== TOWER_POST[i]) TOWER_MASK[i] = 0
-const stillAt = (x, y, k) => get(x, y) === k
-// keep only the records whose pixels survived being painted over by nearer buildings
-REC.stars = REC.stars.filter(([x, y]) => stillAt(x, y, "F"))
-for (const s of REC.signs) { s.pts = s.pts.filter(([x, y, k]) => stillAt(x, y, k)); s.glow = s.glow.filter(([x, y, k]) => stillAt(x, y, k)) }
-REC.signs = REC.signs.filter((s) => s.pts.length >= 4)
-for (const s of REC.trims) { s.pts = s.pts.filter(([x, y, k]) => stillAt(x, y, k)); s.glow = s.glow.filter(([x, y, k]) => stillAt(x, y, k)) }
-REC.trims = REC.trims.filter((s) => s.pts.length >= 8)
-for (const t of REC.tips) t.pts = t.pts.filter(([x, y, k]) => stillAt(x, y, k))
-REC.tips = REC.tips.filter((t) => t.pts.length >= 1)
-const WINS = [...REC.win.values()].map((r) => ({ lit: r.lit, pts: r.pts.filter(([x, y, k]) => stillAt(x, y, k)) })).filter((r) => r.pts.length >= 3)
-
 // pick what moves, by position in the lists (fixed), so every run gives the same loop
 const pickEvery = (list, n) => { const step = Math.max(1, Math.floor(list.length / n)); const out = []; for (let i = Math.floor(step / 2); i < list.length && out.length < n; i += step) out.push(list[i]); return out }
-const MOVING_WINS = pickEvery(WINS.filter((w2) => w2.pts[0][1] > 140), 22).map((w2, i) => ({ w: w2, a: (i * 7 + 3) % FRAMES, d: 6 + ((i * 5) % 10) }))
-const BLINKERS = pickEvery(REC.signs.filter((s) => s.pts[0][1] > 120), 8).map((s, i) => ({ s, a: 3 + i * 6, d: 1 + (i % 2) }))
-const BLINKTRIMS = pickEvery(REC.trims.filter((s) => s.pts[0][1] > 150), 6).map((s, i) => ({ s, a: 9 + i * 7, d: 1 + ((i + 1) % 2) }))
+const lvl = (p) => DEPTH[p[1] * W + p[0]]
+const MOVING_WINS = pickEvery(WINS.filter((w2) => w2.pts[0][1] > 230 && lvl(w2.pts[0]) <= 6), 22).map((w2, i) => ({ w: w2, a: (i * 7 + 3) % FRAMES, d: 6 + ((i * 5) % 10) }))
+const BLINKERS = pickEvery(REC.signs.filter((s) => s.pts[0][1] > 230 && lvl(s.pts[0]) <= 6), 8).map((s, i) => ({ s, a: 3 + i * 6, d: 1 + (i % 2) }))
+const BLINKTRIMS = pickEvery(REC.trims.filter((s) => s.pts[0][1] > 230 && lvl(s.pts[0]) <= 6), 6).map((s, i) => ({ s, a: 9 + i * 7, d: 1 + ((i + 1) % 2) }))
 const LOWSIGNS = REC.signs.filter((s) => s.pts[0][1] > 220)
 const STUTTER = LOWSIGNS[Math.floor(LOWSIGNS.length / 5)]
 const TWINKLERS = pickEvery(REC.stars, 14)
 
 const inLoop = (f, a, d) => ((f - a + FRAMES * 4) % FRAMES) < d
-const setPts = (pts, off) => { for (const p of pts) put(p[0], p[1], off ? p[3] : p[2]) }
+const setPts = (pts, off) => { for (const p of pts) put(p[0], p[1], FK(p[0], p[1], off ? p[3] : p[2])) }
 
 // ================================================================ the moving parts
 const HOLO = { x: 469, y: 75, w: 119, h: 57 }
@@ -911,7 +975,7 @@ const renderFrame = (f) => {
   // windows: each of ~20 flips off (or on) at a fixed frame and flips back, like someone moving about
   for (const { w, a, d } of MOVING_WINS) {
     if (!inLoop(f, a, d)) continue
-    w.pts.forEach(([x, y, k], i) => put(x, y, w.lit ? "w" : i === 0 ? "h" : "y"))
+    w.pts.forEach(([x, y, k], i) => put(x, y, FK(x, y, w.lit ? "w" : i === 0 ? "y" : "m")))
   }
   BLINKERS.forEach(({ s, a, d }) => { if (inLoop(f, a, d)) { setPts(s.pts, true); setPts(s.glow, true) } })
   BLINKTRIMS.forEach(({ s, a, d }) => { if (inLoop(f, a, d)) { setPts(s.pts, true); setPts(s.glow, true) } })

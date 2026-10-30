@@ -21,15 +21,19 @@ const TUT = (() => {
   const atFresh = () => { const f = typeof FRESH !== 'undefined' && FRESH; if (!f) return center(); const v = new THREE.Vector3(f.c.x, f.c.height || 2, f.c.z).project(cam), r = document.getElementById('view').getBoundingClientRect();
     return { x: r.left + (v.x*.5 + .5)*r.width, y: r.top + (1 - (v.y*.5 + .5))*r.height, r: 56 }; };
   const BEATS = [
-    { id: 'pan', say: 'Drag to look around', at: center, ghost: 'drag', ev: 'pan' },
+    // (owner, Oct 30: a tile before a building, and the wording short and plain)
+    { id: 'pan', say: 'Drag to pan the view', at: center, ghost: 'drag', ev: 'pan' },
     { id: 'zoom', say: 'Pinch to zoom', at: center, ghost: 'pinch', ev: 'zoom' },
-    { id: 'zone', say: 'Swipe the zone card up or down, or tap it', at: () => rectOf(zoneCard()), ghost: 'up', test: () => !!S.zone },
-    { id: 'build', say: 'Tap anywhere on the platform to build', at: center, ghost: 'tap', ev: 'build', need: () => !!S.zone, pre: 'Pick a zone first' },
-    { id: 'trim', say: 'Build, then tap it again, quickly: one floor', at: atFresh, ghost: 'tap2', ev: 'trim' },
-    { id: 'resize', say: 'Build, tap it again and drag up: its height', at: atFresh, ghost: 'up', ev: 'resize' },
-    { id: 'remove', say: 'Hold a building to remove it', at: center, ghost: 'hold', ev: 'remove' },
-    { id: 'restore', say: 'Tap Restore to bring it back', at: () => rectOf(document.querySelector('.trestore:not([hidden])')) || center(), ghost: 'tap', ev: 'restore', skipIf: () => !document.querySelector('.trestore:not([hidden])') },
-    { id: 'tilt', say: 'Two fingers up or down: tilt', at: center, ghost: 'two', ev: 'tilt' },
+    { id: 'tile', say: 'Tap the sky beside the platform to add a tile', at: center, ghost: 'tap', ev: 'tile' },
+    // (a tap on an empty tile cycles its surface only with no zone picked: with one picked it builds, so the step is passed over)
+    { id: 'surface', say: 'Tap a tile to cycle its surface', at: center, ghost: 'tap', ev: 'surface', skipIf: () => !!S.zone },
+    { id: 'zone', say: 'Swipe the zone card to choose a zone', at: () => rectOf(zoneCard()), ghost: 'up', test: () => !!S.zone },
+    { id: 'build', say: 'Tap a tile to place a building', at: center, ghost: 'tap', ev: 'build', need: () => !!S.zone, pre: 'Select a zone first' },
+    { id: 'trim', say: 'Double-tap a tile to build a single floor', at: atFresh, ghost: 'tap2', ev: 'trim' },
+    { id: 'resize', say: 'Double-tap and drag up to set the height', at: atFresh, ghost: 'up', ev: 'resize' },
+    { id: 'remove', say: 'Press and hold a building to remove it', at: center, ghost: 'hold', ev: 'remove' },
+    { id: 'restore', say: 'Tap Restore to undo the removal', at: () => rectOf(document.querySelector('.trestore:not([hidden])')) || center(), ghost: 'tap', ev: 'restore', skipIf: () => !document.querySelector('.trestore:not([hidden])') },
+    { id: 'tilt', say: 'Drag two fingers up or down to tilt', at: center, ghost: 'two', ev: 'tilt' },
   ];
   function rectOf(e){ if (!e) return null; const r = e.getBoundingClientRect(); if (!r.width) return null; return { x: r.left + r.width/2, y: r.top + r.height/2, r: Math.max(r.width, r.height)/2 + 10 }; }
 
@@ -62,7 +66,7 @@ const TUT = (() => {
   function finish(skipped){
     on = false; cancelAnimationFrame(raf); ov.hidden = true; if (waitEv) removeEventListener('nt:' + waitEv, onEv); waitEv = null;
     st.done = true; st.skipped = !!skipped; save(KEY, st);
-    if (!skipped) tip('Done. Settings, Controls has every gesture.', null, 4200);
+    if (!skipped) tip('Tutorial complete. All controls are in Settings › Controls.', null, 6000);
   }
   U.replay = () => { st.done = false; save(KEY, st); setTimeout(start, 400); };
 
@@ -88,7 +92,8 @@ const TUT = (() => {
   const TIPS = [
     { id: 'tag', find: () => [...document.querySelectorAll('.tholo.ton')].find(e => e.getBoundingClientRect().width), say: 'Tap the button to open its screen' },
     // (the player is always in the page, see-through until the Psycho-Acoustic Grid is built and playing: 'live', grid.js. Its size alone said it was there from the start)
-    { id: 'music', find: () => { const g = document.getElementById('gridDeck'); return g && !g.hidden && g.classList.contains('live') && g.getBoundingClientRect().width ? g : null; }, say: 'The Grid is broadcasting. Tap the player for more' },
+    // (it points at the building, not the player: "the player" read as the person playing)
+    { id: 'music', find: () => { const g = document.getElementById('gridDeck'); return g && !g.hidden && g.classList.contains('live') && g.getBoundingClientRect().width ? document.getElementById('view') : null; }, say: 'The Grid is broadcasting. Tap the Grid building to open its panel.' },
     { id: 'scan', find: () => { const b = document.getElementById('furnBtn'); return b && !b.hidden && typeof megasOfKind === 'function' && megasOfKind('lidar').length ? document.getElementById('view') : null; }, say: 'Tap the LIDAR Array, then Scan a pod, then a home' },
     { id: 'people', find: () => typeof megasOfKind === 'function' && megasOfKind('police').length ? document.getElementById('view') : null, say: 'Tap someone in the street to watch them' },
   ];

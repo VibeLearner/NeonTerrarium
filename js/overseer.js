@@ -233,9 +233,11 @@ const OVERSEER = (() => {
     const heat = new Map(); for (const [x, z] of cr.pts){ const k = Math.round(x/LOT) + ',' + Math.round(z/LOT); heat.set(k, (heat.get(k) || 0) + 1); }
     let hot = null; for (const [k, n] of heat) if (!hot || n > hot.n){ const [i, j] = k.split(',').map(Number); hot = { i, j, n }; }
     const ni = i1 - i0 + 1, nj = j1 - j0 + 1;
+    // (owner, Oct 30: an incident whose place has been knocked down drops off the map and the list)
+    const there = x => safe(() => { if (x.x == null || x.z == null) return true; const p = cells.get(ckey(Math.round(x.x/LOT), Math.round(x.z/LOT))); return !!p && (p.sections.length > 0 || !!(p.mega && megas.has(p.mega)) || !!p.wall); }, true);
     const sector = (i, j) => 'ABCDEFGH'[Math.max(0, Math.min(7, Math.floor((i - i0)/ni*8)))] + (Math.max(0, Math.min(5, Math.floor((j - j0)/nj*6))) + 1);
     D = { hour, day, plots, megs, hw, mt, i0, i1, j0, j1, ni, nj, zf, pop, awake, out, cr, tr, po, mk, dome, domeOpen, clubbers, heat, hot, sector,
-      inc: LEDGER.inc().slice().reverse(), grow: LEDGER.grow(), count: LEDGER.count(), clock: safe(() => STORY.clock, 0) };
+      inc: LEDGER.inc().slice().reverse().filter(there), grow: LEDGER.grow(), count: LEDGER.count(), clock: safe(() => STORY.clock, 0) };
     return D;
   }
   const whenTxt = c => { const d = Math.floor(c/1440) + 1, h = (c % 1440)/60; return 'D' + d + ' ' + hm(h); };

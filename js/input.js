@@ -334,7 +334,9 @@ function endPtr0(e){
     if (act.kind === 'fresh2' && !(typeof LOADP !== 'undefined' && LOADP.on)){ if (act.started){ if (HL){ hlBuild(); tEmit('resize'); } } else freshTrim(act.f); }
     if (act.kind === 'touch' && !act.moved && tapWaits()){ clearTimeout(act.timer); if (typeof TUI !== 'undefined') TUI.ring(null); if (!(typeof LOADP !== 'undefined' && LOADP.on)) freshBuild(e.clientX, e.clientY); }
     else if (act.kind === 'touch' && !act.moved){ clearTimeout(act.timer); if (typeof TUI !== 'undefined') TUI.ring(null);
-      if (hwMode) hwClick(e.clientX, e.clientY); else if (mtMode) mtClick(e.clientX, e.clientY); else if (megaPick) placeMegaHere(e.clientX, e.clientY);
+      // (a finger in highway or metro mode: the next piece is picked by where it would appear, in the air at the line's height: hwPickTouch, mtPickTouch)
+      const tt = typeof TOUCH !== 'undefined' && TOUCH.on;
+      if (hwMode) hwClick(e.clientX, e.clientY, tt); else if (mtMode) mtClick(e.clientX, e.clientY, tt); else if (megaPick) placeMegaHere(e.clientX, e.clientY);
       else { const pk = !S.zone && typeof TUI !== 'undefined' ? pickAt(e.clientX, e.clientY) : null;   // (no zone picked: a tap on a megastructure shows its button, or its card)
         if (pk && pk.c && pk.c.mega && megas.has(pk.c.mega)) TUI.megaTap(megas.get(pk.c.mega)); else { act.done = new Set(); paintAt(e.clientX, e.clientY); } } }
   }

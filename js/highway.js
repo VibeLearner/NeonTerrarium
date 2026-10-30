@@ -730,7 +730,7 @@ function hwDropVisitor(h){ if (typeof spawnVisitor === 'function') spawnVisitor(
 
 /* ---------- highway mode: picking, the ghost, the hint ---------- */
 const _hray = new THREE.Raycaster(), _hndc = new THREE.Vector2(), _hbox = new THREE.Box3(), _hhit = new THREE.Vector3();
-function hwPick(cx, cy){
+function hwPick(cx, cy, deckFirst){
   const r = canvas.getBoundingClientRect();
   _hndc.set(((cx - r.left)/r.width)*2 - 1, -((cy - r.top)/r.height)*2 + 1);
   _hray.setFromCamera(_hndc, cam);
@@ -758,8 +758,34 @@ function hwPick(cx, cy){
   const o = _hray.ray.origin, dir = _hray.ray.direction, y = hwY(hwLevel);
   if (Math.abs(dir.y) > 1e-4){ const tt = (y - o.y)/dir.y; if (tt > 0){ const p = o.clone().addScaledVector(dir, tt), d = tt*dir.length();
     const i = Math.round(p.x/LOT), j = Math.round(p.z/LOT);
-    if (!best || (!best.near && d < best.d - .5)) best = { kind: 'hwGround', i, j, d }; } }
+    if (!best || (!best.near && !(deckFirst && best.kind === 'hwTile') && d < best.d - .5)) best = { kind: 'hwGround', i, j, d }; } }
   return best;
+}
+// Touch (owner, Oct 30): a tap in the air in front of the road builds the next piece there, not on the plot behind. The next piece is picked by where
+// it would appear: each plot beside an open end (and the open end itself) is put on the screen at its deck height, and the one nearest the finger,
+// within HW_TAP_PX, wins over the plot the finger's line happens to cross. A finger right on a highway piece still picks that piece (an open end, the
+// nearest of it and the plots beside it), even where the plane at the chosen height crosses the finger's line first (deckFirst). Anywhere else (a new highway), the plot at the chosen height, as before.
+const HW_TAP_PX = 44;
+function hwScreenAt(x, y, z){
+  const r = canvas.getBoundingClientRect(); _hos.set(x, y, z).project(cam); if (_hos.z > 1) return null;
+  return [r.left + (_hos.x*.5 + .5)*r.width, r.top + (1 - (_hos.y*.5 + .5))*r.height];
+}
+function hwPickTouch(cx, cy){
+  const pk = hwPick(cx, cy, true);
+  if (pk && pk.kind === 'hwTile' && (pk.h.done || pk.k !== pk.h.tiles.length - 1)) return pk;   // (an open end hit is weighed against the plots beside it, below)
+  let best = null, bd = HW_TAP_PX*HW_TAP_PX;
+  const near = (x, y, z, out) => { const p = hwScreenAt(x, y, z); if (!p) return; const d = (p[0] - cx)**2 + (p[1] - cy)**2; if (d < bd){ bd = d; best = out; } };
+  for (const h of highways){
+    if (h.done) continue;
+    const n = h.tiles.length, e = h.tiles[n - 1], pv = h.tiles[n - 2];
+    near(e.i*LOT, hwY(e.L), e.j*LOT, { kind: 'hwTile', h, k: n - 1, d: 0 });
+    for (const [a, b] of SIDES4){
+      const i = e.i + a, j = e.j + b; if (pv && pv.i === i && pv.j === j) continue;
+      const y = hwY(Math.max(e.L - HW_STEP_L, Math.min(e.L + HW_STEP_L, hwLevel))), out = { kind: 'hwGround', i, j, d: 0, near: true };
+      near(i*LOT, y, j*LOT, out); near((e.i*.25 + i*.75)*LOT, y, (e.j*.25 + j*.75)*LOT, out);   // (the plot itself, and where its ghost is drawn)
+    }
+  }
+  return best || pk;
 }
 const hwGhostMat = new THREE.MeshBasicMaterial({ color: 0x38e8e0, transparent: true, opacity: .32, depthTest: false, depthWrite: false });
 const hwGhostLine = new THREE.LineBasicMaterial({ color: 0x38e8e0, transparent: true, opacity: .95, depthTest: false });
@@ -827,12 +853,12 @@ function hwShowGhost(t){
 // highway mode's line under the bar: only what's wrong, when something is (the Instructions panel has the rest)
 function hwHintText(why){ return why || ''; }
 let hwLastPt = null;
-function hwHover(cx, cy){ hwLastPt = { x: cx, y: cy }; const t = hwTargetAt(hwPick(cx, cy)); hwShowGhost(t);
+function hwHover(cx, cy, touch){ hwLastPt = { x: cx, y: cy, touch }; const t = hwTargetAt(touch ? hwPickTouch(cx, cy) : hwPick(cx, cy)); hwShowGhost(t);
   const el = $('modeHint'), why = hwHintText(t && !t.ok && t.type !== 'none' ? t.why : ''); el.textContent = why; el.hidden = !why; }
-function hwClick(cx, cy){ const t = hwTargetAt(hwPick(cx, cy)); if (hwApply(t)) hwHover(cx, cy); }
+function hwClick(cx, cy, touch){ const t = hwTargetAt(touch ? hwPickTouch(cx, cy) : hwPick(cx, cy)); if (hwApply(t)) hwHover(cx, cy, touch); }   // (touch: a tap, see hwPickTouch)
 function hwRightClick(cx, cy){ const pk = hwPick(cx, cy); if (pk && pk.kind === 'hwTile'){ hwCutAt(pk.h, pk.k); hwHover(cx, cy); } }
-function hwSetLevel(L){ hwLevel = Math.max(HW_MIN_L, Math.min(HW_MAX_L, L)); const el = document.getElementById('hwLevel'); if (el) el.textContent = hwLevel; if (hwLastPt) hwHover(hwLastPt.x, hwLastPt.y); }
-function hwSetLanesUI(n){ hwSetLanes(n); const el = document.getElementById('hwLanes'); if (el) el.textContent = n + ' lanes'; if (hwLastPt) hwHover(hwLastPt.x, hwLastPt.y); }
+function hwSetLevel(L){ hwLevel = Math.max(HW_MIN_L, Math.min(HW_MAX_L, L)); const el = document.getElementById('hwLevel'); if (el) el.textContent = hwLevel; if (hwLastPt) hwHover(hwLastPt.x, hwLastPt.y, hwLastPt.touch); }
+function hwSetLanesUI(n){ hwSetLanes(n); const el = document.getElementById('hwLanes'); if (el) el.textContent = n + ' lanes'; if (hwLastPt) hwHover(hwLastPt.x, hwLastPt.y, hwLastPt.touch); }
 function setHwMode(on, quiet){
   hwMode = on;
   if (on){ if (mtMode) setMtMode(false, true); if (S.zone) selectZone(null); if (delMode) setDelMode(false, true); if (megaPick) selectMega(null, true); hover.visible = hoverFill.visible = hoverStrip.visible = false; showMegaGhost(null); }

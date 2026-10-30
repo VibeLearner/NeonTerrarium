@@ -202,9 +202,12 @@ const TUI = (() => {
     if (!navigator.vibrate) hap.hidden = true;
     const [tips] = tog('Tips', 'tips', '1', on => { if (typeof TUT !== 'undefined') TUT.tips(on); }, 'Short notes the first time something new turns up.');
     const replay = el('button', 'wide', 'Replay the tutorial'); replay.type = 'button'; replay.addEventListener('click', () => { if (typeof TUT !== 'undefined'){ $('deckToggle').click(); TUT.replay(); } });
+    // (the sky highway and metro tutorials: replaying one closes Settings and turns its mode on, once Transit has arrived: tutorial.js)
+    const rx = (label, fn) => { const b = el('button', 'wide', label); b.type = 'button'; b.addEventListener('click', () => { if (typeof TUT !== 'undefined'){ $('deckToggle').click(); TUT[fn](); } }); return b; };
+    const replayHw = rx('Replay the sky highway tutorial', 'replayHw'), replayMt = rx('Replay the metro tutorial', 'replayMt');
     const [erase, eb] = tog('Erase mode', 'eraseOff', '0', on => { if (typeof setDelMode === 'function') setDelMode(on); }, 'Drag to select a block of plots, tap inside it to clear everything there. Two fingers move the view while it is on.');
     eraseBox = eb; eb.checked = !!delMode; ls.set('eraseOff', '0');
-    const kids = [grp('Text size', chips), grp('Display', el('div', 'togs'), ), grp('Help', el('div', 'togs'), replay), grp('Building', el('div', 'togs'))];
+    const kids = [grp('Text size', chips), grp('Display', el('div', 'togs'), ), grp('Help', el('div', 'togs'), replay, replayHw, replayMt), grp('Building', el('div', 'togs'))];
     kids[1].querySelector('.togs').append(clean, calm); kids[2].querySelector('.togs').append(tips); kids[3].querySelector('.togs').append(erase, hap);
     pane.append(...kids);
     // Performance: phone mode (touch.js) on its own for weaker phones, or always, or never

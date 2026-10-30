@@ -796,6 +796,33 @@ function mtPick(cx, cy){
   if (!best){ const g = groundCellAt(cx, cy); if (g) best = { kind: 'mtGround', i: g.i, j: g.j, d: 0 }; }
   return best;
 }
+// Touch (owner, Oct 30): a tap in the air in front of the line builds the next piece there; it used to need the ground of the plot underneath. The next
+// piece is picked by where it would appear: each plot beside an end a line carries on from (and that end itself) is put on the screen at the rail's
+// height, and the one nearest the finger, within HW_TAP_PX (highway.js), wins. A finger right on the track still picks that piece (an end, the nearest of
+// it and the plots beside it). With none near,
+// a new line starts on the plot whose rail would be drawn nearest the finger (the plot the finger's line crosses at the rail's height, or one beside
+// it), and failing that the plot on the ground under the finger, as before
+function mtPickTouch(cx, cy){
+  const pk = mtPick(cx, cy);
+  if (pk && pk.kind === 'mtTile' && (pk.l.loop || (pk.k !== 0 && pk.k !== pk.l.tiles.length - 1))) return pk;   // (an end hit is weighed against the plots beside it, below)
+  let best = null, bd = HW_TAP_PX*HW_TAP_PX;
+  const near = (x, z, out) => { const p = hwScreenAt(x, MT_Y, z); if (!p) return; const d = (p[0] - cx)**2 + (p[1] - cy)**2; if (d < bd){ bd = d; best = out; } };
+  for (const l of metros) if (!l.loop) for (const [e, pv] of [[l.tiles[l.tiles.length - 1], l.tiles[l.tiles.length - 2]], [l.tiles[0], l.tiles[1]]]){   // (the same ends mtPick carries a line on from)
+    if (e === l.tiles[0] && (!pv || (l.done && l !== mtActive))) continue;
+    near(e.i*LOT, e.j*LOT, { kind: 'mtTile', l, k: l.tiles.indexOf(e), d: 0 });
+    for (const [a, b] of SIDES4){
+      const i = e.i + a, j = e.j + b; if (pv && pv.i === i && pv.j === j) continue;
+      const out = { kind: 'mtGround', i, j, d: 0, near: true };
+      near(i*LOT, j*LOT, out); near((e.i*.25 + i*.75)*LOT, (e.j*.25 + j*.75)*LOT, out);   // (the plot itself, and where its ghost is drawn)
+    }
+  }
+  if (best) return best;
+  if (pk && (pk.near || pk.kind === 'mtTile')) return pk;
+  const o = _hray.ray.origin, dir = _hray.ray.direction;   // (set by mtPick just now)
+  if (Math.abs(dir.y) > 1e-4){ const tt = (MT_Y - o.y)/dir.y; if (tt > 0){ const i0 = Math.round((o.x + dir.x*tt)/LOT), j0 = Math.round((o.z + dir.z*tt)/LOT);
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++){ const i = i0 + a, j = j0 + b; if (cells.get(ckey(i, j))) near(i*LOT, j*LOT, { kind: 'mtGround', i, j, d: 0 }); } } }
+  return best || pk;
+}
 // a see-through band over plots k0..k1 of a line (sharing the highway's highlight meshes: only one mode is on at a time)
 function mtHiShow(H, l, k0, k1, col){
   if (!l || k1 < k0){ H.fill.visible = H.line.visible = false; H.key = ''; return; }
@@ -843,11 +870,11 @@ function mtShowGhost(t){
   hwGhost.g.visible = true;
 }
 let mtLastPt = null;
-function mtHover(cx, cy){ mtLastPt = { x: cx, y: cy }; const t = mtTargetAt(mtPick(cx, cy)); mtShowGhost(t);
+function mtHover(cx, cy, touch){ mtLastPt = { x: cx, y: cy, touch }; const t = mtTargetAt(touch ? mtPickTouch(cx, cy) : mtPick(cx, cy)); mtShowGhost(t);
   const say = !t ? '' : !t.ok ? t.why : t.type === 'loop' ? 'click to close the loop: the train will go round and round'
     : t.type === 'join' ? 'click to join the two lines into one' + (t.lost ? ' (a station right beside another becomes plain track)' : '') : t.note || '';
   const el = $('modeHint'); el.textContent = say || ''; el.hidden = !say; }
-function mtClick(cx, cy){ const t = mtTargetAt(mtPick(cx, cy)); if (mtApply(t)) mtHover(cx, cy); }
+function mtClick(cx, cy, touch){ const t = mtTargetAt(touch ? mtPickTouch(cx, cy) : mtPick(cx, cy)); if (mtApply(t)) mtHover(cx, cy, touch); }   // (touch: a tap, see mtPickTouch)
 function mtRightClick(cx, cy){ const pk = mtPick(cx, cy); if (pk && pk.kind === 'mtTile'){ mtCutAt(pk.l, pk.k); mtHover(cx, cy); } }
 function setMtMode(on, quiet){
   mtMode = on;

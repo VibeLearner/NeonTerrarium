@@ -53,12 +53,11 @@ function updateCamera(dt){
   placeSun();
   const asp = W/H; cam.left=-zoom*asp; cam.right=zoom*asp; cam.top=zoom; cam.bottom=-zoom; cam.updateProjectionMatrix();
 }
-// Touch: the starting zoom by the screen's size, so a plot is about 52 CSS pixels across its short side (about 9 mm on a phone, a comfortable
-// tap), and after the title the one that fits the city across the short side, between that and a little over twice as far out
-// (claude/portrait-world-scale.md). Short-side zooms: times ZK for zoom itself
-function touchZoomPhys(){ return clamp(Math.min(innerWidth, innerHeight)*LOT/(2*52), 8, 30); }
-function touchZoomFit(){ const zp = touchZoomPhys(); let x = 0, z = 0, n = 0; for (const c of cells.values()){ x += c.x; z += c.z; n++; } if (!n) return zp;
-  x /= n; z /= n; let r = 0; for (const c of cells.values()) r = Math.max(r, Math.hypot(c.x - x, c.z - z)); return clamp((r + LOT)*1.05, zp, zp*2.2); }
+// Touch: the starting zoom, at the start and after the title: 16 on the short side, the phone benchmark's view of a normal city (its turns),
+// owner's choice Oct 30. Short-side zooms: times ZK for zoom itself (sky.js)
+const TOUCH_ZOOM0 = 16;
+function touchZoomPhys(){ return TOUCH_ZOOM0; }
+function touchZoomFit(){ return TOUCH_ZOOM0; }
 const ptrs = new Map(); let dragging = false, pinch0 = 0, zoom0 = 0, pinchX = 0;
 let act = null;   // the gesture in progress: { kind:'paint'|'rotate'|'right'|'touch', x, y, moved, done:Set, timer }
 const pdist = () => { const [a,b] = [...ptrs.values()]; return Math.hypot(a.x-b.x, a.y-b.y) || 1; };
@@ -155,8 +154,37 @@ const FRESH_MS = 450, FRESH_PX = 40;
 const freshNear = (x, y) => FRESH && performance.now() - FRESH.t < FRESH_MS && Math.hypot(x - FRESH.x, y - FRESH.y) < FRESH_PX && freshOk(FRESH);
 const freshOk = f => cells.get(ckey(f.c.i, f.c.j)) === f.c && f.c.sections[f.c.sections.length - 1] === f.sec && !f.c.lift;
 const tEmit = (name, d) => { try { dispatchEvent(new CustomEvent('nt:' + name, { detail: d })); } catch (e) {} };   // (for the touch tutorial: tutorial.js)
+// Touch placing, as touch builders do it (owner, Oct 30; the conversation's research):
+//  - snap: a tap that hits nothing to build on goes to the nearest plot within a fingertip (SNAP_PX), its top as if tapped there
+//  - aim, then place: when a plot is narrower on screen than AIM_PX (zoomed out, about 6 mm on a phone), the first tap shows where it will build
+//    (the outline) with a tick, and a second tap on it, or near the first, builds there; a tap elsewhere aims there instead. Closer in, a tap
+//    builds at once as before. The aim goes when the view moves or after 8 s
+const AIM_PX = 36, SNAP_PX = 40;
+let AIM = null;
+const plotPx = () => LOT*(canvas.clientHeight || innerHeight)/(2*zoom);
+const camSig = () => camGoal.x.toFixed(3) + ',' + camGoal.z.toFixed(3) + ',' + zoomT.toFixed(3) + ',' + yawT.toFixed(4) + ',' + pitchT.toFixed(4);
+const aimKey = t => !t ? null : t.type === 'empty' || t.type === 'side' ? t.type + ckey(t.i, t.j) : t.type === 'megaUp' ? 'mega:' + t.m.id : t.type + ckey(t.c.i, t.c.j);
+function touchAimAt(x, y){
+  const t = targetOf(pickAt(x, y)); if (t) return { t, x, y };
+  let best = null, bd = SNAP_PX*SNAP_PX; const r = viewRect(), v = new THREE.Vector3();
+  for (const c of cells.values()){ if (c.mega || c.wall) continue; v.set(c.x, c.sections.length ? c.height : CURB, c.z).project(cam); if (v.z > 1) continue;
+    const sx = r.left + (v.x*.5 + .5)*r.width, sy = r.top + (1 - (v.y*.5 + .5))*r.height, d = (sx - x)**2 + (sy - y)**2; if (d < bd){ bd = d; best = [sx, sy]; } }
+  if (!best) return null;
+  const t2 = targetOf(pickAt(best[0], best[1])); return t2 ? { t: t2, x: best[0], y: best[1] } : null;
+}
+function aimClear(){ if (!AIM) return; AIM = null; hover.visible = hoverFill.visible = hoverStrip.visible = false; if (typeof TUI !== 'undefined' && TUI.aimTip) TUI.aimTip(null); }
+setInterval(() => { if (AIM && (performance.now() - AIM.at > 8000 || AIM.cam !== camSig() || !S.zone)) aimClear(); }, 200);
 function freshBuild(x, y){
-  { const pk = typeof TUI !== 'undefined' ? pickAt(x, y) : null; if (pk && pk.c && pk.c.mega && megas.has(pk.c.mega) && TUI.megaTap(megas.get(pk.c.mega))) return; }   // (a tap on a megastructure shows its screen's button, never builds)
+  { const pk = typeof TUI !== 'undefined' ? pickAt(x, y) : null; if (pk && pk.c && pk.c.mega && megas.has(pk.c.mega) && TUI.megaTap(megas.get(pk.c.mega))) return; }
+  if (S.zone && !hwMode && !mtMode && !megaPick && !delMode){
+    const a = touchAimAt(x, y); if (!a){ aimClear(); return; }
+    if (plotPx() < AIM_PX){
+      const k = aimKey(a.t), same = AIM && AIM.cam === camSig() && (k === AIM.key || Math.hypot(x - AIM.fx, y - AIM.fy) < SNAP_PX);
+      if (!same){ const moved = !!AIM; AIM = { t: a.t, key: k, x: a.x, y: a.y, fx: x, fy: y, at: performance.now(), cam: camSig() }; showHover(a.t);
+        if (typeof TUI !== 'undefined'){ TUI.buzz(moved ? 4 : 8); if (TUI.aimTip) TUI.aimTip(x, y); } tEmit('aim'); return; }
+      x = AIM.x; y = AIM.y; aimClear();
+    } else { x = a.x; y = a.y; aimClear(); }
+  }   // (a tap on a megastructure shows its screen's button, never builds)
   const t = targetOf(pickAt(x, y));
   const key = t && t.after === undefined ? (t.type === 'empty' ? ckey(t.i, t.j) : (t.type === 'up' || t.type === 'onto') && t.c && !t.c.mega && !t.c.lift ? ckey(t.c.i, t.c.j) : null) : null;
   const before = key && cells.get(key) ? cells.get(key).sections.length : 0;
@@ -314,7 +342,8 @@ function endPtr0(e){
   if (!ptrs.size){ dragging = false; act = null; }
 }
 canvas.addEventListener('pointerup', endPtr); canvas.addEventListener('pointercancel', endPtr);
-canvas.addEventListener('pointerleave', () => { MON.hoverAt(null); if (!ptrs.size){ hover.visible = hoverFill.visible = hoverStrip.visible = false; showMegaGhost(null); hwGhost.g.visible = false; hwHighlight(null); } });
+canvas.addEventListener('pointerleave', () => { MON.hoverAt(null); if (!ptrs.size && !AIM){   // (a finger lifting is a leave too: an aim's outline stays)
+ hover.visible = hoverFill.visible = hoverStrip.visible = false; showMegaGhost(null); hwGhost.g.visible = false; hwHighlight(null); } });
 // (no zooming while the title screen is up: its view of the city is set by the title, owner Oct 30)
 const titleUp = () => typeof TITLE !== 'undefined' && TITLE.on;
 canvas.addEventListener('wheel', e => { e.preventDefault(); if (titleUp()) return; zoomT = clamp(zoomT*(1+Math.sign(e.deltaY)*.1), 5, 60); }, { passive:false });

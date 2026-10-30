@@ -9,7 +9,7 @@
 //  - small vibrations on a build and a removal (Android; a setting)
 'use strict';
 const TUI = (() => {
-  const U = { buzz(){}, ring(){}, snapCell(){ return null; }, offerRestore(){}, peek(){}, megaTap(){ return false; }, eraseChip(){} };
+  const U = { buzz(){}, ring(){}, snapCell(){ return null; }, offerRestore(){}, peek(){}, megaTap(){ return false; }, eraseChip(){}, aimTip(){} };
   if (typeof TOUCH === 'undefined' || !TOUCH.on) return U;
   const $ = id => document.getElementById(id);
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
@@ -129,6 +129,17 @@ const TUI = (() => {
         if (x !== t.x || y !== t.y){ t.x = x; t.y = y; t.el.style.transform = 'translate(' + x + 'px,' + y + 'px) translate(-50%,-100%)'; } }
     }
   }
+
+  /* ---------- aiming, zoomed out: "Tap again to place" by the outline, the first few times (input.js freshBuild) ---------- */
+  const aimEl = el('div', 'taim', 'Tap again to place'); aimEl.hidden = true; document.body.appendChild(aimEl);
+  let aimT = 0;
+  U.aimTip = (x, y) => {
+    clearTimeout(aimT); if (x == null){ aimEl.hidden = true; return; }
+    let n = 0; try { n = +(localStorage.getItem('touch:nt.aimTips') || 0); } catch (e) {} if (n >= 4) return;
+    try { localStorage.setItem('touch:nt.aimTips', String(n + 1)); } catch (e) {}
+    aimEl.hidden = false; aimEl.style.transform = 'translate(' + Math.round(Math.max(70, Math.min(innerWidth - 70, x))) + 'px,' + Math.round(Math.max(60, y - 56)) + 'px) translate(-50%,-100%)';
+    aimT = setTimeout(() => { aimEl.hidden = true; }, 2600);
+  };
 
   /* ---------- the TURN chip while placing, recenter, erase mode's exit ---------- */
   const turnChip = el('button', 'tchip tturn', 'TURN'); turnChip.type = 'button'; turnChip.hidden = true; document.body.appendChild(turnChip);

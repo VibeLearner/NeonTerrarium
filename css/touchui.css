@@ -1,0 +1,136 @@
+/* Neon Terrarium: the touch screen's own pieces (js/touchui.js, js/tutorial.js; claude/mobile-ui-plan.md). Everything is under html.touch: a mouse and
+   keyboard never see any of it. */
+
+/* ---------- the hold ring: fills under the finger while a press is held, so a removal is seen coming ---------- */
+.tring{display:none}
+html.touch .tring{display:block;position:fixed;left:0;top:0;width:72px;height:72px;margin:-36px 0 0 -36px;z-index:50;pointer-events:none;opacity:0}
+html.touch .tring svg{width:100%;height:100%;transform:rotate(-90deg)}
+html.touch .tring circle{fill:none;stroke-width:5}
+html.touch .tring .bg{stroke:rgba(10,16,32,.55)}
+html.touch .tring .fg{stroke:#ff4a5a;stroke-dasharray:163.4;stroke-dashoffset:163.4;filter:drop-shadow(0 0 4px rgba(255,74,90,.8))}
+html.touch .tring.on{opacity:1}
+html.touch .tring.on .fg{animation:tRingFill var(--ms,400ms) linear forwards}
+@keyframes tRingFill{to{stroke-dashoffset:0}}
+
+/* ---------- chips over the city: Restore, TURN, CENTER, erase mode's exit ---------- */
+.trestore,.tchip{display:none}
+html.touch .trestore:not([hidden]),html.touch .tchip:not([hidden]){display:flex;align-items:center;justify-content:center;position:fixed;z-index:6;min-height:44px;min-width:88px;padding:0 14px;
+  font-family:var(--font-pixel);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#fff;background:rgba(10,16,32,.94);border:1px solid var(--cyan);border-radius:0;
+  box-shadow:0 0 12px rgba(56,232,224,.35);touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none}
+html.touch .trestore{left:50%;transform:translateX(-50%);bottom:calc(150px + env(safe-area-inset-bottom,0px));border-color:#ffb347;color:#ffd9a0;box-shadow:0 0 12px rgba(255,179,71,.35)}
+html.touch .trestore::before{content:"\21BA";margin-right:8px;font-size:15px}
+html.touch .tturn{right:max(10px, env(safe-area-inset-right,0px));bottom:calc(150px + env(safe-area-inset-bottom,0px))}
+html.touch .tcenter{left:max(10px, env(safe-area-inset-left,0px));bottom:calc(150px + env(safe-area-inset-bottom,0px))}
+html.touch .terase{left:50%;transform:translateX(-50%);top:calc(52px + env(safe-area-inset-top,0px));border-color:#ff4a5a;color:#ffb3ba}
+html.tland .trestore,html.tland .tturn,html.tland .tcenter{bottom:calc(96px + env(safe-area-inset-bottom,0px))}
+
+/* ---------- a megastructure's card ---------- */
+.tpeek{display:none}
+html.touch .tpeek:not([hidden]){display:block;position:fixed;z-index:7;left:max(8px, env(safe-area-inset-left,0px));right:max(8px, env(safe-area-inset-right,0px));
+  bottom:calc(150px + env(safe-area-inset-bottom,0px));max-width:420px;margin:0 auto;padding:10px 12px 12px;color:var(--ink);background:rgba(6,9,20,.96);border:1px solid var(--cyan);
+  box-shadow:0 0 0 1px rgba(56,232,224,.12),0 10px 30px rgba(0,0,0,.5);clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px)}
+html.tland .tpeek:not([hidden]){bottom:calc(96px + env(safe-area-inset-bottom,0px))}
+html.touch .tpeek .tp-h{display:flex;align-items:center;justify-content:space-between;gap:10px}
+html.touch .tpeek .tp-h b{font-family:var(--font-pixel);font-weight:400;font-size:13px;letter-spacing:.12em;color:var(--cyan)}
+html.touch .tpeek .tp-x{width:44px;height:44px;flex:none;padding:0;font-size:15px;border-radius:0}
+html.touch .tpeek .tp-l{margin:2px 0 10px;font-size:13px;line-height:1.45;color:#c9d6ea}
+html.touch .tpeek .tp-b{display:flex;gap:8px}
+html.touch .tpeek .tp-b button{flex:1;min-height:44px;font-family:var(--font-pixel);font-size:12px;letter-spacing:.1em;border-radius:0;color:var(--cyan);border-color:var(--cyan);background:rgba(56,232,224,.08)}
+html.touch .tpeek .tp-b button[hidden]{display:none}
+
+/* ---------- holo-tags over the megastructures with a screen ---------- */
+.tholo{display:none}
+html.touch .tholo{display:flex;align-items:center;gap:6px;position:fixed;left:0;top:0;z-index:2;min-height:36px;padding:0 10px;font-family:var(--font-pixel);font-size:11px;letter-spacing:.12em;
+  color:#e9fbff;background:rgba(6,14,26,.86);border:1px solid rgba(90,232,255,.75);border-radius:0;box-shadow:0 0 10px rgba(90,232,255,.35);touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;user-select:none;will-change:transform}
+html.touch .tholo::before{content:"";position:absolute;inset:-5px -4px}   /* (44 px to a finger) */
+html.touch .tholo::after{content:"";position:absolute;left:50%;bottom:-7px;width:1px;height:7px;background:rgba(90,232,255,.75)}
+html.touch .tholo i{width:7px;height:7px;background:#5ae8ff;box-shadow:0 0 6px #5ae8ff}
+
+/* ---------- press and hold: the explanation plate ---------- */
+.tplate{display:none}
+html.touch .tplate:not([hidden]){display:block;position:fixed;left:0;top:0;z-index:200;padding:8px 11px;font-size:13px;line-height:1.45;color:#e8f0ff;background:rgba(6,9,20,.97);
+  border:1px solid var(--cyan);box-shadow:0 6px 20px rgba(0,0,0,.5);pointer-events:none}
+
+/* ---------- the height pick's readout: above the finger, not under it ---------- */
+html.touch #hlTip{transform:translate(-50%, calc(-100% - 56px))!important;font-size:13px!important;padding:6px 10px!important}
+
+/* ---------- Settings: full screen on a touch screen, 44 px tabs, 48 px rows, an "i" for each explanation ---------- */
+html.pui.touch .deck{top:0!important;left:0!important;transform:none;width:100%;max-width:none;height:100vh;height:100dvh;max-height:none;clip-path:none;border:0;
+  padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);box-sizing:border-box}
+html.pui.touch .pu-tabs{overflow-x:auto;scrollbar-width:none;padding:0 8px;flex-wrap:nowrap}
+html.pui.touch .pu-tabs::-webkit-scrollbar{display:none}
+html.pui.touch .pu-tabs button{flex:none;min-height:44px;padding:0 12px;font-size:11px}
+html.pui.touch .pu-pane{overscroll-behavior:contain}
+html.pui.touch .pu-group > h3{font-size:12px}
+html.pui.touch .pu-group .tog{min-height:48px;box-sizing:border-box;padding:4px 0;font-size:14px}
+html.pui.touch .pu-group .tog input[type=checkbox]{width:22px;height:22px;flex:none}
+html.pui.touch .pu-group .chips button{min-height:44px;font-size:13px}
+html.pui.touch .pu-group .note,html.pui.touch .pu-foot .note{font-size:13px}
+html.pui.touch .pu-presets button{min-height:56px}
+html.pui.touch .deck button.wide{min-height:48px;font-size:14px}
+html.pui.touch .pu-i{margin-left:auto;flex:none;width:36px;height:36px;padding:0;border-radius:50%;font:600 13px/1 Georgia,serif;font-style:italic;color:var(--cyan);border-color:rgba(56,232,224,.5)}
+html.pui.touch .pu-i::before{content:"";position:absolute;inset:-4px}
+html.pui.touch .pu-i{position:relative}
+html.pui.touch .pu-why{display:block;margin:-4px 0 6px 30px;font-size:13px;line-height:1.45;color:#b8c6dc}
+html.pui.touch .pu-why[hidden]{display:none}
+html.pui.touch .pu-presets button .pu-i{position:absolute;top:4px;right:4px}
+html.pui.touch input[type=range]{min-height:44px}
+html.touch .pu-group:has(#lookEdBtn){display:none}   /* (the look editor is a creator's tool: not on a phone) */
+html.pui.touch .pu-group section .slider,html.pui.touch .pu-group .slider{min-height:44px}
+html.pui.touch .deck dl{display:grid;grid-template-columns:minmax(0,1fr);gap:2px;font-size:14px}
+html.pui.touch .deck dl dt{color:var(--cyan);margin-top:10px}
+html.pui.touch .deck dl dd{margin:0;color:#c9d6ea}
+
+/* ---------- the title screen: 44 px rows, the pointer shown on the first item, Cities' rows and closes ---------- */
+html.touch .t-menu button{min-height:44px}
+html.touch .t-menu button:first-child::before{opacity:1}
+html.touch .t-panel .tact button{min-height:44px;min-width:44px;font-size:12px}
+html.touch .t-panel input:not([type=file]){font-size:16px;min-height:44px}
+html.touch .t-panel small,html.touch .t-panel .ttag{font-size:11.5px}
+
+/* ---------- the player's own Interface choices (Settings, Interface) ---------- */
+/* reduce motion, opt-in: interface animations and transitions stop (the city keeps moving) */
+html.nt-calm *,html.nt-calm *::before,html.nt-calm *::after{animation-duration:.001s!important;animation-iteration-count:1!important;transition-duration:.001s!important;scroll-behavior:auto!important}
+/* Clean signal, opt-in: the decoration goes (scanlines, glitch curtains, flicker); every label reads the same */
+html.nt-clean #prec::after,html.nt-clean #gridPanel::before,html.nt-clean #spire::before,html.nt-clean #ovsCurtain,html.nt-clean #ovsBars{display:none!important}
+html.nt-clean #view.gp-glitch,html.nt-clean .blink,html.nt-clean .live i{animation:none!important}
+/* text size: the panels, lists and logs grow (zoom keeps their layout; the dock keeps its size) */
+html.nt-text-125 :is(html.pui .pu-pane,#spire,#prec,#gridPanel,.monitor,#wirelog,.hwhelp,.bmenu-list,#modeHint,.tpeek,.tplate,.t-panel,#tsheet){zoom:1.25}
+html.nt-text-150 :is(html.pui .pu-pane,#spire,#prec,#gridPanel,.monitor,#wirelog,.hwhelp,.bmenu-list,#modeHint,.tpeek,.tplate,.t-panel,#tsheet){zoom:1.5}
+html.nt-text-200 :is(html.pui .pu-pane,#spire,#prec,#gridPanel,.monitor,#wirelog,.hwhelp,.bmenu-list,#modeHint,.tpeek,.tplate,.t-panel,#tsheet){zoom:2}
+
+/* ---------- the touch tutorial (js/tutorial.js): a dim with a hole where to act, a ghost of the gesture, an operator's note ---------- */
+.ttut,.ttip{display:none}
+html.touch .ttut:not([hidden]){display:block;position:fixed;inset:0;z-index:150;pointer-events:none}
+html.touch .ttut .tt-dim{position:absolute;inset:0;background:radial-gradient(circle var(--r,70px) at var(--x,50%) var(--y,45%), transparent 0 92%, rgba(56,232,224,.9) 94%, rgba(4,7,16,.55) 97%)}
+html.touch .ttut .tt-note{position:absolute;left:max(12px, env(safe-area-inset-left,0px));right:max(12px, env(safe-area-inset-right,0px));top:calc(64px + env(safe-area-inset-top,0px));
+  max-width:420px;margin:0 auto;padding:10px 12px;background:rgba(18,10,4,.92);border:1px dashed #ffb347;color:#ffe2b8;pointer-events:auto;display:grid;gap:4px}
+html.touch .ttut .tt-note small{font:11px 'JetBrains Mono',monospace;letter-spacing:.14em;color:#ffb347}
+html.touch .ttut .tt-note b{font:600 16px/1.35 'Chakra Petch',sans-serif;letter-spacing:.04em;font-weight:500}
+html.touch .ttut .tt-note button{justify-self:end;min-height:44px;padding:0 12px;font-size:12px;color:#ffb347;border-color:rgba(255,179,71,.5);border-radius:0;background:transparent}
+html.touch .ttut .tt-ghost{position:absolute;left:0;top:0;width:0;height:0}
+html.touch .ttut .tt-ghost i{position:absolute;left:-14px;top:-14px;width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.75);box-shadow:0 0 0 6px rgba(255,255,255,.2);opacity:0}
+html.touch .ttut .g-drag i:first-child{animation:ttDrag 1.6s ease-in-out infinite}
+html.touch .ttut .g-swipe i:first-child{animation:ttSwipe 1.4s ease-in-out infinite}
+html.touch .ttut .g-tap i:first-child{animation:ttTap 1.2s ease-out infinite}
+html.touch .ttut .g-tap2 i:first-child{animation:ttTap2 1.4s ease-out infinite}
+html.touch .ttut .g-up i:first-child{animation:ttUp 1.8s ease-in-out infinite}
+html.touch .ttut .g-hold i:first-child{animation:ttHold 1.8s ease-out infinite}
+html.touch .ttut .g-pinch i:first-child{animation:ttPinchA 1.6s ease-in-out infinite}
+html.touch .ttut .g-pinch i:last-child{animation:ttPinchB 1.6s ease-in-out infinite}
+html.touch .ttut .g-two i:first-child{animation:ttTwoA 1.6s ease-in-out infinite}
+html.touch .ttut .g-two i:last-child{animation:ttTwoB 1.6s ease-in-out infinite}
+@keyframes ttDrag{0%{opacity:0;transform:translate(-40px,0)}15%{opacity:1}85%{opacity:1;transform:translate(40px,10px)}100%{opacity:0;transform:translate(40px,10px)}}
+@keyframes ttSwipe{0%{opacity:0;transform:translate(30px,0)}20%{opacity:1}80%{opacity:1;transform:translate(-30px,0)}100%{opacity:0;transform:translate(-30px,0)}}
+@keyframes ttTap{0%{opacity:0;transform:scale(1.4)}30%{opacity:1;transform:scale(.9)}60%,100%{opacity:0;transform:scale(1)}}
+@keyframes ttTap2{0%{opacity:0;transform:scale(1.4)}15%{opacity:1;transform:scale(.9)}30%{opacity:0}45%{opacity:1;transform:scale(.9)}60%,100%{opacity:0}}
+@keyframes ttUp{0%{opacity:0;transform:translate(0,30px)}15%{opacity:1}85%{opacity:1;transform:translate(0,-40px)}100%{opacity:0;transform:translate(0,-40px)}}
+@keyframes ttHold{0%{opacity:0;transform:scale(1.4)}20%{opacity:1;transform:scale(.9);box-shadow:0 0 0 6px rgba(255,255,255,.2)}80%{opacity:1;box-shadow:0 0 0 18px rgba(255,74,90,.35)}100%{opacity:0}}
+@keyframes ttPinchA{0%{opacity:0;transform:translate(-14px,-14px)}20%{opacity:1}80%{opacity:1;transform:translate(-50px,-50px)}100%{opacity:0;transform:translate(-50px,-50px)}}
+@keyframes ttPinchB{0%{opacity:0;transform:translate(14px,14px)}20%{opacity:1}80%{opacity:1;transform:translate(50px,50px)}100%{opacity:0;transform:translate(50px,50px)}}
+@keyframes ttTwoA{0%{opacity:0;transform:translate(-30px,30px)}20%{opacity:1}80%{opacity:1;transform:translate(-30px,-30px)}100%{opacity:0;transform:translate(-30px,-30px)}}
+@keyframes ttTwoB{0%{opacity:0;transform:translate(30px,30px)}20%{opacity:1}80%{opacity:1;transform:translate(30px,-30px)}100%{opacity:0;transform:translate(30px,-30px)}}
+html.touch .ttip:not([hidden]){display:block;position:fixed;left:0;top:0;z-index:140;padding:8px 11px;font:500 14px/1.4 'Chakra Petch',sans-serif;color:#ffe2b8;background:rgba(18,10,4,.94);
+  border:1px dashed #ffb347;pointer-events:none}
+html.pui.touch .pu-group .togs,html.pui.touch .pu-group .togs.pu-cols{grid-template-columns:minmax(0,1fr)}

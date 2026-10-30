@@ -345,7 +345,6 @@ html.touch .zone .zin{min-width:0;padding:5px 9px 4px;gap:1px}
 html.touch .zone b{font-size:10.5px;letter-spacing:.08em}
 html.touch .zone small{font-size:7.5px;letter-spacing:.04em}
 html.touch .rot.del{width:32px;height:32px;font-size:13px}
-html.touch .trail{display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap}
 html.touch .bmenu{position:static;display:flex;gap:6px;width:auto}
 html.touch .bmenu[hidden]{display:none}
 html.touch .tmenu{display:block}
@@ -535,8 +534,6 @@ html.touch .zonebar{bottom:calc(8px + env(safe-area-inset-bottom,0px));gap:5px}
 html.touch .zonebar > #modeHint{position:absolute;left:50%;bottom:calc(100% + 6px);transform:translateX(-50%);width:max-content;max-width:calc(100vw - 24px);
   font-size:10px;line-height:1.35;padding:3px 9px;pointer-events:none;transition:opacity .6s ease}
 html.touch #modeHint.tfade{opacity:0}
-html.touch .trail{gap:5px;flex-wrap:nowrap}
-html.touch .trail .bmenu{gap:5px}
 html.touch .bmenu-head,html.touch .pu-citybtn,html.touch .ctlhover{height:28px;padding:0 9px;font-size:9.5px;line-height:1;display:flex;align-items:center}
 html.touch .bmenu-head{gap:7px}
 html.touch .pu-ctlrow{gap:5px}
@@ -626,7 +623,6 @@ html.touch .t-menu button:active::before{opacity:1}
 html.touch .mon-pin .x{opacity:1}   /* (the unpin ✕ showed only on hover) */
 /* the dock: a 44 px row of buttons, a 56 px zone card with 44 px arrows, clear of the home bar and the screen's sides */
 html.touch .zonebar{bottom:calc(8px + env(safe-area-inset-bottom,0px));max-width:calc(100% - 16px - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px))}
-html.touch .trail{gap:6px}
 html.touch .bmenu-head,html.touch .pu-citybtn{height:44px;padding:0 10px;font-size:11px}
 html.touch .ctlhover{width:44px;height:44px;font-size:15px}
 html.touch .rot.del{width:44px;height:44px;font-size:15px}
@@ -679,36 +675,30 @@ html.touch #monClose{width:44px;height:44px}
 /* the big screens' closes (their own styles are added by overseer.js, policedesk.js and grid_panel.js; these win on touch) */
 html.touch #spire .close,html.touch #prec .close,html.touch #gridPanel .gx{min-height:44px;min-width:44px;font-size:12px;padding:0 14px}
 html.touch #tClose{min-height:44px;min-width:64px;font-size:12px}
-/* ---------- phones and tablets, round four (Oct 30): the menus as a rail, the big screens fitted to a phone ---------- */
-/* the menus (Buildings, Transport, City, Controls): a rail at the right edge above the dock, one button under another; each list opens beside it */
-html.touch .trail{position:fixed;z-index:4;right:max(8px, env(safe-area-inset-right,0px));bottom:calc(140px + env(safe-area-inset-bottom,0px));
-  width:112px;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-end;gap:6px;flex-wrap:nowrap}
-html.tland .trail{bottom:calc(86px + env(safe-area-inset-bottom,0px));gap:4px}
-html.touch .trail .bmenu,html.touch .trail .tmenu,html.touch .trail .pu-ctlrow{display:flex;flex-direction:column;align-items:stretch;gap:6px;width:100%}
-html.tland .trail .bmenu,html.tland .trail .tmenu,html.tland .trail .pu-ctlrow{gap:4px}
-html.touch .trail .bmenu[hidden],html.touch .trail .tmenu[hidden]{display:none}
-html.touch .trail .ctlwrap{display:flex;width:100%}
-html.touch .trail .bmenu-head,html.touch .trail .pu-citybtn,html.touch .trail .ctlhover{width:100%;height:44px;margin:0;padding:0 10px;justify-content:space-between;
-  font-family:var(--font-pixel);font-size:11px;letter-spacing:.08em;text-transform:uppercase;background:rgba(10,16,32,.9);box-sizing:border-box}
-html.touch .trail .pu-citybtn,html.touch .trail .ctlhover{justify-content:center;border:1px solid rgba(56,232,224,.55);color:var(--cyan)}
-html.touch .trail .pu-citybtn.on,html.touch .trail .ctlwrap.open .ctlhover{background:rgba(56,232,224,.18);color:#fff;border-color:var(--cyan)}
-/* the lists and Controls: a panel to the left of the rail, its foot level with the rail's */
-html.touch .trail .bmenu-list,html.touch .trail .ctlpanel{position:fixed;left:max(8px, env(safe-area-inset-left,0px));right:calc(126px + env(safe-area-inset-right,0px));
-  bottom:calc(140px + env(safe-area-inset-bottom,0px));width:auto;min-width:0;max-width:420px;margin-left:auto;transform:none;
-  max-height:calc(100vh - 210px);max-height:calc(100dvh - 210px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));overflow:auto;overscroll-behavior:contain}
-html.tland .trail .bmenu-list,html.tland .trail .ctlpanel{bottom:calc(86px + env(safe-area-inset-bottom,0px));max-height:calc(100vh - 150px);max-height:calc(100dvh - 150px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px))}
-html.touch .trail .bmenu-list{grid-auto-flow:row;grid-template-rows:none;grid-template-columns:minmax(0,1fr);grid-auto-columns:auto;align-content:start;padding:6px;background:rgba(6,9,20,.94);border:1px solid var(--line)}
-html.touch .trail .tmenu .bmenu-list{grid-template-columns:minmax(0,1fr)}
-html.touch .trail .ctlpanel,html.touch .trail .ctlwrap:hover .ctlpanel,html.touch .trail .ctlhover:focus + .ctlpanel{opacity:0;pointer-events:none;transform:translateY(6px)}
-html.touch .trail .ctlwrap.open .ctlpanel{opacity:1;pointer-events:auto;transform:translateY(0)}
-html.touch .trail .ctlpanel dl.touchonly{grid-template-columns:minmax(0,1fr);gap:2px}
-html.touch .trail .ctlpanel dl.touchonly dt{color:var(--cyan);margin-top:8px}
-html.touch .trail .ctlpanel dl.touchonly dd{margin:0}
-/* the rail steps away while City settings or Settings are open (they're full width) */
-html.touch body:has(#puCity:not([hidden])) .trail,html.touch body.deck-open .trail{visibility:hidden}
-/* the hint stays clear of the rail */
-html.touch .zonebar > #modeHint{max-width:calc(100vw - 2*130px - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px));min-width:180px}
-@media (max-width:440px){html.touch .zonebar > #modeHint{max-width:calc(100vw - 24px)}}
+/* ---------- phones and tablets, round four (Oct 30): the dock, the big screens fitted to a phone ---------- */
+/* the dock (round five, owner Oct 30): no zone arrows and no delete button on touch (the card swipes, press and hold removes, area erase is in Settings);
+   Buildings and Transport stand either side of the zone card once they have something in them, as tall as the card; their lists open above the dock.
+   Controls and City settings are tabs in Settings (playerui.js). */
+html.touch .zarr,html.touch .rot.del{display:none}
+html.pui.touch .ctlwrap,html.touch .pu-citybtn,html.touch .pu-ctlrow{display:none}
+html.touch .zones{align-items:flex-start}
+html.touch .zones > .bmenu-head.tside{flex:none;width:76px;height:56px;padding:6px 4px 5px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;gap:3px;
+  box-sizing:border-box;font-family:var(--font-pixel);font-size:11px;letter-spacing:.06em;text-transform:uppercase;line-height:1;background:rgba(10,16,32,.9)}
+html.touch .zones > .bmenu-head.tside[hidden]{display:none}
+html.touch .zones > .bmenu-head.tside i{display:none}
+html.touch .zones > .bmenu-head.tside::before{content:"";flex:none;width:18px;height:18px;margin-top:2px;background:currentColor;
+  -webkit-mask:var(--ico) center/contain no-repeat;mask:var(--ico) center/contain no-repeat}
+html.touch #bmenuHead.tside{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'%3E%3Cpath d='M2 15V5h4V1h8v14zM4 7v2h2V7zm0 4v2h2v-2zm4-8v2h2V3zm0 4v2h2V7zm0 4v2h2v-2zm3-8v2h1V3zm0 4v2h1V7zm0 4v2h1v-2z' fill-rule='evenodd'/%3E%3C/svg%3E")}
+html.touch #tmenuHead.tside{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'%3E%3Cpath d='M0 3h16v2H0zM2 5h2v8H2zM12 5h2v8h-2zM6 7h4v2H6zM5 9h6v4H5zM0 13h16v2H0z'/%3E%3C/svg%3E")}
+html.touch .zones > .bmenu-head.tside[aria-expanded="true"]{background:rgba(56,232,224,.18);color:#fff;border-color:var(--cyan)}
+html.tport .zones > .tcur{min-width:0;flex:1 1 140px;max-width:180px}
+html.tland .zones > .bmenu-head.tside{height:44px;width:auto;padding:0 10px;flex-direction:row;gap:7px}
+html.tland .zones > .bmenu-head.tside::before{margin:0}
+/* the lists: a panel above the dock, full width */
+html.touch .zonebar > .bmenu-list{grid-auto-flow:row;grid-template-rows:none;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));grid-auto-columns:auto;align-content:start;
+  padding:6px;background:rgba(6,9,20,.95);border:1px solid var(--line);bottom:calc(100% + 34px)}
+/* Scan pod: a small chip above the dock's right end, so it doesn't widen the row */
+html.touch .zones > .furnbtn{position:absolute;right:0;bottom:calc(100% + 6px);height:44px}
 /* the gear in the middle of its button (the button's hidden word was a second grid cell that pushed it up) */
 html.touch .deck-toggle{display:flex;align-items:center;justify-content:center}
 

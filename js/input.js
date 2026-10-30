@@ -140,6 +140,42 @@ const DT_MS = 250, DT_PX = 40;
 const tapWaits = () => S.zone && !hwMode && !mtMode && !megaPick && !delMode && !PERIM;
 function tapBuild(x, y){ const a = act; act = { done: new Set() }; try { if (hwMode) hwClick(x, y); else if (mtMode) mtClick(x, y); else if (megaPick) placeMegaHere(x, y); else paintAt(x, y); } finally { act = a; } }
 function tapFlush(){ if (!tapPend) return; const p = tapPend; tapPend = null; clearTimeout(p.timer); if (!(typeof LOADP !== 'undefined' && LOADP.on)) tapBuild(p.x, p.y); }
+// Touch, with a zone picked (owner's choice, Oct 30, the mobile UI plan): a tap builds at once. The building just made stays "fresh" for a moment:
+// tapping it again trims it to one floor (what a double tap used to do, as Space does), and pressing it again and dragging up or down picks the
+// height it starts at (what double tap and drag did, as Shift does), lifting builds. The second tap always means "change what I just made".
+// (Trimming changes the fresh section in place: one rebuild, no removal sweep, no second sound.)
+let FRESH = null;
+const FRESH_MS = 450, FRESH_PX = 40;
+const freshNear = (x, y) => FRESH && performance.now() - FRESH.t < FRESH_MS && Math.hypot(x - FRESH.x, y - FRESH.y) < FRESH_PX && freshOk(FRESH);
+const freshOk = f => cells.get(ckey(f.c.i, f.c.j)) === f.c && f.c.sections[f.c.sections.length - 1] === f.sec && !f.c.lift;
+const tEmit = (name, d) => { try { dispatchEvent(new CustomEvent('nt:' + name, { detail: d })); } catch (e) {} };   // (for the touch tutorial: tutorial.js)
+function freshBuild(x, y){
+  const t = targetOf(pickAt(x, y));
+  const key = t && t.after === undefined ? (t.type === 'empty' ? ckey(t.i, t.j) : (t.type === 'up' || t.type === 'onto') && t.c && !t.c.mega && !t.c.lift ? ckey(t.c.i, t.c.j) : null) : null;
+  const before = key && cells.get(key) ? cells.get(key).sections.length : 0;
+  tapBuild(x, y);
+  const c = key && cells.get(key);
+  FRESH = c && c.sections.length === before + 1 && !c.lift ? { c, sec: c.sections[c.sections.length - 1], x, y, t: performance.now() } : null;
+  if (FRESH){ if (typeof TUI !== 'undefined') TUI.buzz(12); tEmit('build'); }
+}
+function freshRebuild(c, quiet){
+  stageFinishNear([c]); finishAnimsOn(c); holdRegion(c);
+  const old = { view: c.view, data: c.data }; c.view = null; c.data = null;
+  refresh([c]); dropView(old);
+  return old;
+}
+function freshTrim(f){
+  if (!freshOk(f)) return false;
+  const c = f.c, k = c.sections.length - 1, y0 = k > 0 ? c.sectionTops[k - 1] : CURB;
+  if (f.sec.mf === 1) return true;
+  f.sec.mf = 1; freshRebuild(c);
+  startAnim(c, 'build', y0 - .05, c.height + 1.2, f.sec.zone, SIDE, null, null, { quiet: true });
+  FRESH = null; tEmit('trim'); return true;
+}
+function freshUndo(f){   // (quietly, for the height pick that replaces it)
+  if (!freshOk(f)) return false;
+  f.c.sections.pop(); freshRebuild(f.c); FRESH = null; return true;
+}
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 canvas.addEventListener('pointerdown', e => {
   if (HL && e.pointerType === 'touch') hlStop();   // (a finger's height pick ends when it lifts: a stray one left over just goes)
@@ -148,12 +184,14 @@ canvas.addEventListener('pointerdown', e => {
   //  is let go here, so this press starts clean instead of carrying on the old one: in delete mode that left the selection following the cursor, unpressed)
   if (e.pointerType === 'mouse' && ptrs.size){ ptrs.clear(); act = null; }
   canvas.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); dragging = true;
+  if (e.pointerType === 'touch' && ptrs.size === 1 && tapWaits() && freshNear(e.clientX, e.clientY)){   // pressing the building just made: trim it, or drag for a height
+    act = { kind: 'fresh2', x: FRESH.x, y: FRESH.y, sy: e.clientY, started: false, f: FRESH }; return; }
   if (e.pointerType === 'touch' && tapPend){   // a second tap close to the first, soon after: a double tap. Anything else: the first tap builds now
     if (ptrs.size === 1 && performance.now() - tapPend.t < DT_MS + 150 && Math.hypot(e.clientX - tapPend.x, e.clientY - tapPend.y) < DT_PX){
       clearTimeout(tapPend.timer); const p = tapPend; tapPend = null;
       act = { kind: 'dtap', x: p.x, y: p.y, sy: e.clientY, started: false }; return; }
     tapFlush(); }
-  if (ptrs.size === 2){ if (act && act.timer) clearTimeout(act.timer); if (act && act.kind === 'dtap' && HL) hlStop(); act = { kind: 'pinch', touch: e.pointerType === 'touch', ang: pang(), mid: pmid() }; pinch0 = pdist(); zoom0 = zoomT; pinchX = pmidX(); hover.visible = hoverFill.visible = hoverStrip.visible = false; return; }
+  if (ptrs.size === 2){ if (act && act.timer) clearTimeout(act.timer); if (act && (act.kind === 'dtap' || act.kind === 'fresh2') && HL) hlStop(); if (typeof TUI !== 'undefined') TUI.ring(null); act = { kind: 'pinch', touch: e.pointerType === 'touch', ang: pang(), mid: pmid() }; pinch0 = pdist(); zoom0 = zoomT; pinchX = pmidX(); hover.visible = hoverFill.visible = hoverStrip.visible = false; return; }
   if (delMode && e.button === 0){ act = { kind: 'del', x: e.clientX, y: e.clientY, moved: false, from: groundCellAt(e.clientX, e.clientY) }; return; }   // delete mode: drag selects
   if ((e.button === 0 || e.pointerType === 'touch') && !hwMode && !mtMode && !megaPick){   // someone in the street under the pointer: a click opens the monitor on them (monitor.js)
     // (the quick test here; the exact one, which waits for the graphics card, only once it's a click: a press that starts turning the view never waits for it)
@@ -161,7 +199,13 @@ canvas.addEventListener('pointerdown', e => {
   if (e.pointerType === 'touch'){
     // tap builds, drag paints, press and hold removes
     act = { kind: 'touch', x: e.clientX, y: e.clientY, moved: false, done: new Set() };
-    act.timer = setTimeout(() => { if (act && act.kind === 'touch' && !act.moved){ if (hwMode) hwRightClick(act.x, act.y); else if (mtMode) mtRightClick(act.x, act.y); else if (megaPick) selectMega(null); else removeAt(pickAt(act.x, act.y)); act.kind = 'none'; } }, 550);
+    // (a ring fills under the finger while it's held, so a removal is seen coming and can be cancelled by lifting; what was removed can be put back from
+    //  the Restore chip for a few seconds: touchui.js)
+    if (typeof TUI !== 'undefined' && !megaPick) TUI.ring(e.clientX, e.clientY, 550);
+    act.timer = setTimeout(() => { if (act && act.kind === 'touch' && !act.moved){ if (typeof TUI !== 'undefined') TUI.ring(null);
+      if (hwMode) hwRightClick(act.x, act.y); else if (mtMode) mtRightClick(act.x, act.y); else if (megaPick) selectMega(null);
+      else { const pk = pickAt(act.x, act.y), snap = typeof TUI !== 'undefined' ? TUI.snapCell(pk) : null; removeAt(pk); if (snap) TUI.offerRestore(snap); if (typeof TUI !== 'undefined') TUI.buzz(30); tEmit('remove'); }
+      act.kind = 'none'; } }, 550);
     return;
   }
   if (e.button === 0 && (hwMode || mtMode)){ act = { kind: 'sky', x: e.clientX, y: e.clientY, moved: false }; return; }   // highway or metro mode: a click builds, a drag turns the view
@@ -191,7 +235,17 @@ function pointerMove(e){
   const dx = e.clientX - p.x, dy = e.clientY - p.y, tilt = () => { if (tiltMode) pitchT = clamp(pitchT + dy*.006, PITCH_MIN, PITCH_MAX); };
   ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (!act) return;
-  if (act.kind === 'pinch'){ if (ptrs.size === 2){ zoomT = clamp(zoom0*pinch0/pdist(), 5, 60);
+  if (act.kind === 'pinch'){ if (ptrs.size === 2){
+    // two fingers on a touch screen: dragged up or down together (the gap and the angle between them nearly unchanged) they tilt the view, as in
+    // Google Maps; anything else pinches, twists and pans as before. Which one is decided once the fingers have moved a little, and kept.
+    if (act.touch && !act.mode){ const m = pmid(), d = pdist(); let da = pang() - (act.a0 ?? act.ang); if (da > PI) da -= 2*PI; if (da < -PI) da += 2*PI;
+      if (act.m0 === undefined){ act.m0 = act.mid; act.a0 = act.ang; }
+      const mx = m.x - act.m0.x, my = m.y - act.m0.y, dd = Math.abs(d - pinch0)/Math.max(1, pinch0);
+      if (Math.hypot(mx, my) > 14 || dd > .08 || Math.abs(da) > .12) act.mode = Math.abs(my) > 2*Math.abs(mx) && dd < .1 && Math.abs(da) < .1 ? 'tilt' : 'pinch';
+      if (act.mode === 'pinch'){ pinch0 = d; zoom0 = zoomT; act.ang = pang(); act.mid = m; }
+      if (act.mode !== 'tilt') return; act.mid = m; tEmit('tilt'); }
+    if (act.touch && act.mode === 'tilt'){ const m = pmid(); pitchT = clamp(pitchT + (m.y - act.mid.y)*.006, PITCH_MIN, PITCH_MAX); act.mid = m; return; }
+    zoomT = clamp(zoom0*pinch0/pdist(), 5, 60); if (act.touch && Math.abs(zoomT - zoom0) > .05*zoom0) tEmit('zoom');
     if (act.touch){ const a = pang(), m = pmid(); let da = a - act.ang; if (da > PI) da -= 2*PI; if (da < -PI) da += 2*PI; yawT += da; act.ang = a; touchPan(m.x - act.mid.x, m.y - act.mid.y); act.mid = m; }   // (twist turns, the pair together pans)
     else { const mx = pmidX(); yawT -= (mx - pinchX)*.008; pinchX = mx; } } return; }
   if (act.kind === 'rotate'){ yawT -= dx*.008; tilt(); return; }
@@ -206,13 +260,18 @@ function pointerMove(e){
   if (act.kind === 'npc'){ if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 5){ act.moved = true; if (e.pointerType === 'touch'){ act.kind = 'touch'; touchPan(e.clientX - act.x, e.clientY - act.y); } else act.kind = 'sky'; } return; }
   if (act.kind === 'sky'){ if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 5) act.moved = true; if (act.moved){ yawT -= dx*.008; tilt(); hover.visible = hoverFill.visible = hoverStrip.visible = false; if (megaPick) showMegaGhost(null); } return; }
   if (act.kind === 'right'){ if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 5) act.moved = true; if (act.moved){ yawT -= dx*.008; tilt(); } return; }
+  if (act.kind === 'fresh2'){   // the building just made, pressed again and dragged: it goes, and the height pick takes its place
+    if (!act.started && Math.abs(e.clientY - act.sy) > 12){ act.started = true; if (freshUndo(act.f)){ ptrLast = { x: act.x, y: act.y }; hlStart(); } }
+    if (act.started && HL) hlMove(act.x, e.clientY);
+    return;
+  }
   if (act.kind === 'dtap'){   // double tap, still pressing: dragging up or down picks the height
     if (!act.started && Math.abs(e.clientY - act.sy) > 12){ act.started = true; ptrLast = { x: act.x, y: act.sy }; hlStart(); }
     if (act.started && HL) hlMove(act.x, e.clientY);
     return;
   }
   if (act.kind === 'touch'){
-    if (!act.moved && Math.hypot(e.clientX - act.x, e.clientY - act.y) > 10){ act.moved = true; clearTimeout(act.timer); hover.visible = hoverFill.visible = hoverStrip.visible = false; if (megaPick) showMegaGhost(null); touchPan(e.clientX - act.x, e.clientY - act.y); return; }
+    if (!act.moved && Math.hypot(e.clientX - act.x, e.clientY - act.y) > 10){ act.moved = true; clearTimeout(act.timer); if (typeof TUI !== 'undefined') TUI.ring(null); tEmit('pan'); hover.visible = hoverFill.visible = hoverStrip.visible = false; if (megaPick) showMegaGhost(null); touchPan(e.clientX - act.x, e.clientY - act.y); return; }
     if (act.moved) touchPan(dx, dy);
     return;
   }
@@ -235,8 +294,12 @@ function endPtr0(e){
       if (act.started){ if (HL) hlBuild(); }
       else if (!unitAt(act.x, act.y)) tapBuild(act.x, act.y);   // (one floor; where one floor can't go, an ordinary tap)
     }
-    if (act.kind === 'touch' && !act.moved && tapWaits()){ clearTimeout(act.timer); const x = e.clientX, y = e.clientY; tapPend = { x, y, t: performance.now(), timer: setTimeout(() => { if (tapPend && tapPend.x === x && tapPend.y === y) tapFlush(); }, DT_MS) }; }
-    else if (act.kind === 'touch' && !act.moved){ clearTimeout(act.timer); if (hwMode) hwClick(e.clientX, e.clientY); else if (mtMode) mtClick(e.clientX, e.clientY); else if (megaPick) placeMegaHere(e.clientX, e.clientY); else { act.done = new Set(); paintAt(e.clientX, e.clientY); } }
+    if (act.kind === 'fresh2' && !(typeof LOADP !== 'undefined' && LOADP.on)){ if (act.started){ if (HL){ hlBuild(); tEmit('resize'); } } else freshTrim(act.f); }
+    if (act.kind === 'touch' && !act.moved && tapWaits()){ clearTimeout(act.timer); if (typeof TUI !== 'undefined') TUI.ring(null); if (!(typeof LOADP !== 'undefined' && LOADP.on)) freshBuild(e.clientX, e.clientY); }
+    else if (act.kind === 'touch' && !act.moved){ clearTimeout(act.timer); if (typeof TUI !== 'undefined') TUI.ring(null);
+      if (hwMode) hwClick(e.clientX, e.clientY); else if (mtMode) mtClick(e.clientX, e.clientY); else if (megaPick) placeMegaHere(e.clientX, e.clientY);
+      else { const pk = !S.zone && typeof TUI !== 'undefined' ? pickAt(e.clientX, e.clientY) : null;   // (no zone picked: a tap on a megastructure opens its card)
+        if (pk && pk.c && pk.c.mega && megas.has(pk.c.mega)) TUI.peek(megas.get(pk.c.mega)); else { act.done = new Set(); paintAt(e.clientX, e.clientY); } } }
   }
   ptrs.delete(e.pointerId);
   if (!ptrs.size){ dragging = false; act = null; }
@@ -466,7 +529,8 @@ function setDelMode(on, quiet){
   if (on){ if (S.zone) selectZone(null); if (megaPick) selectMega(null, true); if (hwMode) setHwMode(false, true); if (mtMode) setMtMode(false, true); hover.visible = hoverFill.visible = hoverStrip.visible = false; showMegaGhost(null); }
   document.body.classList.toggle('deleting', on);
   $('delBtn').classList.toggle('on', on); $('delBtn').setAttribute('aria-pressed', on);
-  if (on) $('modeHint').textContent = 'Delete mode: drag to select an area · click inside it to delete · click outside to clear · X to go back to building';
+  if (on) $('modeHint').textContent = typeof TOUCH !== 'undefined' && TOUCH.on ? 'Erase: drag to select, tap inside to clear it · two fingers to move' : 'Delete mode: drag to select an area · click inside it to delete · click outside to clear · X to go back to building';
+  if (typeof TUI !== 'undefined') TUI.eraseChip(on);
   else if (!quiet) selectZone(S.zone ? S.zone : null);
 }
 $('delBtn').addEventListener('click', () => setDelMode(!delMode));

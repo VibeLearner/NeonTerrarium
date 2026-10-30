@@ -17,6 +17,10 @@ const TOUCH = (() => {
   // A laptop with a touch screen still has a trackpad or mouse as its main pointer, so it keeps the desktop layout.
   const mq = matchMedia('(pointer: coarse)'), mqPort = matchMedia('(orientation: portrait)');
   T.on = mq.matches;
+  // the player's own Interface choices (Settings, touchui.js), on the page before anything is drawn: text size, Clean signal, reduce motion.
+  // Only what the player picked: the device's reduce-motion setting is never read (the owner's rule: the animations always play)
+  if (T.on) try { const g = k => localStorage.getItem('touch:nt.' + k), h = document.documentElement, ts = g('text');
+    if (g('clean') === '1') h.classList.add('nt-clean'); if (g('calm') === '1') h.classList.add('nt-calm'); if (ts && ts !== '100') h.classList.add('nt-text-' + ts); } catch (e) {}
   const mark = () => { const h = document.documentElement; h.classList.toggle('touch', T.on); h.classList.toggle('tport', T.on && mqPort.matches); h.classList.toggle('tland', T.on && !mqPort.matches); };
   mark();
   // the words: tap, not click; no keys
@@ -35,7 +39,10 @@ const TOUCH = (() => {
     const hint = $('modeHint');
     let fadeT = 0;
     const flash = () => { if (!hint) return; hint.classList.remove('tfade'); clearTimeout(fadeT); if (T.on) fadeT = setTimeout(() => hint.classList.add('tfade'), 3500); };
-    if (hint) new MutationObserver(() => { if (!T.on) return; const w = words(hint.textContent); if (w !== hint.textContent){ hint.textContent = w; return; } flash(); }).observe(hint, { childList: true, characterData: true, subtree: true });
+    // (on a touch screen only the hint's first part shows: the rest is for the keyboard and mouse, and the tutorial and Settings, Controls explain the gestures.
+    //  Erase mode's line is kept whole: it's the only place that says how to get around while it's on)
+    const short = s => /^Erase:/.test(s) ? s : s.split(' · ')[0];
+    if (hint) new MutationObserver(() => { if (!T.on) return; const w = short(words(hint.textContent)); if (w !== hint.textContent){ hint.textContent = w; return; } flash(); }).observe(hint, { childList: true, characterData: true, subtree: true });
 
     // the highway and metro instructions: tap for click, and the rows that are keyboard keys hidden
     for (const id of ['hwHelp', 'mtHelp']){ const box = $(id); if (!box) continue;
@@ -46,23 +53,31 @@ const TOUCH = (() => {
       for (const dt of document.querySelectorAll('.hwhelp dt[data-mouse]')) dt.textContent = T.on ? dt.dataset.touch : dt.dataset.mouse;
       const c = document.querySelector('.ctlhover');
       if (c){ c.textContent = T.on ? 'Controls' : 'Hover for controls'; if (T.on){ c.setAttribute('role', 'button'); c.setAttribute('aria-label', 'Controls'); } else { c.removeAttribute('role'); c.removeAttribute('aria-label'); } }
-      if (hint && T.on){ const w = words(hint.textContent); if (w !== hint.textContent) hint.textContent = w; }
+      if (hint && T.on){ const w = short(words(hint.textContent)); if (w !== hint.textContent) hint.textContent = w; }
       const cb = $('puCityBtn'); if (cb) cb.textContent = T.on ? 'City' : 'City settings';   // (shorter labels in the dock)
+      for (const [id, a, b] of [['bmenuHead', 'Build', 'Buildings'], ['tmenuHead', 'Transit', 'Transport']]){ const s = $(id) && $(id).querySelector('span'); if (s) s.textContent = T.on ? a : b; }
       const fb = $('furnBtn'); if (fb) fb.textContent = T.on ? 'Scan' : 'Scan pod';   // (it's Scan pod: furnish.js)
       if (T.on) flash(); else if (hint){ clearTimeout(fadeT); hint.classList.remove('tfade'); }
     };
 
-    // the dock: the menus (and City settings, on the player's page) come down beside the zones, in one row
-    // (moved back where they were if the device changes its mind)
-    const bar = document.querySelector('.zonebar'), zones = bar && bar.querySelector('.zones'), bm = $('bmenu'), ctl = document.querySelector('.ctlwrap');
-    const unit = ctl && ctl.parentNode && ctl.parentNode.classList.contains('pu-ctlrow') ? ctl.parentNode : ctl;   // (playerui.js puts City settings beside it)
-    const home = bm && { parent: bm.parentNode, next: bm.nextSibling }, ctlHome = unit && { parent: unit.parentNode, next: unit.nextSibling };
-    let row = null;
+    // the dock: Buildings and Transport sit either side of the zone card (where the arrows and the delete button are on a desktop: a touch screen has
+    // neither; the zones swipe, and press and hold removes), each shown once it has something in it. Their lists open above the dock. Controls and
+    // City settings live in Settings on a touch screen (playerui.js). Everything is moved back where it was if the device changes its mind.
+    const bar = document.querySelector('.zonebar'), zones = bar && bar.querySelector('.zones'), bm = $('bmenu'), tm = $('tmenu'), ctl = document.querySelector('.ctlwrap');
+    const parts = ['bmenuHead', 'tmenuHead', 'bmenuList', 'tmenuList'].map($), homes = parts.map(n => n && { parent: n.parentNode, next: n.nextSibling });
+    const syncHeads = () => { const [bh, th] = parts; if (!T.on) return; if (bh) bh.hidden = !bm || bm.hidden; if (th) th.hidden = !tm || tm.hidden || (bm && bm.hidden); };
+    if (bm) new MutationObserver(syncHeads).observe(bm, { attributes: true, attributeFilter: ['hidden'] });
+    if (tm) new MutationObserver(syncHeads).observe(tm, { attributes: true, attributeFilter: ['hidden'] });
     const dock = () => {
-      if (!bar || !zones || !bm) return;
-      // (the row is a rail of its own at the right edge, above the dock: kept out of the dock, whose transform would pin its lists to the dock)
-      if (T.on){ if (!row){ row = document.createElement('div'); row.className = 'trail'; row.setAttribute('role', 'toolbar'); row.setAttribute('aria-label', 'Menus'); } document.body.appendChild(row); row.appendChild(bm); if (unit) row.appendChild(unit); }
-      else if (row){ home.parent.insertBefore(bm, home.next); if (unit) ctlHome.parent.insertBefore(unit, ctlHome.next); row.remove(); }
+      if (!bar || !zones || parts.some(n => !n)) return;
+      const [bh, th, bl, tl] = parts;
+      if (T.on){
+        const zs = [...zones.querySelectorAll('.zone[data-zone]')].map(z => z.closest('.zcol') || z);
+        zones.insertBefore(bh, zones.firstChild); if (zs.length) zs[zs.length - 1].after(th); else zones.appendChild(th);
+        bar.appendChild(bl); bar.appendChild(tl); bh.classList.add('tside'); th.classList.add('tside'); syncHeads();
+      } else {
+        parts.forEach((n, k) => { n.classList.remove('tside'); n.hidden = false; homes[k].parent.insertBefore(n, homes[k].next && homes[k].next.parentNode === homes[k].parent ? homes[k].next : null); });
+      }
     };
     // Controls: a tap opens the box, the ✕ (or a tap on the city) closes it
     const open = (b) => { if (ctl) ctl.classList.toggle('open', b); };

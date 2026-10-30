@@ -19,8 +19,9 @@ OUT = os.path.join(ROOT, 'build', 'itch')
 CACHE = os.path.join(ROOT, 'build', 'itch-cache')
 ZIP = os.path.join(ROOT, 'build', 'neon-terrarium-itch.zip')
 
-# what the game loads: the three pages, the code, the styles, the art and sound, the stories and cases, the title screen's live lighting
-INCLUDE = ['index.html', 'furnish.html', 'coast.html', 'js/', 'css/', 'furnish/', 'assets/', 'data/', 'tools/title/kitchen.js', 'tools/title/realtime.js']
+# what the game loads: the pages (m.html: the phone page, where index.html sends a phone or tablet, with its smaller scripts in min/ and its
+# saved copy of the files, sw.js), the code, the styles, the art and sound, the stories and cases, the title screen's live lighting
+INCLUDE = ['index.html', 'm.html', 'min/', 'sw.js', 'furnish.html', 'coast.html', 'js/', 'css/', 'furnish/', 'assets/', 'data/', 'tools/title/kitchen.js', 'tools/title/realtime.js']
 EXCLUDE = ['assets/audio/sfx/originals/', 'assets/sprites/originals/']
 EXCLUDE_EXT = ('.md', '.py')
 
@@ -81,7 +82,7 @@ def main():
     if f.startswith('assets/audio/') and ext in AUDIO: audio(src, dst, ext); saved += os.path.getsize(src) - os.path.getsize(dst)
     else: shutil.copyfile(src, dst)
   vend = three()
-  for page in ('index.html', 'furnish.html', 'coast.html'):
+  for page in ('index.html', 'm.html', 'furnish.html', 'coast.html'):
     p = os.path.join(OUT, page); s = open(p, encoding='utf-8').read()
     for url, rel in vend.items(): s = s.replace(url, rel)
     s = s.replace('<head>', '<head>\n' + NO_DEV, 1)
@@ -107,7 +108,7 @@ def check(saved):
   bad += [r + ' has a path over 240 characters' for r in rels if len(r) > 240]
   # every local file the pages ask for by src or href must be there, case for case
   have = set(rels)
-  for page in ('index.html', 'furnish.html', 'coast.html'):
+  for page in ('index.html', 'm.html', 'furnish.html', 'coast.html'):
     for u in re.findall(r'(?:src|href)="([^"#]+)"', open(os.path.join(OUT, page), encoding='utf-8').read()):
       if re.match(r'^(https?:|data:|mailto:|javascript:)', u):
         if u.startswith('http:'): bad.append(page + ' asks for ' + u + ' over plain http')

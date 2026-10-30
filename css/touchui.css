@@ -156,3 +156,27 @@ html.touch .tmq > .tmq-in{animation:tmq var(--mqt,8s) linear infinite}
 .taim{display:none}
 html.touch .taim:not([hidden]){display:block;position:fixed;left:0;top:0;z-index:7;pointer-events:none;padding:6px 10px;font-family:var(--font-pixel);font-size:11px;letter-spacing:.08em;
   color:#e9fbff;background:rgba(6,14,26,.9);border:1px solid rgba(90,232,255,.75);white-space:nowrap}
+
+/* ---------- transit on touch (owner, Oct 30) ---------- */
+/* while a sky highway or a metro line is being built, the dock's Transit button glows in its colour (and so does the one picked in its list), so it is
+   plain what is selected; it breathes slowly, and holds still with Reduce motion */
+html.touch:has(#hwBtn.on) #tmenuHead.tside{--tg:#a77bff}
+html.touch:has(#mtBtn.on) #tmenuHead.tside{--tg:#5aff7a}
+html.touch:has(#hwBtn.on, #mtBtn.on) .zones > #tmenuHead.tside{color:#fff;border-color:var(--tg);background:color-mix(in srgb, var(--tg) 22%, rgba(10,16,32,.92));
+  box-shadow:0 0 0 1px var(--tg),0 0 14px color-mix(in srgb, var(--tg) 70%, transparent),inset 0 0 10px color-mix(in srgb, var(--tg) 35%, transparent);
+  text-shadow:0 0 6px var(--tg);animation:tTransitGlow 2.4s ease-in-out infinite}
+html.touch #tmenuList .bitem.on{box-shadow:0 0 0 1px var(--m),0 0 16px color-mix(in srgb, var(--m) 70%, transparent)}
+@keyframes tTransitGlow{0%,100%{box-shadow:0 0 0 1px var(--tg),0 0 10px color-mix(in srgb, var(--tg) 55%, transparent),inset 0 0 8px color-mix(in srgb, var(--tg) 25%, transparent)}
+  50%{box-shadow:0 0 0 1px var(--tg),0 0 20px color-mix(in srgb, var(--tg) 85%, transparent),inset 0 0 12px color-mix(in srgb, var(--tg) 45%, transparent)}}
+html.touch.nt-calm .zones > #tmenuHead.tside{animation:none}
+/* the Instructions buttons and panels: short tutorials take their place on touch (tutorial.js, the transit tutorials) */
+html.touch .thelp,html.touch .hwhelp{display:none!important}
+/* the highway's height selector: centred, and whole on the screen upright and sideways, clear of the notch and the rounded corners
+   (it was as wide as its contents, wider than the dock on a narrow phone, so it hung off to the right) */
+html.touch .zonebar > .hwbar{box-sizing:border-box;min-width:0;max-width:calc(100vw - 16px - 2*max(env(safe-area-inset-left,0px), env(safe-area-inset-right,0px)));
+  justify-self:center;justify-content:center;gap:6px;padding:6px 10px}
+html.touch .zonebar > .hwbar > *{flex:none}
+html.touch .hwbar button{min-width:40px}
+html.touch .hwbar .hwlanes{margin-left:6px}
+html.tland .zonebar > .hwbar{left:50%;right:auto;transform:translateX(-50%);width:max-content}
+@media (max-width:370px){html.touch .zonebar > .hwbar small{display:none}html.touch .zonebar > .hwbar{gap:4px;padding:6px 8px}}

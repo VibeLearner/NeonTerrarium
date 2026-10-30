@@ -9,15 +9,20 @@ const PAL = {
   0: "#34389f", 1: "#4439a8", 2: "#5c3fae", 3: "#7646ac", 4: "#8e48a2", 5: "#a84c9a", 6: "#c25a98",
   // clouds: lit top, mauve, plum, shadow
   a: "#c4669f", b: "#ac518d", c: "#8f4388", d: "#6f3a7c",
-  // walls as (top / lit side / shadow side), every one built from the sky: dusk rose, mauve, lavender grey,
-  // periwinkle, deep plum, peach clay (warm accent), soft violet-teal (cool accent)
-  R: "#62344e", r: "#4a243a", u: "#321c42",
-  P: "#54345e", p: "#36203f", q: "#2e1a3c",
-  S: "#6e3632", s: "#502a2a", t: "#3a1e2c",
-  K: "#364270", k: "#28325a", l: "#261e44",
-  D: "#3e1e46", E: "#301836", e: "#26142e",
-  T: "#7a4650", U: "#582c38", m: "#321c42",
-  f: "#2e485e", i: "#22364a", j: "#221e40",
+  // walls as (top / lit side / shadow side), seven distinct families: dusk rose, lilac grey, coral clay, periwinkle, plum, ink navy, deep teal
+  R: "#b05a7e", r: "#84405e", u: "#582a42",
+  P: "#8a7aa8", p: "#665a84", q: "#443c5c",
+  S: "#c86a62", s: "#9a4c4c", t: "#643038",
+  K: "#5c6cb0", k: "#434e86", l: "#2c3460",
+  D: "#7a3e86", E: "#582c64", e: "#3a1c44",
+  "%": "#2e3460", "^": "#222648", "&": "#161a32",
+  f: "#3e7a86", i: "#2c5a66", j: "#1c3c48",
+  // rosy wood for rails, benches and trunks; dusky glow
+  T: "#a85a5a", U: "#7a3e48", m: "#4a2a50",
+  // warm dusky stone for plazas and paths: lit, mid, shade
+  "*": "#8a5a78", "(": "#64405c", ")": "#3e2840",
+  // glass: pale cyan-white lit, mid, shade, frame, pink sky reflection
+  "$": "#cfeff0", "-": "#8fc4d0", "+": "#5a8aa8", "=": "#3a4a6a", "[": "#e8a0c8",
   // homes at dusk: peach, honey, soft pink, cool white-blue, shop gold; unlit deep plum
   y: "#ff9a6a", h: "#ffd27a", z: "#ff8ac0", v: "#d8ecff", Y: "#ffc94a", w: "#2a1838", L: "#ffb050",
   // neon: pink, magenta, cyan, violet, mint
@@ -25,7 +30,7 @@ const PAL = {
   // foliage, five steps: warm highlight (7), lit leaf (g), mid (o), shadow (O), indigo deep shadow (8); pink-lavender rim (9)
   7: "#b8e07a", g: "#78c25a", o: "#3f9450", O: "#23604a", 8: "#1c2e44", 9: "#d89ac0",
   // terracotta pots, greenhouse glass glow
-  "!": "#c0644a", "@": "#8a4232", "$": "#cfeec8",
+  "!": "#c0644a", "@": "#8a4232",
   // streets and shadows, the dusk violet of the haze, the pink rim light
   A: "#2a1a48", B: "#2e1c50", Q: "#61298a", Z: "#f08592",
   // title: coral, purple, mint, ink, pale pink
@@ -174,7 +179,7 @@ const nearestKey = (r, g, b) => {
 const levelFor = (yBase) => (yBase >= 400 ? 0 : Math.round(20 * (0.15 + 0.1 * clamp((400 - yBase) / 80, 0, 1))))
 const darkFor = (cx, yBase) => Math.round(clamp((380 - cx) / 170, 0, 1) * clamp((yBase - 350) / 100, 0, 1) * 0.55 * 20)
 const tintCache = new Map()
-const LIGHTKEYS = new Set("yhzvYnHMVNL$7")
+const LIGHTKEYS = new Set("yhzvYnHMVNL$7-[+=")
 const tintKey = (k, hz, dk, wm) => {
   if (LIGHTKEYS.has(k)) { hz = Math.round(hz * 0.3); dk = Math.round(dk * 0.4); wm = 0 }
   if (!hz && !dk && !wm) return k
@@ -199,15 +204,17 @@ const darkKey = (k, amt) => {
 }
 const GROUND_Y = 440
 const grounded = (x, y, k) => {
-  if (y < GROUND_Y) return k
+  if (y < GROUND_Y || "$-+[=".includes(k)) return k
   const t = (y - GROUND_Y) / (H - GROUND_Y)
   return bay(x, y) < Math.min(1, t * 1.15) ? darkKey(k, 0.12 + 0.33 * t) : k
 }
 // what a raw key becomes at (x, y) once the haze, the dark corner, the warm core and the gradient are on it
-const FK = (x, y, k) => { const i = y * W + x; const kk = tintKey(k, DEPTH[i], DARK[i], WARM[i]); return CITY[i] ? grounded(x, y, kk) : kk }
+const DIMW = 9
+const WALLDIM = new Set("RruPpqSstKklDEe%^&fijTUm")
+const FK = (x, y, k) => { const i = y * W + x; const kk = tintKey(k, DEPTH[i], Math.min(20, DARK[i] + (WALLDIM.has(k) ? DIMW : 0)), WARM[i]); return CITY[i] ? grounded(x, y, kk) : kk }
 
 // ---------------------------------------------------------------- glow
-const EMIT = new Set("yhzvYVNHMnL$")
+const EMIT = new Set("yhzvYVNHMnL$-")
 const glowAround = (pts, k, reach = 2, sink) => {
   const set = new Set(pts.map(([x, y]) => x + y * W))
   for (const [x, y] of pts) for (let dy = -reach; dy <= reach; dy++) for (let dx = -reach; dx <= reach; dx++) {
@@ -269,7 +276,7 @@ const wallXY = (side, m, u, r) => side === "L"
 // ---------------------------------------------------------------- colours of the buildings
 const FAMS = {
   rose: { top: "R", L: "r", R: "u" }, mauve: { top: "P", L: "p", R: "q" }, terra: { top: "S", L: "s", R: "t" },
-  peri: { top: "K", L: "k", R: "l" }, plum: { top: "D", L: "E", R: "e" }, peach: { top: "T", L: "U", R: "m" }, teal: { top: "f", L: "i", R: "j" },
+  peri: { top: "K", L: "k", R: "l" }, plum: { top: "D", L: "E", R: "e" }, peach: { top: "S", L: "s", R: "t" }, navy: { top: "%", L: "^", R: "&" }, teal: { top: "f", L: "i", R: "j" },
 }
 const FAMMAIN = ["rose", "plum", "peach", "terra", "rose", "plum", "terra", "peach", "mauve"]
 const ACCENTS = ["H", "H", "H", "H", "M", "M", "n", "n", "n", "V", "N"]
@@ -337,7 +344,7 @@ const PINKRAMP = ["W", "J", "z", "9", "Z"]
 const trunk = (x, y, h, w, seed) => {
   for (let j = 0; j < h; j++) {
     const ww = j < 2 && w > 1 ? w + 1 : w
-    for (let i = 0; i < ww; i++) put(x - (ww >> 1) + i, y - j, i === 0 && ww > 1 ? "U" : i === ww - 1 && ww > 2 ? "e" : "E")
+    for (let i = 0; i < ww; i++) put(x - (ww >> 1) + i, y - j, i === 0 && ww > 1 ? "T" : i === ww - 1 && ww > 2 ? "e" : "U")
   }
 }
 // a round street tree: trunk, a few branches, a lumpy crown 8 to 16 px across
@@ -487,7 +494,7 @@ const stringLights = (x1, y1, x2, y2, sag, seed) => {
   }
   glowAround(pts, "T", 3)
 }
-const GROUNDSET = new Set("AB")
+const GROUNDSET = new Set("AB*()")
 const pool = (cx, cy, rx, ry, k, dens) => {
   for (let y = -ry; y <= ry; y++) for (let x = -rx; x <= rx; x++) {
     const dd = (x * x) / (rx * rx) + (y * y) / (ry * ry)
@@ -876,48 +883,50 @@ const antennaCluster = (x, y, id) => {
   for (const [i, j, k] of [[0, 0, "K"], [1, 0, "K"], [2, 0, "K"], [0, 1, "k"], [1, 1, "l"], [2, 1, "k"], [1, 2, "E"]]) put(x + 12 + i, y - 8 + j, k)
   vlineK(x + 13, y - 5, 5, "E")
 }
-// a person-sized glow of leaves behind glass: used by the greenhouse
+// a glass greenhouse dome: cyan-white panes in a dark frame grid, soft warm light and dim plants inside,
+// a specular streak on the upper left and a pink sky reflection on top
 const greenhouse = (cx, cy, rxD, Dh, seed) => {
   const ryD = Math.round(rxD / 2)
   const inside = (x, y) => { const t = (x + 0.5 - cx) / rxD; if (Math.abs(t) >= 1) return false; const s = Math.sqrt(1 - t * t); return y + 0.5 >= cy - Dh * s && y + 0.5 <= cy + ryD * s }
   const pts = []
-  for (let x = cx - rxD; x <= cx + rxD; x++) {
-    const t = (x + 0.5 - cx) / rxD; if (Math.abs(t) >= 1) continue
-    const s = Math.sqrt(1 - t * t)
-    for (let y = Math.floor(cy - Dh * s); y <= Math.ceil(cy + ryD * s); y++) {
-      if (!inside(x, y)) continue
-      const ty = (y - (cy - Dh)) / (Dh + ryD)
-      put(x, y, ty < 0.35 ? (bay(x, y) < 0.7 ? "$" : "v") : ty < 0.72 ? "$" : (bay(x, y) < 0.6 ? "$" : "7"))
-    }
+  const tot = Dh + ryD
+  // panes: shade by where they sit on the sphere (lit upper left, shade lower right)
+  for (let x = cx - rxD; x <= cx + rxD; x++) for (let y = cy - Dh; y <= cy + ryD; y++) {
+    if (!inside(x, y)) continue
+    const tx = (x + 0.5 - cx) / rxD, ty = (y - (cy - Dh)) / tot
+    const l = -tx * 0.6 - (ty - 0.35) * 0.9 + (bay(x, y) - 0.5) * 0.25
+    put(x, y, l > 0.1 ? "$" : l > -0.5 ? "-" : "+")
   }
-  // plants seen through the glass, clipped to the dome
-  CLIP = inside
-  const base = cy + Math.round(ryD * 0.55)
-  const IR = GREENRAMP
-  palm(cx - Math.round(rxD * 0.35), base, Math.round(Dh * 0.75), seed + 1, -2)
-  leafMass(cx + Math.round(rxD * 0.45), base - 2, Math.max(5, Math.round(rxD * 0.3)), seed + 2, { sq: 0.8, warm: -1, ramp: IR })
-  leafMass(cx - Math.round(rxD * 0.62), base - 1, Math.max(4, Math.round(rxD * 0.22)), seed + 3, { sq: 0.8, ramp: IR })
-  leafMass(cx + Math.round(rxD * 0.05), base + 1, Math.max(5, Math.round(rxD * 0.26)), seed + 4, { sq: 0.75, dots: [["z", "W"], 4], ramp: IR })
-  fern(cx + Math.round(rxD * 0.22), base + 3, seed); fern(cx - Math.round(rxD * 0.2), base + 4, seed + 1)
-  bamboo(cx + Math.round(rxD * 0.28), base, Math.round(Dh * 0.7), 2, seed + 7)
+  // inside: soft warm light, low density, then dim green plants at about half density
+  for (let x = cx - rxD; x <= cx + rxD; x++) for (let y = cy - Math.round(Dh * 0.5); y <= cy + ryD; y++) if (inside(x, y) && ((x + 2 * y) & 7) === 0 && ih(x, y, seed) < 0.7) put(x, y, "h")
+  const DIM = ["o", "o", "O", "O", "8"]
+  CLIP = (x, y) => inside(x, y) && bay(x, y) < 0.55
+  const base = cy + Math.round(ryD * 0.5)
+  leafMass(cx - Math.round(rxD * 0.42), base - 3, Math.max(4, Math.round(rxD * 0.26)), seed + 2, { ramp: DIM, rim: "o", sq: 0.9 })
+  leafMass(cx + Math.round(rxD * 0.4), base - 4, Math.max(5, Math.round(rxD * 0.3)), seed + 3, { ramp: DIM, rim: "o", sq: 0.9 })
+  leafMass(cx, base - 1, Math.max(4, Math.round(rxD * 0.24)), seed + 4, { ramp: DIM, rim: "o", sq: 0.8 })
+  for (const dx of [-0.2, 0.2]) vlineK(cx + Math.round(rxD * dx), base - Math.round(Dh * 0.7), Math.round(Dh * 0.7), "8")
+  leafMass(cx - Math.round(rxD * 0.2), base - Math.round(Dh * 0.7), 3, seed + 5, { ramp: DIM, rim: "o" })
+  leafMass(cx + Math.round(rxD * 0.2), base - Math.round(Dh * 0.55), 3, seed + 6, { ramp: DIM, rim: "o" })
   CLIP = null
-  // ribs, hoop and outline in dark frame metal, glints on the sky side
-  for (let f = -2; f <= 2; f++) {
-    for (let y = Math.floor(cy - Dh); y <= cy + ryD; y++) {
-      const yo = y + 0.5 - cy, s = yo < 0 ? Math.sqrt(Math.max(0, 1 - (yo / Dh) ** 2)) : Math.sqrt(Math.max(0, 1 - (yo / ryD) ** 2))
-      const x = Math.round(cx + (f / 2.6) * rxD * s)
-      if (inside(x, y)) put(x, y, "A")
-    }
+  // the frame: ribs and hoops in dark blue-grey, and an outline
+  for (let f = -2; f <= 2; f++) for (let y = Math.floor(cy - Dh); y <= cy + ryD; y++) {
+    const yo = y + 0.5 - cy, s = yo < 0 ? Math.sqrt(Math.max(0, 1 - (yo / Dh) ** 2)) : Math.sqrt(Math.max(0, 1 - (yo / ryD) ** 2))
+    const x = Math.round(cx + (f / 2.6) * rxD * s)
+    if (inside(x, y)) put(x, y, "=")
   }
   for (let x = cx - rxD; x <= cx + rxD; x++) {
     const t = (x + 0.5 - cx) / rxD; if (Math.abs(t) >= 1) continue
     const s = Math.sqrt(1 - t * t)
     const yt = Math.round(cy - Dh * s), yb = Math.round(cy + ryD * s)
-    put(x, yt, t < 0.2 ? "W" : "A"); pts.push([x, yt])
-    put(x, yb, "A"); put(x, yb + 1, "K"); pts.push([x, yb])
-    put(x, Math.round(cy - Dh * s * 0.5 - 0.0), (x & 1) ? "A" : "$")
+    put(x, yt, "="); pts.push([x, yt])
+    put(x, yb, "="); put(x, yb + 1, "="); pts.push([x, yb])
+    for (const k of [0.33, 0.66]) { const yh = Math.round(cy - Dh * s * k); if (inside(x, yh)) put(x, yh, "=") }
+    // pink sky reflection on the crown
+    if (t > -0.6 && t < 0.5 && ih(x, 1, seed) < 0.9) { put(x, yt + 1, "["); if ((x & 1) === 0) put(x, yt + 2, "[") }
   }
-  for (let j = Math.round(cy - Dh * 0.4); j < cy; j++) { const x = Math.round(cx - rxD * 0.55 + (j - cy) * 0.3); if (inside(x, j)) put(x, j, "W") }
+  // the specular streak, upper left
+  for (let j = 0; j < Math.round(Dh * 0.55); j++) { const x = cx - Math.round(rxD * 0.62) + Math.round(j * 0.55), y = cy - Math.round(Dh * 0.75) + j; if (inside(x, y)) { put(x, y, "W"); if (j < Dh * 0.35) put(x + 1, y, "W") } }
   glowAround(pts, "f", 3)
 }
 
@@ -1015,6 +1024,19 @@ for (const bd of blds) {
     bd.fp = { a: bd.a0 + (bd.w - mw) / 2, b: bd.b0 + (bd.d - md) / 2, w: mw, d: md }
   }
 }
+{
+  // each building gets one wall family, neighbors differ; the towers beside the hero lean cool so they separate from its warm glow
+  const NAMES = ["rose", "teal", "peri", "plum", "terra", "mauve", "navy"]
+  const adj2 = (p, q) => p.a0 - 1 <= q.a0 + q.w && q.a0 - 1 <= p.a0 + p.w && p.b0 - 1 <= q.b0 + q.d && q.b0 - 1 <= p.b0 + p.d
+  const use = {}
+  for (const bd of [...blds].sort((p, q) => (q.vis - p.vis) || (ih(p.id, 9, 9) - ih(q.id, 9, 9)))) {
+    const nb = new Set(blds.filter((o) => o.famName && o !== bd && adj2(bd, o)).map((o) => o.famName))
+    const al = Math.abs(bd.cx - 552) < 130 && bd.cy < 460 ? ["teal", "peri", "navy"] : NAMES
+    let c = al.filter((n) => !nb.has(n)); if (!c.length) c = al
+    c.sort((p, q) => (use[p] || 0) - (use[q] || 0) + (ih(bd.id, p.length * 3 + p.charCodeAt(0), 8) - ih(bd.id, q.length * 3 + q.charCodeAt(0), 8)) * 1.5)
+    bd.famName = c[0]; use[c[0]] = (use[c[0]] || 0) + 1
+  }
+}
 const HRANGE = { tenement: [100, 160], glass: [130, 180], pod: [90, 130], pill: [110, 170], slim: [150, 240], grid: [60, 130], terrace: [55, 115], shop: [30, 46], tea: [28, 40], dome: [58, 80], industrial: [56, 96] }
 const heightOf = (bd) => {
   const r1 = ih(bd.id, 3, 9), r2 = ih(bd.id, 4, 9)
@@ -1061,16 +1083,7 @@ const BRIDGES = []
 }
 
 // ---------------------------------------------------------------- what each type puts on its walls
-const pickFam = (bd, i) => {
-  const r = ih(bd.id, 2, 3)
-  let k = Math.floor(ih(bd.id, 12, 3) * FAMMAIN.length)
-  if (bd.type === "glass") return "peri"
-  if (bd.type === "grid") return ["rose", "plum", "peach", "terra", "mauve"][k % 5]
-  if (r < 0.09) return "teal"
-  if (r < 0.17) return "peri"
-  if (bd.type === "industrial") return ["plum", "plum", "mauve", "terra"][k % 4]
-  return FAMMAIN[(k + i) % FAMMAIN.length]
-}
+const pickFam = (bd) => bd.famName
 const wallBoards = (bd, m, n, accent, wk, kinds, base = 8) => {
   const id = bd.id
   for (let s = 0; s < n; s++) {
@@ -1090,7 +1103,7 @@ let SAKURAS = 0
 const gardenRoofFn = (a, b, w, d) => (x, y, i) => {
   if (i.low || i.up || i.side) return null
   const mid = b + d / 2
-  if (Math.abs(i.b - mid) < 0.2) return ((x + y) % 6 === 0 ? "U" : (x >> 1) % 3 === 0 ? "T" : "S")
+  if (Math.abs(i.b - mid) < 0.2) return ((x + y) % 6 === 0 ? ")" : (x >> 1) % 3 === 0 ? "*" : "(")
   return null
 }
 const gardenBeds = (z, a, b, w, d, seed, far) => {
@@ -1190,7 +1203,7 @@ const drawBuilding = (bd) => {
     roofBits(rx, ry, "tank")
   } else if (type === "glass") {
     const fh = 12, n = Math.max(6, Math.round(H0 / fh)), h = n * fh
-    const lam = FAMS.peri
+    const lam = fam
     const panes = new Map()
     const glassKey = (side) => (u, r, wW, hh, x, y) => {
       const base = side === "L" ? lam.L : lam.R
@@ -1460,7 +1473,7 @@ for (let y = 150; y < H; y++) for (let x = 120; x < W; x++) {
   if (!cellOK(ia, ib)) continue
   curLevel = levelFor(y); curDark = darkFor(x, y)
   const plaza = inRect(PLAZA, ia, ib)
-  put(x, y, plaza ? ((((ia + ib) & 1) ? bay(x, y) < 0.85 : bay(x, y) < 0.35) ? "S" : "s") : (bay(x, y) < 0.22 ? "A" : "B"))
+  put(x, y, plaza ? ((((ia + ib) & 1) ? bay(x, y) < 0.85 : bay(x, y) < 0.35) ? "*" : "(") : (bay(x, y) < 0.22 ? "A" : "B"))
 }
 curLevel = 0; curDark = 0
 // neon spill and shop light pooled on the streets

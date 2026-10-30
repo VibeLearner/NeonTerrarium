@@ -182,3 +182,7 @@ var PHONE = self.PHONE = (() => {
     start(){ if (this.on) return; this.on = true; document.documentElement.classList.add('phone');
       try { if (typeof PERF !== 'undefined'){ PERF.vs = 1000/this.fps; } if (typeof FARV !== 'undefined') FARV.ema = 1000/this.fps; if (typeof SD !== 'undefined'){ SD.v0 = this.sdV0; SD.cursorPx = 0; } } catch (e) {} } };
 })();
+// the phone's own copy of the game's files, so a second visit isn't waiting on the network (sw.js). Touch screens only, registered a few seconds
+// after the page has loaded so it never competes with the first load
+if (TOUCH.on && 'serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost'))
+  addEventListener('load', () => setTimeout(() => { try { navigator.serviceWorker.register('sw.js').catch(() => {}); } catch (e) {} }, 3000));

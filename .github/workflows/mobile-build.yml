@@ -1,0 +1,34 @@
+# Keeps the phone page (m.html) and its smaller scripts (min/js/) in step with index.html and js/: on every push to main that touches either,
+# runs tools/mobile/build.js and commits what changed, then asks GitHub Pages to publish again (a commit made here doesn't start a Pages build
+# by itself). Phones only: a computer never loads m.html or min/js/.
+name: Mobile build
+on:
+  push:
+    branches: [main]
+    paths: ['index.html', 'js/**', 'tools/mobile/**']
+  workflow_dispatch:
+permissions:
+  contents: write
+  pages: write
+concurrency: mobile-build
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build
+        run: npm i --no-save --no-package-lock terser@5.51.2 && node tools/mobile/build.js
+      - name: Commit and publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git add -A m.html min
+          if git diff --cached --quiet; then echo "the phone page was up to date"; exit 0; fi
+          git config user.name "mobile-build"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Phone page: rebuilt from index.html and js/ (tools/mobile/build.js)"
+          git push
+          gh api -X POST "repos/${{ github.repository }}/pages/builds" || echo "could not ask Pages to publish; the next push will"

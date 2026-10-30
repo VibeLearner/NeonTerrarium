@@ -21,12 +21,12 @@ const TITLE = (() => {
   const gD = cvDust.getContext('2d'), gS = cvSky.getContext('2d'), gP = cvPl.getContext('2d');
   let plSrc = null, plOut = null, plBase = null, plW = 0, plH = 0, clouds = [], plantAt = 0;
   const reduced = false;   // (the game's animations play whatever the device's reduce-motion setting says: owner's choice, Oct 30)
-  const VER = '2026-10-19b';
+  const VER = '2026-10-30L';
   let RAW = null, TOD = 'morning', SUNS = [], sunCv = null, gSun = null, sunH = 0, yaw0 = null, sunW = 1, sway = { x: 0, y: 0, r: 0 };
   let A = null, view = null, W = 0, H = 0, S0 = 1, OX = 0, OY = 0, raf = 0, last = 0, motes = [];
   const anchorsP = fetch('assets/title/anchors.json?v=' + VER).then(r => r.json()).catch(() => null);
   // (phone mode, touch.js: no live lighting, the baked pictures instead: a renderer less, and the surface bake's pictures are not loaded)
-  const PHONE_T = !!(self.PHONE && PHONE.on), IMG = PHONE_T ? '.webp' : '.png';   // (and the pictures as lossless WebP: the same pixels, about a third of the bytes)
+  const PHONE_T = !!(self.PHONE && PHONE.on), IMG = PHONE_T || (typeof TOUCH !== 'undefined' && TOUCH.on) ? '.webp' : '.png';   // (and the pictures as lossless WebP: the same pixels, about a third of the bytes)
   const gbufP = PHONE_T ? Promise.resolve(null) : fetch('assets/title/gbuf.json?v=' + VER).then(r => r.ok ? r.json() : null).catch(() => null);   // (the surface bake: the room lit live)
   let GB = null, RTMODE = false, RT = null, rtCv = null, HOUR = 8;
 
@@ -253,7 +253,10 @@ const TITLE = (() => {
   const furnReady = () => { try { return typeof FURN === 'undefined' || !FURN.warmed || FURN.warmed(); } catch (e) { return true; } };
   // (a city with nothing built yet has nobody to wait for: a new one, or one just started)
   const builtNone = () => { try { for (const c of cells.values()) if (c.sections.length || c.mega) return false; return true; } catch (e) { return false; } };
-  const cityReady = () => { try { return (typeof LOADP === 'undefined' || (!LOADP.on && !(LOADP.cool > 0))) && (typeof pplReady === 'undefined' || pplReady || builtNone()); } catch (e) { return true; } };
+  // (touch: the screen doesn't wait out the cool-down after the last plot, nor more than 3 s for the merges, nor for the Scan pod page: phones load slower, and
+  //  all three carry on behind the open city. A phone loads the Scan pod page later, while the player is still, see furnish.js)
+  const TOUCH_T = typeof TOUCH !== 'undefined' && TOUCH.on;
+  const cityReady = () => { try { return (typeof LOADP === 'undefined' || (!LOADP.on && (TOUCH_T || !(LOADP.cool > 0)))) && (typeof pplReady === 'undefined' || pplReady || builtNone()); } catch (e) { return true; } };
   // Loaded: the plots are all in, the people out, and the blocks merged (or ten seconds since the rest, merges can go on a while). The shutter used to give up after 15 s and open
   // on a city still building (owner Oct 26: it opened before the game had loaded); now it waits as long as the load is getting somewhere, and only gives up when nothing has
   // moved on for 20 s
@@ -267,12 +270,12 @@ const TITLE = (() => {
     if (!cityReady()){ loadedAt = null; return false; }
     if (loadedAt === null) loadedAt = now;
     let merging = false; try { merging = !!(solidDirty.size || SOLID_JOB); } catch (e) {}
-    return (!merging && now - loadedAt > 500) || now - loadedAt > 10000;
+    return (!merging && now - loadedAt > 500) || now - loadedAt > (TOUCH_T ? 3000 : 10000);
   }
   let shutR = null, shutCam = null, shutScene = null;
   function drawShutter(now){
     // the shutter is the loading screen: it opens once the city has loaded and the Furnish page is warm (its shaders compiled), so neither costs anything later
-    if (openFrom === null && shutR && now - shownAt > 900){ const ok = settled(now); if ((ok && (furnReady() || now - shownAt > 60000)) || stalled(now)) openFrom = now + 300; }   // (never stuck shut: 60 s at most for the Furnish warm-up once the city has loaded, and a load that stops getting anywhere for 20 s)
+    if (openFrom === null && shutR && now - shownAt > 900){ const ok = settled(now); if ((ok && (TOUCH_T || furnReady() || now - shownAt > 60000)) || stalled(now)){ openFrom = now + 300; T.openAt = openFrom; } }   // (never stuck shut: 60 s at most for the Furnish warm-up once the city has loaded, and a load that stops getting anywhere for 20 s)
     const tt = openFrom === null ? 0 : Math.max(0, Math.min(1, (now - openFrom)/3200)); OPEN = reduced ? (openFrom === null ? 0 : 1) : tt*tt*(3 - 2*tt);
     // the room is dark while it's shut (only what light leaks in, and its own lamps), and the daylight comes up with the plates
     const lit = .3 + .7*Math.pow(OPEN, .8); DIM = lit; if (Math.abs(lit - (drawShutter.lit || 0)) > .004){ drawShutter.lit = lit; const f = lit >= .999 ? '' : 'brightness(' + lit.toFixed(3) + ') saturate(' + (.7 + .3*lit).toFixed(3) + ')'; for (const el of (RTMODE ? [shutCv, stage.querySelector('.t-live')] : [imRoom, imGlass, imOff, shutCv, stage.querySelector('.t-live')])) if (el) el.style.filter = f; }

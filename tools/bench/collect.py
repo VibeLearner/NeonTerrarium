@@ -25,7 +25,28 @@ def f(v, unit=''):
     return '-' if v is None else f'{v}{unit}'
 
 
+LOAD_LABELS = [('scripts', 'Page and scripts read'), ('title', 'Title screen up'), ('worker', 'Plot worker ready'), ('firstPlot', 'First plot in'),
+               ('allPlots', 'Every plot in'), ('people', 'People out'), ('open', 'Loading screen opened'), ('noTitle', 'Game shown (no title)')]
+
+
+def load_report(R):
+    """A load timeline from the phone page's ?loadtest (js/loadtrace.js)."""
+    d, M, F = R.get('device', {}), R.get('marks', {}), R.get('files', {})
+    c = d.get('connection') or {}
+    L = [f"# Phone load {R.get('id')}", '', f"{R.get('started', '?')} on {R.get('page', '?')}, "
+         + ('files from the phone\'s saved copy where it had them' if R.get('swControlled') else 'first visit (nothing saved on the phone)'), '',
+         f"Device: {d.get('model') or '-'}, {d.get('gpu') or '-'}, {d.get('cores')} cores, {d.get('memGB')} GB, phone mode {d.get('phoneMode')}; "
+         f"network {c.get('type')} {c.get('down')} Mbps, {c.get('rtt')} ms round trip. City: {R.get('city')}", '',
+         '| stage | seconds from opening the address |', '|---|---|']
+    L += [f"| {lab} | {M[k]/1000:.1f} |" for k, lab in LOAD_LABELS if M.get(k) is not None]
+    L += ['', f"Downloaded {F.get('n')} files, {F.get('kb', 0)/1024:.1f} MB over the network ({F.get('fromPhone')} from the phone's saved copy). Page itself after {F.get('htmlMs')} ms.", '',
+          '| biggest downloads | KB | ms |', '|---|---|---|'] + [f"| {b['u']} | {b['kb']} | {b['ms']} |" for b in F.get('big', [])]
+    return '\n'.join(L) + '\n'
+
+
 def report(R):
+    if R.get('kind') == 'load':
+        return load_report(R)
     d = R.get('device', {})
     L = [f"# Phone benchmark {R.get('id')}", '']
     L.append(f"Run {R.get('started', '?')} to {R.get('ended', '?')} on {R.get('page', '?')}")
@@ -93,6 +114,10 @@ def index(out):
         except Exception:
             continue
         d = R.get('device', {})
+        if R.get('kind') == 'load':
+            o = (R.get('marks') or {}).get('open') or (R.get('marks') or {}).get('noTitle')
+            rows.append(f"| [{R.get('id')}](results/{fn[:-5]}.md) | {R.get('started', '')[:16]} | {d.get('model') or '-'} | load test: open after {o/1000:.1f} s |  |  |" if o else f"| [{R.get('id')}](results/{fn[:-5]}.md) | {R.get('started', '')[:16]} | {d.get('model') or '-'} | load test |  |  |")
+            continue
         city = next((it for it in R.get('items', []) if it.get('scene') == 'city' and it.get('steps')), None)
         slow = next((s for s in (city or {}).get('steps', []) if s['name'] == 'slow turn'), None) if city else None
         rows.append(f"| [{R.get('id')}](results/{fn[:-5]}.md) | {R.get('started', '')[:16]} | {d.get('model') or '-'} | {d.get('gpu')} | {slow.get('fps') if slow else '-'} | {slow.get('p95') if slow else '-'} |")

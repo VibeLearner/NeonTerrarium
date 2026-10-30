@@ -9,23 +9,27 @@ const PAL = {
   0: "#34389f", 1: "#4439a8", 2: "#5c3fae", 3: "#7646ac", 4: "#964ca6", 5: "#b4529f", 6: "#d0629d",
   // clouds: lit top, mauve, plum, shadow
   a: "#c4669f", b: "#ac518d", c: "#8f4388", d: "#6f3a7c",
-  // walls, as (plate top / lit side / shadow side): brown, brick, plum, burnt orange
-  B: "#7a5038", K: "#7a4a36", k: "#5a3a30",
-  R: "#7a4044", r: "#6a3a3e", u: "#4a2a30",
-  P: "#5a4254", p: "#4a3448", q: "#34243a",
-  O: "#8e5634", L: "#7a4a2c", l: "#54301f",
-  // lit glass: amber, orange, pale core, cyan, dark glass, teal, violet, green
-  y: "#ffc94a", o: "#ff9a3a", h: "#ffe9a0", n: "#5ef0ff", w: "#1a1424", v: "#2fd6c6", V: "#8a5bff", N: "#3ae88a",
-  // neon trim: hot pink, magenta, yellow
-  H: "#ff4fb0", M: "#e02fd0", Y: "#ffd23a",
-  // plants, terracotta pots; helipad dark, stone tile, grout
-  g: "#3f7046", e: "#2f5a3c", T: "#c4602e", D: "#2a2438", S: "#8a6a5a", s: "#6a4a44",
+  // walls as (top / lit side / shadow side), every one built from the sky: dusk rose, mauve, lavender grey,
+  // periwinkle, deep plum, peach clay (warm accent), soft violet-teal (cool accent)
+  R: "#b46a86", r: "#8a4c6a", u: "#5c3049",
+  P: "#9a6aa0", p: "#74497c", q: "#4c2e56",
+  S: "#8a86b0", s: "#66628a", t: "#444064",
+  K: "#6c7cb8", k: "#4e5a8e", l: "#343c64",
+  D: "#6a3a6e", E: "#4c2852", e: "#321a38",
+  T: "#d48a86", U: "#a8646a", m: "#74404c",
+  f: "#5f8aa8", i: "#456886", j: "#2f4862",
+  // homes at dusk: peach, honey, soft pink, cool white-blue, shop gold; unlit deep plum
+  y: "#ffb48a", h: "#ffd08a", z: "#ff9ac8", v: "#cfe6ff", Y: "#ffc94a", w: "#2a1838",
+  // neon: pink, magenta, cyan, violet, mint
+  H: "#ff4fb0", M: "#e02fd0", n: "#5ef0ff", V: "#8a5bff", N: "#6dffc8",
+  // dusk greens: lit, mid, shade
+  g: "#78c88a", o: "#4a9a72", O: "#2c5e58",
+  // streets and shadows, the dusk violet of the haze, the pink rim light
+  A: "#2a1a48", B: "#34205a", Q: "#61298a", Z: "#f08592",
   // title: coral, purple, mint, ink, pale pink
   C: "#ff4a6e", X: "#3b1a5c", G: "#3dffcf", I: "#170f3a", J: "#f7c6d6",
   // star cream, pale pink-white, red lights
   F: "#fff0d0", W: "#ffe6ee", x: "#ff3b4a",
-  // dim window light: amber, brown-orange, teal, soft purple; dusk violet haze; helipad ochre
-  m: "#c9803a", j: "#a8603a", t: "#4fb8c8", z: "#8a6ad0", Q: "#61298a", Z: "#8a6a3a",
 }
 pal(PAL)
 const KEYS = Object.keys(PAL).join("")
@@ -33,8 +37,8 @@ const IDX = {}
 for (let i = 0; i < KEYS.length; i++) IDX[KEYS[i]] = i
 
 let fb = new Uint8Array(W * H)
-let recordCity = false, curLevel = 0
-const DEPTH = new Uint8Array(W * H), CITY = new Uint8Array(W * H)
+let recordCity = false, curLevel = 0, curDark = 0
+const DEPTH = new Uint8Array(W * H), CITY = new Uint8Array(W * H), DARK = new Uint8Array(W * H), WARM = new Uint8Array(W * H)
 const inb = (x, y) => x >= 0 && x < W && y >= 0 && y < H
 const put = (x, y, k) => {
   if (!inb(x, y)) return
@@ -42,7 +46,7 @@ const put = (x, y, k) => {
   if (i === undefined) throw new Error("no palette key " + k)
   const p = y * W + x
   fb[p] = i
-  if (recordCity) { CITY[p] = 1; DEPTH[p] = curLevel }
+  if (recordCity) { CITY[p] = 1; DEPTH[p] = curLevel; DARK[p] = curDark }
 }
 const get = (x, y) => (inb(x, y) ? KEYS[fb[y * W + x]] : null)
 const rectK = (x, y, w, h, k) => { for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) put(x + i, y + j, k) }
@@ -82,7 +86,7 @@ const paintPts = (pts, sink) => {
 // ================================================================ sky
 const SKYV = (x, y) => {
   let v = 6.2 * Math.pow(clamp(y / 400, 0, 1), 0.95)
-  v += 0.9 * Math.exp(-Math.hypot((x - 400) / 1.5, y - 340) / 130)
+  v += 1.5 * Math.exp(-Math.hypot((x - 390) / 1.4, (y - 320) * 0.9) / 120)      // a pinker glow right behind the city
   v -= 0.5 * clamp((x - 330) / 300, 0, 1) * clamp(1 - y / 260, 0, 1)      // bluer at the top right
   return clamp(v, 0, 6)
 }
@@ -140,46 +144,57 @@ cloud(86, 304, 0.95, 31, { n: 5, span: 120 })
 cloud(606, 306, 1.0, 32, { n: 5, span: 120 })
 
 // ================================================================ iso city
-const PXs = (a, b) => Math.round((a - b) * 8)
-const PYs = (a, b) => Math.round((a + b) * 4)
+// The buildings are drawn at 16 px per half cell; the hero tower keeps its own, finer 8 px grid.
+let ISO = 16
+const PXs = (a, b) => Math.round((a - b) * ISO)
+const PYs = (a, b) => Math.round((a + b) * ISO / 2)
 
 // the roof line the city climbs along, and where its back row of ground sits under it
 const TKN = [[136, 455], [160, 392], [195, 388], [215, 345], [250, 308], [272, 332], [300, 350], [322, 232], [345, 290], [372, 304], [395, 226], [425, 232], [450, 262], [480, 276], [510, 284], [532, 300], [575, 326], [605, 346], [640, 356]]
 const roofLine = (x) => lerpPoly(TKN, x)
-const backLine = (x) => (x < 224 ? lerpPoly([[136, 508], [205, 500], [224, roofLine(224) + 60]], x) : roofLine(x) + 60)
-const cellOK = (a, b) => {
-  const cx = 8 * (a - b), cy = 4 * (a + b) + 4
-  return cx >= 138 && cx <= 690 && cy >= backLine(cx) && cy <= 575
-}
+const backLine = (x) => (x < 224 ? lerpPoly([[136, 508], [205, 500], [224, roofLine(224) + 84]], x) : roofLine(x) + 84)
+const cellXY = (a, b) => [16 * (a - b), 8 * (a + b) + 8]
+const cellOK = (a, b) => { const [cx, cy] = cellXY(a, b); return cx >= 136 && cx <= 700 && cy >= backLine(cx) && cy <= 590 }
 
-// ---------------------------------------------------------------- distance haze and a grounding gradient
-// every pixel a building paints remembers how far back it stands (DEPTH, in 1/20ths of a blend toward
-// the dusk violet); after the city is drawn each colour is blended and snapped back onto the palette
+// ---------------------------------------------------------------- one light over everything
+// each pixel a building paints remembers how far back it stands (haze toward the dusk violet), how far
+// into the dark front-left it sits, and how near the tower's warm glow it is; once the city is drawn
+// every colour is blended and snapped back onto the palette
 const KEYRGB = {}
 for (const k of KEYS) { const hx = PAL[k]; KEYRGB[k] = [parseInt(hx.slice(1, 3), 16), parseInt(hx.slice(3, 5), 16), parseInt(hx.slice(5, 7), 16)] }
-const SNAP = [...KEYS].filter((k) => !"CXGIJabcdFW".includes(k))
+const SNAP = [...KEYS].filter((k) => !"CXGIJabcdFWx".includes(k))
 const nearestKey = (r, g, b) => {
   let best = "0", bd = 1e9
   for (const k of SNAP) { const c = KEYRGB[k]; const d = (c[0] - r) ** 2 + (c[1] - g) ** 2 + (c[2] - b) ** 2; if (d < bd) { bd = d; best = k } }
   return best
 }
 const levelFor = (yBase) => {
-  const f = yBase >= 500 ? 0 : yBase >= 470 ? 0.3 * (500 - yBase) / 30 : 0.3 + 0.2 * clamp((470 - yBase) / 140, 0, 1)
+  const f = yBase >= 500 ? 0 : yBase >= 470 ? 0.3 * (500 - yBase) / 30 : 0.3 + 0.25 * clamp((470 - yBase) / 140, 0, 1)
   return Math.round(f * 20)
 }
-const hazeCache = new Map()
-const hazeKey = (k, level) => {
-  if (!level) return k
-  const ck2 = level * 128 + IDX[k]
-  let r = hazeCache.get(ck2)
-  if (!r) { const f = level / 20, c = KEYRGB[k], v = KEYRGB.Q; r = nearestKey(c[0] * (1 - f) + v[0] * f, c[1] * (1 - f) + v[1] * f, c[2] * (1 - f) + v[2] * f); hazeCache.set(ck2, r) }
+const darkFor = (cx, yBase) => Math.round(clamp((380 - cx) / 170, 0, 1) * clamp((yBase - 350) / 100, 0, 1) * 0.42 * 20)
+const tintCache = new Map()
+const LIGHTKEYS = new Set("yhzvYnHMVN")
+const tintKey = (k, hz, dk, wm) => {
+  if (LIGHTKEYS.has(k)) { hz = Math.round(hz * 0.3); dk = Math.round(dk * 0.4); wm = 0 }
+  if (!hz && !dk && !wm) return k
+  const ck2 = ((hz * 32 + dk) * 32 + wm) * 128 + IDX[k]
+  let r = tintCache.get(ck2)
+  if (!r) {
+    let c = KEYRGB[k].slice()
+    const mix = (t, f) => { c = [c[0] * (1 - f) + t[0] * f, c[1] * (1 - f) + t[1] * f, c[2] * (1 - f) + t[2] * f] }
+    if (hz) mix(KEYRGB.Q, hz / 20)
+    if (dk) mix(KEYRGB.A, dk / 20)
+    if (wm) mix(KEYRGB.y, wm / 20)
+    r = nearestKey(c[0], c[1], c[2]); tintCache.set(ck2, r)
+  }
   return r
 }
 const darkCache = new Map()
 const darkKey = (k, amt) => {
   const ck2 = Math.round(amt * 10) * 128 + IDX[k]
   let r = darkCache.get(ck2)
-  if (!r) { const a = Math.round(amt * 10) / 10, c = KEYRGB[k], v = KEYRGB.w; r = nearestKey(c[0] * (1 - a) + v[0] * a, c[1] * (1 - a) + v[1] * a, c[2] * (1 - a) + v[2] * a); darkCache.set(ck2, r) }
+  if (!r) { const a = Math.round(amt * 10) / 10, c = KEYRGB[k], v = KEYRGB.A; r = nearestKey(c[0] * (1 - a) + v[0] * a, c[1] * (1 - a) + v[1] * a, c[2] * (1 - a) + v[2] * a); darkCache.set(ck2, r) }
   return r
 }
 const GROUND_Y = 440
@@ -188,11 +203,11 @@ const grounded = (x, y, k) => {
   const t = (y - GROUND_Y) / (H - GROUND_Y)
   return bay(x, y) < Math.min(1, t * 1.15) ? darkKey(k, 0.12 + 0.33 * t) : k
 }
-// what a raw key becomes at (x, y) once the haze and the gradient are on it
-const FK = (x, y, k) => { const i = y * W + x; const kk = hazeKey(k, DEPTH[i]); return CITY[i] ? grounded(x, y, kk) : kk }
+// what a raw key becomes at (x, y) once the haze, the dark corner, the warm core and the gradient are on it
+const FK = (x, y, k) => { const i = y * W + x; const kk = tintKey(k, DEPTH[i], DARK[i], WARM[i]); return CITY[i] ? grounded(x, y, kk) : kk }
 
 // ---------------------------------------------------------------- glow
-const EMIT = new Set("yohnvVNHMYWFxg")
+const EMIT = new Set("yhzvYVNHMn")
 const glowAround = (pts, k, reach = 2, sink) => {
   const set = new Set(pts.map(([x, y]) => x + y * W))
   for (const [x, y] of pts) for (let dy = -reach; dy <= reach; dy++) for (let dx = -reach; dx <= reach; dx++) {
@@ -210,7 +225,7 @@ const glowAround = (pts, k, reach = 2, sink) => {
 // the dithered halo a trim line throws on what lies below it
 const glowDown = (pts, k, sink) => {
   for (const [x, y] of pts) {
-    for (const [dy, dens] of [[1, 0.42], [2, 0.12]]) {
+    for (const [dy, dens] of [[1, 0.5], [2, 0.2]]) {
       const ny = y + dy
       if (!inb(x, ny) || EMIT.has(get(x, ny))) continue
       if (bay(x, ny) < dens) { sink.push([x, ny, k, get(x, ny)]); put(x, ny, k) }
@@ -220,21 +235,21 @@ const glowDown = (pts, k, sink) => {
 
 // ---------------------------------------------------------------- an iso box with its faces as functions
 function isoBox(a0, b0, w, d, h, z0, fn) {
-  const xl = PXs(a0, b0 + d), yBL = PYs(a0, b0 + d) - z0, wl = Math.round(8 * w)
-  const xf = PXs(a0 + w, b0 + d), yF = PYs(a0 + w, b0 + d) - z0, wr = Math.round(8 * d)
+  const xl = PXs(a0, b0 + d), yBL = PYs(a0, b0 + d) - z0, wl = Math.round(ISO * w)
+  const xf = PXs(a0 + w, b0 + d), yF = PYs(a0 + w, b0 + d) - z0, wr = Math.round(ISO * d)
   if (fn.L) for (let u = 0; u < wl; u++) { const off = (u + 1) >> 1; for (let r = 0; r < h; r++) { const k = fn.L(u, r, wl, h, xl + u, yBL - h + off + r); if (k) put(xl + u, yBL - h + off + r, k) } }
   if (fn.R) for (let u = 0; u < wr; u++) { const off = (u + 1) >> 1; for (let r = 0; r < h; r++) { const k = fn.R(u, r, wr, h, xf + u, yF - h - off + r); if (k) put(xf + u, yF - h - off + r, k) } }
   const z = z0 + h
   if (fn.T) {
     const xs = PXs(a0, b0 + d), xe = PXs(a0 + w, b0), ys = PYs(a0, b0) - z, ye = PYs(a0 + w, b0 + d) - z
     const ins = (x, y) => {
-      const u = (x + 0.5) / 8, v = (y + 0.5 + z) / 4
+      const u = (x + 0.5) / ISO, v = (y + 0.5 + z) / (ISO / 2)
       const a = (u + v) / 2, b = (v - u) / 2
       return a >= a0 && a < a0 + w && b >= b0 && b < b0 + d
     }
     for (let y = ys; y <= ye; y++) for (let x = xs; x <= xe; x++) {
       if (!ins(x, y)) continue
-      const u = (x + 0.5) / 8, v = (y + 0.5 + z) / 4
+      const u = (x + 0.5) / ISO, v = (y + 0.5 + z) / (ISO / 2)
       const a = (u + v) / 2, b = (v - u) / 2
       const k = fn.T(x, y, { a, b, low: !ins(x, y + 1), up: !ins(x, y - 1), side: !ins(x - 1, y) || !ins(x + 1, y) })
       if (k) put(x, y, k)
@@ -247,51 +262,113 @@ function isoBox(a0, b0, w, d, h, z0, fn) {
     pt: (a, b) => [PXs(a, b), PYs(a, b) - z],
   }
 }
+const wallXY = (side, m, u, r) => side === "L"
+  ? [PXs(m.a, m.b + m.d) + u, PYs(m.a, m.b + m.d) - m.z - m.h + ((u + 1) >> 1) + r]
+  : [PXs(m.a + m.w, m.b + m.d) + u, PYs(m.a + m.w, m.b + m.d) - m.z - m.h - ((u + 1) >> 1) + r]
 
-// ---------------------------------------------------------------- building parts
-const FAMS = [
-  { top: "B", L: "K", R: "k" }, { top: "R", L: "r", R: "u" }, { top: "P", L: "p", R: "q" }, { top: "O", L: "L", R: "l" },
-]
-const TRIMC = ["H", "H", "H", "H", "M", "M", "M", "n", "n", "n", "Y"]
+// ---------------------------------------------------------------- colours of the buildings
+const FAMS = {
+  rose: { top: "R", L: "r", R: "u" }, mauve: { top: "P", L: "p", R: "q" }, lav: { top: "S", L: "s", R: "t" },
+  peri: { top: "K", L: "k", R: "l" }, plum: { top: "D", L: "E", R: "e" }, peach: { top: "T", L: "U", R: "m" }, teal: { top: "f", L: "i", R: "j" },
+}
+const FAMMAIN = ["rose", "mauve", "lav", "peri", "plum"]
+const ACCENTS = ["H", "H", "H", "H", "M", "M", "n", "n", "n", "V", "N"]
+const WCOLS = ["h", "h", "h", "y", "y", "z", "z", "v", "v"]
+const WALLSET = new Set("RruPpqSstKklDEeTUmfijAB")
+const HALO = { h: "T", y: "T", z: "R", v: "S", Y: "T" }
+const HALO2 = { h: "U", y: "U", z: "r", v: "s", Y: "U" }
 
-const PLANT = [".g.g.", "ggegg", ".TTT."]
-const BUSH = ["..ggg..", ".ggegg.", "ggeggeg", ".TTTTT."]
-const PALM = ["g.g.g", ".ggg.", "g.e.g", "..e..", "..K..", "..K.."]
-const TREE = ["..ggg..", ".ggegg.", "ggegegg", ".geggg.", "..eKe..", "...K...", "...K..."]
-const TANK = ["..BBB..", ".BBBBK.", "BBBBKKk", "BBBKKkk", "BBKKKkk", "KKKKKkk", ".k...k.", ".k...k.", ".k...k."]
-const AC = ["SSSSSs", "SqqqSs", "SqqqSs", "ssssss"]
-const DISH = ["SSSSSSS", ".SSSSS.", "..sSs..", "...q...", "...q...", "..qqq.."]
-const KIOSK = ["NNNN", "wyyw", "wyyw", "TTTT"]
-const HGLYPH = ["Y...Y", "Y...Y", "Y...Y", "YYYYY", "Y...Y", "Y...Y", "Y...Y"]
+// ---------------------------------------------------------------- foliage, dusk greens
+const canopy = (cx, cy, r, seed) => {
+  for (let y = -r; y <= r; y++) for (let x = -r; x <= r; x++) {
+    const dd = Math.hypot(x, y)
+    if (dd > r + 0.2) continue
+    if (dd > r - 0.9 && ih(cx + x, cy + y, seed) < 0.3) continue
+    const l = (-(x * 0.55) - (y * 0.85)) / r
+    let k = l > 0.42 ? "g" : l > -0.2 ? "o" : "O"
+    if (k === "g" && y <= -r * 0.5 && x <= 0 && ((x + y) & 1) === 0) k = "Z"     // a hint of sky pink on the lit crown
+    put(cx + x, cy + y, k)
+  }
+}
+const tree = (x, y, r, seed) => { rectK(x - 1, y - r, 2, r, "E"); canopy(x, y - r - r, r, seed) }
+const hedge = (x, y, len, seed) => {
+  for (let i = 0; i < len; i++) {
+    const ht = (i === 0 || i === len - 1 ? 2 : 3) + (ih(x + i, seed, 4) < 0.3 ? 1 : 0)
+    for (let j = 0; j < ht; j++) put(x + i, y - j, j === ht - 1 ? "g" : j === 0 ? "O" : "o")
+    if (i % 5 === 2 && ih(x + i, seed, 5) < 0.7) { const fk = ih(x, i, seed) < 0.5 ? "H" : "W"; put(x + i, y - ht, fk); put(x + i + 1, y - ht, fk) }
+  }
+}
+const planter = (x, y, len, seed) => { rectK(x, y - 1, len, 2, "U"); hedge(x, y - 2, len, seed) }
+const vine = (x, y, len, seed) => {
+  for (let k = 0; k < len; k++) {
+    put(x, y + k, k % 3 === 2 ? "g" : "o"); put(x + 1, y + k, (k + seed) % 2 ? "O" : "o")
+    if (k % 4 === 1) put(x - 1, y + k, "o")
+    if (k % 4 === 3) put(x + 2, y + k, "g")
+  }
+}
+const stringLights = (x1, y1, x2, y2, sag, seed) => {
+  const dx = x2 - x1, n = Math.max(2, Math.floor(Math.abs(dx) / 7)), cols = ["h", "z", "y", "v"]
+  for (let x = Math.min(x1, x2); x <= Math.max(x1, x2); x++) { const t = (x - x1) / dx; put(x, Math.round(y1 + (y2 - y1) * t + sag * (1 - Math.pow(2 * t - 1, 2))), "E") }
+  const pts = []
+  for (let i = 0; i <= n; i++) {
+    const t = i / n, x = Math.round(x1 + dx * t), y = Math.round(y1 + (y2 - y1) * t + sag * (1 - Math.pow(2 * t - 1, 2))) + 1
+    rectK(x, y, 2, 2, cols[(i + seed) % cols.length]); pts.push([x, y], [x + 1, y], [x, y + 1], [x + 1, y + 1])
+  }
+  glowAround(pts, "T", 2)
+}
+const GROUNDSET = new Set("AB")
+const pool = (cx, cy, rx, ry, k, dens) => {
+  for (let y = -ry; y <= ry; y++) for (let x = -rx; x <= rx; x++) {
+    const dd = (x * x) / (rx * rx) + (y * y) / (ry * ry)
+    if (dd > 1 || !GROUNDSET.has(get(cx + x, cy + y))) continue
+    if (bay(cx + x, cy + y) < (1 - dd) * dens) put(cx + x, cy + y, k)
+  }
+}
+const streetLamp = (x, y) => {
+  vlineK(x, y - 13, 13, "E"); rectK(x - 1, y - 15, 4, 2, "h")
+  glowAround([[x - 1, y - 15], [x, y - 15], [x + 1, y - 15], [x + 2, y - 15], [x - 1, y - 14], [x, y - 14], [x + 1, y - 14], [x + 2, y - 14]], "T", 3)
+  pool(x, y, 11, 5, "y", 0.55)
+}
+
+// ---------------------------------------------------------------- rooftop and wall props
+const TANKS = (x, y, rx, h, fam) => {
+  // an upright tank on legs: light on the left, dark on the right, ring bands, an elliptical lid
+  const ry = Math.max(2, Math.round(rx / 2))
+  for (let i = -rx; i <= rx; i++) {
+    const t = i / rx, k = t < -0.4 ? fam.top : t < 0.2 ? fam.L : fam.R
+    for (let j = 0; j < h; j++) put(x + i, y - 3 - j, (j % 6 === 5 && Math.abs(t) < 0.95) ? "A" : k)
+  }
+  for (let j = -ry; j <= ry; j++) for (let i = -rx; i <= rx; i++) if ((i * i) / (rx * rx) + (j * j) / (ry * ry) <= 1) put(x + i, y - 3 - h + j, j < 0 ? fam.top : fam.L)
+  vlineK(x - rx + 1, y - 2, 3, "e"); vlineK(x + rx - 1, y - 2, 3, "e"); vlineK(x, y - 2, 3, "e")
+}
+const acUnit = (side, m, u, r) => {
+  for (let i = 0; i < 7; i++) for (let j = 0; j < 5; j++) {
+    const [x, y] = wallXY(side, m, u + i, r + j)
+    put(x, y, j === 0 ? "S" : (i > 1 && i < 5 && j > 1) ? "t" : i === 6 ? "s" : "S")
+  }
+}
 const antenna = (x, y, L, id) => {
-  vlineK(x, y - L, L, "q"); hlineK(x - 2, y - L + 3, 5, "q"); hlineK(x - 1, y - L + 6, 3, "q")
+  vlineK(x, y - L, L, "E"); hlineK(x - 3, y - L + 4, 7, "E"); hlineK(x - 2, y - L + 8, 5, "E")
   const rec = []
-  paintPts([[x, y - L - 1, "x"], [x - 1, y - L - 1, "4"], [x + 1, y - L - 1, "4"]], rec)
+  paintPts([[x, y - L - 1, "x"], [x + 1, y - L - 1, "x"], [x - 1, y - L - 1, "4"], [x + 2, y - L - 1, "4"], [x, y - L - 2, "5"], [x + 1, y - L - 2, "5"]], rec)
   REC.tips.push({ pts: rec, ph: (id * 5) % 12 })
 }
-const pod = (x, y, rx, hgt, wk) => {
-  // upright capsule: a dome on a drum, plum body, one big glowing window filling its front
-  for (let j = 0; j < hgt; j++) {
-    const t = j / (hgt - 1)
-    const hw = t < 0.5 ? Math.round(rx * Math.sqrt(1 - Math.pow(1 - t * 2, 2))) : rx
-    for (let i = -hw; i <= hw; i++) put(x + i, y - hgt + 1 + j, j === 0 || (j < 3 && Math.abs(i) === hw) ? "P" : i > rx * 0.4 ? "q" : "p")
+const laundry = (side, m, u1, u2, r, id) => {
+  for (let u = u1 - 2; u <= u2 + 2; u++) { const [x, y] = wallXY(side, m, u, r); put(x, y, "E") }
+  const cl = ["H", "W", "n", "z", "W", "H"]
+  for (let u = u1 + 1, i = 0; u + 2 < u2; u += 5, i++) {
+    for (let a = 0; a < 3; a++) for (let b = 1; b <= 5; b++) { const [x, y] = wallXY(side, m, u + a, r + b); put(x, y, cl[(i + id) % cl.length]) }
   }
-  const wy = y - Math.round(hgt * 0.45), wr = Math.max(3, rx - 1), wh = Math.max(3, Math.round(hgt * 0.3))
-  for (let j = -wh; j <= wh; j++) for (let i = -wr; i <= wr; i++) {
-    if ((i * i) / (wr * wr) + (j * j) / (wh * wh) <= 1.0) put(x + i, wy + j, wk === "n" ? (j < -wh / 3 ? "n" : "t") : (i < -wr / 3 && j < -wh / 3 ? "y" : j > wh / 2 ? "j" : "m"))
-  }
-  hlineK(x - rx, y, rx * 2 + 1, "q")
 }
-// an upright glass screen on a thin frame, following the left walls' slope
 const screenPanel = (x, y, w, hgt, k) => {
   const pts = []
   const top = y - hgt - 3
-  vlineK(x + 1, y - 3, 3, "q"); vlineK(x + w - 2, y - 3 + ((w - 2) >> 1), 3, "q")
+  vlineK(x + 2, y - 3, 3, "E"); vlineK(x + w - 3, y - 3 + ((w - 3) >> 1), 3, "E")
   for (let u = 0; u < w; u++) for (let j = 0; j < hgt; j++) {
     const yy = top + (u >> 1) + j
     const edge = u === 0 || u === w - 1 || j === 0 || j === hgt - 1
-    if (edge) { put(x + u, yy, "w"); pts.push([x + u, yy]) }
-    else put(x + u, yy, ((u + j) & 1) === 0 || j === 1 ? k : bay(u, j) < 0.4 ? k : "w")
+    if (edge) { put(x + u, yy, "A"); pts.push([x + u, yy]) }
+    else put(x + u, yy, ((u + j) & 1) === 0 || j === 1 ? k : bay(u, j) < 0.45 ? k : "e")
   }
   for (let u = 1; u < w - 1; u++) put(x + u, top + (u >> 1), k)
   glowAround(pts, k, 2)
@@ -304,128 +381,185 @@ const addSign = (cells, col, wallKeys) => {
   let low = -Infinity
   for (const [, y] of xy) low = Math.max(low, y)
   const xs = xy.map(([x]) => x), x0 = Math.min(...xs), x1 = Math.max(...xs)
-  for (let y = low + 3; y <= low + 5; y++) for (let x = x0 - 1; x <= x1 + 1; x++) {
+  for (let y = low + 3; y <= low + 6; y++) for (let x = x0 - 1; x <= x1 + 1; x++) {
     if (wallKeys.includes(get(x, y)) && ((x + y) & 3) === 0) { rec.glow.push([x, y, col, get(x, y)]); put(x, y, col) }
   }
   REC.signs.push(rec)
 }
-// glyph-like lettering: a 3x3 pattern from a hash
 const glyph3 = (seed) => { const rows = []; for (let j = 0; j < 3; j++) { let r = ""; for (let i = 0; i < 3; i++) r += ih(seed, j * 3 + i, 71) < 0.58 ? "X" : "."; rows.push(r) } return rows }
+const ICON = {
+  ring: ["..XXXX..", ".XX..XX.", "XX.WW.XX", "X..WW..X", "X..WW..X", "XX.WW.XX", ".XX..XX.", "..XXXX.."],
+  arrow: ["XX......", "XXXX....", "XXXXXX..", "XXXXXXXX", "XXXXXXXX", "XXXXXX..", "XXXX....", "XX......"],
+  bolt: ["...XXXX.", "..XXXX..", ".XXXX...", "XXXXXXXX", "...XXXX.", "..XXXX..", ".XXXX...", ".XXX...."],
+}
+// boxy neon boards with two lines of glyph-like lettering, tall strips, round and arrow icons, a bracket sign
+const addWallSign = (side, m, kind, u0, r0, col, id, seed, wk) => {
+  const cells = []
+  const at = (u, r, k) => { const [x, y] = wallXY(side, m, u, r); cells.push([x, y, k]) }
+  if (kind === "board") {
+    const bw = 12 + 2 * (seed % 3), bh = 8
+    for (let u = 0; u < bw; u++) for (let r = 0; r < bh; r++) at(u0 + u, r0 + r, (u === 0 || u === bw - 1 || r === 0 || r === bh - 1) ? col : "A")
+    for (let li = 0; li < 2; li++) for (let gi = 0; gi < Math.floor((bw - 2) / 4); gi++) {
+      const g = glyph3(id * 7 + li * 13 + gi + seed * 31)
+      for (let j = 0; j < 3; j++) for (let i = 0; i < 3; i++) if (g[j][i] === "X") at(u0 + 2 + gi * 4 + i, r0 + 1 + li * 3 + j, li ? "W" : col)
+    }
+  } else if (kind === "strip") {
+    const len = 14 + 2 * (seed % 4)
+    for (let r = 0; r < len; r++) { at(u0, r0 + r, col); at(u0 + 1, r0 + r, "W"); at(u0 + 2, r0 + r, col) }
+  } else {
+    const ic = ICON[["ring", "arrow", "bolt"][seed % 3]]
+    ic.forEach((row, r) => { for (let u = 0; u < row.length; u++) if (row[u] !== ".") at(u0 + u, r0 + r, row[u] === "X" ? col : row[u]) })
+  }
+  addSign(cells, col, wk)
+}
+
+// ---------------------------------------------------------------- windows with a soft halo
+let curWins = []
+const haloPass = () => {
+  for (const rec of curWins) {
+    if (!rec.halo) continue
+    const hk = HALO[rec.on] || "T"
+    const P = new Set(rec.pts.map((p) => p[0] + p[1] * W))
+    const seen = new Set()
+    const ring = []
+    for (const p of rec.pts) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = p[0] + dx, ny = p[1] + dy, ni = nx + ny * W
+      if (!inb(nx, ny) || P.has(ni) || seen.has(ni)) continue
+      seen.add(ni)
+      if (!WALLSET.has(get(nx, ny)) || ((nx + ny) & 1)) continue
+      ring.push([nx, ny, hk, get(nx, ny)])
+    }
+    // a second, fainter ring a little further out
+    const R1 = new Set(ring.map((q) => q[0] + q[1] * W))
+    const hk2 = HALO2[rec.on] || "U", ring2 = []
+    for (const q of ring) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]) {
+      const nx = q[0] + dx, ny = q[1] + dy, ni = nx + ny * W
+      if (!inb(nx, ny) || P.has(ni) || R1.has(ni) || seen.has(ni)) continue
+      seen.add(ni)
+      if (!WALLSET.has(get(nx, ny)) || (nx & 1) || (ny & 1)) continue
+      ring2.push([nx, ny, hk2, get(nx, ny)])
+    }
+    for (const q of [...ring, ...ring2]) { rec.pts.push(q); if (rec.lit) put(q[0], q[1], q[2]) }
+  }
+  curWins = []
+}
+const newWin = (lit, on, halo = true) => { const rec = { pts: [], lit, on, halo }; curWins.push(rec); REC.win.set(REC.win.size, rec); return rec }
 
 // ---------------------------------------------------------------- a stack of cantilevered floor plates
-function paneKey(o, side, col, f, pr, pc, lit) {
-  const id = o.id
-  if (o.bright) {
-    const q = ih(id * 131 + col, f * 7 + (side === "L" ? 1 : 2), 11)
-    if (!lit) return q < 0.08 ? "o" : "D"
-    if (q > 0.93) return "D"
-    if (o.glass === "white") return pr < pc - 1 ? (q < 0.25 ? "h" : "F") : "h"
-    const t = ih(id + col * 3, f, 5)
-    if (t < 0.05) return "v"
-    if (t < 0.08) return "V"
-    if (t < 0.16) return pr === 0 ? "h" : "y"
-    return pr < pc - 1 ? (t < 0.55 ? "o" : "y") : "o"
-  }
-  if (!lit) return "w"
-  const t = ih(id + col * 3, f, 5)
-  if (t < 0.125) return t < 0.06 ? "t" : "z"          // about 1 in 8 is cool
-  if (t < 0.3) return pr === 1 ? "y" : "m"             // gold only as a small scattered spark
-  return side === "L" ? (t < 0.65 ? "m" : "j") : "j"
-}
 function stack(o) {
   const { a, b, w, d, n, fh, fam, id } = o
+  const plate = o.plate ?? 3, ins = o.ins ?? 0.15
+  const pw = o.pw ?? 4, pier = o.pier ?? 3, per = pw + pier
+  const wcol = o.wcol ?? "h"
   let z = o.z0 || 0
   const post = []
   let roofBox = null
+  const panes = new Map()
   for (let f = 0; f < n; f++) {
     const last = f === n - 1
+    const fhf = o.fhFor ? o.fhFor(f) : fh
+    const hb = fhf - plate
+    const wh = o.wh ?? Math.min(5, hb - 3), wy0 = o.wy0 ?? 2
     const dx = o.twist ? Math.round(o.twist * Math.sin(f * 1.37 + id)) : 0
     const grow = o.over && f >= n * 0.45 ? o.over : 0
-    const A = a + dx / 16 - grow, B = b - dx / 16 - grow, Wd = w + 2 * grow, Dd = d + 2 * grow
-    const ins = 0.22, hb = fh - 2
-    const fq = ih(id, f, 3), ff = fq < 0.3 ? 0.35 : fq < 0.7 ? 1.0 : 1.6      // some floors dark, some busier
+    const A = a + dx / (2 * ISO) - grow, B = b - dx / (2 * ISO) - grow, Wd = w + 2 * grow, Dd = d + 2 * grow
+    const fq = ih(id, f, 3), ff = fq < 0.3 ? 0.4 : fq < 0.7 ? 1.0 : 1.6      // some floors dark, some busier
     const mk = (side) => (u, r, wW, h, x, y) => {
       const base = side === "L" ? fam.L : fam.R
-      if (r === 0) return side === "L" ? fam.R : "w"
-      if (r === h - 1 || u < 1 || u > wW - 2) return base
-      const pos = (u - 1) % (o.pw + 1)
-      if (pos === o.pw) return o.bright ? "D" : "w"
-      const col = Math.floor((u - 1) / (o.pw + 1)), pr = r - 1, pc = h - 2
-      const lit = o.bright ? fq < (o.litP ?? 0.8) : (col % 4 !== 3 && ih(id * 131 + col, f * 7 + (side === "L" ? 1 : 2), 17) < 0.4 * ff)
-      const k = paneKey(o, side, col, f, pr, pc, lit)
-      const wid = (id * 2 + (side === "L" ? 0 : 1)) * 65536 + col * 64 + (f & 63)
-      let rec = REC.win.get(wid)
-      if (!rec) { rec = { pts: [], lit: "yohnvVNFhmjtz".includes(k) }; REC.win.set(wid, rec) }
-      rec.pts.push([x, y, k])
-      return k
+      if (o.groundWall && f === 0) { const k = o.groundWall(side, u, r, wW, h, x, y); if (k) return k }
+      if (r === 0) return side === "L" ? fam.R : "A"                          // shadow under the plate above
+      if (r < wy0 || r >= wy0 + wh || u < 2) return base
+      const rel = (u - 2) % per
+      if (rel >= pw) return base
+      const u0 = u - rel
+      if (u0 + pw > wW - 2) return base
+      const col = Math.floor((u - 2) / per)
+      const pk = side + f + "_" + col
+      let rec = panes.get(pk)
+      if (!rec) {
+        const q = ih(id * 131 + col, f * 7 + (side === "L" ? 1 : 2), 17), t = ih(id + col * 3, f, 5)
+        const lit = o.bright ? (fq < (o.litP ?? 0.85) && q < 0.92) : (col % 5 !== 4 && q < 0.5 * ff)
+        const on = o.bright ? (o.glass === "white" ? (t < 0.3 ? "h" : "F") : t < 0.12 ? "Y" : t < 0.55 ? "h" : "y") : (t < 0.84 ? wcol : ["h", "y", "z", "v"][Math.floor(t * 40) % 4])
+        rec = newWin(lit, on, !o.bright)
+        panes.set(pk, rec)
+      }
+      rec.pts.push([x, y, rec.on, "w"])
+      return rec.lit ? rec.on : "w"
     }
     isoBox(A + ins, B + ins, Wd - 2 * ins, Dd - 2 * ins, hb, z, { L: mk("L"), R: mk("R") })
     const trimOn = o.trimAll ? (last ? true : ih(id, f, 9) < (o.trimP ?? 0.4)) : (o.trimB && f >= n - 2)
-    const trimC = (f % 4 === 2 ? o.trims[1] : o.trims[0])
+    const trimC = o.trims ? (f % 4 === 2 ? o.trims[1] : o.trims[0]) : "H"
     const rec = { pts: [], glow: [] }
     const roofFn = last && o.roofFn
-    const pl = isoBox(A, B, Wd, Dd, 2, z + hb, {
+    const pl = isoBox(A, B, Wd, Dd, plate, z + hb, {
       L: (u, r) => (r === 0 ? fam.top : fam.L), R: (u, r) => (r === 0 ? fam.L : fam.R),
       T: (x, y, i) => {
         if (trimOn && i.low) { rec.pts.push([x, y, trimC, fam.top]); return trimC }
         if (roofFn) { const k = roofFn(x, y, i); if (k) return k }
-        return (i.low || i.up || i.side) ? fam.top : (bay(x, y) < 0.22 ? "p" : "q")
+        if (o.ringFn) { const k = o.ringFn(x, y, i, f); if (k) return k }
+        return (i.low || i.up || i.side) ? fam.top : (bay(x, y) < 0.12 ? fam.L : fam.top)
       },
     })
     if (rec.pts.length) { glowDown(rec.pts, trimC, rec.glow); REC.trims.push(rec) }
-    // decorations that go on after the whole stack: pots and plants on the plate, vines below
-    if (!last || o.roofPlants) post.push(() => {
+    if (o.plantP && (!last || o.roofPlants)) post.push(() => {
       for (const side of ["L", "R"]) {
         const ww = side === "L" ? pl.wl : pl.wr
-        for (let u = 3; u < ww - 3; u += 5) {
+        for (let u = 5; u < ww - 12; u += 10 + Math.floor(ih(id, u + f, 12) * 6)) {
           const q = ih(id * 17 + f, u + (side === "L" ? 0 : 99), 8)
-          if (q < (o.plantP ?? 0.45)) {
-            const [x, y] = pl[side](u, -1)
-            put(x, y, "T"); put(x + 1, y, "T"); put(x, y - 1, "g"); put(x + 1, y - 1, "g")
-            if (q < 0.15) { put(x - 1, y - 1, "e"); put(x, y - 2, "g") }
-            if (q < 0.1) put(x + 1, y - 2, "e")
-          } else if (q < 0.62) {
-            const [x, y] = pl[side](u, 2)
-            const len = 3 + Math.floor(ih(id, u + f, 6) * 5)
-            for (let k = 0; k < len; k++) put(x, y + k, k % 2 ? "e" : "g")
-          }
+          if (q < o.plantP) { const [x, y] = pl[side](u, -1); planter(x, y, 6 + Math.floor(ih(id, u, 3) * 5), id * 7 + u + f) }
+          else if (q < o.plantP + (o.vineP ?? 0.15)) { const [x, y] = pl[side](u, plate); vine(x, y, 6 + Math.floor(ih(id, u + f, 6) * 9), u + f) }
         }
       }
     })
-    z += fh
+    z += fhf
     roofBox = pl
   }
   for (const fn of post) fn()
   return { z, roofBox }
 }
 
-// a cylinder tower: stacked elliptical bands with curved ring plates
+// ---------------------------------------------------------------- pods and round towers
+function podTop(x, y, rx, hgt, fam, wk) {
+  // a capsule on a ring: dome, a drum, and one big round window
+  for (let j = 0; j < hgt; j++) {
+    const t = j / (hgt - 1)
+    const hw = t < 0.5 ? Math.round(rx * Math.sqrt(1 - Math.pow(1 - t * 2, 2))) : rx
+    for (let i = -hw; i <= hw; i++) put(x + i, y - hgt + 1 + j, j === 0 || (j < 3 && Math.abs(i) === hw) ? fam.top : i > rx * 0.35 ? fam.R : fam.L)
+  }
+  const wy = y - Math.round(hgt * 0.45), wr = Math.max(3, Math.round(rx * 0.6))
+  const pts = []
+  for (let j = -wr; j <= wr; j++) for (let i = -wr; i <= wr; i++) {
+    const dd = Math.hypot(i, j)
+    if (dd <= wr) { put(x + i, wy + j, dd > wr - 1 ? "A" : (i < -wr / 3 && j < -wr / 3) ? "W" : j > wr / 2 ? "z" : wk); pts.push([x + i, wy + j]) }
+  }
+  glowAround(pts, wk === "v" ? "S" : "T", 3)
+  hlineK(x - rx - 1, y, rx * 2 + 3, fam.top); hlineK(x - rx, y + 1, rx * 2 + 1, fam.R)
+}
 function cylinder(o) {
-  const { cx, cy0, rx, ry, n, fh, fam, id } = o
+  const { cx, cy0, rx, ry, n, fh, fam, id, wcol } = o
   let z = 0
-  const ncol = Math.max(6, Math.round(rx / 2.2))
+  const hb = fh - 3
+  const ncol = Math.max(7, Math.round(rx / 3.2))
   const pk = (x, rr) => Math.floor((Math.asin(clamp((x - cx) / rr, -1, 1)) + Math.PI / 2) / (Math.PI / ncol))
   for (let f = 0; f < n; f++) {
     const last = f === n - 1
-    const fq = ih(id, f, 3), ff = fq < 0.3 ? 0.35 : fq < 0.7 ? 1.0 : 1.6, hb = fh - 2, rb = 0.88
-    const trimC = o.trims[0], trimOn = o.trimB && f >= n - 2
+    const fq = ih(id, f, 3), ff = fq < 0.3 ? 0.4 : fq < 0.7 ? 1.0 : 1.6, rb = 0.9
+    const trimOn = o.trimB && f >= n - 2
     for (let x = Math.ceil(cx - rx * rb); x <= Math.floor(cx + rx * rb); x++) {
       const t = (x + 0.5 - cx) / (rx * rb)
       if (Math.abs(t) >= 1) continue
       const dy = ry * rb * Math.sqrt(1 - t * t)
       const yb = Math.round(cy0 - z + dy)
-      const mull = pk(x, rx * rb) !== pk(x - 1, rx * rb)
-      const col = pk(x, rx * rb)
+      const col = pk(x, rx * rb), mull = col !== pk(x - 1, rx * rb)
       for (let r = 0; r < hb; r++) {
         const y = yb - hb + r
-        const tone = t < -0.25 ? fam.L : t > 0.35 ? fam.R : (bay(x, y) < 0.5 ? fam.L : fam.R)
-        let k = tone
-        if (r === 0) k = "w"
-        else if (r < hb - 1) {
-          if (mull) k = "w"
+        let k = t < -0.25 ? fam.L : t > 0.35 ? fam.R : (bay(x, y) < 0.5 ? fam.L : fam.R)
+        if (r === 0) k = "A"
+        else if (r >= 2 && r < hb - 2) {
+          if (mull) k = fam.R
           else {
-            const q = ih(id * 131 + col, f * 7, 17), tt = ih(id + col * 3, f, 5)
-            k = col % 4 !== 3 && q < 0.4 * ff ? (tt < 0.125 ? "t" : tt < 0.3 && r === 2 ? "y" : tt > 0.65 || t > 0.4 ? "j" : "m") : "w"
+            const q = ih(id * 131 + col, f * 7, 17)
+            k = col % 4 !== 3 && q < 0.5 * ff ? (t > 0.45 ? "y" : wcol) : "w"
           }
         }
         put(x, y, k)
@@ -438,218 +572,325 @@ function cylinder(o) {
       if (Math.abs(t) >= 1) continue
       const dy = ry * Math.sqrt(1 - t * t)
       const yw = Math.round(cy0 - (z + hb) + dy)
-      put(x, yw - 2, t < 0.3 ? fam.top : fam.L); put(x, yw - 1, t < 0.1 ? fam.L : fam.R)
+      put(x, yw - 3, t < 0.3 ? fam.top : fam.L); put(x, yw - 2, t < 0.1 ? fam.L : fam.R); put(x, yw - 1, fam.R)
       for (let y = Math.round(yTopC - dy); y <= Math.round(yTopC + dy) - 1; y++) {
         const low = y === Math.round(yTopC + dy) - 1
-        const k = low && trimOn ? trimC : fam.top
-        if (low && trimOn) rec.pts.push([x, y, trimC, fam.top])
-        put(x, y, last && o.roofK ? (low ? trimC : o.roofK) : k)
+        const k = low && trimOn ? o.accent : fam.top
+        if (low && trimOn) rec.pts.push([x, y, o.accent, fam.top])
+        put(x, y, k)
       }
     }
-    glowDown(rec.pts, trimC, rec.glow); REC.trims.push(rec)
+    if (rec.pts.length) { glowDown(rec.pts, o.accent, rec.glow); REC.trims.push(rec) }
     z += fh
   }
   return { z, top: [cx, cy0 - z] }
 }
 
-// ---------------------------------------------------------------- the packing
-const TOWERC = { a: 89, b: 20, w: 6, d: 6 }
+// ---------------------------------------------------------------- the layout: streets, a plaza, lots
+const STREET_A = [34, 41], STREET_B = [9]
+const PLAZA = { a0: 37, b0: 14, w: 5, d: 4 }
+const TOWERC = { a0: 44, b0: 9, w: 5, d: 5 }
 const occ = new Set()
 const ck = (a, b) => a + "," + b
-for (let a = TOWERC.a; a < TOWERC.a + TOWERC.w; a++) for (let b = TOWERC.b; b < TOWERC.b + TOWERC.d; b++) occ.add(ck(a, b))
-const SIZES = [[2, 2], [2, 2], [2, 2], [3, 2], [2, 3], [3, 3], [3, 3], [1, 2], [2, 1], [3, 4], [4, 3], [1, 1]]
+const inRect = (r, a, b) => a >= r.a0 && a < r.a0 + r.w && b >= r.b0 && b < r.b0 + r.d
+// nothing is built in front of the plaza, so it stays in view
+const CLEAR = { a0: 37, b0: 14, w: 9, d: 8 }
+const isStreet = (a, b) => STREET_A.includes(a) || STREET_B.includes(b) || (inRect(CLEAR, a, b) && !inRect(PLAZA, a, b))
+const SIZES = [[3, 3], [3, 3], [3, 4], [4, 3], [2, 3], [3, 2], [4, 4], [2, 4], [4, 2], [2, 2], [3, 3], [2, 3]]
 const blds = []
-for (let b = 0; b <= 160; b++) for (let a = 0; a <= 170; a++) {
-  if (!cellOK(a, b) || occ.has(ck(a, b))) continue
-  let w = 1, d = 1
-  for (let t = 0; t < 8; t++) {
+for (let b = 0; b <= 40; b++) for (let a = 12; a <= 70; a++) {
+  if (!cellOK(a, b) || occ.has(ck(a, b)) || isStreet(a, b) || inRect(PLAZA, a, b) || inRect(TOWERC, a, b)) continue
+  let w = 1, d = 1, found = false
+  for (let t = 0; t < 10; t++) {
     const [tw, td] = SIZES[Math.floor(ih(a, b, 31 + t) * SIZES.length)]
     let ok = true
-    for (let i = 0; i < tw && ok; i++) for (let j = 0; j < td; j++) if (!cellOK(a + i, b + j) || occ.has(ck(a + i, b + j))) { ok = false; break }
-    if (ok) { w = tw; d = td; break }
+    for (let i = 0; i < tw && ok; i++) for (let j = 0; j < td; j++) {
+      const aa = a + i, bb = b + j
+      if (!cellOK(aa, bb) || occ.has(ck(aa, bb)) || isStreet(aa, bb) || inRect(PLAZA, aa, bb) || inRect(TOWERC, aa, bb)) { ok = false; break }
+    }
+    if (ok) { w = tw; d = td; found = true; break }
   }
+  if (!found) for (const [tw, td] of [[2, 2], [2, 1], [1, 2], [1, 1]]) {
+    let ok = true
+    for (let i = 0; i < tw && ok; i++) for (let j = 0; j < td; j++) {
+      const aa = a + i, bb = b + j
+      if (!cellOK(aa, bb) || occ.has(ck(aa, bb)) || isStreet(aa, bb) || inRect(PLAZA, aa, bb) || inRect(TOWERC, aa, bb)) { ok = false; break }
+    }
+    if (ok) { w = tw; d = td; found = true; break }
+  }
+  // a cell that fits no lot stays an open yard, except along the skyline, where it gets a slim tower
+  if (!found && !(8 * (a + b) + 8 - backLine(16 * (a - b)) < 46)) continue
   for (let i = 0; i < w; i++) for (let j = 0; j < d; j++) occ.add(ck(a + i, b + j))
   blds.push({ a0: a, b0: b, w, d, id: blds.length + 1 })
 }
+// the type of each: Kowloon tenements, pod towers, glass offices, terraced garden blocks, shophouses, industrial blocks
+for (const bd of blds) {
+  const [cx, cy] = cellXY(bd.a0 + bd.w / 2 - 0.5, bd.b0 + bd.d / 2 - 0.5)
+  bd.cx = cx; bd.cy = cy
+  bd.back = 8 * (bd.a0 + bd.b0) + 8 - backLine(cx) < 46
+  const r = ih(bd.id, 1, 3)
+  bd.vis = PYs(bd.a0 + bd.w / 2, bd.b0 + bd.d / 2) - 40 < H && bd.cx < 700 && bd.cx > 100
+  bd.lowCap = 0
+  const mid = bd.a0 + bd.w / 2 + bd.b0 + bd.d / 2
+  for (let i = -1; i <= bd.w && !bd.lowCap; i++) for (let j = -1; j <= bd.d; j++) {
+    const aa = bd.a0 + i, bb = bd.b0 + j
+    if ((isStreet(aa, bb) || inRect(PLAZA, aa, bb)) && mid > aa + bb) { bd.lowCap = inRect(PLAZA, aa, bb) ? 34 : 54; break }      // only the near side of a canyon stays low
+  }
+  bd.type = bd.back ? (r < 0.3 ? "tenement" : r < 0.58 ? "glass" : r < 0.82 ? "pod" : "terrace")
+    : (r < 0.3 ? "shop" : r < 0.5 ? "terrace" : r < 0.68 ? "industrial" : r < 0.86 ? "tenement" : "pod")
+  if (bd.lowCap && !bd.back) bd.type = r < 0.55 ? "shop" : r < 0.8 ? "industrial" : "terrace"
+  if (Math.min(bd.w, bd.d) === 1 && !bd.lowCap) bd.type = r < 0.6 ? "tenement" : "glass"
+  if (Math.min(bd.w, bd.d) === 1 && bd.lowCap) bd.type = "shop"
+}
+{
+  const need = { tenement: 6, pod: 4, glass: 4, terrace: 5, shop: 6, industrial: 4 }
+  const count = (t) => blds.filter((x) => x.vis && x.type === t).length
+  const tall = { tenement: 1, pod: 1, glass: 1 }
+  for (const t of Object.keys(need)) {
+    let guard = 0
+    while (count(t) < need[t] && guard++ < 40) {
+      const cand = blds.filter((x) => x.type !== t && count(x.type) > need[x.type] && x.vis && (tall[t] ? (x.back || x.cy < 440) && !x.lowCap : !x.back)).sort((p, q) => ih(p.id, 77, 3) - ih(q.id, 77, 3))[0]
+      if (!cand) break
+      cand.type = t
+    }
+  }
+}
 const heightOf = (bd) => {
-  const ac = bd.a0 + bd.w / 2, bc = bd.b0 + bd.d / 2
-  const cx = 8 * (ac - bc), cyc = 4 * (ac + bc)
   const r1 = ih(bd.id, 3, 9), r2 = ih(bd.id, 4, 9)
-  const back = 4 * (bd.a0 + bd.b0) + 4 - backLine(cx) < 30
+  const ac = bd.a0 + bd.w / 2, bc = bd.b0 + bd.d / 2
+  const cyc = PYs(ac, bc)
   let h
-  if (back) h = cyc - (roofLine(cx) + (r2 - 0.5) * 22)
-  else h = 28 + 96 * Math.pow(r1, 1.4) + (r2 < 0.12 ? 36 : 0)
-  const nearTower = Math.abs(cx - 552) < 70 && ac + bc > 112
-  return clamp(Math.round(nearTower ? Math.min(h, 34) : h), 18, 280)
+  if (bd.back) h = cyc - (roofLine(bd.cx) + (r2 - 0.5) * 20)
+  else h = { shop: 30 + 14 * r2, terrace: 70 + 60 * r1, industrial: 56 + 40 * r1, tenement: 100 + 60 * r1, pod: 100 + 40 * r1, glass: 130 + 50 * r1 }[bd.type]
+  if (bd.back) h = { shop: 40, industrial: 80, terrace: Math.max(h, 70) }[bd.type] ?? h
+  if (bd.type === "shop") h = Math.min(h, 46)
+  if (bd.lowCap && !bd.back) h = Math.min(h, bd.lowCap)
+  if (!bd.back && !bd.lowCap && bd.type !== "shop") h = Math.max(h, 70)
+  const nearTower = Math.abs(bd.cx - 552) < 62 && bd.cy > 380
+  return clamp(Math.round(nearTower ? Math.min(h, 64) : h), 24, 270)
 }
+for (const bd of blds) bd.h = heightOf(bd)
 
-const ICON = {
-  ring: [".XXX.", "X...X", "X.W.X", "X...X", ".XXX."],
-  arrow: ["X....", "XX...", "XXXXX", "XX...", "X...."],
-  bolt: ["..XX.", ".XX..", "XXXX.", "..XX.", ".XX.."],
+// ---------------------------------------------------------------- what each type puts on its walls
+const pickFam = (bd, i) => {
+  const r = ih(bd.id, 2, 3)
+  if (r < 0.16) return "peach"
+  if (r < 0.28) return "teal"
+  let k = Math.floor(ih(bd.id, 12, 3) * FAMMAIN.length)
+  if (bd.type === "glass") return "peri"
+  if (bd.type === "industrial") return ["plum", "peri", "lav"][k % 3]
+  return FAMMAIN[(k + i) % FAMMAIN.length]
 }
-const SIGNC = ["H", "n", "M", "y", "V", "H", "n", "Y"]
-const wallXY = (side, m, u, r) => side === "L"
-  ? [PXs(m.a, m.b + m.d) + u, PYs(m.a, m.b + m.d) - m.z - m.h + ((u + 1) >> 1) + r]
-  : [PXs(m.a + m.w, m.b + m.d) + u, PYs(m.a + m.w, m.b + m.d) - m.z - m.h - ((u + 1) >> 1) + r]
+const wallBoards = (bd, m, n, accent, wk, kinds, base = 8) => {
+  const id = bd.id
+  for (let s = 0; s < n; s++) {
+    const side = ih(id, 26 + s, 3) < 0.7 ? "L" : "R"
+    const wW = Math.round(ISO * (side === "L" ? m.w : m.d))
+    if (wW < 22 || m.h < 30) continue
+    const kind = kinds[Math.floor(ih(id, 28 + s, 3) * kinds.length)]
+    const need = kind === "board" ? 14 : kind === "strip" ? 5 : 9
+    const u0 = 3 + Math.floor(ih(id, 31 + s, 3) * Math.max(1, wW - need - 6))
+    const r0 = base + Math.floor(ih(id, 32 + s, 3) * Math.max(1, m.h - 30))
+    addWallSign(side, m, kind, u0, r0, accent, id, Math.floor(ih(id, 33 + s, 3) * 12), wk)
+  }
+}
 
 const drawBuilding = (bd) => {
   const { a0, b0, w, d, id } = bd
-  const H0 = bd.h
   const left = PXs(a0, b0 + d), right = PXs(a0 + w, b0)
-  const roofY = PYs(a0 + w / 2, b0 + d / 2) - H0
+  const roofY = PYs(a0 + w / 2, b0 + d / 2) - bd.h
   if (right < -30 || left > W + 20 || roofY > H + 20) return
-  const fam = FAMS[Math.floor(ih(id, 1, 3) * 4)]
-  const fh = ih(id, 2, 3) < 0.5 ? 8 : 7
-  const n = Math.max(2, Math.round(H0 / fh))
-  const accent = TRIMC[Math.floor(ih(id, 5, 3) * TRIMC.length)]
+  const yBase = PYs(a0 + w, b0 + d)
+  curLevel = levelFor(yBase); curDark = darkFor(bd.cx, yBase)
+  curWins = []
+  const fam = FAMS[pickFam(bd, bd.id)]
+  const accent = ACCENTS[Math.floor(ih(id, 5, 3) * ACCENTS.length)]
   const trims = [accent, accent]
+  const wcol = WCOLS[Math.floor(ih(id, 6, 3) * WCOLS.length)]
   const trimB = ih(id, 52, 3) < 0.35
-  curLevel = levelFor(PYs(a0 + w, b0 + d))
-  const roofType = ih(id, 7, 3)
-  const big = w >= 2 && d >= 2
-  const isCyl = big && ih(id, 8, 3) < 0.13
-  const pw = ih(id, 9, 3) < 0.5 ? 2 : 3
-  if (isCyl) {
-    const R = Math.min(w, d) * 0.5 * 0.92
-    const rx = 11.3 * R * (ih(id, 10, 3) < 0.35 ? 1.5 : 1), ry = 5.66 * R
-    const cx = PXs(a0 + w / 2, b0 + d / 2), cy0 = PYs(a0 + w / 2, b0 + d / 2)
-    const top = cylinder({ cx, cy0, rx, ry, n, fh, fam, id, trims, trimB, roofK: roofType < 0.5 ? "D" : null })
-    const [tx, ty] = top.top
-    if (roofType < 0.5) { hlineK(tx - 3, ty, 7, "Z"); vlineK(tx, ty - 3, 7, "Z") }
-    else pod(tx, ty + 2, Math.max(4, Math.round(rx * 0.4)), 10, "y")
-  } else {
-    // the roof: helipad, paved terrace, garden, pod or plain clutter
-    const kind = big && roofType < 0.1 ? "heli" : roofType < 0.2 ? "terrace" : roofType < 0.27 ? "garden" : roofType < 0.45 ? "pod" : "plain"
-    const roofFn = (x, y, i) => {
-      if (i.low || i.up) return null
-      if (kind === "heli") return i.side ? "q" : (bay(x, y) < 0.1 ? "p" : "D")
-      if (kind === "terrace") { const ta = Math.floor(i.a * 2), tb = Math.floor(i.b * 2); const gr = (i.a * 2 - ta) < 0.14 || (i.b * 2 - tb) < 0.14; return gr ? "s" : ((ta + tb) & 1 ? "S" : "B") }
-      if (kind === "garden") return bay(x, y) < 0.3 ? "e" : "D"
-      return null
+  const wk = [fam.L, fam.R, "A"]
+  const type = bd.type
+  const H0 = bd.h
+  const mods = []     // wall planes for signs and details
+  if (type === "tenement") {
+    const fh = 11, total = Math.max(5, Math.round(H0 / fh))
+    const ns = [Math.max(2, Math.round(total * 0.5)), Math.max(1, Math.round(total * 0.3))]
+    ns.push(Math.max(1, total - ns[0] - ns[1]))
+    let z = 0, st = null
+    for (let k = 0; k < 3; k++) {
+      const tw = Math.min(0.4 * k, (w - 0.7) / 2), td = Math.min(0.4 * k, (d - 0.7) / 2)
+      const ma = a0 + tw, mb = b0 + td, mw = w - 2 * tw, md = d - 2 * td
+      st = stack({ a: ma, b: mb, w: mw, d: md, z0: z, n: ns[k], fh, fam, id: id * 3 + k, trims, pw: 2, pier: 3, wcol, trimB: trimB && k === 2, plantP: 0.34, vineP: 0.2 })
+      mods.push({ a: ma, b: mb, w: mw, d: md, z, h: ns[k] * fh, n: ns[k], fh })
+      z = st.z
     }
-    const st = stack({
-      a: a0, b: b0, w, d, n, fh, fam, id, trims, pw,
-      twist: ih(id, 11, 3) < 0.4 ? 2 + Math.floor(ih(id, 12, 3) * 2) : 0,
-      over: ih(id, 13, 3) < 0.3 ? 0.22 : 0,
-      trimB, plantP: 0.5, roofFn, roofPlants: kind === "garden",
+    const top = st.roofBox, [rx, ry] = top.pt(a0 + w / 2, b0 + d / 2)
+    // wall clutter: AC units, laundry poles, many signs
+    for (const m of mods) {
+      for (let f = 0; f < m.n; f++) {
+        const q = ih(id, f + m.z, 50)
+        const wL = Math.round(ISO * m.w)
+        if (q < 0.2 && wL > 20) acUnit("L", m, 4 + Math.floor(ih(id, f, 51) * Math.max(1, wL - 16)), (m.n - 1 - f) * m.fh + 4)
+        else if (q < 0.3 && wL > 24) laundry("L", m, 5, wL - 6, (m.n - 1 - f) * m.fh + 4, id + f)
+      }
+    }
+    wallBoards(bd, mods[0], 5, accent, wk, ["board", "strip", "icon", "board"], 14)
+    TANKS(rx - 8, ry + 2, 5, 9, fam)
+    antenna(rx + 6, ry, 12 + Math.floor(ih(id, 100, 6) * 8), id)
+    if (ih(id, 101, 6) < 0.6) planter(rx + 12, ry, 7, id)
+  } else if (type === "glass") {
+    const fh = 12, n = Math.max(6, Math.round(H0 / fh)), h = n * fh
+    const lam = FAMS.peri
+    const panes = new Map()
+    const wl = Math.round(ISO * w), wr = Math.round(ISO * d)
+    const glassKey = (side) => (u, r, wW, hh, x, y) => {
+      const base = side === "L" ? lam.L : lam.R
+      if (r % fh === 0 && r > 0) return side === "L" ? lam.R : "l"
+      if (u % 8 === 0) return side === "L" ? lam.R : "l"
+      const col = Math.floor(u / 8), f = Math.floor(r / fh), rr = r % fh
+      if (u % 8 >= 2 && u % 8 <= 6 && rr >= 3 && rr <= 9 && u > 2 && u < wW - 3) {
+        const pk = side + f + "_" + col
+        let rec = panes.get(pk)
+        if (!rec) {
+          const q = ih(id * 131 + col, f * 7 + (side === "L" ? 1 : 2), 17), t = ih(id + col, f, 5)
+          rec = newWin(q < 0.5 && col % 4 !== 3, t < 0.86 ? wcol : "v", true)
+          panes.set(pk, rec)
+        }
+        rec.pts.push([x, y, rec.on, "w"])
+        return rec.lit ? rec.on : "w"
+      }
+      // smooth glass: a lighter sheen toward the top and the lit edge
+      const sheen = (1 - r / hh) * 0.55 + (side === "L" ? (1 - u / wW) * 0.25 : 0)
+      return bay(x, y) < sheen * 0.7 ? (side === "L" ? lam.top : lam.L) : base
+    }
+    isoBox(a0, b0, w, d, h, 0, {
+      L: glassKey("L"), R: glassKey("R"),
+      T: (x, y, i) => ((i.low || i.up) ? accent : (i.side ? lam.top : (bay(x, y) < 0.15 ? lam.L : lam.top))),
     })
+    const top = { a: a0, b: b0, w, d, z: 0, h }
+    // a neon stripe up the front corner
+    const cells = []
+    const [fx, fy] = wallXY("R", top, 0, 0)
+    for (let r = 2; r < h - 2; r++) { const x = PXs(a0 + w, b0 + d), y = PYs(a0 + w, b0 + d) - h + r; cells.push([x - 1, y, accent], [x, y, "W"], [x + 1, y, accent]) }
+    addSign(cells, accent, wk)
+    mods.push(top)
+    const [rx, ry] = [PXs(a0 + w / 2, b0 + d / 2), PYs(a0 + w / 2, b0 + d / 2) - h]
+    antenna(rx + 4, ry - 2, 16 + Math.floor(ih(id, 100, 6) * 10), id)
+    spr(rx - 10, ry + 2, ["SSSSSs", "SttttS", "SttttS", "ssssss"])
+    if (ih(id, 102, 6) < 0.5) hedge(rx + 12, ry + 6, 8, id)
+  } else if (type === "pod") {
+    const fh = 12, n = Math.max(5, Math.round(H0 / fh))
+    const R = Math.min(w, d) * 0.5 * 0.92
+    const rx = 22.6 * R * (ih(id, 10, 3) < 0.3 ? 1.35 : 1), ry = 11.3 * R
+    const cx = PXs(a0 + w / 2, b0 + d / 2), cy0 = PYs(a0 + w / 2, b0 + d / 2)
+    const top = cylinder({ cx, cy0, rx, ry, n, fh, fam, id, wcol, trimB, accent })
+    const [tx, ty] = top.top
+    podTop(tx, ty + 2, 5 + Math.floor(ih(id, 11, 3) * 3), 13 + Math.floor(ih(id, 12, 3) * 3), fam, ih(id, 13, 3) < 0.3 ? "v" : wcol)
+    if (ih(id, 14, 3) < 0.7) { tree(tx - Math.round(rx * 0.55), ty + 4, 4, id); }
+    mods.push({ a: a0, b: b0, w, d, z: 0, h: n * fh })
+  } else if (type === "terrace") {
+    // wide, stepped, every step planted
+    const fh = 12, steps = Math.max(2, Math.min(4, Math.round(H0 / 40)))
+    const per = Math.max(2, Math.round(H0 / fh / steps))
+    let z = 0, st = null
+    for (let k = 0; k < steps; k++) {
+      const tw = Math.min(0.5 * k, (w - 0.8) / 2), td = Math.min(0.5 * k, (d - 0.8) / 2)
+      const ma = a0 + tw, mb = b0 + td, mw = w - 2 * tw, md = d - 2 * td
+      const lastStep = k === steps - 1
+      st = stack({
+        a: ma, b: mb, w: mw, d: md, z0: z, n: per, fh, fam, id: id * 5 + k, trims, pw: 4, pier: 3, wcol,
+        ins: 0.4, trimB: trimB && lastStep, plantP: 0.9, vineP: 0.4, roofPlants: true,
+        ringFn: (x, y, i, f) => ((i.low || i.up || i.side) ? (bay(x, y) < 0.5 ? "o" : "g") : (((x >> 1) + y * 5 + id) % 17 === 0 ? (ih(x, y, id) < 0.5 ? "H" : "W") : (bay(x, y) < 0.3 ? "o" : "g"))),
+        roofFn: (x, y, i) => ((i.low || i.up || i.side) ? "g" : (((x >> 1) + y * 5 + id) % 13 === 0 ? (ih(x, y, id) < 0.5 ? "H" : "W") : (bay(x, y) < 0.35 ? "o" : "g"))),
+      })
+      mods.push({ a: ma, b: mb, w: mw, d: md, z, h: per * fh })
+      // trees and hedges on this step's roof
+      const rb = st.roofBox
+      const nt = 1 + Math.floor(mw * md * 0.8)
+      for (let t = 0; t < nt; t++) {
+        const [px, py] = rb.pt(ma + 0.4 + ih(id * 9 + k, t, 20) * Math.max(0.2, mw - 0.8), mb + 0.4 + ih(id * 9 + k, t, 21) * Math.max(0.2, md - 0.8))
+        const q = ih(id * 9 + k, t, 22)
+        if (q < 0.55) tree(px, py, 3 + Math.floor(ih(id, t + k, 23) * 3), id + t)
+        else hedge(px - 4, py, 8 + Math.floor(ih(id, t, 24) * 4), id + t)
+      }
+      z = st.z
+    }
+  } else if (type === "shop") {
+    const fh = 12, n = 2 + (ih(id, 15, 3) < 0.5 ? 1 : 0)
+    const awn = accent === "N" ? "H" : accent
+    const st = stack({
+      a: a0, b: b0, w, d, n, fh, fhFor: (f) => (f === 0 ? 16 : fh), fam, id, trims, pw: 4, pier: 3, wcol, trimB, plantP: 0.5, vineP: 0.2, ins: 0.2,
+      groundWall: (side, u, r, wW, h) => {
+        if (side === "R") {
+          if (r === 0) return fam.R
+          if (u >= 3 && u < wW - 3 && r >= 5 && r < h - 1) return (u - 3) % 9 < 3 ? "w" : (u % 11 < 6 ? "h" : "y")     // a lit door and a window
+          return null
+        }
+        if (r === 0) return fam.R
+        if (r >= 1 && r <= 4) return Math.floor(u / 3) % 2 === 0 ? awn : "W"                                         // striped awning
+        if (u >= 3 && u < wW - 3 && r >= 5 && r < h - 1) return (u - 3) % 9 === 8 ? "A" : (r === 5 ? "Y" : (u % 17 < 9 ? "h" : "Y"))         // warm shopfront glass
+        return null
+      },
+      roofFn: (x, y, i) => ((i.low || i.up || i.side) ? null : ((x + y) % 5 === 0 ? fam.L : fam.top)),
+    })
+    const m0 = { a: a0, b: b0, w, d, z: 0, h: 16 + (n - 1) * fh }
+    mods.push(m0)
+    wallBoards(bd, m0, 2, accent, wk, ["board", "icon"], 22)
+    // warm shop light pooling on the street in front
+    const [px, py] = [PXs(a0, b0 + d) + Math.round(ISO * w * 0.5), PYs(a0, b0 + d) + 3]
+    pool(px, py + 3, 22, 7, "y", 0.7)
     const rb = st.roofBox
-    const [cx, cy] = rb.pt(a0 + w / 2, b0 + d / 2)
-    if (H0 >= 150 && ih(id, 90, 3) < 0.3) screenPanel(cx - 13, cy - 1, 26, 15, ["M", "n", "V", "N"][Math.floor(ih(id, 91, 3) * 4)])
-    if (kind === "heli") {
-      for (let j = 0; j < 7; j++) for (let i = 0; i < 5; i++) if (HGLYPH[j][i] !== ".") put(cx - 2 + i, cy - 3 + j, "Z")
-      for (const [px, py, k] of [[a0, b0, "n"], [a0 + w, b0, "H"], [a0 + w, b0 + d, "n"], [a0, b0 + d, "H"]]) {
-        const [qx, qy] = rb.pt(px, py); const sx = Math.sign(cx - qx), sy = Math.sign(cy - qy)
-        put(qx + 2 * sx, qy + 2 * sy, k); put(qx + 3 * sx, qy + 2 * sy, k)
-      }
-    } else if (kind === "terrace") {
-      const [kx, ky] = rb.pt(a0 + w * 0.65, b0 + d * 0.4)
-      spr(kx, ky, KIOSK)
-      const [px, py] = rb.pt(a0 + w * 0.3, b0 + d * 0.6); spr(px, py, PLANT)
-      const [qx, qy] = rb.pt(a0 + w * 0.7, b0 + d * 0.75); spr(qx, qy, BUSH)
-    } else if (kind === "garden") {
-      for (let i = 0; i < 4 + w + d; i++) {
-        const [px, py] = rb.pt(a0 + 0.35 + ih(id, 20 + i, 6) * Math.max(0.2, w - 0.7), b0 + 0.35 + ih(id, 40 + i, 6) * Math.max(0.2, d - 0.7))
-        const t = ih(id, 60 + i, 6)
-        spr(px, py, t < 0.3 ? PALM : t < 0.55 ? TREE : t < 0.85 ? BUSH : PLANT)
-      }
-    } else if (kind === "pod") {
-      const [px, py] = rb.pt(a0 + w * (0.35 + 0.3 * ih(id, 14, 6)), b0 + d * (0.35 + 0.3 * ih(id, 15, 6)))
-      pod(px, py + 2, 5 + Math.floor(ih(id, 16, 6) * 3), 11 + Math.floor(ih(id, 17, 6) * 3), ih(id, 18, 6) < 0.3 ? "n" : "y")
-    } else {
-      const items = 1 + Math.floor(ih(id, 70, 6) * 3)
-      for (let i = 0; i < items; i++) {
-        const [px, py] = rb.pt(a0 + 0.4 + ih(id, 56 + i, 6) * Math.max(0.1, w - 0.8), b0 + 0.4 + ih(id, 66 + i, 6) * Math.max(0.1, d - 0.8))
-        const t = ih(id, 80 + i, 6)
-        if (t < 0.22) spr(px, py, TANK)
-        else if (t < 0.4) antenna(px, py, 8 + Math.floor(ih(id, 100 + i, 6) * 9), id * 4 + i)
-        else if (t < 0.52) spr(px, py, AC)
-        else if (t < 0.6) spr(px, py, DISH)
-        else if (t < 0.69) screenPanel(px - 7, py, 14 + 2 * Math.floor(ih(id, 110 + i, 6) * 3), 8, ["n", "V", "N"][Math.floor(ih(id, 111 + i, 6) * 3)])
-        else if (t < 0.92) spr(px, py, BUSH)
-        else spr(px, py, PLANT)
-      }
+    const [x1, y1] = rb.pt(a0 + 0.2, b0 + d - 0.2), [x2, y2] = rb.pt(a0 + w - 0.2, b0 + d - 0.2)
+    stringLights(x1 + 2, y1 - 8, x2 - 2, y2 - 8, 4, id)
+    const [cx2, cy2] = rb.pt(a0 + w / 2, b0 + d / 2)
+    planter(cx2 - 12, cy2 + 2, 8, id); spr(cx2 + 6, cy2 + 3, ["UUUUU", ".E.E."])
+  } else {
+    // industrial: pipes, tanks, vents, a chimney, slit windows
+    const fh = 14, n = Math.max(3, Math.round(H0 / fh))
+    const st = stack({ a: a0, b: b0, w, d, n, fh, fam, id, trims, pw: 10, pier: 4, wh: 2, wy0: 5, wcol, trimB, plantP: 0.1, vineP: 0.25, litP: 0.3,
+      roofFn: (x, y, i) => ((i.low || i.up || i.side) ? null : (((i.a * 3) % 1 < 0.1 || (i.b * 3) % 1 < 0.1) ? fam.L : null)) })
+    const m0 = { a: a0, b: b0, w, d, z: 0, h: n * fh }
+    mods.push(m0)
+    const wL = Math.round(ISO * w), wR = Math.round(ISO * d)
+    for (let k = 0; k < 2; k++) {
+      const u = 6 + Math.floor(ih(id, 60 + k, 3) * Math.max(1, wL - 14))
+      for (let r = 3; r < m0.h - 4; r++) { for (let t = 0; t < 3; t++) { const [x, y] = wallXY("L", m0, u + t, r); put(x, y, t === 0 ? "K" : t === 1 ? "k" : "l") } }
     }
+    for (let u = 3; u < wL - 3; u++) { const [x, y] = wallXY("L", m0, u, Math.round(m0.h * 0.4)); put(x, y, "K"); const [x2, y2] = wallXY("L", m0, u, Math.round(m0.h * 0.4) + 1); put(x2, y2, "l") }
+    const rb = st.roofBox
+    const [cx2, cy2] = rb.pt(a0 + w / 2, b0 + d / 2)
+    wallBoards(bd, m0, 1, accent, wk, ["board", "strip"], 16)
+    TANKS(cx2 - 14, cy2 + 2, 7, 12, FAMS.lav)
+    TANKS(cx2 + 6, cy2 + 6, 5, 9, FAMS.peri)
+    rectK(cx2 + 16, cy2 - 4, 8, 6, "t"); hlineK(cx2 + 16, cy2 - 4, 8, "S"); for (let i = 0; i < 3; i++) hlineK(cx2 + 17, cy2 - 2 + i * 2, 6, "l")
+    for (let j = 0; j < 22; j++) rectK(cx2 - 2, cy2 - 6 - j, 5, 1, j % 6 < 2 ? "S" : "s")
+    const tipRec = []; paintPts([[cx2, cy2 - 29, "x"], [cx2 + 1, cy2 - 29, "x"], [cx2 - 1, cy2 - 29, "4"], [cx2 + 2, cy2 - 29, "4"]], tipRec); REC.tips.push({ pts: tipRec, ph: (id * 5) % 12 })
   }
-  // neon on the walls: boxy two-line shop signs, strips and icons, a zigzag stair on some towers
-  const m = { a: a0, b: b0, w, d, z: 0, h: n * fh }
-  const wk = [fam.L, fam.R, "w"]
-  const nsign = H0 > 30 && ih(id, 24, 3) < 0.4 ? 1 + (ih(id, 25, 3) < 0.2 ? 1 : 0) : 0
-  for (let s = 0; s < nsign; s++) {
-    const side = ih(id, 26 + s, 3) < 0.65 ? "L" : "R"
-    const wW = Math.round(8 * (side === "L" ? w : d))
-    if (wW < 10) continue
-    const col = accent
-    const kind = ih(id, 28 + s, 3)
-    const cells = []
-    const at = (u, r, k) => { const [x, y] = wallXY(side, m, u, r); cells.push([x, y, k]) }
-    const rr = (lo, hi, sd) => lo + Math.floor(ih(id, sd, 3) * Math.max(1, hi - lo))
-    if (kind < 0.4) {
-      const bw = Math.min(wW - 5, 12 + 2 * Math.floor(ih(id, 30 + s, 3) * 3))
-      const u0 = 1 + 2 * Math.floor(ih(id, 31 + s, 3) * Math.floor(Math.max(1, wW - bw - 3) / 2))
-      const r0 = rr(8, m.h - 18, 32 + s)
-      for (let u = 0; u < bw; u++) for (let r = 0; r < 8; r++) {
-        const edge = u === 0 || u === bw - 1 || r === 0 || r === 7
-        at(u0 + u, r0 + r, edge ? col : "w")
-      }
-      for (let li = 0; li < 2; li++) for (let gi = 0; gi < Math.floor((bw - 2) / 4); gi++) {
-        const g = glyph3(id * 7 + li * 13 + gi + s * 31)
-        for (let j = 0; j < 3; j++) for (let i = 0; i < 3; i++) if (g[j][i] === "X") at(u0 + 2 + gi * 4 + i, r0 + 1 + li * 3 + j, li ? "W" : col)
-      }
-    } else if (kind < 0.7) {
-      const len = Math.min(m.h - 12, 8 + Math.floor(ih(id, 33 + s, 3) * 10))
-      const u0 = 1 + 2 * Math.floor(ih(id, 34 + s, 3) * Math.floor(Math.max(1, wW - 6) / 2))
-      const r0 = rr(6, m.h - len - 6, 35 + s)
-      for (let r = 0; r < len; r++) { at(u0, r0 + r, col); at(u0 + 1, r0 + r, r % 3 === 0 ? "W" : col) }
-    } else {
-      const ic = ICON[["ring", "arrow", "bolt"][Math.floor(ih(id, 36 + s, 3) * 3)]]
-      const u0 = 3 + 2 * Math.floor(ih(id, 37 + s, 3) * Math.floor(Math.max(1, wW - 12) / 2))
-      const r0 = rr(6, m.h - 14, 38 + s)
-      ic.forEach((row, r) => { for (let u = 0; u < row.length; u++) if (row[u] !== ".") at(u0 + u, r0 + r, row[u] === "X" ? col : row[u]) })
-    }
-    addSign(cells, col, wk)
-  }
-  if (m.h > 80 && ih(id, 45, 3) < 0.2) {
-    // neon zigzag exterior stair up the lit side
-    const col = accent
-    const wL = Math.round(8 * w)
-    const cells = []
-    const flights = Math.floor((m.h - 12) / fh)
-    for (let fl = 0; fl < flights; fl++) {
-      const u0 = fl % 2 ? wL - 3 : 2, u1 = fl % 2 ? 2 : wL - 3
-      const len = Math.abs(u1 - u0)
-      for (let s2 = 0; s2 <= len; s2++) {
-        const u = u0 + Math.sign(u1 - u0) * s2
-        const r = m.h - 6 - fl * fh - Math.round((s2 / len) * (fh - 1))
-        const [x, y] = wallXY("L", m, u, r)
-        cells.push([x, y, col])
-      }
-    }
-    addSign(cells, col, wk)
-  }
+  haloPass()
+  curLevel = 0; curDark = 0
 }
 
-// ---------------------------------------------------------------- the hero tower
+// ---------------------------------------------------------------- the hero tower (its own finer grid)
 let TOWER_MASK = null, TOWER_POST = null
 const drawTower = () => {
   const pre = fb.slice()
-  curLevel = 0
-  const F = { brick: FAMS[1], brown: FAMS[0], plum: FAMS[2], orange: FAMS[3] }
+  curLevel = 0; curDark = 0
+  ISO = 8
+  const F = FAMS
   // a stepped, wide base with plants
-  stack({ a: 90, b: 21, w: 4, d: 4, n: 3, fh: 8, fam: F.brick, id: 9901, bright: true, trimAll: true, trims: ["H", "n"], pw: 6, litP: 0.8, plantP: 0.7 })
+  stack({ a: 90, b: 21, w: 4, d: 4, n: 3, fh: 8, plate: 2, ins: 0.22, fam: F.rose, id: 9901, bright: true, trimAll: true, trims: ["H", "n"], pw: 6, pier: 1, wh: 4, wy0: 1, litP: 0.8, plantP: 0.7 })
   // the white-lit body, windows in pale rows
-  stack({ a: 90.3, b: 21.3, w: 3.4, d: 3.4, z0: 24, n: 13, fh: 8, fam: F.brown, id: 9902, bright: true, trimAll: true, trims: ["h", "Y"], pw: 4, litP: 0.95, plantP: 0.55, glass: "white" })
-  // a twisting stack of thick plates, white and yellow floor lines
-  stack({ a: 90.75, b: 21.75, w: 2.5, d: 2.5, z0: 128, n: 10, fh: 9, fam: F.plum, id: 9903, bright: true, trimAll: true, trims: ["h", "Y"], pw: 4, litP: 0.55, plantP: 0.3, twist: 3 })
-  // a warm brown block with a lit crown line
-  stack({ a: 91, b: 22, w: 2, d: 2, z0: 218, n: 4, fh: 10, fam: F.orange, id: 9904, bright: true, trimAll: true, trims: ["Y", "H"], pw: 4, litP: 0.85, plantP: 0.2 })
+  stack({ a: 90.3, b: 21.3, w: 3.4, d: 3.4, z0: 24, n: 13, fh: 8, plate: 2, ins: 0.22, fam: F.lav, id: 9902, bright: true, trimAll: true, trims: ["h", "z"], pw: 4, pier: 1, wh: 4, wy0: 1, litP: 0.95, plantP: 0.55, glass: "white" })
+  // a twisting stack of thick plates
+  stack({ a: 90.75, b: 21.75, w: 2.5, d: 2.5, z0: 128, n: 10, fh: 9, plate: 2, ins: 0.22, fam: F.mauve, id: 9903, bright: true, trimAll: true, trims: ["h", "H"], pw: 4, pier: 1, wh: 5, wy0: 1, litP: 0.7, plantP: 0.3, twist: 3 })
+  // a warm peach block with a lit crown line
+  stack({ a: 91, b: 22, w: 2, d: 2, z0: 218, n: 4, fh: 10, plate: 2, ins: 0.22, fam: F.peach, id: 9904, bright: true, trimAll: true, trims: ["z", "H"], pw: 4, pier: 1, wh: 6, wy0: 1, litP: 0.85, plantP: 0.2 })
   // a dark stack with cyan and pink trims
-  stack({ a: 91, b: 22, w: 2, d: 2, z0: 258, n: 12, fh: 9, fam: F.plum, id: 9905, bright: true, trimAll: true, trims: ["n", "H"], pw: 4, litP: 0.5, trimP: 0.7, plantP: 0.15, twist: 2 })
-  const st = stack({ a: 91.2, b: 22.2, w: 1.6, d: 1.6, z0: 366, n: 2, fh: 9, fam: F.brown, id: 9906, bright: true, trimAll: true, trims: ["n", "Y"], pw: 4, litP: 0.95 })
+  stack({ a: 91, b: 22, w: 2, d: 2, z0: 258, n: 12, fh: 9, plate: 2, ins: 0.22, fam: F.plum, id: 9905, bright: true, trimAll: true, trims: ["n", "H"], pw: 4, pier: 1, wh: 5, wy0: 1, litP: 0.6, trimP: 0.7, plantP: 0.15, twist: 2 })
+  const st = stack({ a: 91.2, b: 22.2, w: 1.6, d: 1.6, z0: 366, n: 2, fh: 9, plate: 2, ins: 0.22, fam: F.peach, id: 9906, bright: true, trimAll: true, trims: ["n", "H"], pw: 4, pier: 1, wh: 5, wy0: 1, litP: 0.95 })
   const [cx, cy] = st.roofBox.pt(92, 23)
   // crown: an antenna with a red tip, and a small screen on a frame
-  vlineK(cx + 6, cy - 16, 16, "q")
+  vlineK(cx + 6, cy - 16, 16, "E")
   const tip = []
   paintPts([[cx + 6, cy - 17, "x"], [cx + 5, cy - 17, "4"], [cx + 7, cy - 17, "4"]], tip)
   REC.tips.push({ pts: tip, ph: 0 })
@@ -658,39 +899,98 @@ const drawTower = () => {
   for (let j = 0; j < 30; j++) for (let i = 0; i < 28; i++) {
     const yy = y0 + j + Math.floor(i / 7)
     const edge = i === 0 || i === 27 || j === 0 || j === 29
-    if (edge) { put(x0 + i, yy, "w"); pts.push([x0 + i, yy]) }
+    if (edge) { put(x0 + i, yy, "A"); pts.push([x0 + i, yy]) }
     else put(x0 + i, yy, j < 3 ? "n" : (i + j) % 5 === 0 ? "W" : j > 20 ? "V" : bay(i, j) < 0.5 ? "n" : "v")
   }
   glowAround(pts, "n", 2)
-  vlineK(x0 + 4, y0 + 33, 10, "q"); vlineK(x0 + 22, y0 + 38, 8, "q")
+  vlineK(x0 + 4, y0 + 33, 10, "E"); vlineK(x0 + 22, y0 + 38, 8, "E")
+  ISO = 16
   TOWER_POST = fb.slice()
   TOWER_MASK = new Uint8Array(W * H)
-  for (let i = 0; i < W * H; i++) if (TOWER_POST[i] !== pre[i]) TOWER_MASK[i] = 1
+  for (let i = 0; i < W * H; i++) if (TOWER_POST[i] !== pre[i]) { TOWER_MASK[i] = 1 }
+  curWins = []
 }
 
-// ---------------------------------------------------------------- go
-for (const bd of blds) bd.h = heightOf(bd)
-const order = blds.map((b) => ({ t: "b", b, k: b.a0 + b.w + b.b0 + b.d, k2: b.a0 + b.w }))
-order.push({ t: "T", k: 119, k2: 94 })
-order.sort((p, q) => p.k - q.k || p.k2 - q.k2)
+// ---------------------------------------------------------------- go: ground and streets first, then everything back to front
 recordCity = true
-for (const e of order) { if (e.t === "T") drawTower(); else drawBuilding(e.b); curLevel = 0 }
+for (let y = 150; y < H; y++) for (let x = 120; x < W; x++) {
+  const u = (x + 0.5) / 16, v = (y + 0.5) / 8
+  const ia = Math.floor((u + v) / 2), ib = Math.floor((v - u) / 2)
+  if (!cellOK(ia, ib)) continue
+  curLevel = levelFor(y); curDark = darkFor(x, y)
+  const plaza = inRect(PLAZA, ia, ib)
+  put(x, y, plaza ? ((((ia + ib) & 1) ? bay(x, y) < 0.85 : bay(x, y) < 0.35) ? "S" : "s") : (bay(x, y) < 0.22 ? "A" : "B"))
+}
+curLevel = 0; curDark = 0
+// neon spill and shop light pooled on the streets
+for (let a = 12; a <= 70; a++) for (let b = 0; b <= 40; b++) {
+  if (!cellOK(a, b) || !isStreet(a, b)) continue
+  const [cx, cy] = cellXY(a, b), q = ih(a, b, 61)
+  curLevel = levelFor(cy); curDark = darkFor(cx, cy)
+  if (q < 0.18) pool(cx, cy, 12, 5, "H", 0.5)
+  else if (q < 0.36) pool(cx, cy, 12, 5, "n", 0.5)
+  else if (q < 0.46) pool(cx, cy, 10, 4, "y", 0.5)
+}
+curLevel = 0
+const props = []
+for (let a = 12; a <= 70; a++) for (let b = 0; b <= 40; b++) if (cellOK(a, b) && isStreet(a, b) && ih(a, b, 62) < 0.16) props.push({ t: "lamp", a, b })
+// the plaza is drawn as one prop, in its own place in the back-to-front order
+const order = blds.map((b) => ({ t: "b", b, k: b.a0 + b.w + b.b0 + b.d, k2: b.a0 + b.w }))
+for (const p of props) order.push({ t: "lamp", p, k: p.a + p.b + 1.5, k2: p.a })
+order.push({ t: "T", k: 59.5, k2: 0 })
+order.push({ t: "plaza", k: PLAZA.a0 + PLAZA.w + PLAZA.b0 + PLAZA.d - 0.5, k2: 0 })
+order.sort((p, q) => p.k - q.k || p.k2 - q.k2)
+for (const e of order) {
+  if (e.t === "T") drawTower()
+  else if (e.t === "lamp") { const [cx, cy] = cellXY(e.p.a, e.p.b); curLevel = levelFor(cy); curDark = darkFor(cx, cy); streetLamp(cx, cy + 6) }
+  else if (e.t === "plaza") {
+    const pcx = 16 * (PLAZA.a0 + PLAZA.w / 2 - PLAZA.b0 - PLAZA.d / 2), pcy = 8 * (PLAZA.a0 + PLAZA.w / 2 + PLAZA.b0 + PLAZA.d / 2)
+    curLevel = levelFor(pcy); curDark = darkFor(pcx, pcy)
+    // two lawns, benches, hedges, trees, and string lights hung between four lamp posts
+    for (const [lx, ly, rx, ry] of [[pcx - 30, pcy + 4, 26, 10], [pcx + 34, pcy - 2, 22, 8]]) {
+      for (let y = -ry; y <= ry; y++) for (let x = -rx; x <= rx; x++) {
+        const dd = (x * x) / (rx * rx) + (y * y) / (ry * ry)
+        if (dd > 1) continue
+        put(lx + x, ly + y, dd > 0.82 ? "O" : bay(lx + x, ly + y) < 0.5 ? "o" : "g")
+      }
+    }
+    spr(pcx - 4, pcy + 14, ["UUUUUUUU", ".E....E."]); spr(pcx + 22, pcy + 4, ["UUUUUUUU", ".E....E."])
+    hedge(pcx - 58, pcy + 8, 14, 3); hedge(pcx + 44, pcy + 8, 14, 5)
+    for (const [tx, ty, r] of [[pcx - 52, pcy - 2, 6], [pcx - 22, pcy - 10, 5], [pcx + 20, pcy - 14, 6], [pcx + 54, pcy - 4, 5], [pcx - 34, pcy + 14, 5], [pcx + 40, pcy + 14, 6]]) tree(tx, ty + r + 2, r, tx + ty)
+    const posts = [[pcx - 62, pcy], [pcx, pcy - 30], [pcx + 62, pcy], [pcx, pcy + 30]]
+    for (const [x, y] of posts) { vlineK(x, y - 24, 24, "E"); rectK(x - 1, y - 26, 3, 2, "h"); pool(x, y + 2, 12, 5, "y", 0.5) }
+    for (let i = 0; i < 4; i++) { const [x1, y1] = posts[i], [x2, y2] = posts[(i + 1) % 4]; stringLights(x1, y1 - 22, x2, y2 - 22, 6, i) }
+    curLevel = 0; curDark = 0
+  } else drawBuilding(e.b)
+  curLevel = 0; curDark = 0
+}
 
-const stillAt = (x, y, k) => get(x, y) === k
 // keep only the records whose pixels survived being painted over by nearer buildings
+const stillAt = (x, y, k) => get(x, y) === k
 REC.stars = REC.stars.filter(([x, y]) => stillAt(x, y, "F"))
 for (const s of REC.signs) { s.pts = s.pts.filter(([x, y, k]) => stillAt(x, y, k)); s.glow = s.glow.filter(([x, y, k]) => stillAt(x, y, k)) }
-REC.signs = REC.signs.filter((s) => s.pts.length >= 4)
+REC.signs = REC.signs.filter((s) => s.pts.length >= 6)
 for (const s of REC.trims) { s.pts = s.pts.filter(([x, y, k]) => stillAt(x, y, k)); s.glow = s.glow.filter(([x, y, k]) => stillAt(x, y, k)) }
 REC.trims = REC.trims.filter((s) => s.pts.length >= 8)
 for (const t of REC.tips) t.pts = t.pts.filter(([x, y, k]) => stillAt(x, y, k))
 REC.tips = REC.tips.filter((t) => t.pts.length >= 1)
-const WINS = [...REC.win.values()].map((r) => ({ lit: r.lit, pts: r.pts.filter(([x, y, k]) => stillAt(x, y, k)) })).filter((r) => r.pts.length >= 3)
+const WINS = [...REC.win.values()].map((r) => ({ lit: r.lit, pts: r.pts.filter(([x, y, on, off]) => stillAt(x, y, r.lit ? on : off)) })).filter((r) => r.pts.length >= 6)
 
-
-// the haze and the grounding gradient, now that the records hold the raw colours
+// the warm glow round the hero tower, then the haze, the dark corner and the gradient on every city pixel
+for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+  const i = y * W + x
+  if (!CITY[i] || TOWER_MASK[i]) continue
+  const d = Math.hypot((x - 552) / 1.25, y - 410)
+  WARM[i] = Math.round(20 * 0.26 * Math.pow(clamp(1 - d / 120, 0, 1), 1.2))
+}
 recordCity = false
 for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = y * W + x; if (CITY[i]) fb[i] = IDX[FK(x, y, KEYS[fb[i]])] }
+// a 1 px soft pink rim along the skyline against the clouds, and along the left edge
+for (let y = 1; y < H; y++) for (let x = 1; x < W; x++) {
+  const i = y * W + x
+  if (!CITY[i] || TOWER_MASK[i]) continue
+  if (!CITY[i - W] || (!CITY[i - 1] && ((x + y) & 1) === 0)) fb[i] = IDX.Z
+}
 
 // ================================================================ title: the letters are Archivo Black outlines
 // rasterized once from the supplied SVG (8x, box filtered, thresholded at 50%) and kept as row runs
@@ -814,7 +1114,7 @@ for (let i = 0; i < W * H; i++) if (TOWER_MASK[i] && BASE[i] !== TOWER_POST[i]) 
 const pickEvery = (list, n) => { const step = Math.max(1, Math.floor(list.length / n)); const out = []; for (let i = Math.floor(step / 2); i < list.length && out.length < n; i += step) out.push(list[i]); return out }
 const lvl = (p) => DEPTH[p[1] * W + p[0]]
 const MOVING_WINS = pickEvery(WINS.filter((w2) => w2.pts[0][1] > 230 && lvl(w2.pts[0]) <= 6), 22).map((w2, i) => ({ w: w2, a: (i * 7 + 3) % FRAMES, d: 6 + ((i * 5) % 10) }))
-const BLINKERS = pickEvery(REC.signs.filter((s) => s.pts[0][1] > 230 && lvl(s.pts[0]) <= 6), 8).map((s, i) => ({ s, a: 3 + i * 6, d: 1 + (i % 2) }))
+const BLINKERS = pickEvery(REC.signs.filter((s) => s.pts[0][1] > 230 && lvl(s.pts[0]) <= 9), 8).map((s, i) => ({ s, a: 3 + i * 6, d: 1 + (i % 2) }))
 const BLINKTRIMS = pickEvery(REC.trims.filter((s) => s.pts[0][1] > 230 && lvl(s.pts[0]) <= 6), 6).map((s, i) => ({ s, a: 9 + i * 7, d: 1 + ((i + 1) % 2) }))
 const LOWSIGNS = REC.signs.filter((s) => s.pts[0][1] > 220)
 const STUTTER = LOWSIGNS[Math.floor(LOWSIGNS.length / 5)]
@@ -851,28 +1151,21 @@ const drawHolo = (f) => {
   for (const [cu, cj] of [[0, 0], [hw - 1, 0], [0, hh - 1], [hw - 1, hh - 1]]) {
     for (let k = 0; k < 9; k++) { hp(cu === 0 ? k : cu - k, cj, "W"); hp(cu, cj === 0 ? k : cj - k, "W"); hp(cu === 0 ? k : cu - k, cj + (cj === 0 ? 1 : -1), "W"); hp(cu + (cu === 0 ? 1 : -1), cj === 0 ? k : cj - k, "W") }
   }
-  // a round corporate emblem
-  const eu = 59, ej = 15
-  for (let j = -10; j <= 10; j++) for (let i = -10; i <= 10; i++) {
+  // a bold emblem that reads at thumbnail size: a thick ring around a leaf
+  const eu = 59, ej = 28
+  for (let j = -23; j <= 23; j++) for (let i = -23; i <= 23; i++) {
     const dd = Math.hypot(i, j)
-    if (dd <= 9.3 && dd >= 7.6) hp(eu + i, ej + j, "W")
-    else if (dd < 7.6) hp(eu + i, ej + j, bay(eu + i, ej + j) < 0.45 ? "n" : "1")
+    if (dd <= 21.5 && dd >= 17.5) hp(eu + i, ej + j, "W")
+    else if (dd < 17.5) hp(eu + i, ej + j, dd > 16 ? "n" : (bay(eu + i, ej + j) < 0.55 ? "1" : "0"))
   }
-  for (let k = 0; k <= 4; k++) { hp(eu - 4 + k, ej - 2 + k, "W"); hp(eu + 4 - k, ej - 2 + k, "W") }
-  for (let i = -4; i <= 4; i++) hp(eu + i, ej - 3, "W")
-  for (let j = 27; j < 38; j++) for (let u = 14; u < 106; u++) if (((u + j) & 1) === 0 || j === 27 || j === 37) hp(u, j, "1")
-  // the pixel text HAS YOUR BACK, each letter held flat on the sloped panel
-  const text = "HAS YOUR BACK"
-  let tu = 20
-  for (const ch of text) {
-    if (ch !== " ") {
-      const g = SMALL[ch]
-      for (let j = 0; j < 7; j++) for (let i = 0; i < 5; i++) if (g[j][i] === "X") hp(tu + i, 29 + j - (Math.floor((tu + i) / 3) - Math.floor(tu / 3)), "W")
-    }
-    tu += 6
+  const ax = Math.cos(-0.7), ay = Math.sin(-0.7)
+  for (let j = -15; j <= 15; j++) for (let i = -15; i <= 15; i++) {
+    const p = i * ax + j * ay, q = -i * ay + j * ax
+    if (Math.abs(p) > 13) continue
+    const wq = 6.5 * Math.sqrt(1 - (p / 13) * (p / 13))
+    if (Math.abs(q) <= wq) hp(eu + i, ej + j, Math.abs(q) < 0.8 ? "W" : q < 0 ? "N" : "n")
   }
-  // two thin lines of "data"
-  for (const [j, u0, u1, step] of [[42, 14, 100, 7], [47, 14, 78, 5]]) for (let u = u0; u < u1; u++) if ((u - u0) % step < step - 2) hp(u, j, ((u - u0) / step) % 3 < 1 ? "W" : "n")
+  for (let k = 13; k <= 18; k++) hp(eu + Math.round(-k * ax), ej + Math.round(-k * ay), "W")
   const pts = []
   for (const [x, y, k, j] of ops) {
     const sh = glitch && j >= glitch[0] && j <= glitch[1] ? 3 : 0
@@ -885,6 +1178,7 @@ const drawHolo = (f) => {
 
 const drawTaxi = (f) => {
   const bob = Math.round(Math.sin((2 * Math.PI * f) / FRAMES))
+  ISO = 8      // the taxi keeps the finer grid
   // draw it level into a scratch buffer, then shear it so it climbs toward the city
   const saved = fb
   fb = new Uint8Array(W * H).fill(255)
@@ -901,7 +1195,7 @@ const drawTaxi = (f) => {
       if (r === 3 && u >= 6 && u <= 9) return "W"
       return u === 0 ? "h" : "Y"
     },
-    R: (u, r, wW, h) => (r === h - 1 ? "w" : r === 0 ? "h" : u > wW - 3 ? "o" : r > h - 3 ? "o" : "Y"),
+    R: (u, r, wW, h) => (r === h - 1 ? "w" : r === 0 ? "h" : u > wW - 3 ? "U" : r > h - 3 ? "U" : "Y"),
     T: (x, y, i) => ((i.low || i.up) ? "h" : "Y"),
   })
   // cabin and roof sign
@@ -941,6 +1235,7 @@ const drawTaxi = (f) => {
   }
   // hover glow under the skids
   for (const [lx, ly] of lamps) for (let k = -2; k <= 2; k++) if (bay(lx + k, ly) < 0.6) put(lx + k - 1, ly + 3, "C")
+  ISO = 16
 }
 const wlast = (arr) => arr.length ? arr[arr.length - 1] : [13, 3]
 
@@ -960,7 +1255,7 @@ const drawTitle = (f) => {
   for (const [x, y] of TITLE.ter.body) put(x, y, "G")
 }
 
-const DARKER = { 6: "5", 5: "4", 4: "3", 3: "2", 2: "1", 1: "0", a: "b", b: "c", c: "d", d: "3", B: "K", K: "k", k: "u", R: "r", r: "u", P: "p", p: "q", O: "L", L: "l", S: "s", g: "e" }
+const DARKER = { 6: "5", 5: "4", 4: "3", 3: "2", 2: "1", 1: "0", a: "b", b: "c", c: "d", d: "3", R: "r", r: "u", P: "p", p: "q", S: "s", s: "t", K: "k", k: "l", D: "E", E: "e", T: "U", U: "m", f: "i", i: "j", g: "o", o: "O", B: "A" }
 const scanlines = () => {
   for (let y = 2; y < H; y += 3) for (let x = (y >> 1) & 1; x < W; x += 2) {
     const i = y * W + x
@@ -975,7 +1270,7 @@ const renderFrame = (f) => {
   // windows: each of ~20 flips off (or on) at a fixed frame and flips back, like someone moving about
   for (const { w, a, d } of MOVING_WINS) {
     if (!inLoop(f, a, d)) continue
-    w.pts.forEach(([x, y, k], i) => put(x, y, FK(x, y, w.lit ? "w" : i === 0 ? "y" : "m")))
+    w.pts.forEach(([x, y, on, off]) => put(x, y, FK(x, y, w.lit ? off : on)))
   }
   BLINKERS.forEach(({ s, a, d }) => { if (inLoop(f, a, d)) { setPts(s.pts, true); setPts(s.glow, true) } })
   BLINKTRIMS.forEach(({ s, a, d }) => { if (inLoop(f, a, d)) { setPts(s.pts, true); setPts(s.glow, true) } })

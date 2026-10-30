@@ -103,13 +103,17 @@ html.nt-text-200 :is(html.pui .pu-pane,#spire,#prec,#gridPanel,.monitor,#wirelog
 /* ---------- the touch tutorial (js/tutorial.js): a dim with a hole where to act, a ghost of the gesture, an operator's note ---------- */
 .ttut,.ttip{display:none}
 html.touch .ttut:not([hidden]){display:block;position:fixed;inset:0;z-index:150;pointer-events:none}
-html.touch .ttut .tt-dim{position:absolute;inset:0;background:radial-gradient(circle var(--r,70px) at var(--x,50%) var(--y,45%), transparent 0 92%, rgba(56,232,224,.9) 94%, rgba(4,7,16,.55) 97%)}
 html.touch .ttut .tt-note{position:absolute;left:max(12px, env(safe-area-inset-left,0px));right:max(12px, env(safe-area-inset-right,0px));top:calc(64px + env(safe-area-inset-top,0px));
   max-width:420px;margin:0 auto;padding:10px 12px;background:rgba(18,10,4,.92);border:1px dashed #ffb347;color:#ffe2b8;pointer-events:auto;display:grid;gap:4px}
 html.touch .ttut .tt-note small{font:11px 'JetBrains Mono',monospace;letter-spacing:.14em;color:#ffb347}
 html.touch .ttut .tt-note b{font:600 16px/1.35 'Chakra Petch',sans-serif;letter-spacing:.04em;font-weight:500}
 html.touch .ttut .tt-note button{justify-self:end;min-height:44px;padding:0 12px;font-size:12px;color:#ffb347;border-color:rgba(255,179,71,.5);border-radius:0;background:transparent}
-html.touch .ttut .tt-ghost{position:absolute;left:0;top:0;width:0;height:0}
+html.touch .ttut .tt-note{grid-template-columns:72px minmax(0,1fr);align-items:center;column-gap:10px}
+html.touch .ttut .tt-note > button{grid-column:1/-1}
+html.touch .ttut .tt-txt{display:grid;gap:4px}
+html.touch .ttut .tt-demo{position:relative;width:72px;height:72px;overflow:hidden;border:1px solid rgba(255,179,71,.35);background:rgba(255,179,71,.06)}
+html.touch .ttut .tt-ghost{position:absolute;left:50%;top:50%;width:0;height:0;transform:scale(.55)}
+html.touch .ttut .tt-ghost i{transform-origin:center}
 html.touch .ttut .tt-ghost i{position:absolute;left:-14px;top:-14px;width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.75);box-shadow:0 0 0 6px rgba(255,255,255,.2);opacity:0}
 html.touch .ttut .g-drag i:first-child{animation:ttDrag 1.6s ease-in-out infinite}
 html.touch .ttut .g-swipe i:first-child{animation:ttSwipe 1.4s ease-in-out infinite}

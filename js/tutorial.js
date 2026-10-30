@@ -24,7 +24,7 @@ const TUT = (() => {
     { id: 'pan', say: 'Drag to look around', at: center, ghost: 'drag', ev: 'pan' },
     { id: 'zoom', say: 'Pinch to zoom', at: center, ghost: 'pinch', ev: 'zoom' },
     { id: 'zone', say: 'Swipe the zone card, or tap it', at: () => rectOf(zoneCard()), ghost: 'swipe', test: () => !!S.zone },
-    { id: 'build', say: 'Tap a plot to build', at: center, ghost: 'tap', ev: 'build', need: () => !!S.zone, pre: 'Pick a zone first' },
+    { id: 'build', say: 'Tap anywhere on the platform to build', at: center, ghost: 'tap', ev: 'build', need: () => !!S.zone, pre: 'Pick a zone first' },
     { id: 'trim', say: 'Build, then tap it again, quickly: one floor', at: atFresh, ghost: 'tap2', ev: 'trim' },
     { id: 'resize', say: 'Build, tap it again and drag up: its height', at: atFresh, ghost: 'up', ev: 'resize' },
     { id: 'remove', say: 'Hold a building to remove it', at: center, ghost: 'hold', ev: 'remove' },
@@ -35,16 +35,15 @@ const TUT = (() => {
 
   // the overlay: a dim with a hole where to act (no pointer events: the game underneath takes every touch), the note, and Skip
   const ov = document.createElement('div'); ov.className = 'ttut'; ov.hidden = true;
-  ov.innerHTML = '<div class="tt-dim"></div><div class="tt-ghost"><i></i><i></i></div><div class="tt-note"><small></small><b></b><button type="button">Skip tutorial</button></div>';
+  // (no dimming and no spotlight (owner, Oct 30): the player does each gesture wherever they like; the note shows a small ghost of it)
+  ov.innerHTML = '<div class="tt-note"><div class="tt-demo"><div class="tt-ghost"><i></i><i></i></div></div><div class="tt-txt"><small></small><b></b></div><button type="button">Skip tutorial</button></div>';
   document.body.appendChild(ov);
-  const dim = ov.querySelector('.tt-dim'), ghost = ov.querySelector('.tt-ghost'), note = ov.querySelector('.tt-note'), say = note.querySelector('b'), step = note.querySelector('small');
+  const ghost = ov.querySelector('.tt-ghost'), note = ov.querySelector('.tt-note'), say = note.querySelector('b'), step = note.querySelector('small');
   note.querySelector('button').addEventListener('click', () => finish(true));
   let k = -1, on = false, raf = 0, waitEv = null;
   function place(){
     if (!on) return; raf = requestAnimationFrame(place);
-    const b = BEATS[k]; const p = (b && b.at()) || center();
-    dim.style.setProperty('--x', p.x + 'px'); dim.style.setProperty('--y', p.y + 'px'); dim.style.setProperty('--r', p.r + 'px');
-    ghost.style.transform = 'translate(' + Math.round(p.x) + 'px,' + Math.round(p.y) + 'px)';
+    const b = BEATS[k];
     if (b && b.test && b.test()) next();
     if (b && b.skipIf && b.skipIf()) next();
   }

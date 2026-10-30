@@ -2169,12 +2169,12 @@ function updatePeople(dt, t){
   // decisions are spread over frames: a slice of the population each time
   // (and a time budget: a decision can mean finding a new route across town, and a burst of them on one frame is a
   // visible stutter; whoever isn't reached this frame is reached on the next)
-  const n = pplList.length, slice = Math.min(n, 60), tb = performance.now();
+  const n = pplList.length, slice = Math.min(n, 60), tb = performance.now(), budget = typeof TOUCH !== 'undefined' && TOUCH.on ? 1.5 : 2.5;   // (touch: a smaller slice of each frame; the rest wait a frame or two)
   let k = 0;
   for (; k < slice; k++){
     const p = pplList[(pplCursor + k) % n];
     if (!p.walk && pplNow >= p.until) decide(p);
-    if (performance.now() - tb > 2.5){ k++; break; }
+    if (performance.now() - tb > budget){ k++; break; }
   }
   PH.sub('people: decisions');
   pplCursor = n ? (pplCursor + k) % n : 0;

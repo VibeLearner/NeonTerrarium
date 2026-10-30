@@ -303,7 +303,20 @@ function megaFx(m){
   if (m.carryFx){ const fx = m.carryFx; m.carryFx = null; fx.rebase(m); m.fx = m.keptFx = fx; return; }   // turned: the same live parts, set down in the new layout
   const t = MEGA_TYPES[m.kind]; if (t.fx) m.fx = t.fx(m) || null;
 }
-function updateMegaFx(dt, time){ PH.subBegin(); for (const m of megas.values()) if (m.fx){ m.fx.update(dt, time); PH.sub('megastructure: ' + m.kind); } fieldTick(dt); PH.sub('megastructure: forcefield'); }   // (each one timed in the hitch report, F3)
+function updateMegaFx(dt, time){ PH.subBegin();
+  // (touch: a megastructure off screen moves its belts, drones and crates every eighth frame, with the time of the frames between, instead of every frame:
+  //  nothing of them shows off screen, and on a phone with a big city they cost a couple of milliseconds a frame. On screen, every frame as before)
+  const lazy = typeof TOUCH !== 'undefined' && TOUCH.on, VP = lazy ? comp.uniforms.VP.value : null; MEGAFX_N++;
+  for (const m of megas.values()) if (m.fx){
+    if (lazy){ m._fxDt = (m._fxDt || 0) + dt;
+      if (((MEGAFX_N + m.i) & 7) && !megaOnScreen(VP, m)){ PH.sub('megastructure: ' + m.kind); continue; }
+      m.fx.update(m._fxDt, time); m._fxDt = 0; }
+    else m.fx.update(dt, time);
+    PH.sub('megastructure: ' + m.kind); }
+  fieldTick(dt); PH.sub('megastructure: forcefield'); }
+let MEGAFX_N = 0;
+function megaOnScreen(VP, m){ const pad = 2.5, x0 = m.i*LOT - LOT/2 - pad, x1 = (m.i + m.w - 1)*LOT + LOT/2 + pad, z0 = m.j*LOT - LOT/2 - pad, z1 = (m.j + m.h - 1)*LOT + LOT/2 + pad;
+  return boxOnScreen(VP, x0, x1, -8, Math.max(m.top || 0, m.roofH || 0, CURB) + 8, z0, z1); }   // (each one timed in the hitch report, F3)
 // The effects' instance buffers (belts, crates, the spire's light) change every frame, but only go up to the graphics card
 // while their megastructure is on screen (none of them casts a shadow, so off screen they show nowhere); a change made off
 // screen waits and goes up the frame it comes into view. megaFxFlush runs once the frame's view is known (main.js).

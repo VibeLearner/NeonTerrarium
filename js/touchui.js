@@ -106,11 +106,16 @@ const TUI = (() => {
     t.until = performance.now() + SHOW_MS; U.buzz(6); dispatchEvent(new CustomEvent('nt:peek', { detail: m.kind })); return true;
   };
   let tagRect = null, wasBusy = false; addEventListener('resize', () => { tagRect = null; });
+  let gpEl = null, tsEl = null;
   function placeTags(){
     if (!tags.size) return;
+    // (nothing to show or watch: nothing to do. This runs every frame; it used to look the page up each time, about half a millisecond a frame)
+    const now = performance.now(); let any = false;
+    for (const t of tags.values()) if (t.on || t.opened || now < t.until){ any = true; break; }
+    if (!any) return;
+    gpEl = gpEl || document.getElementById('gridPanel'); tsEl = tsEl || document.getElementById('tsheet');
     const busy = root.classList.contains('gp-open') || (typeof OVERSEER !== 'undefined' && OVERSEER.hold) || (typeof PRECINCT !== 'undefined' && PRECINCT.hold) || (typeof FURN !== 'undefined' && FURN.hold) || (typeof TITLE !== 'undefined' && TITLE.on) ||
-      !!document.querySelector('#gridPanel.open, #tsheet:not([hidden])') || !card.hidden;
-    const now = performance.now();
+      !!(gpEl && gpEl.classList.contains('open')) || !!(tsEl && !tsEl.hidden) || !card.hidden;
     // a screen opened from a button has closed: the button again, for 5 s
     if (wasBusy && !busy) for (const t of tags.values()) if (t.opened){ t.opened = false; t.until = now + SHOW_MS; }
     wasBusy = busy;

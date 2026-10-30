@@ -207,6 +207,14 @@ const bank = (o) => {
     let t = 6; for (let j = 0; j < 6; j++) if (s > th[j]) { t = j; break }
     tone[(y - top) * bw + (x - bx0)] = t
   }
+  // close pin-holes of sky enclosed inside the cloud
+  for (let pass = 0; pass < 3; pass++) for (let y = top + 1; y < top + bh - 1; y++) for (let x = bx0 + 1; x < bx1; x++) {
+    const i = (y - top) * bw + (x - bx0)
+    if (tone[i] >= 0) continue
+    const cnt = {}; let n = 0
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { if (!dx && !dy) continue; const t = tone[i + dy * bw + dx]; if (t >= 0) { cnt[t] = (cnt[t] || 0) + 1; n++ } }
+    if (n >= 5) tone[i] = +Object.keys(cnt).sort((p, q) => cnt[q] - cnt[p])[0]
+  }
   for (let pass = 0; pass < 2; pass++) {
     const nt = tone.slice()
     for (let y = top + 1; y < top + bh - 1; y++) for (let x = bx0 + 1; x < bx1; x++) {
@@ -310,6 +318,7 @@ const GROUND_Y = 440
 const grounded = (x, y, k) => {
   if (y < GROUND_Y || "$-+[=".includes(k)) return k
   const t = (y - GROUND_Y) / (H - GROUND_Y)
+  if ("*()AB".includes(k)) { const st = Math.floor(clamp(t, 0, 1) * 3.99); return st ? darkKey(k, 0.1 + 0.1 * st) : k }      // the floor darkens in clean bands
   return bay(x, y) < Math.min(1, t * 1.15) ? darkKey(k, 0.12 + 0.33 * t) : k
 }
 // what a raw key becomes at (x, y) once the haze, the dark corner, the warm core and the gradient are on it
@@ -326,7 +335,7 @@ const glowAround = (pts, k, reach = 2, sink) => {
     if (d === 0 || d > reach) continue
     const nx = x + dx, ny = y + dy
     if (!inb(nx, ny) || set.has(nx + ny * W)) continue
-    if (EMIT.has(get(nx, ny))) continue
+    if (EMIT.has(get(nx, ny)) || GROUNDSET.has(get(nx, ny))) continue
     if (d === 1 ? ((nx + ny) & 1) === 0 : (nx & 1) === 0 && (ny & 1) === 0) {
       if (sink) sink.push([nx, ny, k, get(nx, ny)])
       put(nx, ny, k)
@@ -573,23 +582,6 @@ const moss = (x, y, len, seed) => {
     if (ih(x + i, seed, 92) < 0.22) { put(x + i, y + 1, "o"); put(x + i, y + 2, "O") }
   }
 }
-// a mottled lawn: patches of lit, mid and shaded grass, tufts, clover flowers
-const lawn = (lx, ly, rx, ry, seed) => {
-  for (let y = -ry; y <= ry; y++) for (let x = -rx; x <= rx; x++) {
-    const dd = (x * x) / (rx * rx) + (y * y) / (ry * ry)
-    if (dd > 1) continue
-    const nz = Math.sin((lx + x) * 0.23 + seed) + Math.sin((ly + y) * 0.55 + (lx + x) * 0.07) + 0.9 * (y / ry)
-    let k = dd > 0.8 ? (y > 0 ? "8" : "O") : nz < -0.7 ? "g" : nz < 0.9 ? "o" : "O"
-    if (dd > 0.8 && y < 0) k = "o"
-    if (dd < 0.8 && ih(lx + x, ly + y, seed) < 0.1) { put(lx + x, ly + y - 1, "g"); k = "g" }
-    put(lx + x, ly + y, k)
-  }
-  for (let i = 0; i < Math.round(rx * ry / 45); i++) {
-    const px = Math.round(lx + (ih(seed, i, 31) * 2 - 1) * rx * 0.75), py = Math.round(ly + (ih(seed, i, 32) * 2 - 1) * ry * 0.7)
-    if (i % 3 === 0) put(px, py, ["z", "W", "Y"][i % 3 + (i % 2)] || "W")
-    else leafMass(px, py, 2.6, seed + i, { sq: 0.8, lr: 2 })
-  }
-}
 const stringLights = (x1, y1, x2, y2, sag, seed) => {
   const dx = x2 - x1, n = Math.max(2, Math.floor(Math.abs(dx) / 7)), cols = ["h", "L", "y", "z"]
   for (let x = Math.min(x1, x2); x <= Math.max(x1, x2); x++) { const t = (x - x1) / dx; put(x, Math.round(y1 + (y2 - y1) * t + sag * (1 - Math.pow(2 * t - 1, 2))), "E") }
@@ -601,17 +593,69 @@ const stringLights = (x1, y1, x2, y2, sag, seed) => {
   glowAround(pts, "T", 3)
 }
 const GROUNDSET = new Set("AB*()")
-const pool = (cx, cy, rx, ry, k, dens) => {
+const POOLUP = { A: "(", B: "(", "(": "*", ")": "(" }
+// warm light on the floor: a hard-edged ellipse that lifts the stone one step (two overlapping pools make two steps)
+const pool = (cx, cy, rx, ry) => {
   for (let y = -ry; y <= ry; y++) for (let x = -rx; x <= rx; x++) {
-    const dd = (x * x) / (rx * rx) + (y * y) / (ry * ry)
-    if (dd > 1 || !GROUNDSET.has(get(cx + x, cy + y))) continue
-    if (bay(cx + x, cy + y) < (1 - dd) * dens) put(cx + x, cy + y, k)
+    if ((x * x) / (rx * rx) + (y * y) / (ry * ry) > 1) continue
+    const up = POOLUP[get(cx + x, cy + y)]
+    if (up) put(cx + x, cy + y, up)
+  }
+}
+// an organic patch of grass drawn on the iso ground plane (cell units ra, rb along the two ground axes): a lumpy outline
+// with bitten edges, a lit top-left rim, a shadow rim bottom-right, tufts in clusters, tiny flowers, a few bushes and ferns
+const GREENK = "7goO8"
+const patch = (cx, cy, ra, rb, seed, o = {}) => {
+  const s1 = seed * 1.7, s2 = seed * 2.3, s3 = seed * 0.9
+  const f = (th) => 1 + 0.26 * Math.sin(3 * th + s1) + 0.16 * Math.sin(5 * th + s2) + 0.09 * Math.sin(8 * th + s3)
+  const ext = Math.ceil(Math.hypot(ra, rb) * 16 * 1.45) + 3
+  const band = 1.7 / (Math.min(ra, rb) * 15 + 1)
+  const inPatch = []
+  for (let y = -Math.ceil(ext / 2) - 2; y <= Math.ceil(ext / 2) + 2; y++) for (let x = -ext; x <= ext; x++) {
+    const a = (x / 16 + y / 8) / 2, b = (y / 8 - x / 16) / 2
+    const r = Math.hypot(a / ra, b / rb), ff = f(Math.atan2(b / rb, a / ra))
+    if (r > ff) continue
+    const e = ff - r, gx = cx + x, gy = cy + y
+    const cur = get(gx, gy)
+    if (!(GROUNDSET.has(cur) || GREENK.includes(cur))) continue
+    const h = ih(gx, gy, seed + 5), h2 = ih(gx, gy, seed + 6)
+    if (e < band * 1.1 && h < 0.3) continue
+    const facing = -(x * 0.55 + y * 0.9)
+    const nz = Math.sin(gx * 0.33 + seed) * Math.sin(gy * 0.85 + seed * 1.3)
+    let k = "o"
+    if (e < band && facing > 0) k = h2 < 0.25 ? "7" : "g"
+    else if (e < band * 1.4 && facing < 0) k = e < band * 0.55 ? "8" : "O"
+    else if (nz > 0.3 && h < 0.45) k = "g"
+    else if (nz < -0.5 && h < 0.4) k = "O"
+    else if (facing > 8 && h2 > 0.94) k = "7"
+    if (o.tint && k === "g" && facing > 0 && h < 0.08) k = o.tint
+    inPatch.push([gx, gy, e])
+    put(gx, gy, k)
+  }
+  // grass blades: short 1 to 2 px strokes, clustered
+  for (const [gx, gy, e] of inPatch) {
+    if (e < band * 1.2) continue
+    const nz = Math.sin(gx * 0.33 + seed) * Math.sin(gy * 0.85 + seed * 1.3)
+    if (nz > 0.1 && ih(gx, gy, seed + 7) < 0.13) { put(gx, gy - 1, "g"); if (ih(gx, gy, seed + 8) < 0.4) put(gx + 1, gy - 1, "7") }
+    else if (ih(gx, gy, seed + 9) > 0.992) put(gx, gy, ["z", ":", "V", "z", ":"][Math.floor(ih(gx, gy, seed + 10) * 5)])
+  }
+  if (o.bushes && inPatch.length > 60) for (let i = 0; i < o.bushes; i++) {
+    const [gx, gy] = inPatch[Math.floor(ih(seed, i, 71) * inPatch.length)]
+    if (i % 2) fern(gx, gy, seed + i); else leafMass(gx, gy - 2, 2.6 + ih(seed, i, 72) * 1.2, seed + i, { sq: 0.85, lr: 2, warm: o.warm ?? 0, dots: ih(seed, i, 73) < 0.4 ? [["z", ":"], 2] : null })
+  }
+}
+// pink petals fallen on the ground round a blossom tree
+const petals = (x, y, seed) => {
+  for (let i = 0; i < 14; i++) {
+    const px = Math.round(x + (ih(seed, i, 81) * 2 - 1) * 14), py = Math.round(y + 1 + (ih(seed, i, 82) * 2 - 1) * 6)
+    const c = get(px, py)
+    if (GROUNDSET.has(c) || GREENK.includes(c)) put(px, py, i % 3 ? "J" : "z")
   }
 }
 const streetLamp = (x, y) => {
   vlineK(x, y - 13, 13, "E"); rectK(x - 1, y - 15, 4, 2, "h")
   glowAround([[x - 1, y - 15], [x, y - 15], [x + 1, y - 15], [x + 2, y - 15], [x - 1, y - 14], [x, y - 14], [x + 1, y - 14], [x + 2, y - 14]], "T", 3)
-  pool(x, y, 11, 5, "y", 0.55)
+  pool(x, y, 11, 5)
 }
 
 // ---------------------------------------------------------------- rooftop and wall props
@@ -1407,7 +1451,7 @@ const drawBuilding = (bd) => {
     mods.push(m0)
     wallBoards(bd, m0, 2, accent, wk, ["board", "icon"], 22)
     const [px, py] = [PXs(a0, b0 + d) + Math.round(ISO * w * 0.5), PYs(a0, b0 + d) + 3]
-    pool(px, py + 3, 30, 9, "L", 0.85); pool(px, py + 3, 20, 6, "y", 0.8)
+    pool(px, py + 3, 30, 9); pool(px, py + 3, 20, 6)
     const rb = st.roofBox
     const [x1, y1] = rb.pt(a0 + 0.2, b0 + d - 0.2), [x2, y2] = rb.pt(a0 + w - 0.2, b0 + d - 0.2)
     stringLights(x1 + 2, y1 - 8, x2 - 2, y2 - 8, 4, id)
@@ -1438,7 +1482,7 @@ const drawBuilding = (bd) => {
     const nL = Math.max(2, Math.round(Math.abs(ex2 - ex1) / 11))
     for (let i = 0; i <= nL; i++) { const t = (i + 0.5) / (nL + 1); lantern(Math.round(ex1 + (ex2 - ex1) * t), Math.round(ey1 + (ey2 - ey1) * t) + 1, ["z", "y", "L"][(i + id) % 3]) }
     const [px, py] = [PXs(a0, b0 + d) + Math.round(ISO * w * 0.5), PYs(a0, b0 + d) + 3]
-    pool(px, py + 3, 26, 8, "L", 0.85); pool(px, py + 3, 16, 5, "y", 0.8)
+    pool(px, py + 3, 26, 8); pool(px, py + 3, 16, 5)
     if (!far) { const [wx, wy] = wallXY("L", { a: a0, b: b0, w, d, z: 0, h: st.z }, 6, 15); potRow(wx, wy + 2, 2, 7, id + 4); const [mx, my] = wallXY("R", { a: a0, b: b0, w, d, z: 0, h: st.z }, 4, 15); fern(mx, my + 2, id) }
   } else if (type === "grid") {
     // a boxy apartment block: a grid of small pink, peach and blue windows, each with a balcony rail and a tiny plant
@@ -1586,7 +1630,9 @@ for (let y = 150; y < H; y++) for (let x = 120; x < W; x++) {
   if (!cellOK(ia, ib)) continue
   curLevel = levelFor(y); curDark = darkFor(x, y)
   const plaza = inRect(PLAZA, ia, ib)
-  put(x, y, plaza ? ((((ia + ib) & 1) ? bay(x, y) < 0.85 : bay(x, y) < 0.35) ? "*" : "(") : (bay(x, y) < 0.22 ? "A" : "B"))
+  const fa = (u + v) / 2 - ia, fb = (v - u) / 2 - ib
+  const seam = fa < 0.034 || fb < 0.034
+  put(x, y, plaza ? (seam ? ")" : ((ia * 7 + ib * 13) % 5 === 0 ? "*" : "(")) : (seam ? "A" : "B"))
 }
 curLevel = 0; curDark = 0
 // neon spill and shop light pooled on the streets
@@ -1594,9 +1640,7 @@ for (let a = 12; a <= 70; a++) for (let b = 0; b <= 40; b++) {
   if (!cellOK(a, b) || !isStreet(a, b)) continue
   const [cx, cy] = cellXY(a, b), q = ih(a, b, 61)
   curLevel = levelFor(cy); curDark = darkFor(cx, cy)
-  if (q < 0.18) pool(cx, cy, 12, 5, "H", 0.5)
-  else if (q < 0.36) pool(cx, cy, 12, 5, "n", 0.5)
-  else if (q < 0.62) { pool(cx, cy, 14, 6, "L", 0.8); pool(cx, cy, 8, 3, "y", 0.7) }
+  if (q >= 0.36 && q < 0.62) { pool(cx, cy, 14, 6); pool(cx, cy, 8, 3) }
 }
 curLevel = 0
 const props = []
@@ -1627,6 +1671,7 @@ for (const e of order) {
     const x = cx0 + Math.round((ih(e.a, e.b, 66) - 0.5) * 14), y = cy0 + 5 + Math.round(ih(e.a, e.b, 67) * 4)
     curLevel = levelFor(cy0); curDark = darkFor(cx0, cy0)
     const wm = ih(e.a, e.b, 68) < 0.5 ? -1 : 1
+    if (e.kind !== "shrub") patch(x, y + 1, 0.3 + 0.12 * ih(e.a, e.b, 83), 0.22, sd + 3, {})
     if (e.kind === "tree") streetTree(x, y, 5 + Math.floor(ih(e.a, e.b, 69) * 4), sd, { warm: wm })
     else if (e.kind === "palm") palm(x, y, 16 + Math.floor(ih(e.a, e.b, 69) * 10), sd, wm * 4)
     else if (e.kind === "bamboo") bamboo(x, y, 16 + Math.floor(ih(e.a, e.b, 69) * 8), 3 + (sd % 2), sd)
@@ -1637,29 +1682,33 @@ for (const e of order) {
     const pcx = 16 * (PLAZA.a0 + PLAZA.w / 2 - PLAZA.b0 - PLAZA.d / 2), pcy = 8 * (PLAZA.a0 + PLAZA.w / 2 + PLAZA.b0 + PLAZA.d / 2)
     curLevel = levelFor(pcy); curDark = darkFor(pcx, pcy)
     // two mottled lawns; then, back to front, bamboo, palms, a pair of blossom trees, round trees, benches, pots, ferns
-    lawn(pcx - 30, pcy + 5, 30, 12, 3); lawn(pcx + 34, pcy - 2, 26, 10, 7)
+    // two big organic beds with clear stone paths between them, patches at the foot of every tree, along the edges and in the cracks
+    patch(pcx - 30, pcy + 6, 1.05, 0.62, 3, { tint: "H", bushes: 4 }); patch(pcx + 36, pcy - 2, 0.9, 0.55, 7, { tint: "n", bushes: 3, warm: -1 })
+    const grove = (x, y, sd, k = 1, tint) => patch(x, y + 1, 0.38 * k, 0.28 * k, sd, { tint, bushes: k > 1 ? 1 : 0 })
+    for (const [x, y, ra, rb, sd] of [[-58, 14, 0.4, 0.26, 21], [54, 16, 0.45, 0.26, 22], [-4, -24, 0.5, 0.3, 23], [62, -8, 0.32, 0.22, 26]]) patch(pcx + x, pcy + y, ra, rb, sd, { tint: x < 0 ? "H" : "n", bushes: ra > 0.45 ? 1 : 0 })
+    for (let i = 0; i < 9; i++) { const a = 37 + 5 * ih(i, 1, 90), b = 14 + 4 * ih(i, 2, 90); const [tx, ty] = cellXY(a, b); if (Math.hypot(tx - pcx, (ty - pcy) * 2) > 28) patch(tx, ty - 8, 0.08 + 0.05 * ih(i, 3, 90), 0.06, 40 + i, {}) }
     const bench = (x, y) => { spr(x, y, ["UUUUUUUU", ".E....E."]); hlineK(x - 4, y - 2, 8, "T") }
     const items = [
-      [pcy - 10, () => bamboo(pcx - 70, pcy - 10, 30, 5, 5)],
-      [pcy - 12, () => bamboo(pcx + 70, pcy - 12, 26, 4, 9)],
-      [pcy - 14, () => streetTree(pcx + 20, pcy - 14, 8, 11, { warm: -1 })],
-      [pcy - 10, () => streetTree(pcx - 22, pcy - 10, 7, 12, { warm: 1 })],
-      [pcy - 4, () => palm(pcx + 6, pcy - 4, 30, 3, 6)],
-      [pcy - 2, () => sakura(pcx - 52, pcy - 2, 9, 13, { warm: 1 })],
-      [pcy - 4, () => sakura(pcx + 54, pcy - 4, 8, 14, { warm: -1 })],
-      [pcy + 4, () => palm(pcx - 64, pcy + 6, 34, 2, -6)],
-      [pcy + 6, () => palm(pcx + 62, pcy + 8, 28, 1, 6)],
+      [pcy - 10, () => { grove(pcx - 70, pcy - 10, 31); bamboo(pcx - 70, pcy - 10, 30, 5, 5) }],
+      [pcy - 12, () => { grove(pcx + 70, pcy - 12, 32); bamboo(pcx + 70, pcy - 12, 26, 4, 9) }],
+      [pcy - 14, () => { grove(pcx + 20, pcy - 14, 33, 1.3); streetTree(pcx + 20, pcy - 14, 8, 11, { warm: -1 }) }],
+      [pcy - 10, () => { grove(pcx - 22, pcy - 10, 34, 1.2); streetTree(pcx - 22, pcy - 10, 7, 12, { warm: 1 }) }],
+      [pcy - 4, () => { grove(pcx + 6, pcy - 4, 35); palm(pcx + 6, pcy - 4, 30, 3, 6) }],
+      [pcy - 2, () => { grove(pcx - 52, pcy - 2, 36, 1.4, 'H'); sakura(pcx - 52, pcy - 2, 9, 13, { warm: 1 }); petals(pcx - 52, pcy - 2, 3) }],
+      [pcy - 4, () => { grove(pcx + 54, pcy - 4, 37, 1.3, 'n'); sakura(pcx + 54, pcy - 4, 8, 14, { warm: -1 }); petals(pcx + 54, pcy - 4, 5) }],
+      [pcy + 4, () => { grove(pcx - 64, pcy + 6, 38); palm(pcx - 64, pcy + 6, 34, 2, -6) }],
+      [pcy + 6, () => { grove(pcx + 62, pcy + 8, 39); palm(pcx + 62, pcy + 8, 28, 1, 6) }],
       [pcy + 8, () => { hedge(pcx - 58, pcy + 8, 14, 3, { bloom: true }); hedge(pcx + 44, pcy + 8, 14, 5, { bloom: true }) }],
       [pcy + 4, () => bench(pcx + 22, pcy + 4)],
       [pcy + 14, () => { bench(pcx - 4, pcy + 14); potRow(pcx - 16, pcy + 14, 3, 6, 21) }],
-      [pcy + 14, () => streetTree(pcx - 34, pcy + 18, 7, 15, { warm: 1 })],
-      [pcy + 16, () => { streetTree(pcx + 40, pcy + 20, 9, 16, { warm: -1 }); fern(pcx + 30, pcy + 22, 4); moss(pcx + 24, pcy + 24, 6, 4) }],
-      [pcy + 18, () => { potRow(pcx + 4, pcy + 24, 4, 7, 33); planter(pcx - 50, pcy + 26, 9, 8) }],
+      [pcy + 14, () => { grove(pcx - 34, pcy + 18, 41, 1.3); streetTree(pcx - 34, pcy + 18, 7, 15, { warm: 1 }) }],
+      [pcy + 16, () => { grove(pcx + 40, pcy + 20, 42, 1.5); streetTree(pcx + 40, pcy + 20, 9, 16, { warm: -1 }); fern(pcx + 30, pcy + 22, 4); moss(pcx + 24, pcy + 24, 6, 4) }],
+      [pcy + 18, () => { patch(pcx - 40, pcy + 28, 0.2, 0.12, 43, {}); patch(pcx + 20, pcy + 30, 0.18, 0.12, 44, {}); potRow(pcx + 4, pcy + 24, 4, 7, 33); planter(pcx - 50, pcy + 26, 9, 8); for (const [mx, my, ml] of [[-70, 4, 6], [-18, -32, 5], [28, -28, 6], [66, 6, 5], [10, 34, 6]]) moss(pcx + mx, pcy + my, ml, ml + mx) }],
     ]
     items.sort((p, q) => p[0] - q[0])
     for (const it of items) it[1]()
     const posts = [[pcx - 62, pcy], [pcx, pcy - 30], [pcx + 62, pcy], [pcx, pcy + 30]]
-    for (const [x, y] of posts) { vlineK(x, y - 24, 24, "E"); rectK(x - 1, y - 26, 3, 2, "h"); pool(x, y + 2, 16, 6, "L", 0.8) }
+    for (const [x, y] of posts) { vlineK(x, y - 24, 24, "E"); rectK(x - 1, y - 26, 3, 2, "h"); pool(x, y + 2, 16, 6) }
     for (let i = 0; i < 4; i++) { const [x1, y1] = posts[i], [x2, y2] = posts[(i + 1) % 4]; stringLights(x1, y1 - 22, x2, y2 - 22, 6, i) }
     curLevel = 0; curDark = 0
   } else drawBuilding(e.b)

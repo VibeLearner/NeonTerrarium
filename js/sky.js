@@ -1099,7 +1099,7 @@ const cloudScene = new THREE.Scene(); cloudScene.add(new THREE.Mesh(new THREE.Pl
 // before, and once it stops the full-size image builds up again from that one, a share a frame
 const CLOUDT = { reset: true, i: 0, slot: 0, VP: new THREE.Matrix4(), drift: new THREE.Vector2(), cover: -1, prev: null, yaw: null, pitch: null, old: null };
 function cloudFrame(){
-  const U = cloudMat.uniforms, n = S.cloudQ === 1 ? 4 : S.cloudQ === 3 ? 16 : 8;   // (Settings, cloud quality: sharp, balanced, fast; all at the frame's own size)
+  const U = cloudMat.uniforms, n = S.cloudQ === 1 ? 4 : S.cloudQ === 3 || (PORTRAIT_T() && S.cloudQ === 2) ? 16 : 8;   // (a touch screen upright at Balanced: one pixel in 16 marched a frame, the rest carried over; the same picture, its new sky filling in a little slower)   // (Settings, cloud quality: sharp, balanced, fast; all at the frame's own size)
   if (Math.abs(U.cover.value - CLOUDT.cover) > .02){ CLOUDT.cover = U.cover.value; CLOUDT.reset = true; }   // (a look's change of cover: everything at once)
   // a picture from another view altogether can't be carried over: coming in from the title screen (its window's view of the city), the sky went black for
   // about eight frames (owner, Oct 25), one block in eight coming right each frame. Leaving or entering the title, or a sudden big zoom: everything at once
@@ -1613,6 +1613,10 @@ const CAP720_KEY = 'neonIsland.cap720', PIX_720 = 1280*720;
 let CAP720 = (() => { try { return localStorage.getItem(CAP720_KEY) === '1'; } catch (e) { return false; } })();
 function setCap720(on){ CAP720 = !!on; try { localStorage.setItem(CAP720_KEY, CAP720 ? '1' : '0'); } catch (e) {}
   try { const f = document.querySelector('iframe.furnish-frame'); if (f) f.contentWindow.postMessage({ type: 'furnish:pixcap' }, location.origin); } catch (e) {} }   // the most pixels the city is drawn at (applyRenderRes): a 1080p screen never reaches it, a sharp laptop screen zoomed out does
+// (touch, upright: the screen taller than wide)
+const PORTRAIT_T = () => typeof TOUCH !== 'undefined' && TOUCH.on && DH > DW;
+let ZK = 1;   // the view's half height over its short side's: 1 except a touch screen held upright (resize)
+const zoomS = () => zoom/ZK;   // the zoom on the short side: what the zoom limits, the detail levels and the render size go by
 function resize(){
   const dpr = devicePixelRatio || 1;
   DW = Math.max(1, Math.round(innerWidth*dpr)); DH = Math.max(1, Math.round(innerHeight*dpr));
@@ -1621,9 +1625,25 @@ function resize(){
   const whole = t => Math.ceil(DH / Math.max(1, Math.round(DH / t)));
   BASE_H = RENDER_LINES === 0 ? Math.min(DH, SMOOTH_MAX) : whole(RENDER_LINES);
   if (RENDER_LINES === 720 && BASE_H <= whole(480)) BASE_H = Math.min(DH, 720);
+  // A phone or tablet held upright: the lines are counted across the short side, the width, as they are on its side (claude/portrait-world-scale.md).
+  // Counted down the long side, "720" upright was about 360 x 674, a quarter of the pixels on its side, and every building came out a few chunky
+  // pixels. Now about 720 across (720 x 1348 on a 1080 x 2022 screen), each a whole number of screen pixels, as on its side
+  if (PORTRAIT_T() && RENDER_LINES !== 0){
+    const wholeW = t => Math.ceil(DW / Math.max(1, Math.round(DW / t)));
+    let bw = wholeW(RENDER_LINES); if (RENDER_LINES === 720 && bw <= wholeW(480)) bw = Math.min(DW, 720);
+    BASE_H = Math.min(DH, Math.round(bw*DH/DW));
+  }
+  // and the view framed by the short side too (ZK: input.js keeps zoom as the view's half height; ZK turns that into the short side's, which
+  // is what the zoom limits, the starting zoom and the detail levels go by). A turn of the phone keeps the same short-side zoom: the same size
+  // of building, the same middle
+  const zk = PORTRAIT_T() ? DH/DW : 1;
+  if (zk !== ZK && typeof zoom !== 'undefined'){ const r = zk/ZK; zoom *= r; zoomT *= r; }
+  ZK = zk;
+  // (touch, the first time: the starting zoom by the screen's size, input.js)
+  if (!resize.once && typeof TOUCH !== 'undefined' && TOUCH.on && typeof touchZoomPhys === 'function'){ resize.once = true; zoom = zoomT = touchZoomPhys()*ZK; }
   renderer.setSize(DW, DH, false);
   canvas.style.width = innerWidth + 'px'; canvas.style.height = innerHeight + 'px';
-  H = 0; applyRenderRes(zoom);
+  H = 0; applyRenderRes(zoomS());
 }
 // Zooming out draws at more lines, but no more than PERF.grow times the base (it used to climb all the way to the screen's
 // own resolution: on a sharp laptop screen, zoomed out over a big city, four to nine times the pixels for every
@@ -1638,7 +1658,7 @@ const PERF = { grow: Infinity, max: 1.6, ema: 16, t: 0, f: 1, quick: 0, quietUnt
 const ZOOMRES_KEY = 'neonIsland.zoomRes';
 let ZOOM_RES = (() => { try { const raw = localStorage.getItem(ZOOMRES_KEY); if (raw !== null && ['1', '1.6', '0'].includes(raw)) return +raw;
   const cap = localStorage.getItem('neonIsland.capRes'); if (cap !== null) return cap === '1' ? 1.6 : 0; } catch (e) {} return 1.6; })();   // (the old box's choice is kept; new players: Sharper)
-function setZoomRes(v){ ZOOM_RES = v; try { localStorage.setItem(ZOOMRES_KEY, String(v)); } catch (e) {} applyRenderRes(zoom); }
+function setZoomRes(v){ ZOOM_RES = v; try { localStorage.setItem(ZOOMRES_KEY, String(v)); } catch (e) {} applyRenderRes(zoomS()); }
 // The sharp view when zoomed out (Settings, Optimize framerate, "Sharp view when zoomed out"). Far out each building is a few pixels wide and at the
 // game's usual resolution they run together; the owner's "Smooth" and "Sharpest" made them read as separate buildings, but cost the whole frame at
 // every zoom. So past FARV.inZ the look is smooth, and once the view has been still for a moment it's drawn at up to the screen's own resolution
@@ -1658,7 +1678,7 @@ function farTrack(now){
   const sp = p ? Math.max(Math.abs(v[0] - p[0]), Math.abs(v[1] - p[1])/v[1], Math.abs(v[2] - p[2])*2, Math.hypot(v[3] - p[3], v[4] - p[4])/v[1])*1000/dtF : 1;
   FARV.p = v;
   const title = typeof TITLE !== 'undefined' && TITLE.on;
-  if (!FARV.on || title) FARV.far = false; else if (zoom >= FARV.inZ) FARV.far = true; else if (zoom <= FARV.outZ) FARV.far = false;
+  if (!FARV.on || title) FARV.far = false; else if (zoomS() >= FARV.inZ) FARV.far = true; else if (zoomS() <= FARV.outZ) FARV.far = false;
   // The sharp view comes in as the view slows, not when it has stopped: every move ends in a glide (input.js eases the camera onto its target), and
   // over that glide's last stretch the resolution steps up a quarter at a time, so the picture sharpens with the slowing instead of snapping when it
   // settles (owner, Oct 25). Down at once when the view speeds up again; up no faster than a step every third frame
@@ -1691,6 +1711,10 @@ function applyRenderRes(z){
   if (ZOOM_RES > 0) f = Math.min(f, ZOOM_RES);
   if (z > 30) f = Math.max(1, f*Math.pow(30/z, .3));   // (past zoom 30, out to 60: a little fewer pixels, eased (1.6 down to 1.3 times the base), so the far view doesn't outrun the card; much lower and the grass tufts went under a render pixel)
   if (S.autoPerf !== false) f = Math.min(f, PERF.grow);
+  // (a touch screen held upright: one render size at every zoom, 720 across. Its base is already four times the pixels it had upright before the short
+  //  side counted, more than it ever reached zoomed out, and growing on from there (up to 1.6 times each way) cost the card more than the phone can
+  //  spare. On its side it grows as before)
+  if (PORTRAIT_T()) f = 1;
   PERF.f = f;
   const step = Math.round(Math.log(f)/Math.log(1.04));   // 4% steps, so targets aren't remade every frame
   let h = Math.min(DH, Math.round(BASE_H*Math.pow(1.04, step)));

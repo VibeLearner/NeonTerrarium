@@ -107,7 +107,7 @@ function frameBody(now){
   clouds.rotation.y += dt*.008*cDrift;
   comp.uniforms.windR.value = windNow; comp.uniforms.rainT.value = (comp.uniforms.rainT.value + dt*(0.9 + windNow*0.12)) % 3600; clouds.position.set(camT.x, 0, camT.z); rain.position.set(camT.x, 0, camT.z);
   comp.uniforms.glowC.value.set(camT.x, camT.z);
-  farTrack(now); applyRenderRes(zoom);   // (zoomed out and still: the sharp view, sky.js)
+  farTrack(now); applyRenderRes(zoomS());   // (zoomed out and still: the sharp view, sky.js)
   updateCamera(dt);
   comp.uniforms.camDist.value = CAM_DIST + SC.dc;   // (depth is measured from the pinned camera: see staticcache.js)
   comp.uniforms.outlines.value = S.outlines ? 1 : 0;
@@ -121,7 +121,7 @@ function frameBody(now){
   { // detail levels: only needed once zooming out outruns the screen's resolution (see applyRenderRes)
     // (by the size without the sharp view's extra lines: as the view settled and the resolution stepped up, the plants and fine pieces came back, and
     //  went again as soon as it moved: foliage popping in and out when turning zoomed out, owner Oct 25. Now they stay as they are while moving)
-    const loss = (zoom/ZOOM_REF)*(BASE_H/(H_LOD || H));   // 1 = every building keeps all its pixels
+    const loss = (zoomS()/ZOOM_REF)*(BASE_H/(H_LOD || H));   // (the short side's zoom: a phone held upright the same as on its side, sky.js ZK)   // 1 = every building keeps all its pixels
     const t = clamp((loss - 1.15)/1.0, 0, 1), e = t*t*(3 - 2*t);
     // (plants thin later and more gently than the fine pieces: they are a few percent of a frame (tools/procfol/MEASURE.md), and tufts vanishing while
     //  still a pixel tall showed as pop-in with the render fixed; from loss 1.6, fully thinned only by 3.2)

@@ -53,6 +53,12 @@ function updateCamera(dt){
   placeSun();
   const asp = W/H; cam.left=-zoom*asp; cam.right=zoom*asp; cam.top=zoom; cam.bottom=-zoom; cam.updateProjectionMatrix();
 }
+// Touch: the starting zoom by the screen's size, so a plot is about 52 CSS pixels across its short side (about 9 mm on a phone, a comfortable
+// tap), and after the title the one that fits the city across the short side, between that and a little over twice as far out
+// (claude/portrait-world-scale.md). Short-side zooms: times ZK for zoom itself
+function touchZoomPhys(){ return clamp(Math.min(innerWidth, innerHeight)*LOT/(2*52), 8, 30); }
+function touchZoomFit(){ const zp = touchZoomPhys(); let x = 0, z = 0, n = 0; for (const c of cells.values()){ x += c.x; z += c.z; n++; } if (!n) return zp;
+  x /= n; z /= n; let r = 0; for (const c of cells.values()) r = Math.max(r, Math.hypot(c.x - x, c.z - z)); return clamp((r + LOT)*1.05, zp, zp*2.2); }
 const ptrs = new Map(); let dragging = false, pinch0 = 0, zoom0 = 0, pinchX = 0;
 let act = null;   // the gesture in progress: { kind:'paint'|'rotate'|'right'|'touch', x, y, moved, done:Set, timer }
 const pdist = () => { const [a,b] = [...ptrs.values()]; return Math.hypot(a.x-b.x, a.y-b.y) || 1; };
@@ -248,7 +254,7 @@ function pointerMove(e){
       if (act.mode === 'pinch'){ pinch0 = d; zoom0 = zoomT; act.ang = pang(); act.mid = m; }
       if (act.mode !== 'tilt') return; act.mid = m; tEmit('tilt'); }
     if (act.touch && act.mode === 'tilt'){ const m = pmid(); pitchT = clamp(pitchT + (m.y - act.mid.y)*.006, PITCH_MIN, PITCH_MAX); act.mid = m; return; }
-    zoomT = clamp(zoom0*pinch0/pdist(), 5, 60); if (act.touch && Math.abs(zoomT - zoom0) > .05*zoom0) tEmit('zoom');
+    zoomT = clamp(zoom0*pinch0/pdist(), 5*ZK, 60*ZK);   // (the limits on the short side: ZK, sky.js) if (act.touch && Math.abs(zoomT - zoom0) > .05*zoom0) tEmit('zoom');
     if (act.touch){ const a = pang(), m = pmid(); let da = a - act.ang; if (da > PI) da -= 2*PI; if (da < -PI) da += 2*PI; yawT += da; act.ang = a; touchPan(m.x - act.mid.x, m.y - act.mid.y); act.mid = m; }   // (twist turns, the pair together pans)
     else { const mx = pmidX(); yawT -= (mx - pinchX)*.008; pinchX = mx; } } return; }
   if (act.kind === 'rotate'){ yawT -= dx*.008; tilt(); return; }

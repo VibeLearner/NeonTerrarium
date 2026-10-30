@@ -648,7 +648,7 @@ html.touch .hwbar b{font-size:14px}
 /* the hint: larger, on a dark plate */
 html.touch .zonebar > #modeHint{font-size:12px;line-height:1.4;padding:5px 10px;background:rgba(6,9,20,.9);border:1px solid var(--line)}
 /* the Buildings and Transport lists: 48 px rows, 12 px names, and the reason a locked one is locked shown under it (it was only in a hover title) */
-html.touch .bitem{min-height:48px;box-sizing:border-box;padding:8px 10px}
+html.touch .bmenu .bitem,html.touch .bmenu-list .bitem{min-height:48px;box-sizing:border-box;padding:8px 10px}
 html.touch .bitem b{font-size:12.5px}
 html.touch .bitem small{font-size:11px}
 html.touch .bmenu-list{max-height:min(52vh,420px);max-height:min(52dvh,420px)}
@@ -711,17 +711,13 @@ html.touch #gridPanel .gtab{min-height:44px;padding:0 14px}
 html.touch #gridPanel .gx{order:-1;margin-left:auto;min-height:44px}
 html.touch #gridPanel .gname{display:none}
 html.touch #gridPanel .gchip{font-size:12px}
-html.touch #gridPanel .gbot{flex-wrap:wrap;white-space:normal;row-gap:2px;font-size:12px}
 @media (max-width:760px){
-  html.touch #gridPanel .gmain{display:flex;flex-direction:column;gap:10px;overflow-y:auto;overscroll-behavior:contain}
-  html.touch #gridPanel .gmain > .gp{flex:none;overflow:visible;min-height:0}
   html.touch #gridPanel .gp{padding:30px 12px 14px}
   html.touch #gridPanel .gp > .gtag{display:none}
   html.touch #gridPanel .gp > h3{right:14px;overflow:hidden;text-overflow:ellipsis}
   html.touch #gridPanel .gclock{flex:none;min-height:0;flex-wrap:wrap;align-items:stretch}
   html.touch #gridPanel .gorb{flex:1 1 140px;min-height:140px}
   html.touch #gridPanel .gside{width:auto;flex:1 1 150px}
-  html.touch #gridPanel .gstrip{flex:none}
   html.touch #gridPanel .gs{grid-template-columns:minmax(0,1fr) 56px;grid-template-areas:"n o" "r r";row-gap:2px}
   html.touch #gridPanel .gs > span{grid-area:n} html.touch #gridPanel .gs > output{grid-area:o} html.touch #gridPanel .gs > input{grid-area:r}
   html.touch #gridPanel .gmix{grid-template-columns:minmax(0,1fr)}
@@ -739,26 +735,15 @@ html.touch #gridPanel .gpill{min-height:36px}
   html.touch #spire .top{position:sticky;top:0;z-index:5;height:auto;min-height:56px;flex-wrap:wrap;gap:4px 12px;padding:calc(6px + env(safe-area-inset-top,0px)) 0 6px;background:var(--bg)}
   html.touch #spire .top::after{width:100%}
   html.touch #spire .top .mid{margin:0;order:3;width:100%;gap:10px}
-  html.touch #spire .top .mid span{font-size:11px}
   html.touch #spire .brand small{display:none}
   html.touch #spire .top{padding-right:96px}
   html.touch #spire .brand .hd{font-size:18px}
   html.touch #spire .pn > .tab .m{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   html.touch #spire .pn > .tab code,html.touch #spire .pn > .tab .hd{white-space:nowrap;flex:none}
-  html.touch #spire .spark{height:auto;min-height:30px;grid-template-columns:70px minmax(0,1fr) 56px}
-  html.touch #spire .pn > .tab{height:26px}
-  html.touch #spire .pn > .tab code{font-size:11px}
-  html.touch #spire .pn > .tab .hd{font-size:12px}
-  html.touch #spire .pn > .tab .m{font-size:11px}
-  html.touch #spire .pn{padding-top:32px}
-  html.touch #spire .kv,html.touch #spire .bar,html.touch #spire .spark,html.touch #spire .inc .t1,html.touch #spire .empty{font-size:12px}
-  html.touch #spire .unit,html.touch #spire .inc .t2,html.touch #spire .inc .w,html.touch #spire .legend,html.touch #spire .spark em{font-size:11px}
-  html.touch #spire .bar.wide{grid-template-columns:110px minmax(0,1fr) 34px}
-  html.touch #spire .map{height:60vh;height:60dvh}
 }
 /* the Precinct desk */
 @media (max-width:1000px){
-  html.touch #prec{grid-template-columns:minmax(0,1fr);grid-template-rows:auto;overflow-y:auto;overscroll-behavior:contain;font-size:12px;
+  html.touch #prec{grid-template-columns:minmax(0,1fr);overflow-y:auto;overscroll-behavior:contain;font-size:12px;
     padding:0 max(8px, env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(8px, env(safe-area-inset-left,0px))}
   html.touch #prec > *{min-width:0}
   html.touch #prec .top{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));margin-top:env(safe-area-inset-top,0px);padding-right:0}
@@ -766,11 +751,6 @@ html.touch #gridPanel .gpill{min-height:36px}
   html.touch #prec .top > div:first-child{padding-right:96px;grid-column:1/-1}
   html.touch #prec .top .clk{font-size:16px}
   html.touch #prec .top .sp{display:none}
-  html.touch #prec .top small,html.touch #prec th,html.touch #prec .lg,html.touch #prec .pn > .h{font-size:11px}
-  html.touch #prec .pn > .h{height:24px}
-  html.touch #prec .pn{padding-top:28px}
-  html.touch #prec .map{height:52vh;height:52dvh}
-  html.touch #prec .map canvas{top:24px;height:calc(100% - 24px)}
   html.touch #prec .bt{grid-template-columns:minmax(0,1fr)}
   html.touch #prec .rt{grid-template-columns:minmax(0,1fr)}
   html.touch #prec .pn:not(.map){min-height:120px}

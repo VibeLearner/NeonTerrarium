@@ -17,6 +17,12 @@ const TOUCH = (() => {
   // A laptop with a touch screen still has a trackpad or mouse as its main pointer, so it keeps the desktop layout.
   const mq = matchMedia('(pointer: coarse)'), mqPort = matchMedia('(orientation: portrait)');
   T.on = mq.matches;
+  // touch: the loading cover's bar (css/style.css html.touch.title-boot) fills as the page's scripts arrive, of the number the phone page has
+  // (data-nscripts, written by tools/mobile/build.js), most of the way; the rest is the title's own pictures
+  if (T.on) try { const h = document.documentElement, N = +h.dataset.nscripts || 75; let n = 0;
+    const set = v => h.style.setProperty('--boot', String(Math.max(.04, Math.min(1, v))));
+    document.addEventListener('load', e => { if (e.target && e.target.tagName === 'SCRIPT'){ n++; set(.9*n/N); } }, true);   // (on the document: a file's load event never reaches the window)
+    addEventListener('DOMContentLoaded', () => set(.92)); addEventListener('load', () => set(1)); } catch (e) {}
   // the player's own Interface choices (Settings, touchui.js), on the page before anything is drawn: text size, Clean signal, reduce motion.
   // Only what the player picked: the device's reduce-motion setting is never read (the owner's rule: the animations always play)
   if (T.on) try { const g = k => localStorage.getItem('touch:nt.' + k), h = document.documentElement, ts = g('text');

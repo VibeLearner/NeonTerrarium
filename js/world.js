@@ -3065,7 +3065,11 @@ function pickBox(minx, miny, minz, maxx, maxy, maxz){
 let PICK_MEMO = null, PICK_SOFT = false;
 // the same pick for hovering: never waits for a plot to be made again (see pickTris)
 function pickAtSoft(cx, cy){ PICK_SOFT = true; try { return pickAt(cx, cy); } finally { PICK_SOFT = false; } }
+// (touch: every pick goes by the plot's box where its full arrays were let go, as hovering does, and asks the worker for them. Making the plot again on
+//  the spot for an exact pick took 60 to 160 ms a tap on a phone, the hitch on each build and removal, owner Oct 30. A finger is no finer than the box)
+const PICK_TOUCH = typeof TOUCH !== 'undefined' && TOUCH.on;
 function pickAt(cx, cy){
+  if (PICK_TOUCH && !PICK_SOFT){ PICK_SOFT = true; try { return pickAt(cx, cy); } finally { PICK_SOFT = false; } }
   const r = viewRect();
   _ndc.set(((cx - r.left)/r.width)*2 - 1, -((cy - r.top)/r.height)*2 + 1);
   ray.setFromCamera(_ndc, cam);

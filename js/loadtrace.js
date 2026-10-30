@@ -71,6 +71,8 @@
           const k = (sc.sourceURL || '').replace(location.origin, '').replace(/\?.*/, '') + ' ' + (sc.sourceFunctionName || sc.invoker || '?');
           const q = S.scripts[k] || (S.scripts[k] = { n: 0, ms: 0, max: 0 }); q.n++; q.ms += Math.round(sc.duration); q.max = Math.max(q.max, Math.round(sc.duration)); } } });
       obs.observe({ type: 'long-animation-frame', buffered: false }); } catch (e) { obs = null; }
+    // (the performance overlay's trace, kept hidden: each frame's time by part of the game, perfhud.js)
+    const phWas = !!g(() => PH.on); g(() => { if (!PH.on) PH.toggle(); PH.traceStart(); });
     const t0 = now(); let last = performance.now(), leftAt = null, sec = { t: 0, n: 0, worst: 0 };
     (function frame(ts){
       const dt = ts - last; last = ts; S.frames++;
@@ -83,7 +85,12 @@
       const end = (leftAt !== null && ts - leftAt > 30000) || ts - t0 > 120000;
       pill.textContent = leftAt === null ? 'LOAD TEST · recording smoothness · tap Continue and play normally' : 'LOAD TEST · recording smoothness · play normally · ' + Math.max(0, Math.ceil(30 - (ts - leftAt)/1000)) + ' s';
       if (!end){ requestAnimationFrame(frame); return; }
-      if (obs) obs.disconnect(); pill.remove(); store(); card();
+      if (obs) obs.disconnect(); pill.remove();
+      const tr = g(() => PH.traceStop()) || []; g(() => { if (PH.on && !phWas) PH.toggle(); });
+      S.parts = tr.filter(f => f.gap > LONG).sort((a, b) => b.gap - a.gap).slice(0, 40).map(f => ({ t: Math.round(f.at), gap: f.gap, up: f.up, links: f.links, dels: f.dels,
+        laps: f.laps.slice().sort((a, b) => b[1] - a[1]).slice(0, 8) }));
+      const tot = {}; for (const f of tr) if (f.gap > LONG) for (const [k, ms] of f.laps) tot[k] = Math.round(((tot[k] || 0) + ms)*10)/10; S.partsTotal = tot;
+      store(); card();
     })(performance.now());
   }
   const iv = setInterval(() => { if (M.open != null && !saved){ store(); clearInterval(iv); } }, 500);

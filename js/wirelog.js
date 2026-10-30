@@ -3,6 +3,8 @@
 // corporations' bulletins) and SIGNAL (something out there, slowly getting closer). Flavor only: nothing to type, nothing
 // to answer. It moves through stages as play goes on: CITY alone at first, then the meshes and the first bulletins, then
 // more corp traffic, then the signal ladder. The last 40 lines are kept. Click the header to fold it or open it again.
+// On a touch screen it's a one-line ticker along the top instead (the newest line and how many came since you last looked);
+// a tap opens the whole log in the shared bottom sheet (tsheet.js), newest at the bottom.
 // Content plan: claude/transmission-log-plan.md in the project. Ticked from main.js; saves in this browser.
 // (The command line, the trace agent and the corp file systems that were here are kept for the hacking mode later:
 // js/wirefs.js holds the files; the code is in git history, "Transmission log: the trace offers every step".)
@@ -10,6 +12,7 @@
 const WIRELOG = (() => {
   const KEY = 'neonIsland.wirelog', COLLAPSE_KEY = (typeof TOUCH !== 'undefined' && TOUCH.on ? 'touch:' : '') + 'neonIsland.wirelog.collapsed';   // (touch screens keep their own fold)
   const MAX_LINES = 40;
+  const TS = typeof TSHEET !== 'undefined' && TSHEET.on ? TSHEET : null;   // (a touch screen: the ticker and the sheet)
   // stage timings, real seconds with the log running (WIRELOG.dev.fast() divides them)
   const T = { s1: 150, s2: 240, s3: 360, gapLo: 8, gapHi: 15 };
   // the corporations: SynthCorp is settled, the other three are placeholders until they get their names
@@ -63,6 +66,7 @@ const WIRELOG = (() => {
   /* ---------- state (saved) ---------- */
   const W = { on: false, stage: 0, st: 0, lines: [], sig: 0, seed: 0, mesh: ['A'] };
   let el = null, bodyEl = null, footEl = null, stick = true;
+  let tickEl = null, unread = 0, newEl = null, fresh = 0;   // (touch: the ticker, the lines it hasn't shown you, the "new" chip in the sheet)
   const load = () => { try { const v = JSON.parse(localStorage.getItem(KEY) || 'null'); if (v && typeof v === 'object'){ for (const k of Object.keys(W)) if (k in v) W[k] = v[k]; } } catch (e) {}
     if (!Array.isArray(W.lines)) W.lines = []; if (!Array.isArray(W.mesh)) W.mesh = ['A'];
     W.lines = W.lines.filter(L => L && ['CITY', 'MESH', 'CORP', 'SIGNAL', 'SYS'].includes(L.ch) && !/leak|swarm|trace|Agent|Option|Pull|Transfer|Scan|FLAG/i.test(L.x)).map(({ t, ch, x, key }) => ({ t, ch, x, key })); };   // (lines from the old command line go)
@@ -125,8 +129,24 @@ const WIRELOG = (() => {
     const L = { t: now(), ch, x }; if (o.key) L.key = 1;
     W.lines.push(L); while (W.lines.length > MAX_LINES) W.lines.shift(); save();
     if (bodyEl){ bodyEl.appendChild(lineEl(L)); while (bodyEl.childElementCount > MAX_LINES) bodyEl.firstElementChild.remove(); toEnd(); }
+    if (TS) ticked(L);
   }
   function toEnd(){ if (bodyEl && stick) bodyEl.scrollTop = bodyEl.scrollHeight; }
+  // the ticker shows the newest line; with the sheet open and the reader scrolled back up, a chip counts what came in below
+  function ticked(L){
+    if (!tickEl) return;
+    const open = TS.isOpen(el);
+    if (L){ tickEl.querySelector('.ch').textContent = L.ch; tickEl.querySelector('.tx').textContent = L.x; tickEl.dataset.ch = L.ch;
+      if (!open) unread++; else if (!stick) fresh++; }
+    const n = tickEl.querySelector('.n'); n.hidden = !unread; n.textContent = unread > 9 ? '9+' : String(unread);
+    tickEl.setAttribute('aria-label', 'Transmission log' + (unread ? ', ' + unread + ' new' : '') + ': open');
+    if (newEl){ newEl.hidden = !(open && fresh && !stick); newEl.textContent = '▼ ' + fresh + ' new'; }
+  }
+  function openSheet(){
+    if (TS.isOpen(el)){ TS.close(el); return; }
+    TS.open(el, { key: 'wirelog', title: 'Transmission log', detent: 'half', detents: ['half', 'full'], scroll: false, onClose: () => { fresh = 0; ticked(); } });
+    unread = 0; fresh = 0; stick = true; toEnd(); ticked(); if (cur) foot(cur);
+  }
 
   /* ---------- the ambient lines: templates per channel, each picked least-recently-used ---------- */
   const used = new Map();
@@ -266,11 +286,21 @@ const WIRELOG = (() => {
       <div class="wl-foot"><span>RX <b id="wlRx">0</b> pkt/s</span><span>MESH <b id="wlMesh">A</b></span><span>LINES <b id="wlN">0</b>/${MAX_LINES}</span></div></div>`;
     document.body.appendChild(el);
     bodyEl = el.querySelector('.wl-body'); footEl = el.querySelector('.wl-foot');
-    bodyEl.addEventListener('scroll', () => { stick = bodyEl.scrollTop + bodyEl.clientHeight >= bodyEl.scrollHeight - 6; });
-    const hd = el.querySelector('header'), fold = () => setCollapsed(!el.classList.contains('collapsed'));   // the whole header opens and folds it
+    bodyEl.addEventListener('scroll', () => { stick = bodyEl.scrollTop + bodyEl.clientHeight >= bodyEl.scrollHeight - 6; if (stick && fresh){ fresh = 0; ticked(); } });
+    const hd = el.querySelector('header'), fold = () => { if (!TS) setCollapsed(!el.classList.contains('collapsed')); };   // the whole header opens and folds it (on touch the sheet does)
     hd.addEventListener('click', fold); hd.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === hd){ e.preventDefault(); fold(); } });
     let col = null; try { col = localStorage.getItem(COLLAPSE_KEY); } catch (e) {}
-    setCollapsed(col === '1', true);
+    setCollapsed(!TS && col === '1', true);
+    if (TS){
+      tickEl = document.createElement('button'); tickEl.id = 'wlTick'; tickEl.className = 'wl-tick'; tickEl.type = 'button'; tickEl.hidden = true;
+      tickEl.innerHTML = '<span class="live" aria-hidden="true"></span><span class="ch"></span><span class="tx"></span><b class="n" hidden></b>';
+      tickEl.addEventListener('click', openSheet); document.body.appendChild(tickEl);
+      newEl = document.createElement('button'); newEl.className = 'wl-new'; newEl.type = 'button'; newEl.hidden = true;
+      newEl.addEventListener('click', () => { stick = true; toEnd(); fresh = 0; ticked(); });
+      el.querySelector('.wl-box').appendChild(newEl);
+      const last = W.lines[W.lines.length - 1]; if (last){ tickEl.querySelector('.ch').textContent = last.ch; tickEl.querySelector('.tx').textContent = last.x; tickEl.dataset.ch = last.ch; }
+      ticked();
+    }
     document.body.classList.add('wl-on');
     new ResizeObserver(() => document.body.style.setProperty('--wl-h', el.getBoundingClientRect().height + 'px')).observe(el);
     for (const L of W.lines) bodyEl.appendChild(lineEl(L));
@@ -284,7 +314,7 @@ const WIRELOG = (() => {
   }
   const setTxt = (n, v) => { v = String(v); if (n && n.textContent !== v) n.textContent = v; };
   function foot(s){
-    if (!footEl || el.classList.contains('collapsed')) return;
+    if (!footEl || el.classList.contains('collapsed') || (TS && !TS.isOpen(el))) return;
     setTxt(footEl.querySelector('#wlRx'), Math.round((60 + s.z.any*4.5 + outside()*.8) * (.9 + rnd()*.2)));
     setTxt(footEl.querySelector('#wlMesh'), W.mesh.join(' '));
     setTxt(footEl.querySelector('#wlN'), W.lines.length);
@@ -299,7 +329,7 @@ const WIRELOG = (() => {
       if (!unlocked()) return;
       started = true; load(); rs = W.seed || 1; while (!zoneStep(1e9)); makePanel();
       if (!W.on){ W.on = true; boot(); }
-      el.hidden = false;
+      el.hidden = false; if (tickEl) tickEl.hidden = false;
     }
     if (zIter || (snapT += dt) > 3){ if (zoneStep()){ snapT = 0; cur = snap(); events(cur); } }
     flushBuild(dt);

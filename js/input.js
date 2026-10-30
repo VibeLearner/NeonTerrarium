@@ -479,6 +479,7 @@ function placeMegaHere(x, y){
   const c = groundCellAt(x, y); if (!c) return;
   const m = placeFromMenu(megaPick, c.i, c.j, megaTurn);
   if (!m) return;   // doesn't fit there (the footprint shows red)
+  if (typeof TOUCH !== 'undefined' && TOUCH.on){ selectMega(null, true); return; }   // (touch: one per pick, so the placing footprint and its TURN button go once it's down)
   showMegaGhost(megaPick, c, megaTurn);
 }
 function setBmenuOpen(open){

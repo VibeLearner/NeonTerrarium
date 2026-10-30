@@ -1,0 +1,617 @@
+{
+ "id": "L202610300804-uxv7",
+ "kind": "load",
+ "started": "2026-10-30T08:04:41.093Z",
+ "page": "https://vibelearner.github.io/NeonTerrarium/m.html",
+ "swControlled": true,
+ "marks": {
+  "title": 1297,
+  "scripts": 1388,
+  "allFiles": 1391,
+  "worker": 2527,
+  "firstPlot": 2850,
+  "allPlots": 4753,
+  "people": 4831,
+  "open": 9663,
+  "played": 16195
+ },
+ "files": {
+  "n": 131,
+  "kb": 0,
+  "bodyKb": 5712,
+  "fromPhone": 130,
+  "by": {
+   "script": {
+    "n": 75,
+    "bytes": 0
+   },
+   "link": {
+    "n": 5,
+    "bytes": 0
+   },
+   "css": {
+    "n": 3,
+    "bytes": 0
+   },
+   "fetch": {
+    "n": 40,
+    "bytes": 0
+   },
+   "other": {
+    "n": 1,
+    "bytes": 0
+   },
+   "img": {
+    "n": 7,
+    "bytes": 0
+   }
+  },
+  "big": [
+   {
+    "u": "/NeonTerrarium/min/js/benchboot.js?v=a86ea20fbc",
+    "kb": 0,
+    "ms": 0
+   },
+   {
+    "u": "/NeonTerrarium/min/js/saveguard.js?v=5cb495749e",
+    "kb": 0,
+    "ms": 0
+   },
+   {
+    "u": "/NeonTerrarium/min/js/tv.js?v=e874b5e8bc",
+    "kb": 0,
+    "ms": 0
+   },
+   {
+    "u": "https://fonts.googleapis.com/css2?family=Silkscreen&family=JetBrains+Mono:wght@400;600&fam",
+    "kb": 0,
+    "ms": 0
+   },
+   {
+    "u": "/NeonTerrarium/min/js/touch.js?v=3a5ba83e97",
+    "kb": 0,
+    "ms": 0
+   },
+   {
+    "u": "/NeonTerrarium/min/js/loadtrace.js?v=11b51f08d2",
+    "kb": 0,
+    "ms": 0
+   },
+   {
+    "u": "/NeonTerrarium/min/js/tsheet.js?v=82401fd443",
+    "kb": 0,
+    "ms": 0
+   },
+   {
+    "u": "/NeonTerrarium/css/style.css?v=2026-10-30zc",
+    "kb": 0,
+    "ms": 0
+   },
+   {
+    "u": "/NeonTerrarium/css/player.css?v=2026-10-30u",
+    "kb": 0,
+    "ms": 0
+   },
+   {
+    "u": "/NeonTerrarium/css/touchui.css?v=2026-10-30h",
+    "kb": 0,
+    "ms": 0
+   }
+  ],
+  "htmlMs": 37,
+  "redirectMs": 0
+ },
+ "device": {
+  "ua": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Mobile Safari/537.36",
+  "cores": 8,
+  "memGB": 8,
+  "dpr": 3,
+  "inner": [
+   360,
+   689
+  ],
+  "gpu": "ANGLE (Qualcomm, Adreno (TM) 830, OpenGL ES 3.2)",
+  "phoneMode": false,
+  "connection": {
+   "type": "4g",
+   "down": 7.6,
+   "rtt": 100,
+   "saveData": false
+  }
+ },
+ "city": {
+  "plots": 102,
+  "built": 92
+ },
+ "smooth": {
+  "frames": 2124,
+  "over50": 21,
+  "over100": 11,
+  "worst": 175,
+  "long": [
+   {
+    "t": 16195,
+    "ms": 92,
+    "title": false,
+    "cool": 0,
+    "loading": false,
+    "merging": 0,
+    "stageQ": 0,
+    "people": false,
+    "scan": false,
+    "scanWarm": false,
+    "cache": "reuse",
+    "scrolling": 1
+   },
+   {
+    "t": 16312,
+    "ms": 117,
+    "title": false,
+    "cool": 0,
+    "loading": false,
+    "merging": 0,
+    "stageQ": 0,
+    "people": false,
+    "scan": false,
+    "scanWarm": false,
+    "cache": "reuse",
+    "scrolling": 1
+   },
+   {
+    "t": 16429,
+    "ms": 117,
+    "title": false,
+    "cool": 0,
+    "loading": false,
+    "merging": 0,
+    "stageQ": 0,
+    "people": false,
+    "scan": false,
+    "scanWarm": false,
+    "cache": "reuse",
+    "scrolling": 1
+   },
+   {
+    "t": 19119,
+    "ms": 133,
+    "title": false,
+    "cool": 0,
+    "loading": false,
+    "merging": 0,
+    "stageQ": 0,
+    "people": false,
+    "scan": false,
+    "scanWarm": false,
+    "cache": "reuse",
+    "scrolling": 1
+   },
+   {
+    "t": 21902,
+    "ms": 142,
+    "title": false,
+    "cool": 0,
+    "loading": false,
+    "merging": 0,
+    "stageQ": 0,
+    "people": false,
+    "scan": false,
+    "scanWarm": false,
+    "cache": "reuse",
+    "scrolling": 1
+   },
+   {
+    "t": 22994,
+    "ms": 58,
+    "title": false,
+    "cool": 0,
+    "loading": false,
+    "merging": 0,
+    "stageQ": 0,
+    "people": false,
+    "scan": false,
+    "scanWarm": false,
+    "cache": "reuse",
+    "scrolling": 1
+   },
+   {
+    "t": 23668,
+    "ms": 158,
+    "title": false,
+    "cool": 0,
+    "loading": false,
+    "merging": 0,
+    "stageQ": 0,
+    "people": false,
+    "scan": false,
+    "scanWarm": false,
+    "cache": "reuse",
+    "scrolling": 1
+   },
+   {
+    "t": 24127,
+    "ms": 67,
+    "title": false,
+    "cool": 0,
+    "loading": false,
+    "merging": 0,
+    "stageQ": 0,
+    "people": false,
+    "scan": false,
+    "scanWarm": false,
+    "cache": "reuse",
+    "scrolling": 1
+   },
+   {
+    "t": 26418,
+    "ms": 167,
+    "title": false,
+    "cool": 0,
+    "loading": false,
+    "merging": 14,
+    "stageQ": 0,
+    "people": false,
+    "scan": false,
+    "scanWarm": false,
+    "cache": "reuse",
+    "scrolling": 1
+   },
+   {
+    "t": 26484,
+    "ms": 58,
+    "title": false,
+    "cool": 0,
+    "loading": false,
+    "merging": 14,
+    "stageQ": 0,
+    "people": false,
+    "scan": false,
+    "scanWarm": false,
+    "cache": "reuse",
+    "scrolling": 1
+   },
+   {
+    "t": 26551,
+    "ms": 67,
+    "title": false,
+    "cool": 0,
+    "loading": false,
+    "merging": 14,
+    "stageQ": 0,
+    "people": false,
+    "scan": false,
+    "scanWarm": false,
+    "cache": "reuse",
+    "scrolling": 1
+   },
+   {
+    "t": 32608,
+    "ms": 158,
+    "title": false,
+    "cool": 0,
+    "loading": false,
+    "merging": 2,
+    "stageQ": 0,
+    "people": false,
+    "scan": false,
+    "scanWarm": false,
+    "cache": "reuse",
+    "scrolling": 1
+   },
+   {
+    "t": 33666,
+    "ms": 67,
+    "title": false,
+    "cool": 0,
+    "loading": false,
+    "merging": 0,
+    "stageQ": 0,
+    "people": false,
+    "scan": false,
+    "scanWarm": false,
+    "cache": "reuse",
+    "scrolling": 1
+   },
+   {
+    "t": 34199,
+    "ms": 167,
+    "title": false,
+    "cool": 0,
+    "loading": false,
+    "merging": 0,
+    "stageQ": 0,
+    "people": false,
+    "scan": false,
+    "scanWarm": false,
+    "cache": "reuse",
+    "scrolling": 1
+   },
+   {
+    "t": 34707,
+    "ms": 58,
+    "title": false,
+    "cool": 0,
+    "loading": false,
+    "merging": 0,
+    "stageQ": 0,
+    "people": false,
+    "scan": false,
+    "scanWarm": false,
+    "cache": "reuse",
+    "scrolling": 1
+   },
+   {
+    "t": 35390,
+    "ms": 175,
+    "title": false,
+    "cool": 0,
+    "loading": false,
+    "merging": 0,
+    "stageQ": 0,
+    "people": false,
+    "scan": false,
+    "scanWarm": false,
+    "cache": "reuse",
+    "scrolling": 1
+   },
+   {
+    "t": 35490,
+    "ms": 50,
+    "title": false,
+    "cool": 0,
+    "loading": false,
+    "merging": 0,
+    "stageQ": 0,
+    "people": false,
+    "scan": false,
+    "scanWarm": false,
+    "cache": "reuse",
+    "scrolling": 1
+   },
+   {
+    "t": 35998,
+    "ms": 142,
+    "title": false,
+    "cool": 0,
+    "loading": false,
+    "merging": 0,
+    "stageQ": 0,
+    "people": false,
+    "scan": false,
+    "scanWarm": false,
+    "cache": "reuse",
+    "scrolling": 1
+   },
+   {
+    "t": 41555,
+    "ms": 158,
+    "title": false,
+    "cool": 0,
+    "loading": false,
+    "merging": 6,
+    "stageQ": 0,
+    "people": false,
+    "scan": false,
+    "scanWarm": false,
+    "cache": "reuse",
+    "scrolling": 1
+   },
+   {
+    "t": 42563,
+    "ms": 67,
+    "title": false,
+    "cool": 0,
+    "loading": false,
+    "merging": 4,
+    "stageQ": 0,
+    "people": false,
+    "scan": false,
+    "scanWarm": false,
+    "cache": "reuse",
+    "scrolling": 1
+   },
+   {
+    "t": 43179,
+    "ms": 92,
+    "title": false,
+    "cool": 0,
+    "loading": false,
+    "merging": 6,
+    "stageQ": 0,
+    "people": false,
+    "scan": false,
+    "scanWarm": false,
+    "cache": "reuse",
+    "scrolling": 1
+   }
+  ],
+  "scripts": {
+   "/NeonTerrarium/min/js/title.js de": {
+    "n": 1,
+    "ms": 111,
+    "max": 111
+   },
+   "/NeonTerrarium/min/js/main.js frame": {
+    "n": 17,
+    "ms": 447,
+    "max": 114
+   },
+   "/NeonTerrarium/min/js/input.js endPtr": {
+    "n": 6,
+    "ms": 357,
+    "max": 137
+   }
+  },
+  "perSec": [
+   [
+    -1,
+    2,
+    0
+   ],
+   [
+    0,
+    60,
+    17
+   ],
+   [
+    1,
+    60,
+    17
+   ],
+   [
+    2,
+    60,
+    17
+   ],
+   [
+    3,
+    41,
+    117
+   ],
+   [
+    4,
+    60,
+    17
+   ],
+   [
+    5,
+    59,
+    17
+   ],
+   [
+    6,
+    74,
+    133
+   ],
+   [
+    7,
+    100,
+    17
+   ],
+   [
+    8,
+    78,
+    142
+   ],
+   [
+    9,
+    65,
+    58
+   ],
+   [
+    10,
+    65,
+    158
+   ],
+   [
+    11,
+    60,
+    67
+   ],
+   [
+    12,
+    60,
+    33
+   ],
+   [
+    13,
+    50,
+    167
+   ],
+   [
+    14,
+    60,
+    17
+   ],
+   [
+    15,
+    60,
+    17
+   ],
+   [
+    16,
+    59,
+    33
+   ],
+   [
+    17,
+    91,
+    50
+   ],
+   [
+    18,
+    92,
+    17
+   ],
+   [
+    19,
+    59,
+    158
+   ],
+   [
+    20,
+    64,
+    67
+   ],
+   [
+    21,
+    62,
+    167
+   ],
+   [
+    22,
+    50,
+    175
+   ],
+   [
+    23,
+    64,
+    50
+   ],
+   [
+    24,
+    61,
+    25
+   ],
+   [
+    25,
+    61,
+    25
+   ],
+   [
+    26,
+    61,
+    25
+   ],
+   [
+    27,
+    78,
+    50
+   ],
+   [
+    28,
+    52,
+    158
+   ],
+   [
+    29,
+    58,
+    67
+   ],
+   [
+    30,
+    61,
+    92
+   ],
+   [
+    31,
+    60,
+    17
+   ],
+   [
+    32,
+    64,
+    25
+   ]
+  ]
+ }
+}

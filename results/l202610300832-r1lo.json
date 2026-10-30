@@ -1,0 +1,967 @@
+{
+ "id": "L202610300832-r1lo",
+ "kind": "load",
+ "started": "2026-10-30T08:32:29.027Z",
+ "page": "https://vibelearner.github.io/NeonTerrarium/m.html",
+ "swControlled": true,
+ "marks": {
+  "title": 1044,
+  "scripts": 1053,
+  "allFiles": 1055,
+  "worker": 1680,
+  "firstPlot": 1841,
+  "allPlots": 3092,
+  "people": 3171,
+  "open": 7936,
+  "played": 14918
+ },
+ "files": {
+  "n": 131,
+  "kb": 0,
+  "bodyKb": 5712,
+  "fromPhone": 130,
+  "by": {
+   "script": {
+    "n": 75,
+    "bytes": 0
+   },
+   "link": {
+    "n": 5,
+    "bytes": 0
+   },
+   "css": {
+    "n": 3,
+    "bytes": 0
+   },
+   "fetch": {
+    "n": 40,
+    "bytes": 0
+   },
+   "other": {
+    "n": 1,
+    "bytes": 0
+   },
+   "img": {
+    "n": 7,
+    "bytes": 0
+   }
+  },
+  "big": [
+   {
+    "u": "/NeonTerrarium/min/js/benchboot.js?v=a86ea20fbc",
+    "kb": 0,
+    "ms": 7
+   },
+   {
+    "u": "https://fonts.googleapis.com/css2?family=Silkscreen&family=JetBrains+Mono:wght@400;600&fam",
+    "kb": 0,
+    "ms": 4
+   },
+   {
+    "u": "/NeonTerrarium/min/js/saveguard.js?v=5cb495749e",
+    "kb": 0,
+    "ms": 7
+   },
+   {
+    "u": "/NeonTerrarium/min/js/tv.js?v=e874b5e8bc",
+    "kb": 0,
+    "ms": 11
+   },
+   {
+    "u": "/NeonTerrarium/min/js/loadtrace.js?v=b82b95cde8",
+    "kb": 0,
+    "ms": 0
+   },
+   {
+    "u": "/NeonTerrarium/min/js/touch.js?v=3a5ba83e97",
+    "kb": 0,
+    "ms": 14
+   },
+   {
+    "u": "/NeonTerrarium/css/style.css?v=2026-10-30zc",
+    "kb": 0,
+    "ms": 15
+   },
+   {
+    "u": "/NeonTerrarium/min/js/tsheet.js?v=82401fd443",
+    "kb": 0,
+    "ms": 15
+   },
+   {
+    "u": "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js",
+    "kb": 0,
+    "ms": 0
+   },
+   {
+    "u": "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/BufferGeometryUtils.js",
+    "kb": 0,
+    "ms": 0
+   }
+  ],
+  "htmlMs": 15,
+  "redirectMs": 0
+ },
+ "device": {
+  "ua": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Mobile Safari/537.36",
+  "cores": 8,
+  "memGB": 8,
+  "dpr": 3,
+  "inner": [
+   360,
+   689
+  ],
+  "gpu": "ANGLE (Qualcomm, Adreno (TM) 830, OpenGL ES 3.2)",
+  "phoneMode": false,
+  "connection": {
+   "type": "4g",
+   "down": 7.75,
+   "rtt": 100,
+   "saveData": false
+  }
+ },
+ "city": {
+  "plots": 114,
+  "built": 104
+ },
+ "smooth": {
+  "frames": 2212,
+  "over50": 11,
+  "over100": 5,
+  "worst": 167,
+  "long": [
+   {
+    "t": 14918,
+    "ms": 83,
+    "title": false,
+    "cool": 0,
+    "loading": false,
+    "merging": 0,
+    "stageQ": 0,
+    "people": false,
+    "scan": false,
+    "scanWarm": false,
+    "cache": "reuse",
+    "scrolling": 1
+   },
+   {
+    "t": 15035,
+    "ms": 117,
+    "title": false,
+    "cool": 0,
+    "loading": false,
+    "merging": 0,
+    "stageQ": 0,
+    "people": false,
+    "scan": false,
+    "scanWarm": false,
+    "cache": "reuse",
+    "scrolling": 1
+   },
+   {
+    "t": 15176,
+    "ms": 125,
+    "title": false,
+    "cool": 0,
+    "loading": false,
+    "merging": 0,
+    "stageQ": 0,
+    "people": false,
+    "scan": false,
+    "scanWarm": false,
+    "cache": "reuse",
+    "scrolling": 1
+   },
+   {
+    "t": 17834,
+    "ms": 133,
+    "title": false,
+    "cool": 0,
+    "loading": false,
+    "merging": 0,
+    "stageQ": 0,
+    "people": false,
+    "scan": false,
+    "scanWarm": false,
+    "cache": "reuse",
+    "scrolling": 1
+   },
+   {
+    "t": 19834,
+    "ms": 167,
+    "title": false,
+    "cool": 0,
+    "loading": false,
+    "merging": 0,
+    "stageQ": 0,
+    "people": false,
+    "scan": false,
+    "scanWarm": false,
+    "cache": "reuse",
+    "scrolling": 1
+   },
+   {
+    "t": 23066,
+    "ms": 58,
+    "title": false,
+    "cool": 0,
+    "loading": false,
+    "merging": 0,
+    "stageQ": 0,
+    "people": false,
+    "scan": false,
+    "scanWarm": false,
+    "cache": "reuse",
+    "scrolling": 1
+   },
+   {
+    "t": 32805,
+    "ms": 100,
+    "title": false,
+    "cool": 0,
+    "loading": false,
+    "merging": 6,
+    "stageQ": 0,
+    "people": false,
+    "scan": false,
+    "scanWarm": false,
+    "cache": "reuse",
+    "scrolling": 1
+   },
+   {
+    "t": 36787,
+    "ms": 83,
+    "title": false,
+    "cool": 0,
+    "loading": false,
+    "merging": 6,
+    "stageQ": 0,
+    "people": false,
+    "scan": false,
+    "scanWarm": false,
+    "cache": "reuse",
+    "scrolling": 1
+   },
+   {
+    "t": 38787,
+    "ms": 58,
+    "title": false,
+    "cool": 0,
+    "loading": false,
+    "merging": 2,
+    "stageQ": 0,
+    "people": false,
+    "scan": false,
+    "scanWarm": false,
+    "cache": "reuse",
+    "scrolling": 1
+   },
+   {
+    "t": 40836,
+    "ms": 58,
+    "title": false,
+    "cool": 0,
+    "loading": false,
+    "merging": 0,
+    "stageQ": 0,
+    "people": false,
+    "scan": false,
+    "scanWarm": false,
+    "cache": "reuse",
+    "scrolling": 1
+   },
+   {
+    "t": 40936,
+    "ms": 75,
+    "title": false,
+    "cool": 0,
+    "loading": false,
+    "merging": 2,
+    "stageQ": 0,
+    "people": false,
+    "scan": false,
+    "scanWarm": false,
+    "cache": "reuse",
+    "scrolling": 1
+   }
+  ],
+  "scripts": {
+   "/NeonTerrarium/min/js/title.js de": {
+    "n": 1,
+    "ms": 105,
+    "max": 105
+   },
+   "/NeonTerrarium/min/js/main.js frame": {
+    "n": 14,
+    "ms": 333,
+    "max": 125
+   },
+   "/NeonTerrarium/min/js/input.js endPtr": {
+    "n": 6,
+    "ms": 351,
+    "max": 91
+   }
+  },
+  "perSec": [
+   [
+    0,
+    62,
+    17
+   ],
+   [
+    1,
+    60,
+    17
+   ],
+   [
+    2,
+    60,
+    17
+   ],
+   [
+    3,
+    42,
+    125
+   ],
+   [
+    4,
+    60,
+    17
+   ],
+   [
+    5,
+    60,
+    17
+   ],
+   [
+    6,
+    54,
+    133
+   ],
+   [
+    7,
+    113,
+    42
+   ],
+   [
+    8,
+    58,
+    167
+   ],
+   [
+    9,
+    61,
+    42
+   ],
+   [
+    10,
+    61,
+    17
+   ],
+   [
+    11,
+    75,
+    58
+   ],
+   [
+    12,
+    86,
+    17
+   ],
+   [
+    13,
+    65,
+    17
+   ],
+   [
+    14,
+    64,
+    17
+   ],
+   [
+    15,
+    64,
+    25
+   ],
+   [
+    16,
+    61,
+    17
+   ],
+   [
+    17,
+    66,
+    17
+   ],
+   [
+    18,
+    60,
+    17
+   ],
+   [
+    19,
+    81,
+    17
+   ],
+   [
+    20,
+    64,
+    17
+   ],
+   [
+    21,
+    55,
+    100
+   ],
+   [
+    22,
+    84,
+    17
+   ],
+   [
+    23,
+    63,
+    42
+   ],
+   [
+    24,
+    60,
+    17
+   ],
+   [
+    25,
+    58,
+    83
+   ],
+   [
+    26,
+    58,
+    50
+   ],
+   [
+    27,
+    59,
+    58
+   ],
+   [
+    28,
+    91,
+    33
+   ],
+   [
+    29,
+    54,
+    75
+   ],
+   [
+    30,
+    84,
+    17
+   ],
+   [
+    31,
+    70,
+    17
+   ],
+   [
+    32,
+    60,
+    42
+   ]
+  ],
+  "parts": [
+   {
+    "t": 19667,
+    "gap": 166.7,
+    "up": 5193,
+    "links": 0,
+    "dels": 0,
+    "laps": [
+     [
+      "color",
+      1.9
+     ],
+     [
+      "people",
+      0.5
+     ],
+     [
+      "scene upkeep",
+      0.5
+     ],
+     [
+      "  upkeep: matrices",
+      0.3
+     ],
+     [
+      "time of day, interface",
+      0.2
+     ],
+     [
+      "vehicles, highways, metros",
+      0.2
+     ],
+     [
+      "  people: the loop over everyone",
+      0.2
+     ],
+     [
+      "  vehicle shadows",
+      0.1
+     ]
+    ]
+   },
+   {
+    "t": 17701,
+    "gap": 133.3,
+    "up": 0,
+    "links": 0,
+    "dels": 0,
+    "laps": [
+     [
+      "color",
+      1.9
+     ],
+     [
+      "people",
+      0.4
+     ],
+     [
+      "scene upkeep",
+      0.3
+     ],
+     [
+      "time of day, interface",
+      0.2
+     ],
+     [
+      "  people: the loop over everyone",
+      0.2
+     ],
+     [
+      "  upkeep: matrices",
+      0.2
+     ],
+     [
+      "  vehicle shadows",
+      0.1
+     ],
+     [
+      "megastructures, animations",
+      0.1
+     ]
+    ]
+   },
+   {
+    "t": 15051,
+    "gap": 124.9,
+    "up": 15017,
+    "links": 1,
+    "dels": 1,
+    "laps": [
+     [
+      "color",
+      122.4
+     ],
+     [
+      "people",
+      0.5
+     ],
+     [
+      "scene upkeep",
+      0.4
+     ],
+     [
+      "  people: the loop over everyone",
+      0.3
+     ],
+     [
+      "  upkeep: matrices",
+      0.3
+     ],
+     [
+      "time of day, interface",
+      0.2
+     ],
+     [
+      "vehicles, highways, metros",
+      0.1
+     ],
+     [
+      "  people: stall scan",
+      0.1
+     ]
+    ]
+   },
+   {
+    "t": 14918,
+    "gap": 116.8,
+    "up": -50122,
+    "links": 0,
+    "dels": 979,
+    "laps": [
+     [
+      "color",
+      1.9
+     ],
+     [
+      "people",
+      0.7
+     ],
+     [
+      "scene upkeep",
+      0.6
+     ],
+     [
+      "vehicles, highways, metros",
+      0.3
+     ],
+     [
+      "  people: the loop over everyone",
+      0.3
+     ],
+     [
+      "  upkeep: tiers",
+      0.3
+     ],
+     [
+      "time of day, interface",
+      0.2
+     ],
+     [
+      "  upkeep: matrices",
+      0.2
+     ]
+    ]
+   },
+   {
+    "t": 32705,
+    "gap": 100.1,
+    "up": 1765,
+    "links": 1,
+    "dels": 0,
+    "laps": [
+     [
+      "color + shadow redraw",
+      11
+     ],
+     [
+      "scene upkeep",
+      3
+     ],
+     [
+      "  upkeep: merges",
+      1.8
+     ],
+     [
+      "  upkeep: edit sync",
+      0.9
+     ],
+     [
+      "people",
+      0.2
+     ],
+     [
+      "  upkeep: matrices",
+      0.2
+     ],
+     [
+      "pass setup",
+      0.2
+     ],
+     [
+      "vehicles, highways, metros",
+      0.1
+     ]
+    ]
+   },
+   {
+    "t": 14835,
+    "gap": 83.2,
+    "up": 0,
+    "links": 0,
+    "dels": 0,
+    "laps": [
+     [
+      "color",
+      1.3
+     ],
+     [
+      "scene upkeep",
+      0.3
+     ],
+     [
+      "  people: the loop over everyone",
+      0.2
+     ],
+     [
+      "people",
+      0.2
+     ],
+     [
+      "  upkeep: matrices",
+      0.2
+     ],
+     [
+      "vehicles, highways, metros",
+      0.1
+     ],
+     [
+      "  vehicle shadows",
+      0.1
+     ],
+     [
+      "megastructures, animations",
+      0.1
+     ]
+    ]
+   },
+   {
+    "t": 36704,
+    "gap": 83.2,
+    "up": 1386,
+    "links": 1,
+    "dels": 23,
+    "laps": [
+     [
+      "color + shadow redraw",
+      13
+     ],
+     [
+      "scene upkeep",
+      2.7
+     ],
+     [
+      "  upkeep: edit sync",
+      1.6
+     ],
+     [
+      "  upkeep: merges",
+      1
+     ],
+     [
+      "people",
+      0.3
+     ],
+     [
+      "  people: the loop over everyone",
+      0.2
+     ],
+     [
+      "pass setup",
+      0.2
+     ],
+     [
+      "time of day, interface",
+      0.1
+     ]
+    ]
+   },
+   {
+    "t": 40861,
+    "gap": 74.9,
+    "up": 2005,
+    "links": 1,
+    "dels": 23,
+    "laps": [
+     [
+      "color + shadow redraw",
+      9.8
+     ],
+     [
+      "scene upkeep",
+      2.1
+     ],
+     [
+      "  upkeep: edit sync",
+      1.1
+     ],
+     [
+      "  upkeep: merges",
+      0.7
+     ],
+     [
+      "people",
+      0.5
+     ],
+     [
+      "  upkeep: matrices",
+      0.2
+     ],
+     [
+      "pass setup",
+      0.2
+     ],
+     [
+      "time of day, interface",
+      0.1
+     ]
+    ]
+   },
+   {
+    "t": 23008,
+    "gap": 58.3,
+    "up": 0,
+    "links": 0,
+    "dels": 0,
+    "laps": [
+     [
+      "color",
+      1.1
+     ],
+     [
+      "people",
+      0.4
+     ],
+     [
+      "time of day, interface",
+      0.2
+     ],
+     [
+      "scene upkeep",
+      0.2
+     ],
+     [
+      "outside the frame: pointer move",
+      0.2
+     ],
+     [
+      "  megastructure: forcefield",
+      0.1
+     ],
+     [
+      "megastructures, animations",
+      0.1
+     ],
+     [
+      "  people: lifts",
+      0.1
+     ]
+    ]
+   },
+   {
+    "t": 38729,
+    "gap": 58.3,
+    "up": 1363,
+    "links": 1,
+    "dels": 14,
+    "laps": [
+     [
+      "color + shadow redraw",
+      9.1
+     ],
+     [
+      "scene upkeep",
+      1.9
+     ],
+     [
+      "  upkeep: edit sync",
+      1
+     ],
+     [
+      "  upkeep: merges",
+      0.7
+     ],
+     [
+      "people",
+      0.4
+     ],
+     [
+      "  people: the loop over everyone",
+      0.2
+     ],
+     [
+      "time of day, interface",
+      0.1
+     ],
+     [
+      "vehicles, highways, metros",
+      0.1
+     ]
+    ]
+   },
+   {
+    "t": 40778,
+    "gap": 58.3,
+    "up": 0,
+    "links": 0,
+    "dels": 0,
+    "laps": [
+     [
+      "color",
+      2
+     ],
+     [
+      "scene upkeep",
+      1
+     ],
+     [
+      "  upkeep: never-seen",
+      0.7
+     ],
+     [
+      "people",
+      0.6
+     ],
+     [
+      "  people: the loop over everyone",
+      0.2
+     ],
+     [
+      "  upkeep: matrices",
+      0.2
+     ],
+     [
+      "time of day, interface",
+      0.1
+     ],
+     [
+      "vehicles, highways, metros",
+      0.1
+     ]
+    ]
+   }
+  ],
+  "partsTotal": {
+   "time of day, interface": 1.4,
+   "vehicles, highways, metros": 1.2,
+   "  vehicle shadows": 0.4,
+   "  build animations": 0,
+   "  megastructure: radio": 0,
+   "  megastructure: forcefield": 0.1,
+   "megastructures, animations": 0.6,
+   "  people: decisions": 0.3,
+   "  people: removing the gone": 0,
+   "  people: bots, lurkers, clubs": 0,
+   "  people: bumps": 0,
+   "  people: stall scan": 0.6,
+   "  people: lifts": 0.2,
+   "  people: the loop over everyone": 2.1,
+   "people": 4.7,
+   "steam, rain, camera": 0.9,
+   "  upkeep: later": 0.1,
+   "  upkeep: staged builds": 0,
+   "  upkeep: loading": 0,
+   "  upkeep: plot arrays": 0,
+   "  upkeep: tiers": 0.8,
+   "  upkeep: edit sync": 4.7,
+   "  upkeep: merges": 4.2,
+   "  upkeep: never-seen": 1.1,
+   "  upkeep: matrices": 2.1,
+   "scene upkeep": 13,
+   "  view: far order": 0.1,
+   "  view: side arc": 0,
+   "  view: culling": 0.3,
+   "  view: shadows": 0.5,
+   "color": 132.5,
+   "pass setup": 1.1,
+   "night lights": 0.1,
+   "clouds": 0.4,
+   "soft effects (half resolution)": 0.3,
+   "composite": 0.8,
+   "bloom and grade": 0.8,
+   "to screen": 0.1,
+   "outside the frame: pointer move": 0.4,
+   "color + shadow redraw": 42.9
+  }
+ }
+}

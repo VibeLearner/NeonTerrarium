@@ -17,12 +17,13 @@ html.touch .tring.on .fg{animation:tRingFill var(--ms,400ms) linear forwards}
 html.touch .trestore:not([hidden]),html.touch .tchip:not([hidden]){display:flex;align-items:center;justify-content:center;position:fixed;z-index:6;min-height:44px;min-width:88px;padding:0 14px;
   font-family:var(--font-pixel);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#fff;background:rgba(10,16,32,.94);border:1px solid var(--cyan);border-radius:0;
   box-shadow:0 0 12px rgba(56,232,224,.35);touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none}
-html.touch .trestore{left:50%;transform:translateX(-50%);bottom:calc(150px + env(safe-area-inset-bottom,0px));border-color:#ffb347;color:#ffd9a0;box-shadow:0 0 12px rgba(255,179,71,.35)}
+html.touch .trestore{min-width:0;min-height:0;padding:0 8px;box-sizing:border-box;font-size:11px;border-color:#ffb347;color:#ffd9a0;box-shadow:none;
+  clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)}   /* (placed and sized by touchui.js: just above the zone card, its size) */
 html.touch .trestore::before{content:"\21BA";margin-right:8px;font-size:15px}
 html.touch .tturn{right:max(10px, env(safe-area-inset-right,0px));bottom:calc(150px + env(safe-area-inset-bottom,0px))}
 html.touch .tcenter{left:max(10px, env(safe-area-inset-left,0px));bottom:calc(150px + env(safe-area-inset-bottom,0px))}
 html.touch .terase{left:50%;transform:translateX(-50%);top:calc(52px + env(safe-area-inset-top,0px));border-color:#ff4a5a;color:#ffb3ba}
-html.tland .trestore,html.tland .tturn,html.tland .tcenter{bottom:calc(96px + env(safe-area-inset-bottom,0px))}
+html.tland .tturn,html.tland .tcenter{bottom:calc(96px + env(safe-area-inset-bottom,0px))}
 
 /* ---------- a megastructure's card ---------- */
 .tpeek{display:none}

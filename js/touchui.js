@@ -39,7 +39,10 @@ const TUI = (() => {
   };
   const chip = el('button', 'trestore', 'Restore'); chip.type = 'button'; chip.hidden = true; document.body.appendChild(chip);
   let chipSnap = null, chipT = 0;
-  U.offerRestore = snap => { chipSnap = snap; chip.hidden = false; clearTimeout(chipT); chipT = setTimeout(() => { chip.hidden = true; chipSnap = null; }, 5000); };
+  // (it sits just above the zone card, the card's own size, owner Oct 30: placed from the card's box each time it shows)
+  const placeChip = () => { const z = document.querySelector('.zones > .tcur .zone, .zones > .zone.tcur, .zones .zone.on') || document.querySelector('.zones .zone'), r = z && z.getBoundingClientRect();
+    if (!r || !r.width) return; chip.style.left = Math.round(r.left) + 'px'; chip.style.width = Math.round(r.width) + 'px'; chip.style.height = Math.round(r.height) + 'px'; chip.style.bottom = Math.round(innerHeight - r.top + 8) + 'px'; };
+  U.offerRestore = snap => { chipSnap = snap; chip.hidden = false; placeChip(); clearTimeout(chipT); chipT = setTimeout(() => { chip.hidden = true; chipSnap = null; }, 5000); };
   chip.addEventListener('click', () => { const s = chipSnap; chip.hidden = true; chipSnap = null; clearTimeout(chipT); if (s && restore(s)){ U.buzz(12); dispatchEvent(new CustomEvent('nt:restore')); } });
   function restore(s){
     try {

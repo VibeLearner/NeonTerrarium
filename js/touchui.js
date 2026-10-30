@@ -184,6 +184,10 @@ const TUI = (() => {
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iface); else iface();
 
+  /* ---------- the title screen can't be zoomed (Safari pinches through touch-action, so its gesture is stopped too) ---------- */
+  for (const ev of ['gesturestart', 'gesturechange']) document.addEventListener(ev, e => { if (typeof TITLE !== 'undefined' && TITLE.on) e.preventDefault(); }, { passive: false });
+  document.addEventListener('touchmove', e => { if (e.touches.length > 1 && typeof TITLE !== 'undefined' && TITLE.on) e.preventDefault(); }, { passive: false });
+
   /* ---------- Cities: Export makes a share sheet on an iPhone ---------- */
   if (/iP(hone|ad|od)/.test(navigator.userAgent)) new MutationObserver(() => { for (const b of document.querySelectorAll('button[data-do="export"]')) if (b.textContent === 'Export') b.textContent = 'Export (share)'; })
     .observe(document.body, { childList: true, subtree: true });

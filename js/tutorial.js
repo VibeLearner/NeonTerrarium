@@ -87,7 +87,8 @@ const TUT = (() => {
   }
   const TIPS = [
     { id: 'tag', find: () => [...document.querySelectorAll('.tholo.ton')].find(e => e.getBoundingClientRect().width), say: 'Tap the button to open its screen' },
-    { id: 'music', find: () => { const g = document.getElementById('gridDeck'); return g && !g.hidden && g.getBoundingClientRect().width ? g : null; }, say: 'The Grid is broadcasting. Tap the player for more' },
+    // (the player is always in the page, see-through until the Psycho-Acoustic Grid is built and playing: 'live', grid.js. Its size alone said it was there from the start)
+    { id: 'music', find: () => { const g = document.getElementById('gridDeck'); return g && !g.hidden && g.classList.contains('live') && g.getBoundingClientRect().width ? g : null; }, say: 'The Grid is broadcasting. Tap the player for more' },
     { id: 'scan', find: () => { const b = document.getElementById('furnBtn'); return b && !b.hidden && typeof megasOfKind === 'function' && megasOfKind('lidar').length ? document.getElementById('view') : null; }, say: 'Tap the LIDAR Array, then Scan a pod, then a home' },
     { id: 'people', find: () => typeof megasOfKind === 'function' && megasOfKind('police').length ? document.getElementById('view') : null, say: 'Tap someone in the street to watch them' },
   ];

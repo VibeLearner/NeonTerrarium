@@ -158,8 +158,10 @@ function freshBuild(x, y){
   FRESH = c && c.sections.length === before + 1 && !c.lift ? { c, sec: c.sections[c.sections.length - 1], x, y, t: performance.now() } : null;
   if (FRESH){ if (typeof TUI !== 'undefined') TUI.buzz(12); tEmit('build'); }
 }
-function freshRebuild(c, quiet){
-  stageFinishNear([c]); finishAnimsOn(c); holdRegion(c);
+// (hold: the region's plants and glows wait for a build sweep that will let them go; only when one follows. A hold with no sweep after it was never let
+//  go, and every later edit in that region left its plants and glows as they were: a removed building's foliage stayed, owner Oct 30)
+function freshRebuild(c, hold){
+  stageFinishNear([c]); finishAnimsOn(c); if (hold) holdRegion(c);
   const old = { view: c.view, data: c.data }; c.view = null; c.data = null;
   refresh([c]); dropView(old);
   return old;
@@ -168,7 +170,7 @@ function freshTrim(f){
   if (!freshOk(f)) return false;
   const c = f.c, k = c.sections.length - 1, y0 = k > 0 ? c.sectionTops[k - 1] : CURB;
   if (f.sec.mf === 1) return true;
-  f.sec.mf = 1; freshRebuild(c);
+  f.sec.mf = 1; freshRebuild(c, true);
   startAnim(c, 'build', y0 - .05, c.height + 1.2, f.sec.zone, SIDE, null, null, { quiet: true });
   FRESH = null; tEmit('trim'); return true;
 }

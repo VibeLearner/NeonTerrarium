@@ -45,12 +45,13 @@ const TUI = (() => {
     try {
       let c = cells.get(ckey(s.i, s.j));
       if (!c){ c = addPlatform(s.i, s.j, null); if (!c) return false; }
-      stageFinishNear([c]); finishAnimsOn(c); holdRegion(c);
+      stageFinishNear([c]); finishAnimsOn(c);
+      const top = s.sections && s.sections.length ? s.sections[s.sections.length - 1].zone : null;
+      if (top) holdRegion(c);   // (only when a build sweep follows to let it go: see freshRebuild in input.js)
       const old = { view: c.view, data: c.data }; c.view = null; c.data = null;
       c.sections = clone(s.sections) || []; c.lift = clone(s.lift) || null; c.below = clone(s.below) || null; if (s.green) c.green = s.green; if (s.style) c.style = s.style;
       const near = SIDES4.map(([a, b]) => cells.get(ckey(c.i + a, c.j + b))).filter(n => n && n.lift && !n.mega);
       refresh([c, ...near]); dropView(old);
-      const top = c.sections.length ? c.sections[c.sections.length - 1].zone : null;
       if (top) startAnim(c, 'build', CURB - .05, c.height + 1.2, top, SIDE, null);
       return true;
     } catch (e){ console.warn('restore', e); return false; }

@@ -11,7 +11,7 @@ const FURN = (() => {
   // detail by distance from the home, in game units (x3.16 in the lab). The lab's backdrop is sharp only within about 45 m (14 units):
   // full detail to NEAR, clustered on a CG grid to MID, simple blocks (the clustered stand-in clustered again on a CG_FAR grid) beyond.
   // F.lightCity = false sends the city as before (full detail to 46, clustered beyond) to compare.
-  const SAVE_KEY = 'neonIsland.furnish', NEAR = 18, MID = 60, CG = .22, CG_FAR = .9, PAGE = 'furnish.html?v=2026-10-30w';
+  const SAVE_KEY = 'neonIsland.furnish', NEAR = 18, MID = 60, CG = .22, CG_FAR = .9, PAGE = 'furnish.html?v=2026-10-30ft';
   const btn = document.getElementById('furnBtn'), hint = document.getElementById('modeHint');
   // The LIDAR Array unlocks Scan pod (mega.js): the button shows once the array is unlocked, greyed out while none stands, and only the homes in an array's range
   // can be picked. What the card shows of who lives there is what has been learned (lidar.js: the scan, the person cam, a trace
@@ -31,11 +31,30 @@ const FURN = (() => {
     show(); setInterval(show, 1000);
     {   // (it's a scan of the pod, and the apartment a reconstruction from it; #dev too, which only skips needing an array in range)
       btn.textContent = 'Scan pod';
-      for (const dt of document.querySelectorAll('dt')) if (dt.textContent === 'Furnish pod'){ dt.textContent = 'Scan pod'; if (dt.nextElementSibling) dt.nextElementSibling.textContent = 'Pick a pod (scroll or Up / Down), click to scan it'; }
+      for (const dt of document.querySelectorAll('dt')) if (dt.textContent === 'Furnish pod'){ dt.textContent = 'Scan pod'; if (dt.nextElementSibling) dt.nextElementSibling.textContent = TCH() ? 'Tap a building, step the pod with the arrows, tap it again to scan it' : 'Pick a pod (scroll or Up / Down), click to scan it'; }
     }
   })();
   const VERB = 'scan';
   const tip = document.createElement('div'); tip.className = 'furn-tip'; tip.hidden = true; document.body.appendChild(tip);
+  // On a touch screen there is no wheel or arrow keys to step the pod, and the finger covers whatever sits under it: the tip goes
+  // above the finger, and beside it two 44 px arrows step the pod up and down (html.touch only; the desktop tip is as it was).
+  function TCH(){ return typeof TOUCH !== 'undefined' && TOUCH.on; }
+  const step = document.createElement('div'); step.className = 'furn-step'; step.hidden = true; step.setAttribute('role', 'group'); step.setAttribute('aria-label', 'Pod');
+  step.innerHTML = '<button type="button" data-d="1" aria-label="One pod up">&#x25B2;</button><button type="button" data-d="-1" aria-label="One pod down">&#x25BC;</button>';
+  for (const b of step.querySelectorAll('button')){
+    b.addEventListener('pointerdown', e => e.stopPropagation());   // (never a tap on the city under it)
+    b.addEventListener('click', e => { e.stopPropagation(); stepFloor(+b.dataset.d); });
+  }
+  document.body.appendChild(step);
+  {
+    const st = document.createElement('style');
+    st.textContent = 'html.touch .furn-tip{transform:none;white-space:normal;max-width:calc(100vw - 136px);font-size:13px;line-height:1.35;padding:6px 10px;background:rgba(5,5,12,.9)}' +
+      '.furn-step{position:fixed;z-index:61;display:flex;gap:6px}.furn-step[hidden]{display:none}' +
+      '.furn-step button{width:44px;height:44px;padding:0;font:16px/1 var(--font-mono);color:#fff;background:rgba(5,5,12,.9);border:1px solid var(--cyan);border-radius:0;text-shadow:0 0 6px var(--cyan);' +
+      'touch-action:manipulation;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;user-select:none;-webkit-user-select:none;cursor:pointer}' +
+      '.furn-step button:disabled{color:var(--muted);border-color:var(--line);text-shadow:none}';
+    document.head.appendChild(st);
+  }
 
   /* ---------- the saved homes ---------- */
   const keyOf = h => h.cell[0] + ',' + h.cell[1] + '|' + h.section + '|' + h.floor;
@@ -118,10 +137,11 @@ const FURN = (() => {
       if (mtMode) setMtMode(false, true);
       if (HL) hlStop();
       if (MON.id) MON.close();
-      hint.textContent = 'Scan pod' + ': point at a residential or luxury building in LIDAR range · scroll or Up / Down picks the pod · click to ' + VERB + ' · Esc to cancel';
+      hint.textContent = TCH() ? 'Scan pod: tap a residential or luxury building in LIDAR range · the arrows step the pod · tap it again to ' + VERB + ' · tap Scan to cancel'
+        : 'Scan pod' + ': point at a residential or luxury building in LIDAR range · scroll or Up / Down picks the pod · click to ' + VERB + ' · Esc to cancel';
       if (ptrLast) hoverAt(ptrLast.x, ptrLast.y);
       warmStart();   // (the far city's stand-ins made while the player picks)
-    } else { hoverStrip.material.color.set(0xff5ad8); hoverFill.material.color.set(0xff5ad8); hoverFill.visible = false; tip.hidden = true; selectZone(null); }   // (the strip's and fill's own pink back, for the side pods)
+    } else { hoverStrip.material.color.set(0xff5ad8); hoverFill.material.color.set(0xff5ad8); hoverFill.visible = false; tip.hidden = true; step.hidden = true; selectZone(null); }   // (the strip's and fill's own pink back, for the side pods)
   }
   F.setPick = setPick;
   function flash(msg){ hint.textContent = msg; clearTimeout(flash.t); flash.t = setTimeout(() => { if (!F.pick) selectZone(S.zone || null); }, 3500); }
@@ -148,7 +168,7 @@ const FURN = (() => {
   // the picked pod in a bold neon outline hugging its block, with a light fill; the rest of the building stays as it is
   function showPick(hv, px, py){
     hoverFill.visible = false; hoverStrip.visible = false;
-    if (!hv){ hover.visible = false; tip.hidden = true; return; }
+    if (!hv){ hover.visible = false; tip.hidden = true; step.hidden = true; return; }
     const c = hv.c;
     if (!hv.rows.length){
       hover.visible = false;
@@ -166,10 +186,24 @@ const FURN = (() => {
     hoverFill.material.color.set(col); hoverFill.position.copy(hover.position); hoverFill.scale.set(ex - .04, h - .04, ez - .04); hoverFill.visible = true;
     const saved = !!getRecipe(r);
     const hh = typeof POD_HH !== 'undefined' ? POD_HH.get(keyOf(r)) : null, nres = hh ? hh.members.length : 0;
-    tip.textContent = label(r) + ' · pod ' + r.pod + ' of ' + r.pods + ' · ' + (nres ? 'occupied · ' + nres + (nres > 1 ? ' residents' : ' resident') : 'vacant') + (saved ? ' · furnished' : '') + ' · click to ' + (saved ? 'open' : VERB);
+    tip.textContent = label(r) + ' · pod ' + r.pod + ' of ' + r.pods + ' · ' + (nres ? 'occupied · ' + nres + (nres > 1 ? ' residents' : ' resident') : 'vacant') + (saved ? ' · furnished' : '') + (TCH() ? ' · tap again to ' : ' · click to ') + (saved ? 'open' : VERB);
     placeTip(px, py);
   }
-  function placeTip(px, py){ if (px == null){ tip.hidden = true; return; } tip.style.left = px + 'px'; tip.style.top = py + 'px'; tip.hidden = false; }
+  function placeTip(px, py){
+    if (px == null){ tip.hidden = true; step.hidden = true; return; }
+    tip.hidden = false;
+    if (!TCH()){ tip.style.left = px + 'px'; tip.style.top = py + 'px'; return; }
+    // touch: centred above the finger (below it near the top edge), kept on screen, with the arrows to its right while there is a pod to step
+    const rows = F.hov && F.hov.rows, many = !tip.classList.contains('no') && rows && rows.length > 1;
+    const w = tip.offsetWidth, h = tip.offsetHeight, sw = many ? 100 : 0, W = innerWidth, M = 16;
+    const left = Math.max(M, Math.min(W - M - sw - w, px - (w + sw)/2));
+    let top = py - h - 64; if (top < 56) top = py + 64;
+    top = Math.max(M, Math.min(innerHeight - Math.max(h, 44) - 96, top));
+    tip.style.left = left + 'px'; tip.style.top = top + 'px';
+    step.hidden = !many;
+    if (many){ step.style.left = (left + w + 8) + 'px'; step.style.top = (top + h/2 - 22) + 'px';
+      const [up, dn] = step.querySelectorAll('button'); up.disabled = F.fl >= rows.length - 1; dn.disabled = F.fl <= 0; }
+  }
 
   // pick mode takes the pointer, the wheel and a few keys before the building controls see them; dragging still turns the view
   canvas.addEventListener('pointerdown', e => {
@@ -217,7 +251,7 @@ const FURN = (() => {
     if (!F.hov || !F.hov.rows.length || F.busy || F.hov.out) return;
     const h = Object.assign({}, F.hov.rows[F.fl]); delete h.top; delete h.base;
     const keepHov = hover.visible, keepFill = hoverFill.visible;
-    setPick(false); tip.hidden = true;
+    setPick(false); tip.hidden = true; step.hidden = true;
     hover.visible = keepHov; hoverFill.visible = keepFill; if (keepFill) hoverFill.material.color.set(zoneCol(h.zone));   // (the picked pod stays lit under the opening page)
     openHome(h);
   }

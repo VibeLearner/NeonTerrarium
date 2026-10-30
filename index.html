@@ -11,9 +11,12 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Silkscreen&family=JetBrains+Mono:wght@400;600&family=Chakra+Petch:wght@500;600&display=swap" rel="stylesheet">
 <link rel="icon" href="data:,">
-<script src="js/touch.js?v=2026-10-30p"></script>
-<link rel="stylesheet" href="css/style.css?v=2026-10-30w">
+<script src="js/touch.js?v=2026-10-30u2"></script>
+<script src="js/tsheet.js?v=2026-10-30s"></script>   <!-- the touch screen's shared bottom sheet (nothing with a mouse) -->
+<link rel="stylesheet" href="css/style.css?v=2026-10-30u2">
 <link rel="stylesheet" href="css/player.css?v=2026-10-30u">
+<link rel="stylesheet" href="css/touchui.css?v=2026-10-30u2">
+<link rel="stylesheet" href="css/touch-sheets.css?v=2026-10-30s">
 </head>
 <body>
 
@@ -325,7 +328,7 @@
 <script src="js/buildings.js?v=2026-10-23m1"></script>
 <script src="js/ground.js?v=2026-10-13l"></script>
 <script src="js/vehicles.js?v=2026-10-26k"></script>
-<script src="js/sky.js?v=2026-10-30p"></script>
+<script src="js/sky.js?v=2026-10-30u2"></script>
 <script src="js/looks.js?v=2026-10-16aj"></script>
 <script src="js/lookui.js?v=2026-10-30u"></script>
 <script src="js/audio.js?v=2026-10-13l"></script>
@@ -335,20 +338,20 @@
 <script src="js/people.js?v=2026-10-30p"></script>
 <script src="js/highway.js?v=2026-10-29a"></script>
 <script src="js/metro.js?v=2026-10-29c"></script>
-<script src="js/story.js?v=2026-10-26g"></script>
+<script src="js/story.js?v=2026-10-30u2"></script>
 <script src="js/cases.js?v=2026-10-26e"></script>
 <script src="js/pacing.js?v=2026-10-20p"></script>
-<script src="js/monitor.js?v=2026-10-29a"></script>
+<script src="js/monitor.js?v=2026-10-30s"></script>
 <script src="js/recipe.js?v=2026-10-29a"></script>
 <script src="js/loadcity.js?v=2026-10-13l"></script>
-<script src="js/grid_panel.js?v=2026-10-30w"></script>
+<script src="js/grid_panel.js?v=2026-10-30u2"></script>
 <script src="js/grid_engine.js?v=2026-10-20b"></script>
-<script src="js/grid.js?v=2026-10-30w"></script>
-<script src="js/grid_viz.js?v=2026-10-18a"></script>
+<script src="js/grid.js?v=2026-10-30s"></script>
+<script src="js/grid_viz.js?v=2026-10-30u2"></script>
 <script src="js/booth_song.js?v=2026-10-18g"></script>
-<script src="js/booth.js?v=2026-10-18x"></script>
-<script src="js/input.js?v=2026-10-30u"></script>
-<script src="js/furnish.js?v=2026-10-30w"></script>
+<script src="js/booth.js?v=2026-10-30u2"></script>
+<script src="js/input.js?v=2026-10-30u2"></script>
+<script src="js/furnish.js?v=2026-10-30u2"></script>
 <script src="js/lidar.js?v=2026-10-26e"></script>
 <script src="js/perfhud.js?v=2026-10-27b"></script>
 <script src="js/memcensus.js?v=2026-10-27a"></script>
@@ -356,13 +359,16 @@
 <script src="js/neverseen.js?v=2026-10-26s"></script>
 <script src="js/main.js?v=2026-10-30p"></script>
 <script src="js/cityledger.js?v=2026-10-29a"></script>
-<script src="js/overseer.js?v=2026-10-26e"></script>
-<script src="js/policedesk.js?v=2026-10-26e"></script>
-<script src="js/wirelog.js?v=2026-10-30w"></script>
+<script src="js/overseer.js?v=2026-10-30u2"></script>
+<script src="js/policedesk.js?v=2026-10-30u2"></script>
+<script src="js/wirelog.js?v=2026-10-30s"></script>
 <script src="js/slots.js?v=2026-10-26h"></script>
 <script src="js/title.js?v=2026-10-30w"></script>
 <script>document.getElementById('toTitle').addEventListener('click', () => { const tg = document.getElementById('deckToggle'); if (document.getElementById('deck').classList.contains('open')) tg.click(); (TITLE.fromGame || TITLE.show)(); });</script>
 <!-- the player's interface for the public build (settings dialog, city settings, folds): not on #dev -->
-<script src="js/playerui.js?v=2026-10-29a"></script>
+<script src="js/playerui.js?v=2026-10-30u2"></script>
+<!-- the touch screen's own pieces and its tutorial (nothing with a mouse and keyboard) -->
+<script src="js/touchui.js?v=2026-10-30u2"></script>
+<script src="js/tutorial.js?v=2026-10-30u2"></script>
 </body>
 </html>

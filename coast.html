@@ -6,6 +6,14 @@
 <title>Neon Terrarium: the coast</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <script src="js/tv.js?v=2026-10-16p"></script>
+<script>
+  // A device whose main pointer is a finger gets html.touch (and tport upright, tland sideways), before anything is drawn,
+  // as js/touch.js does for the sky city. A mouse and keyboard see none of it. (coast.js keeps it up to date.)
+  (() => { const h = document.documentElement, c = matchMedia('(pointer: coarse)').matches, p = matchMedia('(orientation: portrait)').matches;
+    h.classList.toggle('touch', c); h.classList.toggle('tport', c && p); h.classList.toggle('tland', c && !p);
+    // (the player's own Interface choices from the game's Settings: Clean signal and reduce motion, opt-in, never the device setting)
+    if (c) try { if (localStorage.getItem('touch:nt.clean') === '1') h.classList.add('nt-clean'); if (localStorage.getItem('touch:nt.calm') === '1') h.classList.add('nt-calm'); } catch (e) {} })();
+</script>
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Patrick+Hand&family=JetBrains+Mono:wght@600&display=swap" rel="stylesheet">
 <style>
   /* Hand-painted UI: watercolor washes on paper with bleeding edges, wobbly ink lines, hand lettering. The washes and the
@@ -19,14 +27,14 @@
   button { cursor: pointer; background: none; border: 0; padding: 0; }
   /* a wash: the paper-colored ground with a pigment bloom, bleeding at its edge (::before, filtered) and a wobbly ink line (::after) */
   .wash { position: relative; isolation: isolate; }
-  .wash::before { content: ''; position: absolute; inset: -3px; z-index: -2; border-radius: 14px 18px 12px 20px / 18px 12px 20px 14px;
+  .wash::before, .wash > .wl > .wf { content: ''; position: absolute; inset: -3px; z-index: -2; border-radius: 14px 18px 12px 20px / 18px 12px 20px 14px;
     background:
       radial-gradient(120% 90% at 18% 12%, color-mix(in srgb, var(--w, var(--sky)) 34%, transparent) 0 38%, transparent 70%),
       radial-gradient(90% 120% at 88% 92%, color-mix(in srgb, var(--w2, var(--apricot)) 26%, transparent) 0 30%, transparent 72%),
       url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .45 0 0 0 0 .4 0 0 0 0 .32 0 0 0 .16 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E"),
       rgba(251, 246, 236, .86);
     filter: url(#bleed); }
-  .wash::after { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; border: 1.6px solid color-mix(in srgb, var(--ink) 70%, transparent);
+  .wash::after, .wash > .wl > .wb { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; border: 1.6px solid color-mix(in srgb, var(--ink) 70%, transparent);
     border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px; filter: url(#wobble); opacity: .75; }
 
   /* top left: the title and the time */
@@ -66,7 +74,7 @@
   .ctlhover { padding: 1px 12px 2px; font: 17px/1.1 'Caveat', cursive; color: var(--ink2); cursor: help; --w: var(--sage); --w2: var(--paper); }
   .ctlpanel { display: none; position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); width: 320px; padding: 12px 16px 14px; --w: var(--paper); --w2: var(--sky); cursor: default; }
   .ctlwrap:hover .ctlpanel, .ctlhover:focus + .ctlpanel { display: block; }
-  .ctlpanel { z-index: 5; } .ctlpanel.wash::before { background-color: rgba(251, 246, 236, .97); }   /* (a sheet laid over the rest: nothing shows through it) */
+  .ctlpanel { z-index: 5; } .ctlpanel.wash::before, .ctlpanel.wash > .wl > .wf { background-color: rgba(251, 246, 236, .97); }   /* (a sheet laid over the rest: nothing shows through it) */
   .ctlpanel h4 { margin: 2px 0 4px; font: 700 21px/1 'Caveat', cursive; }
   .ctlpanel .row { display: flex; gap: 10px; align-items: baseline; margin: 2px 0; font: 15px/1.2 'Patrick Hand', cursive; }
   .ctlpanel kbd { flex: 0 0 104px; white-space: nowrap; font: 700 17px/1 'Caveat', cursive; color: var(--terra); }
@@ -82,7 +90,7 @@
   .card small { font: 13px/1 'Patrick Hand', cursive; color: var(--ink2); letter-spacing: .3px; }
   .card:hover { transform: translateY(-3px) rotate(-1deg); }
   .card.on { transform: translateY(-4px); }
-  .card.on::before { filter: url(#bleed) saturate(1.6); background-color: color-mix(in srgb, var(--w) 40%, var(--paper)); }
+  .card.on::before, .card.on > .wl > .wf { filter: url(#bleed) saturate(1.6); background-color: color-mix(in srgb, var(--w) 40%, var(--paper)); }
   .card.on b::after { content: ''; display: block; height: 3px; margin-top: 1px; border-radius: 3px; background: var(--terra); filter: url(#wobble); }
   .rot { width: 44px; height: 44px; font: 700 26px/1 'Caveat', cursive; --w: var(--paper); --w2: var(--sky); transition: transform .15s; }
   .rot:hover { transform: rotate(-8deg); }
@@ -104,6 +112,113 @@
   @keyframes exFlick { 0%, 87%, 91%, 100% { opacity: 1; transform: none; } 88% { opacity: .55; transform: translateX(-3px) skewX(-8deg); } 89% { opacity: 1; clip-path: polygon(0 20%, 100% 20%, 100% 60%, 0 60%); } 90% { opacity: .8; transform: translateX(2px); } }
   @keyframes exDot { 50% { opacity: .25; } }
   @keyframes exJit { 50% { transform: translate(1px, -1px); } }
+  /* the player's own calm choices (Settings in the sky city): the EXIT button keeps its look but stops flickering, and its
+     two colored ghost layers (the blend-mode glitch) go. Only when chosen: never from the device's own setting. */
+  html.nt-calm .exitg, html.nt-clean .exitg, html.nt-calm .exitg::before, html.nt-clean .exitg::before { animation: none; }
+  html.nt-calm .exitg:hover, html.nt-clean .exitg:hover, html.nt-calm .exitg:focus-visible, html.nt-clean .exitg:focus-visible { animation: none; }
+  html.nt-calm .exitg span::before, html.nt-calm .exitg span::after, html.nt-clean .exitg span::before, html.nt-clean .exitg span::after { content: none; animation: none; }
+
+  /* ---------- on a touch screen (html.touch, set in the head): the same hand-painted world, sized for a finger ---------- */
+  /* The washes, painted once: coast.js moves each panel's watercolor ground and ink line out of ::before and ::after into
+     a small layer of their own (.wl), so a change of words in the panel no longer runs the two filters again; the layer
+     is drawn once and then just moved about. The same rules draw it, so it looks the same. (?wash=live keeps the old way.) */
+  html.touch .wash.wr::before, html.touch .wash.wr::after { content: none; }
+  html.touch .wash > .wl { position: absolute; inset: 0; z-index: -1; will-change: transform; pointer-events: none; }
+  html.touch, html.touch body { height: 100vh; height: 100dvh; }
+  html.touch canvas { touch-action: none; }
+  html.touch button, html.touch .ctlhover, html.touch .readout, html.touch .zonebar, html.touch .cmus { -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+  html.touch body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  /* (no hover on a finger: a tapped card or chip would keep its hover tilt until the next tap somewhere else) */
+  html.touch .card:hover, html.touch .rot:hover, html.touch .chips button:hover { transform: none; }
+  html.touch .chips button:hover { background: color-mix(in srgb, var(--paper) 60%, transparent); }
+  html.touch .chips button.on, html.touch .chips button.on:hover { background: color-mix(in srgb, var(--teal) 55%, var(--paper)); }
+  html.touch .chips button.cycle.on, html.touch .chips button.cycle.on:hover { background: color-mix(in srgb, var(--ochre) 45%, var(--paper)); }
+  html.touch .card.on, html.touch .card.on:hover { transform: translateY(-3px); }
+  html.touch .exitg:hover { background: rgba(4,10,14,.88); color: #e8fffb; animation: exFlick 4.2s infinite; }
+  html.touch .exitg:active { background: #2affe0; color: #04090c; }
+  html.nt-calm.touch .exitg:hover, html.nt-clean.touch .exitg:hover { animation: none; }
+
+  /* top left: the title and the time. The time's slider and chips fold away; a tap on the time opens them */
+  html.touch .brand { top: max(10px, env(safe-area-inset-top)); left: max(16px, env(safe-area-inset-left)); padding: 4px 10px 4px 2px; z-index: 45;
+    max-width: calc(100vw - 32px - 164px - env(safe-area-inset-left) - env(safe-area-inset-right)); }
+  html.touch .brand h1 { font-size: 28px; }
+  html.touch .brand .readout { pointer-events: auto; cursor: pointer; display: flex; width: max-content; align-items: center; gap: 4px; min-height: 44px; margin: -8px 0 -8px 10px; font-size: 19px; white-space: nowrap; }
+  html.touch .brand .readout::after { content: '▾'; font-size: 14px; color: var(--ink2); }
+  html.touch .brand.topen .readout::after { content: '▴'; }
+  html.touch .timebox { display: none; }
+  html.touch .brand.topen { z-index: 55; max-width: calc(100vw - 32px - env(safe-area-inset-left) - env(safe-area-inset-right)); }
+  html.touch .brand.topen .timebox { display: block; width: min(304px, calc(100vw - 56px - env(safe-area-inset-left) - env(safe-area-inset-right))); margin: 4px 0 6px 12px; }
+  html.touch #timeSlider { height: 44px; margin: 0; }
+  html.touch #timeSlider::-webkit-slider-thumb { width: 28px; height: 28px; margin-top: -11px; }
+  html.touch #timeSlider::-moz-range-thumb { width: 24px; height: 24px; }
+  html.touch .timebox .chips { gap: 6px; }
+  html.touch .timebox .chips button { min-height: 44px; min-width: 52px; padding: 4px 10px 6px; font-size: 18px; }
+
+  /* top right: EXIT, a finger's height */
+  html.touch .exitg { top: max(10px, env(safe-area-inset-top)); right: max(16px, env(safe-area-inset-right)); min-height: 44px; padding: 15px 16px 15px 28px; }
+
+  /* the bottom: the hint floats over the city, then a row of turn, Controls and the brush switch, then the zones, then the tools.
+     Upright, one zone shows at a time (swipe it, or the arrows); sideways, all four, and the small row beside the tools. */
+  html.touch .zonebar { bottom: max(8px, env(safe-area-inset-bottom)); display: grid; grid-template-columns: auto auto; justify-items: center; align-items: end; gap: 6px 8px;
+    grid-template-areas: "trow trow" "zones zones" "tools tools"; max-width: calc(100vw - 32px - env(safe-area-inset-left) - env(safe-area-inset-right)); }
+  html.tland .zonebar { grid-template-areas: "zones zones" "trow tools"; }
+  html.touch .hint { position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); white-space: normal; text-align: center; width: max-content;
+    max-width: calc(100vw - 32px - env(safe-area-inset-left) - env(safe-area-inset-right)); font-size: 18px; margin: 0; pointer-events: none; }
+  html.touch .trow { grid-area: trow; display: flex; align-items: center; gap: 8px; }
+  html.touch .zones { grid-area: zones; align-items: center; gap: 8px; }
+  html.tport .zones { touch-action: none; }   /* (the swipe is ours: the browser doesn't take it for a pan and cancel it) */
+  html.touch .ctlpanel .acts .sz { align-self: center; font: 15px/1 'Patrick Hand', cursive; color: var(--ink2); }
+  html.touch .tools { grid-area: tools; gap: 6px; margin: 0; }
+  html.touch .rot { width: 44px; height: 44px; font-size: 26px; }
+  /* Controls: a "?" a finger can find; a tap opens the box, the ✕ or a tap on the city closes it */
+  html.touch .ctlwrap { position: static; }
+  html.touch .ctlhover { width: 44px; height: 44px; margin: 0; padding: 0; display: grid; place-items: center; font: 700 26px/1 'Caveat', cursive; color: var(--ink); cursor: pointer; }
+  html.touch .ctlwrap .ctlpanel { display: none; }
+  html.touch .ctlwrap.open .ctlpanel { display: block; }
+  html.touch .ctlpanel { position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); width: min(340px, calc(100vw - 32px - env(safe-area-inset-left) - env(safe-area-inset-right)));
+    box-sizing: border-box; max-height: calc(100vh - 230px); max-height: calc(100dvh - 230px - env(safe-area-inset-top)); overflow-y: auto; overscroll-behavior: contain; padding: 12px 16px 14px; }
+  html.tland .ctlpanel { max-height: calc(100vh - 120px); max-height: calc(100dvh - 120px - env(safe-area-inset-top)); }
+  html.touch .ctlpanel h4 { font-size: 22px; padding-right: 40px; }
+  html.touch .ctlpanel .row { font-size: 16px; line-height: 1.25; margin: 5px 0; }
+  html.touch .ctlpanel kbd { flex: 0 0 112px; white-space: normal; font-size: 18px; }
+  html.touch .ctlpanel .ctlclose { position: absolute; top: 4px; right: 4px; width: 44px; height: 44px; font: 700 24px/1 'Caveat', cursive; color: var(--ink); }
+  html.touch .ctlpanel .acts { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 2px; }
+  html.touch .ctlpanel .acts button { min-height: 44px; padding: 4px 12px 6px; font: 600 18px/1 'Caveat', cursive; color: var(--ink); border: 1.5px solid color-mix(in srgb, var(--ink) 55%, transparent);
+    border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px; background: color-mix(in srgb, var(--paper) 60%, transparent); }
+  html.touch .ctlpanel .acts button:active { background: color-mix(in srgb, var(--teal) 45%, var(--paper)); }
+  /* the brush switch: shown with Grass or Paths. On, one finger paints; off, it turns the view. One or the other, never both */
+  html.touch .bchip { min-width: 96px; height: 44px; padding: 0 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; --w: var(--paper); --w2: var(--sage); }
+  html.touch .bchip b { font: 700 19px/1 'Caveat', cursive; }
+  html.touch .bchip small { font: 13px/1 'Patrick Hand', cursive; color: var(--ink2); }
+  html.touch .bchip.on { --w: var(--sage); --w2: var(--ochre); }
+  html.touch .bchip.on b { color: #2f4a2c; }
+  html.touch .bchip[hidden] { display: none; }
+  /* the zone cards: a picture and the name side by side */
+  html.touch .card { flex-direction: row; gap: 8px; }
+  html.touch .zones .card { width: auto; min-width: 92px; padding: 0 10px; box-sizing: border-box; height: 44px; gap: 6px; }
+  html.touch .zones .card svg { width: 20px; height: 20px; }
+  html.touch .zones .card b { font-size: 17px; }
+  html.touch .card.on b::after { height: 2px; }
+  html.tport .zones .card { display: none; width: 184px; height: 52px; gap: 10px; }
+  html.tport .zones .card.tcur { display: flex; }
+  html.tport .zones .card svg { width: 26px; height: 26px; }
+  html.tport .zones .card b { font-size: 22px; }
+  html.touch .zarr { display: none; }
+  html.tport .zarr { display: grid; place-items: center; width: 44px; height: 52px; font: 700 30px/1 'Caveat', cursive; color: var(--ink); --w: var(--paper); --w2: var(--sky); }
+  /* the tools: a picture over its name, four across in 322 px; the key letter (X) left out */
+  html.touch .card.small { width: 76px; height: 44px; flex-direction: column; gap: 1px; }
+  html.touch .card.small svg { width: 18px; height: 18px; }
+  html.touch .card.small b { font-size: 16px; }
+  html.touch .card.small small { display: none; }
+  /* press and hold: a ring fills round the finger; when it closes, what's under it goes */
+  .lpring { position: fixed; z-index: 60; width: 76px; height: 76px; margin: -38px 0 0 -38px; pointer-events: none; }
+  .lpring svg { width: 100%; height: 100%; transform: rotate(-90deg); overflow: visible; }
+  .lpring .bg { fill: rgba(251, 246, 236, .5); stroke: rgba(51, 65, 58, .35); stroke-width: 2; }
+  .lpring .fg { fill: none; stroke: var(--terra); stroke-width: 5; stroke-linecap: round; stroke-dasharray: 214; stroke-dashoffset: 214; animation: lpFill var(--lp, 550ms) linear forwards; filter: drop-shadow(0 0 2px #fff); }
+  .lpring.done .fg { animation: none; stroke-dashoffset: 0; }
+  .lpring.done { animation: lpPop .22s ease-out forwards; }
+  @keyframes lpFill { to { stroke-dashoffset: 0; } }
+  @keyframes lpPop { to { transform: scale(1.35); opacity: 0; } }
 </style>
 </head>
 <body>
@@ -146,8 +261,8 @@
 <div id="tiltChip" class="chip wash" hidden>Tilt: drag up and down, Space to go back</div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <button id="exitg" class="exitg" type="button" aria-label="Exit to the sky city"><span data-t="EXIT">EXIT</span><i></i></button>
-<script src="js/coast.js?v=2026-10-16aa"></script>
-<script src="js/coastmusic.js?v=2026-10-15a"></script>
+<script src="js/coast.js?v=2026-10-30c2"></script>
+<script src="js/coastmusic.js?v=2026-10-30t"></script>
 <script>
   // back up to the sky city: the television switches off, and the city comes on
   document.getElementById('exitg').addEventListener('click', () => { if (typeof TV !== 'undefined') TV.go('index.html'); else location.href = 'index.html'; });

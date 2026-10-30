@@ -1,0 +1,174 @@
+/* Neon Terrarium: the shared bottom sheet and what opens in it, on a touch screen (js/tsheet.js; claude/mobile-ui-plan.md,
+   "Sheets keep the city alive"). The person cam (monitor.js), the transmission log (wirelog.js) and the music player (grid.js)
+   each open here, one at a time, and the city above stays live. With them: the music pill, the log's ticker along the top,
+   the pinned people as a strip above the dock, and the follow chip the person cam folds to.
+   Everything is under html.touch, which a mouse and keyboard never get: the desktop layout doesn't change.
+   Numbers: 44 px for anything tapped often (48 for the sheet's handle), text 12 px at the least for short all-caps labels and
+   13 to 14 px for lines you read; solid tinted plates instead of a live blur over the city. */
+
+/* ---------- the sheet ---------- */
+.tsheet{display:none}
+html.touch .tsheet{position:fixed;left:env(safe-area-inset-left,0px);right:env(safe-area-inset-right,0px);bottom:0;z-index:5;max-width:640px;margin:0 auto;
+  display:flex;flex-direction:column;box-sizing:content-box;padding-bottom:env(safe-area-inset-bottom,0px);
+  background:rgba(5,5,12,.97);border:1px solid rgba(56,232,224,.45);border-bottom:0;color:var(--ink);
+  box-shadow:0 -1px 0 rgba(56,232,224,.10),0 -10px 28px rgba(0,0,0,.55),0 0 14px rgba(56,232,224,.10);contain:layout paint style}
+html.touch .tsheet[hidden]{display:none}
+html.touch .tsheet.ts-in{animation:tsIn .22s ease-out}
+@keyframes tsIn{from{transform:translateY(100%)}to{transform:none}}
+html.touch .tsheet.ts-anim .ts-body{transition:height .2s ease}
+html.nt-calm .tsheet.ts-in{animation:none}
+html.nt-calm .tsheet.ts-anim .ts-body{transition:none}
+/* the handle: the whole 48 px row takes the drag; the bar in the middle is what you see of it */
+html.touch .ts-bar{position:relative;flex:none;display:flex;align-items:center;height:48px;padding:0 2px 0 14px;touch-action:none;cursor:grab;
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+html.touch .ts-grip{position:absolute;left:50%;top:7px;width:40px;height:4px;margin-left:-20px;background:rgba(207,227,241,.55);pointer-events:none}
+html.touch .ts-t{min-width:0;max-width:calc(100% - 64px);padding-top:6px;font-family:var(--font-pixel);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--cyan);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+html.touch .ts-x{margin-left:auto;width:44px;height:44px;padding:0;display:grid;place-items:center;font:inherit;font-size:15px;line-height:1;color:var(--ink);
+  background:rgba(56,232,224,.10);border:1px solid rgba(56,232,224,.55);border-radius:0}
+html.touch .ts-x[hidden]{display:none}
+html.touch .ts-body{flex:none;min-height:0;overflow:hidden}
+html.touch .tsheet.ts-scroll .ts-body{overflow-y:auto;overscroll-behavior:contain}
+
+/* ---------- the person cam in the sheet ---------- */
+/* (off the sheet it keeps its corner look, but on a plate: a blur of the city moving under it costs every frame) */
+html.touch .monitor{backdrop-filter:none;-webkit-backdrop-filter:none;background:rgba(5,5,12,.88)}
+html.touch #tsheet .monitor{position:static;width:auto;height:100%;max-height:none;border:0;border-radius:0;background:transparent;box-shadow:none;overscroll-behavior:contain}
+html.touch #tsheet .monitor header{min-height:60px;box-sizing:border-box;padding:12px 6px 4px 14px;gap:6px}
+/* the sheet's handle lies over the name, so the monitor gives no extra row to it: the name's side of the header is the 48 px drag strip, Pin and ✕ stay tappable */
+html.touch #tsheet[data-key=monitor] .ts-bar{position:absolute;left:0;top:0;right:112px;z-index:1}
+html.touch #tsheet[data-key=monitor] .ts-grip{left:calc(50% + 56px)}   /* (still in the middle of the sheet) */
+/* off the sheet (folded to its chip, or waiting under another sheet) the monitor isn't shown at all */
+html.touch body > #monitor{display:none}
+html.touch #tsheet .mon-title b{font-size:13px}
+html.touch #tsheet .mon-title small{font-size:12px}
+html.touch #tsheet #monPin{font-size:18px}
+html.touch #tsheet #monClose{font-size:15px}
+/* the feed: 16:9, the sheet's whole width */
+.mon-feedwrap{position:relative}
+html.touch .mon-feedwrap #monFeed{width:100%;margin:0;border-left:0;border-right:0}
+html.touch:not(:has(#tsheet .monitor)) .mon-feedwrap{margin:0 10px}
+/* the static over a lost signal: a tile baked once (monitor.js), moved in jumps; faded at the edges the way the vignette darkens them */
+.mon-noise{position:absolute;inset:0;overflow:hidden;pointer-events:none;
+  -webkit-mask:radial-gradient(62% 110% at 50% 50%, #000 30%, rgba(0,0,0,.45) 100%);mask:radial-gradient(62% 110% at 50% 50%, #000 30%, rgba(0,0,0,.45) 100%)}
+.mon-noise[hidden]{display:none}
+.mon-noise::before{content:"";position:absolute;left:0;top:0;width:200%;height:200%;background:var(--nz) 0 0/50% 50% repeat;image-rendering:pixelated;
+  animation:monNoise .8s steps(1,end) infinite}
+@keyframes monNoise{0%{transform:translate(0,0)}10%{transform:translate(-31%,-17%)}20%{transform:translate(-7%,-41%)}30%{transform:translate(-44%,-9%)}40%{transform:translate(-19%,-28%)}
+  50%{transform:translate(-38%,-46%)}60%{transform:translate(-3%,-23%)}70%{transform:translate(-26%,-4%)}80%{transform:translate(-47%,-33%)}90%{transform:translate(-13%,-12%)}}
+html.nt-calm .mon-noise::before,html.nt-clean .mon-noise::before{animation:none}
+html.touch #tsheet .mon-trace{font-size:13px;line-height:1.45}
+html.touch #tsheet .mon-trace.on{padding:10px 14px}
+html.touch #tsheet .mon-trace b{font-size:12px}
+html.touch #tsheet .mon-trace .lid-c button{min-height:44px}
+/* the tabs, and the log and notebook under them */
+html.touch #tsheet #monTabs{padding:8px 14px 4px;gap:6px}
+html.touch #monTabs button{min-height:44px;font-size:12px}
+html.touch #tsheet .mon-body{padding:4px 14px 14px;font-size:14px;line-height:1.45;overscroll-behavior:contain;-webkit-user-select:text;user-select:text}
+html.touch #tsheet .mon-body h4{font-size:12px;margin:14px 0 6px}
+html.touch #tsheet .ml,html.touch #tsheet .mo{grid-template-columns:78px 1fr;gap:8px;padding:6px 0}
+html.touch #tsheet .ml time,html.touch #tsheet .mo time{font-size:12px;padding-top:2px}
+html.touch #tsheet .mo small,html.touch #tsheet .md small,html.touch #tsheet .mp small{font-size:12px}
+html.touch #tsheet .md{grid-template-columns:96px 1fr;gap:3px 10px;padding:4px 0}
+html.touch #tsheet .mp{padding:2px 0}
+html.touch #tsheet .mp button{padding:12px 0;-webkit-user-select:none;user-select:none}
+html.touch #tsheet .mon-key{font-size:12px}
+html.touch #tsheet .mon-key summary{min-height:44px;display:flex;align-items:center}
+/* "rewritten": a tap shows the first version under the line */
+html.touch #tsheet .ml i{position:relative;font-size:12px;padding:2px 7px;cursor:pointer;-webkit-user-select:none;user-select:none}
+html.touch #tsheet .ml i::after{content:"";position:absolute;left:-8px;right:-8px;top:-12px;bottom:-12px}
+html.touch #tsheet .ml-orig{display:block;margin-top:4px;font-size:13px;color:var(--muted)}
+
+/* ---------- the follow chip: the person cam folded away (a tap on the city), their picture and name; a tap brings the sheet back ---------- */
+.mon-chip{display:none}
+html.touch .mon-chip{position:fixed;z-index:4;left:max(10px, env(safe-area-inset-left,0px));bottom:calc(var(--tdock-h, 140px) + 8px);display:flex;align-items:stretch;height:48px;
+  max-width:min(280px, calc(100vw - 20px));box-sizing:border-box;background:rgba(5,5,12,.9);border:1px solid rgba(255,79,106,.6);box-shadow:0 0 10px rgba(255,79,106,.25)}
+html.touch .mon-chip[hidden]{display:none}
+html.touch .mon-chip button{background:transparent;border:0;border-radius:0;color:var(--ink);font:inherit;padding:0}
+html.touch .mon-chip .mc-open{display:flex;align-items:center;gap:8px;min-width:0;padding:0 6px 0 5px}
+html.touch .mon-chip canvas{flex:none;width:36px;height:36px;image-rendering:pixelated;border:1px solid #1d2a3d;background:#05080f}
+html.touch .mon-chip b{min-width:0;font-family:var(--font-pixel);font-weight:400;font-size:12px;letter-spacing:.1em;color:#ffd0d7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html.touch .mon-chip .x{flex:none;width:44px;font-size:15px;border-left:1px solid rgba(255,79,106,.35)}
+/* above the pinned strip when there is one */
+html.touch:has(#monPins:not(:empty)) .mon-chip{bottom:calc(var(--tdock-h, 140px) + 64px)}
+
+/* ---------- pinned people: a strip of 44 px chips just above the dock, each with its ✕ in view ---------- */
+html.touch #monPins{top:auto;left:max(10px, env(safe-area-inset-left,0px));right:max(10px, env(safe-area-inset-right,0px));bottom:calc(var(--tdock-h, 140px) + 8px);
+  flex-direction:row;align-items:center;justify-content:flex-start;gap:8px;overflow-x:auto;overscroll-behavior:contain;scrollbar-width:none}
+html.touch #monPins::-webkit-scrollbar{display:none}
+html.touch #monPins .mon-pin{flex:none;height:44px;max-width:190px;box-sizing:border-box;padding:0 0 0 10px;gap:6px;font-size:13px;border-radius:0;
+  background:rgba(5,5,12,.88);backdrop-filter:none;-webkit-backdrop-filter:none}
+html.touch #monPins .mon-pin .st{font-size:14px}
+html.touch #monPins .mon-pin .x{flex:none;width:44px;height:44px;padding:0;opacity:1;font-size:14px;color:var(--ink);border-left:1px solid var(--line)}
+/* the hint line floats over the dock: up past the strip and the chip */
+html.touch:has(#monPins:not(:empty)) .zonebar > #modeHint{bottom:calc(100% + 60px)}
+html.touch:has(#monChip:not([hidden])) .zonebar > #modeHint{bottom:calc(100% + 64px)}
+html.touch:has(#monPins:not(:empty)):has(#monChip:not([hidden])) .zonebar > #modeHint{bottom:calc(100% + 120px)}
+/* out of the way while a sheet is up, or a list from the dock opens over where they sit */
+html.touch.tsheet-on #monPins,html.touch.tsheet-on .mon-chip,
+html.touch:has(#bmenuList:not([hidden])) #monPins,html.touch:has(#tmenuList:not([hidden])) #monPins,html.touch:has(.ctlwrap.open) #monPins,
+html.touch:has(#bmenuList:not([hidden])) .mon-chip,html.touch:has(#tmenuList:not([hidden])) .mon-chip,html.touch:has(.ctlwrap.open) .mon-chip{visibility:hidden}
+
+/* ---------- the music player: a 44 px pill (the pattern's name, hold/play); a tap on it opens the sheet ---------- */
+html.touch #gridDeck{top:calc(52px + env(safe-area-inset-top,0px))}
+html.touch #gridDeck.tmin{height:44px;box-sizing:border-box;padding:0 0 0 12px;gap:6px;max-width:min(220px, calc(50vw - 14px))}
+html.touch #gridDeck.tmin .gd-main::before{font-size:14px;margin-right:8px}
+html.touch #gridDeck.tmin .gd-prog{font-size:12.5px;letter-spacing:.08em}
+html.touch #gridDeck.tmin .gd-ctl{align-self:stretch}
+html.touch #gridDeck.tmin #gdPlay{width:44px;min-width:44px;height:44px;padding:0;border:0;border-left:1px solid #2a5173;background:rgba(80,160,210,.08)}
+html.touch #gridDeck.tmin #gdPlay svg{width:14px;height:14px}
+/* the sheet: the trace, the cycles a minute, the controls, the Acoustic Panel, the volume */
+html.touch .gd-sheet{display:grid;gap:10px;padding:0 14px 14px;color:#cfe3f1}
+html.touch .gs-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;min-width:0}
+html.touch .gs-prog{min-width:0;font-family:'Chakra Petch',var(--font-mono);font-weight:600;font-size:16px;letter-spacing:.12em;text-transform:uppercase;color:#e4f1fa;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html.touch .gs-bpm{flex:none;white-space:nowrap}
+html.touch .gs-bpm b{font-family:'Chakra Petch',var(--font-mono);font-weight:600;font-size:24px;color:#f2c94c;text-shadow:0 0 8px rgba(242,201,76,.45)}
+html.touch .gs-bpm small{margin-left:6px;font-family:var(--font-pixel);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#6fb4d6}
+html.touch .gs-chord{min-height:18px;font-size:13px;letter-spacing:.06em;color:#6fb4d6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html.touch .gs-cv{display:block;width:100%;height:56px;background:#0b1a2c;border:1px solid #17304a;box-sizing:border-box}
+html.touch .gs-bars{height:30px}
+html.touch .gs-ctl{display:flex;align-items:center;gap:8px}
+html.touch #tsheet .gs-ctl button{width:48px;height:48px;padding:0;display:grid;place-items:center;color:#8fc7e3;background:rgba(80,160,210,.08);border:1px solid #2a5173;border-radius:0}
+html.touch #tsheet .gs-ctl button:active{background:rgba(80,160,210,.22)}
+html.touch .gs-ctl svg{width:16px;height:16px;fill:currentColor}
+html.touch .gs-play .i-play{display:none}
+html.touch .gs-play.paused .i-play{display:block}
+html.touch .gs-play.paused .i-pause{display:none}
+html.touch #tsheet .gs-ctl .gs-panel{width:auto;margin-left:auto;padding:0 14px;font-family:var(--font-pixel);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#f2c94c;border-color:#6d5d24;background:rgba(242,201,76,.07)}
+html.touch .gs-vol{display:flex;align-items:center;gap:12px;min-height:48px}
+html.touch .gs-vol span{font-family:var(--font-pixel);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#6fb4d6}
+html.touch .gs-vol input{flex:1;min-width:0;height:44px;margin:0;accent-color:#f2c94c;touch-action:pan-y}
+html.touch .gs-vol output{min-width:44px;text-align:right;font-size:13px;font-variant-numeric:tabular-nums}
+
+/* ---------- the transmission log: a one-line ticker along the top (the newest line, and how many since you last looked) ---------- */
+.wl-tick{display:none}
+html.touch .wl-tick{position:fixed;z-index:3;top:calc(52px + env(safe-area-inset-top,0px));left:max(10px, env(safe-area-inset-left,0px));right:max(10px, env(safe-area-inset-right,0px));
+  height:44px;min-width:0;box-sizing:border-box;display:flex;align-items:center;gap:8px;padding:0 10px;text-align:left;border-radius:0;
+  background:rgba(13,9,24,.92);border:1px solid rgba(214,92,255,.42);color:#d9d2ea;font:13px/1 'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace}
+html.touch.gdeck-on .wl-tick{left:calc(var(--gdeck-r, 0px) + 8px)}
+html.touch .wl-tick[hidden]{display:none}
+html.touch .wl-tick .live{flex:none;width:6px;height:6px;background:#5affa8;animation:wlBlink 1.6s steps(2) infinite}
+html.touch .wl-tick .ch{flex:none;font-size:12px;letter-spacing:.1em;color:#ff6fb8}
+html.touch .wl-tick[data-ch=CITY] .ch{color:#38e8e0}
+html.touch .wl-tick[data-ch=MESH] .ch{color:#5affa8}
+html.touch .wl-tick[data-ch=CORP] .ch{color:#ffb347}
+html.touch .wl-tick[data-ch=SIGNAL] .ch{color:#ff5a6e}
+html.touch .wl-tick .tx{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html.touch .wl-tick .n{flex:none;min-width:22px;height:22px;padding:0 6px;box-sizing:border-box;display:grid;place-items:center;background:#ff6fb8;color:#12081c;font-size:12px;font-weight:600}
+html.touch .wl-tick .n[hidden]{display:none}
+html.touch.tsheet-on:has(#tsheet[data-key=wirelog]) .wl-tick{border-color:#ff6fb8}
+/* the log itself, in the sheet: newest at the bottom, 13.5 px lines, half again as much space between them */
+html.touch body > #wirelog{display:none}
+html.touch #tsheet #wirelog{position:static;width:auto;height:100%;font-size:13.5px;line-height:1.5}
+html.touch #tsheet #wirelog .wl-box{position:relative;height:100%;display:flex;flex-direction:column;border:0;background:transparent}
+html.touch #tsheet #wirelog header{display:none}
+html.touch #tsheet #wirelog .wl-body{flex:1;height:auto;min-height:0;padding:2px 0 8px;overscroll-behavior:contain}
+html.touch #tsheet #wirelog .wl-line{grid-template-columns:46px 58px minmax(0,1fr);gap:8px;padding:3px 14px}
+html.touch #tsheet #wirelog .wl-line .ts,html.touch #tsheet #wirelog .wl-line .ch{font-size:12px}
+html.touch #tsheet #wirelog .wl-foot{flex:none;padding:8px 14px;font-size:12px}
+/* what came in below while you were reading further up: a tap goes to it */
+html.touch .wl-new{position:absolute;right:14px;bottom:48px;height:44px;padding:0 14px;border-radius:0;font:12px/1 'JetBrains Mono',ui-monospace,monospace;letter-spacing:.08em;
+  color:#12081c;background:#ff6fb8;border:0;box-shadow:0 0 10px rgba(255,111,184,.45)}
+html.touch .wl-new[hidden]{display:none}
+html.nt-calm .wl-tick .live,html.nt-clean .wl-tick .live,html.nt-calm #tsheet #wirelog .live,html.nt-clean #tsheet #wirelog .live{animation:none}

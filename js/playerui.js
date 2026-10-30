@@ -40,7 +40,10 @@ const foot = deck.querySelector('.foot');
 const toTitle = $('toTitle');
 
 const head = el('header', { class: 'pu-head' }, el('h2', { text: 'Settings' }), el('button', { class: 'pu-x', 'aria-label': 'Close settings', text: '✕', onclick: () => closeDeck() }));
-const T = tabs([['game', 'Game Settings'], ['adv', 'Advanced Settings']]);
+// (a touch screen gets three more tabs: City settings and Controls move in from the dock, and Interface, for touch: touchui.js fills it)
+const TT = typeof TOUCH !== 'undefined' && TOUCH.on;
+const T = tabs(TT ? [['game', 'Game'], ['city', 'City'], ['ctl', 'Controls'], ['ui', 'Interface'], ['adv', 'Advanced']] : [['game', 'Game Settings'], ['adv', 'Advanced Settings']]);
+window.PUI = { panes: T.panes, pick: T.pick, bar: T.bar, open: () => { if (!deck.classList.contains('open')) $('deckToggle').click(); } };
 
 // --- Graphics: presets, then the few choices most players want
 const PRESETS = {
@@ -152,8 +155,15 @@ if (looksSec){ const lookPick = looksSec.querySelector('.lookpick'), ed = $('loo
 if (timeSec) timeSec.remove(); if (buildSec) buildSec.remove();
 // next to "Hover for controls"
 const ctl = document.querySelector('.ctlwrap');
-if (ctl){ const row = el('div', { class: 'pu-ctlrow' }); ctl.parentNode.insertBefore(row, ctl); row.append(ctl, cityBtn); }
-document.querySelector('.zonebar').append(cityPanel);
+if (TT){   // touch: City settings is a tab of Settings, and so is Controls (the dock keeps only what you build with)
+  T.panes.city.append(...C.panes.city.childNodes, ...C.panes.adv.childNodes);
+  const dl = ctl && ctl.querySelector('dl.touchonly'); if (dl) T.panes.ctl.append(group('Touch controls', dl));
+  document.body.append(cityPanel);   // (kept in the page, hidden and empty but for the old Rain box the looks read)
+}
+else {
+  if (ctl){ const row = el('div', { class: 'pu-ctlrow' }); ctl.parentNode.insertBefore(row, ctl); row.append(ctl, cityBtn); }
+  document.querySelector('.zonebar').append(cityPanel);
+}
 // (only now: until the city panel has taken its pieces, they have to stay in the page for getElementById to find them)
 deck.replaceChildren(head, T.bar, ...Object.values(T.panes), puFoot);
 

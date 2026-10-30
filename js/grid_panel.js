@@ -271,6 +271,113 @@ const GRIDPANEL = (() => {
   #gridPanel.boot .gtop, #gridPanel.boot .gbot { animation: gpBoot .26s ease-out both; }
   #gridPanel.boot .gp { animation: gpBoot .32s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--i, 0) * 30ms + 40ms); }
   @keyframes gpBoot { 0% { opacity: 0; clip-path: inset(0 100% 0 0); filter: brightness(2.4) saturate(1.6); } 55% { opacity: 1; filter: brightness(1.6); } 100% { opacity: 1; clip-path: inset(0 0 0 0); filter: none; } }
+  /* the player's own Settings: reduce motion (nt-calm) or Clean signal (nt-clean) and the glitch, the boot, the blinking and the scanlines stay still.
+     Off unless the player turns them on (grid.js skips the curtain and the decoding titles then too) */
+  html.nt-calm #view.gp-glitch, html.nt-clean #view.gp-glitch, html.nt-calm #gridPanel.boot .gtop, html.nt-clean #gridPanel.boot .gtop, html.nt-calm #gridPanel.boot .gbot, html.nt-clean #gridPanel.boot .gbot,
+  html.nt-calm #gridPanel.boot .gp, html.nt-clean #gridPanel.boot .gp, html.nt-calm #gridPanel .gchip.live i, html.nt-clean #gridPanel .gchip.live i, html.nt-calm #gridPanel .bkey.retune { animation: none; }
+  html.nt-calm #gridPanel .gtab.beckon:not(.on), html.nt-clean #gridPanel .gtab.beckon:not(.on) { animation: none; color: #b8ffd2; box-shadow: inset 0 0 0 1px #5df09a; }
+  html.nt-clean #gridPanel::before { display: none; }
+
+  /* ---------- on a touch screen (html.touch, touch.js; css/style.css has the first pass: the top row, the 44 px buttons and bars) ----------
+     The console splits into four sections that each fit a phone, a readout strip at the top shows the dial under the finger (never under the
+     thumb), and a press and hold on anything opens a plate that says in plain words what it does. A mouse and keyboard see none of this. */
+  #gridPanel .gsec, #gridPanel .gread, #gridPanel .gplate { display: none; }
+  html.touch #gridPanel { -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+  html.touch #gridPanel button, html.touch #gridPanel .gk, html.touch #gridPanel select, html.touch #gridPanel .gchk, html.touch #gridPanel input[type=range] { touch-action: manipulation; }
+  html.touch #gridPanel .gk svg { touch-action: none; }
+  /* (whichever of the two is hidden stays hidden: the column rules in style.css would otherwise show the Console under the Booth) */
+  html.touch #gridPanel .gmain[hidden], html.touch #gridPanel .gbooth[hidden] { display: none; }
+  html.touch #gridPanel .gx { min-width: 64px; }
+  /* (the chips always start a row of their own under the tabs and CLOSE, so CLOSE stays in the top right corner on a wide tablet too) */
+  /*  Sideways on a phone there's no height to spare, so there they share the top row) */
+  @media (min-height: 521px) { html.touch #gridPanel .gtop::before { content: ''; order: 0; flex: 0 0 100%; height: 0; } html.touch #gridPanel .gtop > .gchip { order: 1; } }
+  /* the readout strip: the dial or bar being touched, its name and value, and where it sits in its range */
+  html.touch #gridPanel .gread { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto 3px; align-items: center; column-gap: 10px; flex: none; min-height: 38px;
+    padding: 5px 10px 0; background: rgba(3,14,18,.92); border: 1px solid var(--faint); color: var(--dim); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
+  html.touch #gridPanel .gread .grn { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  html.touch #gridPanel .gread .grv { font: 600 17px 'Chakra Petch', sans-serif; letter-spacing: .04em; color: var(--yl); white-space: nowrap; text-transform: none; }
+  html.touch #gridPanel .gread .grbar { grid-column: 1 / -1; align-self: end; height: 2px; margin: 4px -10px 0; background: transparent; }
+  html.touch #gridPanel .gread .grbar > i { display: block; height: 100%; width: 0; background: var(--yl); box-shadow: 0 0 6px rgba(232,213,83,.7); }
+  html.touch #gridPanel .gread.live { border-color: var(--line); } html.touch #gridPanel .gread.live .grn { color: var(--ink); }
+  html.touch #gridPanel .gread:not(.live) .grbar > i { width: 0 !important; }
+  /* the explanation plate, dropped from the top of the panel (the control it explains gets a yellow frame) */
+  html.touch #gridPanel .gplate:not([hidden]) { display: grid; gap: 8px; position: absolute; z-index: 6; left: max(12px, env(safe-area-inset-left,0px)); right: max(12px, env(safe-area-inset-right,0px)); top: calc(56px + env(safe-area-inset-top,0px));
+    max-width: 460px; margin: 0 auto; padding: 14px 14px 12px; background: rgba(5,18,23,.97); border: 1px solid var(--cy); box-shadow: 0 0 0 1px rgba(3,12,16,.9), 0 0 30px rgba(95,216,222,.22), 0 12px 40px rgba(0,0,0,.6); }
+  html.touch #gridPanel .gplate .gpn { font: 600 16px 'Chakra Petch', sans-serif; letter-spacing: .16em; color: var(--ink); text-transform: uppercase; }
+  html.touch #gridPanel .gplate .gpn::before { content: '[ '; color: var(--dim); } html.touch #gridPanel .gplate .gpn::after { content: ' ]'; color: var(--dim); }
+  html.touch #gridPanel .gplate .gpp { margin: 0; color: #eafcfc; font-size: 15px; line-height: 1.45; letter-spacing: .02em; }
+  html.touch #gridPanel .gplate .gpl { margin: 0; color: var(--cy2); font-size: 13px; line-height: 1.45; letter-spacing: .02em; opacity: .85; }
+  html.touch #gridPanel .gplate .gpl:empty { display: none; }
+  html.touch #gridPanel .gplate .gpr { display: flex; gap: 8px; justify-content: flex-end; } html.touch #gridPanel .gplate .gpr .gb { width: auto; margin: 0; padding: 0 16px; font-size: 12px; }
+  html.touch #gridPanel .gplate .gpr .gb[hidden] { display: none; }
+  html.touch #gridPanel .gexp { outline: 2px solid var(--yl); outline-offset: 2px; }
+  /* the sections bar: one tab a section, under the top row */
+  html.touch #gridPanel .gsect { flex: 1 1 0; min-width: 0; min-height: 44px; padding: 0 4px; background: rgba(5,22,29,.85); border: 1px solid var(--faint); border-radius: 0; color: var(--cy2);
+    font: 400 12px 'JetBrains Mono', monospace; letter-spacing: .04em; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+  html.touch #gridPanel .gsect.on { background: rgba(95,216,222,.16); border-color: var(--cy); color: var(--ink); box-shadow: inset 0 -3px 0 var(--cy); }
+  html.touch #gridPanel:has(.gmain[hidden]) .gsec { display: none !important; }
+  @media (max-width: 1100px), (max-height: 780px) {
+    html.touch #gridPanel .gsec { display: flex; gap: 4px; flex: none; }
+    html.touch #gridPanel .gmain { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; overscroll-behavior: contain; grid-template-areas: none; }
+    html.touch #gridPanel .gmain > .gp { flex: 1 0 auto; min-height: 0; overflow: visible; }
+    html.touch #gridPanel .gmain > .gp:not(.sec-on) { display: none; }
+    html.touch #gridPanel .gmain > .a-chart { order: -1; }   /* (the chart leads its section: the harmonics are its fine-tuning) */
+    html.touch #gridPanel .gmain .gv { flex: 1 1 0; height: auto; min-height: 84px; }
+    html.touch #gridPanel .gmain .a-state > .gv:not(.gcurve) { min-height: 200px; }
+    html.touch #gridPanel .gmain .a-state .gcurve { flex: none; height: 46px; min-height: 0; }
+    html.touch #gridPanel .gstripwrap { flex: none; min-height: 0; }
+    html.touch #gridPanel .gmain .gstripwrap .gv { flex: 1 1 0; height: 184px; min-height: 0; }
+    html.touch #gridPanel .gfeel { flex-wrap: wrap; row-gap: 4px; } html.touch #gridPanel .gfeel .gb { flex: 1 0 100%; margin: 0; }
+    html.touch #gridPanel .gknobs, html.touch #gridPanel .gmini { flex-wrap: wrap; justify-content: space-around; }
+  }
+  /* sideways on a phone (wide and short): a section's two blocks side by side, each scrolling on its own */
+  @media (max-height: 520px) and (min-width: 560px) {
+    html.touch #gridPanel .gmain { flex-direction: row; overflow: hidden; }
+    html.touch #gridPanel .gmain > .gp { flex: 1 1 0; min-width: 0; overflow-y: auto; overscroll-behavior: contain; }
+    html.touch #gridPanel .gmain .a-state > .gv:not(.gcurve) { min-height: 120px; }
+    html.touch #gridPanel .gread { position: absolute; z-index: 5; left: max(10px, env(safe-area-inset-left,0px)); right: max(10px, env(safe-area-inset-right,0px)); min-height: 44px; border-color: var(--cy); background: #04131a; }
+    html.touch #gridPanel .gread:not(.live) { display: none; }
+  }
+  /* text no smaller than 12 px for the short capitals, 13 for sentences */
+  html.touch #gridPanel .gk > span, html.touch #gridPanel .gkey, html.touch #gridPanel .glbl, html.touch #gridPanel .gpad small, html.touch #gridPanel .gorb small,
+  html.touch #gridPanel .gring small, html.touch #gridPanel .gfeel span, html.touch #gridPanel .gfeel small, html.touch #gridPanel .gfeel b, html.touch #gridPanel .gzoom b,
+  html.touch #gridPanel .gchk, html.touch #gridPanel .gb small, html.touch #gridPanel .gside .gb, html.touch #gridPanel .gchartbar .gb, html.touch #gridPanel .gstripbar .gb,
+  html.touch #gridPanel .gxrow .gb, html.touch #gridPanel .glayers .gb, html.touch #gridPanel .bsonginfo, html.touch #gridPanel .bsonginfo dt, html.touch #gridPanel .bvoices .gb small { font-size: 12px; }
+  html.touch #gridPanel .gnote, html.touch #gridPanel .ghint2, html.touch #gridPanel .bsongst, html.touch #gridPanel .bempty, html.touch #gridPanel .gdlgp { font-size: 13px; line-height: 1.45; }
+  html.touch #gridPanel .gstrip .ghint2 { white-space: normal; }
+  html.touch #gridPanel .gchk { min-height: 44px; } html.touch #gridPanel .gchk input { width: 20px; height: 20px; }
+  html.touch #gridPanel select { min-height: 44px; font-size: 16px; }   /* (16 px: smaller and iOS zooms the page when it opens) */
+  html.touch #gridPanel .gk > output { font-size: 13px; }
+  /* a phone: the room goes to the controls. The status bar along the foot repeats what the chips, the clock and the switches already say, and
+     two of the chips repeat the clock and the chart, so they step out; the chart picker gets a row of its own */
+  @media (max-width: 760px) {
+    html.touch #gridPanel .gbot { display: none; }
+    html.touch #gridPanel .gchip:has(#gpMood), html.touch #gridPanel .gchip:has(#gpClock) { display: none; }
+    html.touch #gridPanel .gchartbar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } html.touch #gridPanel .gchartbar select { grid-column: 1 / -1; }
+    html.touch #gridPanel .gmain .gv { min-height: 64px; }
+  }
+  /* the two bars under the strip: 44 px tall to the finger, the drawn bar stays thin */
+  html.touch #gridPanel input.gscroll { height: 44px; background: transparent; border: 0; }
+  html.touch #gridPanel input.gscroll::-webkit-slider-runnable-track { height: 12px; background: rgba(5,22,29,.9); box-shadow: inset 0 0 0 1px var(--faint); }
+  html.touch #gridPanel input.gscroll::-webkit-slider-thumb { height: 12px; margin-top: 0; }
+  html.touch #gridPanel input.gscroll::-moz-range-track { height: 12px; background: rgba(5,22,29,.9); }
+  html.touch #gridPanel .gzoom { width: 48px; }
+  html.touch #gridPanel .gstrip.rw #gStripCv { touch-action: none; }   /* (a rewired loop: the finger moves notes there, the page doesn't scroll under it) */
+  /* the Booth: the pads show their place in the chord, not the computer keys; the loop's status and the chord stay in view; the shelf's buttons and the name box sized for a thumb */
+  html.touch #gridPanel .bkey small { font-size: 13px; color: var(--cy2); letter-spacing: .04em; }
+  html.touch #gridPanel .bkey.down small { color: #0b3a40; }
+  html.touch #gridPanel .gbooth { overscroll-behavior: contain; }
+  html.touch #gridPanel .gbooth .b-roll > .gtag, html.touch #gridPanel .gbooth .b-keys > .gtag { display: block; left: auto; right: 14px; top: 7px; max-width: calc(100% - 130px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--yl); }
+  html.touch #gridPanel .bsave input, html.touch #gridPanel .bitem input { font-size: 16px; min-height: 44px; }
+  html.touch #gridPanel .bitem .br .gb { min-height: 44px; padding: 0 12px; font-size: 12px; flex: 1 1 auto; }
+  html.touch #gridPanel .bnudge .gb { font-size: 12px; }
+  html.touch #gridPanel .bitem .bm { font-size: 12px; } html.touch #gridPanel .bitem .bt { font-size: 14px; }
+  /* the DELETE chip over a held note (booth.js) */
+  html.touch #gridPanel .gdel { position: absolute; z-index: 4; width: auto; min-height: 36px; margin: 0; padding: 0 14px; transform: translate(-50%, calc(-100% - 8px));
+    font: 600 12.5px 'Chakra Petch', sans-serif; letter-spacing: .18em; color: #fff; background: rgba(120,14,70,.96); border: 1px solid var(--mg); box-shadow: 0 0 14px rgba(229,55,159,.55); }
+  html.touch #gridPanel .gdel.below { transform: translate(-50%, 8px); }
+  html.touch #gridPanel .gdel::before { content: ''; position: absolute; inset: -6px -4px; }   /* (44 px to the finger) */
+  html.touch #gridPanel .gdel[hidden] { display: none; }
   `;
   const knob = (id, name, min, max, step, val, tip, cls = '', out = true) => `<label class="gk ${cls}" title="${tip} (drag up or down, scroll, double-click to reset)"><svg viewBox="0 0 48 48" aria-hidden="true"></svg><input type="range" id="g-${id}" min="${min}" max="${max}" step="${step}" value="${val}" aria-label="${name}"><output${out ? ` id="g-${id.replace(/Slider$/, '')}Val"` : ''}></output><span>${name}</span></label>`;
   const html = `
@@ -284,6 +391,8 @@ const GRIDPANEL = (() => {
     <span class="gname">PSYCHO-ACOUSTIC GRID</span>
     <button class="gx" id="gpClose" title="Close the panel (Esc)">CLOSE</button>
   </div>
+  <div class="gsec" role="tablist" aria-label="Console sections"><button class="gsect" data-sec="cast" role="tab">Broadcast</button><button class="gsect" data-sec="clock" role="tab">Clock</button><button class="gsect" data-sec="carrier" role="tab">Carrier</button><button class="gsect" data-sec="air" role="tab">Air</button></div>
+  <div class="gread" aria-live="polite"><span class="grn"></span><b class="grv"></b><i class="grbar"><i></i></i></div>
   <div class="gmain">
     <section class="gp a-clock"><h3>Circadian clock</h3><span class="gtag" id="g-beatCounterBadge">1/4</span><span id="g-tempoSyncLed" hidden></span>
       <div class="gclock">
@@ -461,7 +570,175 @@ const GRIDPANEL = (() => {
     el.addEventListener('wheel', e => { const r = e.target.closest && e.target.closest('.gs, .gk') && e.target.closest('.gs, .gk').querySelector('input[type=range]'); if (!r) return;
       e.preventDefault(); const st = +r.step || 1, n = Math.max(1, Math.round((+r.max - +r.min)/st/50)); set(r, +r.value + (e.deltaY < 0 ? 1 : -1)*st*n*(e.shiftKey ? 4 : 1)); }, { passive: false });
     el.addEventListener('dblclick', e => { const r = e.target.closest && e.target.closest('.gs, .gk') && e.target.closest('.gs, .gk').querySelector('input[type=range]'); if (r && r.dataset.def !== undefined) set(r, +r.dataset.def); });
+    if (typeof TOUCH !== 'undefined' && TOUCH.on) touchUI(el, set);
     return el;
+  }
+
+  // ---------- on a touch screen ----------
+  // What each control does, in plain words, for the press-and-hold plate. The panel keeps the planners' names as the labels (Clock rate,
+  // Smog, Resonance); this is the one place that says tempo, filter, reverb. Anything not listed falls back to its own title.
+  const PLAIN = {
+    'g-bpmSlider': 'Tempo, in beats a minute. Drag the dial up or down; double tap it to put it back.',
+    'g-tapTempoBtn': 'Tap tempo: tap it in time and the tempo follows your taps.',
+    'g-tempoLock': 'Keeps the tempo where you set it while the auto-governor moves everything else.',
+    subdiv: 'The beat grid: how finely each beat is cut for the echoes and the melody (quarters, eighths, triplets, sixteenths).',
+    'g-quantizeToggleBtn': 'Quantize: melody notes snap onto that beat grid.',
+    'g-leadLoopBtn': 'A melody layer: an improvised lead line over the chords.',
+    'g-autopilotBtn': 'Automation: the Grid changes its own tempo, rhythm and dials as the mood shifts.',
+    'g-ambientBtn': 'Ambient mode: soft pads in place of the heavy drone.',
+    'g-engageSwitch': 'Pause or resume the whole broadcast.',
+    prog: 'A preset: a starting mix of layers and settings for the broadcast.',
+    'g-warmthFilterSlider': 'A filter that cuts the highs: lower is darker and more muffled.',
+    'g-spaceReverbSlider': 'Reverb: how big and echoing the space sounds.',
+    'g-droneLevelSlider': 'Drone volume: the held chord under everything.',
+    'g-subAnchorSlider': 'Sub bass: the low weight under the drone.',
+    'g-chordHoldSlider': 'Chord length: how long each chord lasts before the next.',
+    'mode-MOSAIC': 'A style for the granular texture layer.',
+    'mode-HAZE': 'A style for the granular texture layer.',
+    'mode-ARP': 'A style for the granular texture layer.',
+    'g-granularMixSlider': 'Granular texture: how many tiny grains of sound.',
+    'g-lofiTextureSlider': 'Lo-fi noise: hiss and crackle.',
+    'g-progressionSelect': 'The chord progression the broadcast plays.',
+    'g-freezeSwitch': 'Freeze: holds the sound playing now in a loop until you let it go.',
+    'g-markovToggleBtn': 'Chord order: in sequence, or wandering to related chords.',
+    'g-chordTimelineGrid': 'The chords of the progression: tap one to jump to it.',
+    'g-motifSparsitySlider': 'How often the melody pings play.',
+    'g-motifLevelSlider': 'Melody ping volume.',
+    'g-manualMotifBtn': 'Play one melody ping now.',
+    'g-manualBellBtn': 'Play a cluster of bell tones now.',
+    'g-motifStyleSelect': 'The melody style the pings use.',
+    'g-motifXform': "Give the pings the sound of one of your songs.",
+    gAct: 'How many notes the loop and its answers play, from sparse to busy.',
+    'g-boothChopSlider': "Volume of your song's samples and chops.",
+    'g-boothPadSlider': 'Volume of the backing chords.',
+    'g-boothBpmSlider': 'Tempo of the loop, in beats a minute.',
+    'g-boothApSlider': 'How much the autopilot plays back to you.',
+    'g-boothProg': 'The chords you play over: one chord a bar.',
+    'sec-cast': 'Presets, layers, and a picture of everything playing.',
+    'sec-clock': 'Tempo, rhythm and the melody pings.',
+    'sec-carrier': 'The chords: which progression, how it moves, and the drone under it.',
+    'sec-air': 'Reverb, filter and texture.',
+    'tab-console': "The broadcast's controls.",
+    'tab-booth': 'Play over a chord pattern, record loops and keep them. The city broadcast steps aside while you play.',
+  };
+  // which section of the console each block belongs to
+  const SEC = { 'a-state': 'cast', 'a-prog': 'cast', 'a-clock': 'clock', 'a-ping': 'clock', 'a-chart': 'carrier', 'a-harm': 'carrier', 'a-atmos': 'air', 'a-disp': 'air' };
+  const SEC_KEY = 'neonIsland.gridSection';
+  function touchUI(el, set){
+    const $e = s => el.querySelector(s), words = s => (typeof TOUCH !== 'undefined' && TOUCH.words) ? TOUCH.words(s) : s;
+    // the sections: a tab each, the last one picked comes back next time
+    el.querySelectorAll('.gmain > .gp').forEach(g => { for (const c in SEC) if (g.classList.contains(c)) g.dataset.sec = SEC[c]; });
+    const pick = s => {
+      el.querySelectorAll('.gsect').forEach(b => { const on = b.dataset.sec === s; b.classList.toggle('on', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); });
+      el.querySelectorAll('.gmain > .gp').forEach(g => g.classList.toggle('sec-on', g.dataset.sec === s));
+      $e('.gmain').scrollTop = 0; try { localStorage.setItem(SEC_KEY, s); } catch (e){}
+      el.dispatchEvent(new Event('gpsection'));   // (grid.js sizes the trace canvases that just came into view)
+    };
+    let s0 = 'cast'; try { const v = localStorage.getItem(SEC_KEY); if (v && Object.values(SEC).includes(v)) s0 = v; } catch (e){}
+    pick(s0);
+    el.querySelectorAll('.gsect').forEach(b => b.addEventListener('click', () => pick(b.dataset.sec)));
+
+    // the readout strip: the dial or bar under the finger, by name, with its value, shown up here where the thumb isn't
+    const rd = $e('.gread'), rn = rd.querySelector('.grn'), rv = rd.querySelector('.grv'), rb = rd.querySelector('.grbar > i');
+    const IDLE = 'Hold a control to see what it does';
+    const rangeOf = t => { const k = t.closest && t.closest('.gk'); if (k) return k.querySelector('input[type=range]'); return t.matches && t.matches('input[type=range]') ? t : null; };
+    const nameOf = r => { const k = r.closest('.gk'); if (k) return k.querySelector('span').textContent;
+      return { gAct: 'Activity', gStripScroll: 'Along the loop' }[r.id] || r.getAttribute('aria-label') || ''; };
+    const valOf = r => { const k = r.closest('.gk'), o = k && k.querySelector('output');
+      if (o && o.textContent.trim()) return o.textContent.trim();
+      if (r.id === 'g-bpmSlider') return r.value + ' cycles/min';
+      if (r.id === 'gAct'){ const l = $e('#gActLbl'); return l && l.textContent.trim() ? l.textContent.trim() : Math.round(+r.value*100) + '%'; }
+      if (r.id === 'gStripScroll') return 'Beat ' + (Math.floor(+r.value) + 1);
+      return String(+(+r.value).toFixed(2)); };
+    let idleT = 0, cur = null, shown = null, pre = '', raf = 0;
+    const idle = () => { rd.classList.remove('live'); rn.textContent = IDLE; rv.textContent = ''; shown = null; };
+    const paint = () => { const r = shown; if (!r) return; const n = (pre ? pre + ' · ' : '') + nameOf(r), v = valOf(r);
+      if (rn.textContent !== n) rn.textContent = n; if (rv.textContent !== v) rv.textContent = v;
+      const lo = +r.min, hi = +r.max; rb.style.width = (hi > lo ? (+r.value - lo)/(hi - lo)*100 : 0) + '%'; };
+    // (the dials' own numbers are written by the engine or by the shapes' frame (grid_viz.js), a moment after the value moves: so while the
+    //  strip is lit it reads them again every frame, and stops when it goes back to the hint)
+    const loop = () => { raf = 0; if (!shown || !P.open) return; paint(); raf = requestAnimationFrame(loop); };
+    const show = (r, p) => { if (!r) return; clearTimeout(idleT);
+      // (sideways the strip has no row of its own: it lies over the sections bar, or the top row's foot in the Booth, while a finger is on a dial)
+      const s = $e('.gsec'), under = s.getBoundingClientRect().height > 0 ? s : $e('.gtop'); rd.style.top = (under === s ? s.offsetTop : under.offsetTop + under.offsetHeight - 44) + 'px';
+      rd.classList.add('live'); shown = r; pre = p || ''; paint(); if (!raf) raf = requestAnimationFrame(loop); };
+    const later = () => { clearTimeout(idleT); idleT = setTimeout(idle, 1800); };
+    idle();
+
+    // press and hold: the explanation plate (and Reset, for a dial or a bar); a double tap on a dial resets it too
+    const plate = document.createElement('div'); plate.className = 'gplate'; plate.hidden = true; plate.setAttribute('role', 'dialog');
+    plate.innerHTML = '<b class="gpn"></b><p class="gpp"></p><p class="gpl"></p><div class="gpr"><button class="gb" data-a="reset">Reset</button><button class="gb" data-a="ok">Got it</button></div>';
+    el.appendChild(plate);
+    const SKIP = '.bkey, #bRoll, #gStripCv, input[type=text], input:not([type]), .gplate, .gdel, .gdlg';
+    const CTRL = '.gk, button, select, input[type=range], .gchk, canvas, .gchip, .gpills';
+    const keyOf = c => (rangeOf(c) || c).id || (c.classList.contains('subdiv-btn') ? 'subdiv' : c.classList.contains('micro-mode-btn') ? 'mode-' + c.dataset.mode : c.closest('.gprogs') ? 'prog'
+      : c.classList.contains('gsect') ? 'sec-' + c.dataset.sec : c.classList.contains('gtab') ? 'tab-' + c.dataset.mode : '');
+    const labelOf = c => {
+      if (c.classList.contains('gk')) return c.querySelector('span').textContent;
+      if (c.matches('canvas, .gpills')){ const h = c.closest('.gp') && c.closest('.gp').querySelector('h3'); return h ? h.textContent : ''; }
+      if (c.matches('select')){ const l = c.previousElementSibling; return l && l.classList.contains('glbl') ? l.textContent : (c.closest('.gp') && c.closest('.gp').querySelector('h3') || {}).textContent || ''; }
+      if (c.classList.contains('gchk')) return c.textContent;
+      const t = c.cloneNode(true); t.querySelectorAll('small, .gled').forEach(n => n.remove()); return t.textContent.replace(/\s+/g, ' ').trim();
+    };
+    let pl = null;   // { c (the control), r (its range, if it has one) }
+    const closePlate = () => { if (!pl) return; pl.c.classList.remove('gexp'); plate.hidden = true; pl = null; };
+    function openPlate(c){
+      closePlate();
+      const k = keyOf(c), ttl = (c.closest('[title]') || {}).title || '', r = rangeOf(c);
+      // the title, as the plate's second line: the planners' wording, with the mouse's how-to taken out
+      const lore = words(ttl.replace(/\s*\([^)]*\b(drag|scroll|click|Space|Enter|Esc|Ctrl)\b[^)]*\)/gi, '')).trim();
+      const plain = PLAIN[k] || '';
+      if (!plain && !lore) return false;
+      plate.querySelector('.gpn').textContent = labelOf(c) || 'Control';
+      plate.querySelector('.gpp').textContent = plain || lore;
+      plate.querySelector('.gpl').textContent = plain && lore !== plain ? lore : '';
+      const canReset = !!(r && r.dataset.def !== undefined && !(r.classList.contains('gscroll') && !r.classList.contains('gact')));
+      const rs = plate.querySelector('[data-a=reset]'); rs.hidden = !canReset;
+      // (just under the readout strip, so the dial's value stays in view above it)
+      const above = [rd, $e('.gsec'), $e('.gtop')].find(n => n.getBoundingClientRect().height > 0 && getComputedStyle(n).position !== 'absolute');
+      plate.style.top = Math.round(above.getBoundingClientRect().bottom - el.getBoundingClientRect().top + 6) + 'px';
+      pl = { c, r }; c.classList.add('gexp'); plate.hidden = false;
+      if (r) show(r);
+      return true;
+    }
+    plate.addEventListener('click', e => { const a = e.target.dataset && e.target.dataset.a; if (!a || !pl) return;
+      if (a === 'reset' && pl.r){ set(pl.r, +pl.r.dataset.def); show(pl.r, 'Reset'); later(); }
+      closePlate(); });
+    let lp = null, swallow = 0, lastType = 'mouse', tap = null, lastTap = null;
+    P.lp = false;   // (true once a hold has opened the plate: the dial under the finger stops following it, grid_viz.js)
+    el.addEventListener('pointerdown', e => {
+      lastType = e.pointerType; if (e.pointerType === 'mouse') return;
+      P.lp = false;
+      if (pl && !plate.contains(e.target)){ closePlate(); swallow = performance.now(); e.stopPropagation(); return; }   // (a tap away from the plate only closes it)
+      const r = rangeOf(e.target); if (r){ cur = r; show(r); }
+      const dial = e.target.closest('.gk');
+      tap = dial ? { k: dial, x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId } : null;
+      const c = e.target.closest(CTRL); if (!c || !el.contains(c) || e.target.closest(SKIP)) return;
+      lp = { c, x: e.clientX, y: e.clientY, id: e.pointerId, timer: setTimeout(() => { const ok = openPlate(lp.c); lp = null;
+        if (ok){ P.lp = true; swallow = performance.now(); if (navigator.vibrate) try { navigator.vibrate(12); } catch (e){} } }, 500) };
+    }, true);
+    el.addEventListener('pointermove', e => {
+      if (lp && e.pointerId === lp.id && Math.hypot(e.clientX - lp.x, e.clientY - lp.y) > 10){ clearTimeout(lp.timer); lp = null; }
+      if (tap && e.pointerId === tap.id && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) > 10) tap = null;
+    }, true);
+    const up = e => {
+      if (lp && e.pointerId === lp.id){ clearTimeout(lp.timer); lp = null; }
+      if (e.pointerType !== 'mouse' && cur){ cur = null; later(); }
+      // a double tap on a dial: back to where it started (the canvas's own dblclick doesn't come reliably from a finger)
+      if (e.type === 'pointerup' && tap && e.pointerId === tap.id && !P.lp && performance.now() - tap.t < 300){
+        const now = performance.now();
+        if (lastTap && lastTap.k === tap.k && now - lastTap.t < 350){ const r = rangeOf(tap.k); if (r && r.dataset.def !== undefined){ set(r, +r.dataset.def); show(r, 'Reset'); later(); } lastTap = null; }
+        else lastTap = { k: tap.k, t: now };
+      }
+      tap = null;
+    };
+    el.addEventListener('pointerup', up, true); el.addEventListener('pointercancel', up, true);
+    // the click that ends a hold (or a tap that only closed the plate) does nothing else
+    el.addEventListener('click', e => { if (swallow && performance.now() - swallow < 900){ e.preventDefault(); e.stopPropagation(); swallow = 0; } }, true);
+    // no browser menu or text callout from a held finger (a right-click with a mouse still gets through to the Booth's notes)
+    el.addEventListener('contextmenu', e => { if (lastType !== 'mouse'){ e.preventDefault(); e.stopPropagation(); } }, true);
+    el.addEventListener('keydown', e => { if (pl && e.key === 'Escape'){ e.stopPropagation(); closePlate(); } }, true);
+    P.closePlate = closePlate;
   }
   P.build = build; P.fill = r => { const lo = +r.min, hi = +r.max; r.style.setProperty('--p', (hi > lo ? (+r.value - lo)/(hi - lo)*100 : 0) + '%'); };
   return P;

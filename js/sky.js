@@ -1344,7 +1344,8 @@ function glowPass(mat, target, name){ PH.begin(name, true); glowQuad.material = 
 // is drawn straight onto the screen instead: one whole-screen pass fewer, the same pixels (the copy at scale 1 reads each texel exactly). GLOW_DIRECT tells main.js.
 let GLOW_DIRECT = false;
 function renderGlow(){
-  GLOW_DIRECT = W === DW && H === DH && !PH.tests.noDirect && !window.__NO_DIRECT && !(WARP.k.value > 0);
+  fadeFrame();
+  GLOW_DIRECT = W === DW && H === DH && !PH.tests.noDirect && !window.__NO_DIRECT && !(WARP.k.value > 0) && !FADE.tex;   // (the far view's fade needs the pass to the screen)
   const fin = GLOW_DIRECT ? null : rtFinal;
   glowMix.uniforms.res.value.set(W, H); glowMix.uniforms.tD.value = comp.uniforms.tDepth.value;   // (the depth the composite read: the lens flare hides behind the city)
   if (typeof LK !== 'undefined' && !LK.old && !window.__OLD_GRADES) lkGlow();   // (the looks' lens and film values: looks.js)
@@ -1560,19 +1561,23 @@ let rtOut = null;
 // WARP: the title's flight through the porthole (title.js): k how strong (0 off), c the window's middle on the screen
 const WARP = { k: { value: 0 }, c: { value: new THREE.Vector2(.5, .5) } };
 const upMat = new THREE.ShaderMaterial({
-  uniforms: { t:{ value:null }, srcRes:{ value:new THREE.Vector2(1,1) }, dstRes:{ value:new THREE.Vector2(1,1) }, warp: WARP.k, warpC: WARP.c },
+  uniforms: { t:{ value:null }, srcRes:{ value:new THREE.Vector2(1,1) }, dstRes:{ value:new THREE.Vector2(1,1) }, warp: WARP.k, warpC: WARP.c,
+              tOld:{ value:null }, oldRes:{ value:new THREE.Vector2(1,1) }, fade:{ value:0 } },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
   fragmentShader: `uniform sampler2D t; uniform vec2 srcRes; uniform vec2 dstRes; uniform float warp; uniform vec2 warpC; varying vec2 vUv;
-    vec4 sharp(vec2 uv){
-      vec2 texel = uv*srcRes, base = floor(texel), s = texel - base;
-      float scale = max(1.0, dstRes.y/srcRes.y);
+    uniform sampler2D tOld; uniform vec2 oldRes; uniform float fade;
+    vec4 sharpOf(sampler2D tx, vec2 res, vec2 uv){
+      vec2 texel = uv*res, base = floor(texel), s = texel - base;
+      float scale = max(1.0, dstRes.y/res.y);
       float range = 0.5 - 0.5/scale;
       vec2 cd = s - 0.5;
       vec2 f = (cd - clamp(cd, -range, range))*scale + 0.5;
-      return texture2D(t, (base + f)/srcRes);
+      return texture2D(tx, (base + f)/res);
     }
+    vec4 sharp(vec2 uv){ return sharpOf(t, srcRes, uv); }
     void main(){
-      if (warp <= 0.0){ gl_FragColor = sharp(vUv); return; }
+      // (the far view sharpening: the last picture at the old size fades out over the new one, so it comes in softly: FADE below)
+      if (warp <= 0.0){ gl_FragColor = fade > 0.0 ? mix(sharp(vUv), sharpOf(tOld, oldRes, vUv), fade) : sharp(vUv); return; }
       // through the glass: a lens bulge round the window's middle, a ripple running out, and the colours parting a little
       float asp = dstRes.x/dstRes.y; vec2 d = vUv - warpC; d.x *= asp; float r = length(d);
       vec2 n = d/max(r, 1e-4); float bulge = warp*.22*exp(-r*r*2.5), ring = sin(r*30.0 - warp*9.0)*.008*warp*smoothstep(.0, .25, r);
@@ -1679,6 +1684,8 @@ function farTrack(now){
   else { FARV.t = 0; FARV.ema = PERF.vs; }
   FARV.lt = now;
 }
+// (the far view's fade on a touch screen: see the end of applyRenderRes; declared before anything can resize)
+const FADE = { tex: null, res: new THREE.Vector2(1, 1), t0: 0, MS: 320 };
 function applyRenderRes(z){
   let f = Math.max(1, z/ZOOM_REF);
   if (ZOOM_RES > 0) f = Math.min(f, ZOOM_RES);
@@ -1708,8 +1715,20 @@ function applyRenderRes(z){
   // while the zoom is still gliding, small steps wait: each step remakes every render target (the frame, the depth, the glow, the clouds), and a turn
   // of the wheel crossed a dozen of them in half a second. A big step goes at once (the picture mustn't blur), the rest when the zoom settles
   if (H && !FARV.far && typeof zoomT !== 'undefined' && Math.abs(zoomT - z) > .02*z && Math.abs(h - H) < H*.12) return;   // (zoomed out the sharp view steps in quarters as the view slows: those go through)
+  // Touch screens: when the far view sharpens (a step up, the view slowing or still), the frame at the old size is kept and fades out over the new
+  // one (FADE_MS), instead of the city popping sharp. Stepping down as a turn starts goes at once: the motion hides it, and a stale frame would smear.
+  if (typeof TOUCH !== 'undefined' && TOUCH.on && FARV.far && H && h > H && rtFinal && !GLOW_DIRECT && !FADE.tex){ FADE.tex = rtFinal; FADE.res.set(W, H); FADE.t0 = performance.now(); rtFinal = null; }
+  else if (FADE.tex && h < H) fadeEnd();
   H = h; W = w || Math.max(1, Math.round(h*DW/DH)); pxK = BASE_H/H;
   FOL_UNI.res.value.set(W, H); comp.uniforms.pxK.value = pxK;
   makeTargets();
+}
+function fadeEnd(){ if (FADE.tex){ FADE.tex.dispose(); FADE.tex = null; } upMat.uniforms.fade.value = 0; upMat.uniforms.tOld.value = null; }
+// (each frame, before the picture goes to the screen: how far the fade has come)
+function fadeFrame(){
+  if (!FADE.tex) return;
+  const u = (performance.now() - FADE.t0)/FADE.MS;
+  if (u >= 1){ fadeEnd(); return; }
+  upMat.uniforms.tOld.value = FADE.tex.texture; upMat.uniforms.oldRes.value.copy(FADE.res); upMat.uniforms.fade.value = (1 - u)*(1 - u);
 }
 addEventListener('resize', resize);

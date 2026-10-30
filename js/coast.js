@@ -2914,6 +2914,11 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   const PL = { kind: null, rot: 0, hit: null, ok: null, ptr: null, onto: null, seed: 1 + PIECES.length*7 + (PIECES.reduce((a, p) => a + (p.seed || 0), 0) % 997), zkinds: { zone: 'townhouse', czone: 'noodle', izone: 'field', lzone: 'mansion' }, zseed: 0, zoneFol: 'res' };   // (zkinds, zseed: single mode's building, per zone)
   PL.zseed = PL.seed + 500;   // (seed: the next home's look; V rolls another)
   const status = document.getElementById('placeStatus');
+  // a finger, not a mouse (html.touch, set in coast.html's head): the hint line then says tap, and leaves the keys out
+  const TOUCHC = () => document.documentElement.classList.contains('touch');
+  // the brush switch (touch only): on, one finger paints with Grass or Paths; off, it turns the view (touchSync: the dock follows)
+  const BRUSH = { on: false }; let touchSync = null;
+  const KW = t => TOUCHC() ? t.replace(/ \(V next\)/g, '').replace(/\bclick\b/g, 'tap') : t;
   // the home under the pointer, if any (its block)
   const _ray = new THREE.Raycaster(), _ndc = new THREE.Vector2();
   const _nm = new THREE.Matrix3();
@@ -3085,9 +3090,11 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     document.querySelectorAll('button[data-k]').forEach(b => b.classList.toggle('on', b.dataset.k === PL.kind));
     const tip = document.getElementById('ctrlTool'); if (tip) tip.innerHTML = controlsFor();
     const gb = document.querySelector('button[data-k=grass] b'); if (gb) gb.textContent = PL.zoneFol === 'lux' ? 'Blossom' : PL.zoneFol === 'com' ? 'Trees' : PL.zoneFol === 'ind' ? 'Planting' : 'Grass';
-    if (status) status.classList.toggle('idle', !PL.kind || PL.kind === 'del'); }
+    if (status) status.classList.toggle('idle', !PL.kind || PL.kind === 'del');
+    if (touchSync) touchSync(); }
   // what the keys and the mouse do with whatever is chosen (shown when Controls is hovered)
   function controlsFor(){
+    if (TOUCHC()) return controlsTouch();
     const row = (k, t) => '<div class="row"><kbd>' + k + '</kbd><span>' + t + '</span></div>';
     if (PL.kind === 'path') return '<h4>Paths</h4>' + row('drag', 'draw a path') + row('right drag', 'rub paths out') + row('V', 'next kind: ' + PSTY.join(', '));
     if (PL.kind === 'del') return '<h4>Clear an area</h4>' + row('drag', 'select an area') + row('click inside', 'clear it: buildings, walkways, grass') + row('click outside / Esc', 'let the selection go') + row('X', 'back to building');
@@ -3100,6 +3107,27 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     if (COM(PL.kind)) return '<h4>Commercial: ' + KINDS[PL.kind].name.toLowerCase() + '</h4>' + row('click', 'build it (on flat ground)') + row('V', 'another look') + row('R', 'turn (it starts facing you)') + row('right click', 'remove the building under it');
     if (PL.kind && KINDS[PL.kind]) return '<h4>Residential: one by one</h4>' + row('click', 'place (on a roof: stack; on a wall: build off it)') + row('V', 'another look') + row('R', 'turn') + row('right click', 'remove (and all above)') + row('Z', 'switch to the brush');
     return '<h4>Pick a zone or a tool</h4>' + row('right click', 'take away the walkway, home or grass under it') + row('1', 'residential') + row('2', 'commercial') + row('3', 'industrial') + row('4', 'luxury') + row('5', 'walkways') + row('6', 'grass') + row('7', 'paths') + row('X', 'clear an area');
+  }
+  // the same, for a finger: tap for click, press and hold for right click, and what the keys did as buttons to tap
+  // (each button sends its key, so it does just what the key does)
+  function controlsTouch(){
+    const row = (k, t) => '<div class="row"><kbd>' + k + '</kbd><span>' + t + '</span></div>';
+    const acts = (...bs) => '<div class="acts">' + bs.map(([k, t, sh]) => '<button type="button" data-key="' + k + '"' + (sh ? ' data-shift="1"' : '') + '>' + t + '</button>').join('') + '</div>';
+    const size = (n, m) => acts(['q', 'Bigger'], ['e', 'Smaller']).replace('</div>', '<span class="sz">size ' + (n + 1) + ' of ' + m + '</span></div>');
+    const br = BRUSH.on ? 'drag' : 'Brush on: drag', hold = BRUSH.on ? 'hold, then drag' : 'press and hold';
+    if (PL.kind === 'path') return '<h4>Paths</h4>' + row(br, 'draw a path') + row(hold, 'rub paths out') + (BRUSH.on ? '' : row('drag', 'turn the view')) + acts(['v', 'Next kind: ' + PSTY[PTH.style]]);
+    if (PL.kind === 'del') return '<h4>Clear an area</h4>' + row('drag', 'select an area') + row('tap inside', 'clear it: buildings, walkways, grass') + row('tap outside', 'let the selection go') + row('press and hold', 'let it go too');
+    if (PL.kind === 'grass'){ const lux = PL.zoneFol === 'lux', ind = PL.zoneFol === 'ind', com = PL.zoneFol === 'com';
+      const h = lux ? 'Cherry trees (luxury)' : ind ? 'Planting (industrial)' : com ? 'Trees (commercial)' : 'Grass', v = lux || ind || com ? 'plant' : 'paint';
+      const clr = lux ? 'clear them (the grass stays)' : ind ? 'clear it (the grass stays)' : com ? 'clear the trees (the grass stays)' : 'clear';
+      return '<h4>' + h + '</h4>' + row('tap', v) + row(br, v) + row(hold, clr) + (BRUSH.on ? '' : row('drag', 'turn the view')) + size(GR.size, GRS.length)
+        + (lux || ind || com ? '<div class="row"><span>pick Residential first for grass, which grows under ' + (com || lux ? 'the trees' : 'it') + '</span></div>' : acts(['v', 'Next kind: ' + GSTYLES[GR.style]])); }
+    if (PL.kind === 'connect') return '<h4>Walkways</h4>' + row('tap, tap', 'pick two buildings to join') + row('press and hold', 'take away the walkway there (or let go of the first pick)') + acts(['v', 'Next kind: ' + LINK_TYPES[CN.type]]);
+    if (isZone(PL.kind)){ const u = ZUNIT(); return '<h4>' + (PL.kind === 'czone' ? 'Commercial' : PL.kind === 'izone' ? 'Industrial' : PL.kind === 'lzone' ? 'Luxury' : 'Residential') + ': brush</h4>' + row('tap', 'build the ' + u + 's in the brush') + row('press and hold', ZONE.size ? 'clear the brush' : 'remove the ' + u + ' under it')
+      + size(ZONE.size, ZSIZE.length) + '<div class="row"><span>smallest: one ' + u + '</span></div>' + acts(ZONE.size ? ['v', 'Another layout'] : ['v', 'Next kind'], ...(ZONE.size ? [] : [['v', 'New look', 1]]), ['r', 'Turn it']); }
+    if (COM(PL.kind)) return '<h4>Commercial: ' + KINDS[PL.kind].name.toLowerCase() + '</h4>' + row('tap', 'build it (on flat ground)') + row('press and hold', 'remove the building under it') + acts(['v', 'Another look'], ['r', 'Turn it']);
+    if (PL.kind && KINDS[PL.kind]) return '<h4>Residential: one by one</h4>' + row('tap', 'place (on a roof: stack; on a wall: build off it)') + row('press and hold', 'remove (and all above)') + acts(['v', 'Another look'], ['r', 'Turn it']);
+    return '<h4>Pick a zone or a tool</h4>' + row('press and hold', 'take away the walkway, home or grass under it');
   }
   document.getElementById('zoneRes') && document.getElementById('zoneRes').addEventListener('click', () => setKind(resActive() ? PL.kind : 'zone'));   // (always the brush: Q/E size it, smallest is one home)
   document.getElementById('zoneCom') && document.getElementById('zoneCom').addEventListener('click', () => setKind(comActive() ? PL.kind : 'czone'));
@@ -3282,8 +3310,8 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     if (key === PTH.hk) return; PTH.hk = key; dropMesh(PTH.hov); PTH.hov = null; if (!h) return;
     const c = Math.cos(yaw), s_ = Math.sin(yaw), L = 1.4; PTH.hov = pathMesh([{ s: PTH.style, p: [[h.x - c*L, h.z + s_*L], [h.x, h.z], [h.x + c*L, h.z - s_*L]] }], [], true); }
   function showPath(){ ghost.visible = false; zHide(); connGhost.visible = false; const h = PL.ptr ? pick(PL.ptr.x, PL.ptr.y) : null;
-    if (!h || h.sea || (act && act.kind === 'path')){ pathHover(null); ring.visible = false; if (status) status.textContent = h && h.sea ? 'not on the sea' : ''; return; }
-    pathHover(h); ring.visible = false; if (status){ status.textContent = 'path: ' + PSTY[PTH.style] + ' (V next)'; status.style.color = '#33413a'; } }
+    if (!h || h.sea || (act && act.kind === 'path')){ pathHover(null); ring.visible = false; if (status) status.textContent = h && h.sea ? 'not on the sea' : TOUCHC() && !BRUSH.on && !act ? 'path: ' + PSTY[PTH.style] + ' · Brush on to draw' : ''; return; }
+    pathHover(h); ring.visible = false; if (status){ status.textContent = KW('path: ' + PSTY[PTH.style] + ' (V next)'); status.style.color = '#33413a'; } }
   /* ---------- clearing an area (X), as in the sky city: drag to select, click inside to clear, outside to let go ---------- */
   // The selection is a rectangle squared to the view as it was when the drag began (its sides along the screen's right and
   // up, laid on the ground); everything whose middle is inside goes: homes and shops with all built on or off them, the
@@ -3335,7 +3363,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   function showConnect(){
     ghost.visible = false; zHide();
     const hov = PL.ptr ? pieceHit(PL.ptr.x, PL.ptr.y) : null, P = hov ? hov.piece : null, tn = LINK_TYPES[CN.type];
-    const say = (t, ok) => { if (status){ status.textContent = 'walkways: ' + tn + ' (V next) ' + t; status.style.color = ok ? '#5c7060' : '#c0623f'; } };
+    const say = (t, ok) => { if (status){ status.textContent = KW('walkways: ' + tn + ' (V next) ' + t); status.style.color = ok ? '#5c7060' : '#c0623f'; } };
     if (!CN.a){ connGhost.visible = false; outline.visible = false; CN.ok = false;
       const lk = PL.ptr ? linkAt(PL.ptr.x, PL.ptr.y) : null;
       if (lk){ ring.visible = false; hlLink(lk, hlDel); say('', false); return; }   // (the outline says it; no words)
@@ -3417,7 +3445,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     const lux = PL.zoneFol === 'lux', com = PL.zoneFol === 'com' || lux, ind = PL.zoneFol === 'ind', nm = lux ? 'cherry trees' : com ? 'trees, mixed' : ind ? 'sunflowers, grain and wildflowers' : 'grass: ' + GSTYLES[GR.style];
     if (!hit || hit.sea){ ring.visible = false; if (status) status.textContent = nm + (hit ? ' · not on the sea' : ''); return; }
     ringAt(hit.x, hit.z, GRS[GR.size], null, .12); ringM.color.set(lux ? 0xf4b0c6 : com ? 0x9fd8e0 : ind ? 0xf0d080 : 0xb8e08a);
-    if (status){ status.textContent = nm + (com || ind ? '' : ' (V next)') + ' · brush ' + (GR.size + 1); status.style.color = '#33413a'; } }
+    if (status){ status.textContent = KW(nm + (com || ind ? '' : ' (V next)') + ' · brush ' + (GR.size + 1)); status.style.color = '#33413a'; } }
   function grassStroke(cx, cy, erase, force){
     const h = pick(cx, cy); if (!h || h.sea) return; const r = GRS[GR.size];
     if (!force && GR.last && Math.hypot(h.x - GR.last[0], h.z - GR.last[1]) < r*.35) return;
@@ -3429,16 +3457,52 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   const ptrs = new Map(); let act = null, pinch0 = 0, zoom0 = 0, pinchX = 0;
   const pdist = () => { const [a, b] = [...ptrs.values()]; return Math.hypot(a.x - b.x, a.y - b.y) || 1; };
   const pmidX = () => { const [a, b] = [...ptrs.values()]; return (a.x + b.x)/2; };
+  // (two fingers on a touch screen, as in the sky city: they pinch to zoom, twist to turn, and moved together they pan; a phone has no WASD)
+  const pang2 = () => { const [a, b] = [...ptrs.values()]; return Math.atan2(b.y - a.y, b.x - a.x); };
+  const pmid2 = () => { const [a, b] = [...ptrs.values()]; return { x: (a.x + b.x)/2, y: (a.y + b.y)/2 }; };
+  function fingerPan(dx, dy){
+    const k = 2*zoom/(canvas.clientHeight || 1), sy = Math.sin(yaw), cy = Math.cos(yaw), f = dy*k/Math.max(.3, Math.sin(pitch)), r = -dx*k;
+    camGoal.x += cy*r - sy*f; camGoal.z += -sy*r - cy*f; camT.copy(camGoal);
+  }
   canvas.addEventListener('contextmenu', e => e.preventDefault());
   canvas.addEventListener('pointerdown', e => {
     canvas.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (ptrs.size === 2){ act = { kind: 'pinch' }; pinch0 = pdist(); zoom0 = zoomT; pinchX = pmidX(); return; }
+    if (ptrs.size === 2){ lpCancel(); if (act && act.kind === 'path' && act.fin){ PTH.cur = null; liveStroke(); }   // (a second finger: the path being drawn is dropped, the view zooms)
+      act = { kind: 'pinch', touch: e.pointerType === 'touch', ang: pang2(), mid: pmid2() }; pinch0 = pdist(); zoom0 = zoomT; pinchX = pmidX(); return; }
     act = { kind: 'turn', b: e.button, x: e.clientX, y: e.clientY, moved: false };
+    // a finger with the brush on: a drag paints (or draws a path), a press and hold then a drag clears; never the view
+    if (e.pointerType === 'touch' && BRUSH.on && (PL.kind === 'grass' || PL.kind === 'path') && TOUCHC()){ act = { kind: 'brush0', x: e.clientX, y: e.clientY }; lpStart(e.clientX, e.clientY); return; }
     if (PL.kind === 'path' && (e.button === 0 || e.button === 2) && !e.altKey && e.pointerType !== 'touch'){ act = { kind: 'path', erase: e.button === 2 }; pathStroke(e.clientX, e.clientY, act.erase, true); return; }
     if (PL.kind === 'del' && e.button === 0 && !e.altKey){ act = { kind: 'del', x: e.clientX, y: e.clientY, moved: false, from: pick(e.clientX, e.clientY) }; return; }   // (clear mode: a drag selects)
     // the grass brush paints (left) or clears (right) as it's dragged; Alt+drag or the middle button still turns the view
     if (PL.kind === 'grass' && (e.button === 0 || e.button === 2) && !e.altKey && e.pointerType !== 'touch'){ act = { kind: 'paint', erase: e.button === 2 }; GR.last = null; grassStroke(e.clientX, e.clientY, act.erase, true); }
+    // a finger held still: the ring fills, and what a right click would take goes
+    if (e.pointerType === 'touch' && TOUCHC() && (act.kind === 'turn' || act.kind === 'del')) lpStart(e.clientX, e.clientY);
   });
+  /* ---------- press and hold (touch): a finger kept still for LP_MS, a ring filling round it, is the right click ---------- */
+  const LP_MS = 550, LP_SLOP = 10;
+  let lp = null;
+  function lpStart(x, y){ lpCancel();
+    const el = document.createElement('div'); el.className = 'lpring'; el.style.left = x + 'px'; el.style.top = y + 'px'; el.style.setProperty('--lp', LP_MS + 'ms');
+    el.innerHTML = '<svg viewBox="0 0 76 76"><circle class="bg" cx="38" cy="38" r="34"/><circle class="fg" cx="38" cy="38" r="34"/></svg>';
+    el.firstChild.lastChild.style.strokeDasharray = el.firstChild.lastChild.style.strokeDashoffset = String(2*PI*34);
+    document.body.appendChild(el); lp = { x, y, el, t: setTimeout(lpFire, LP_MS) }; }
+  function lpCancel(){ if (!lp) return; clearTimeout(lp.t); lp.el.remove(); lp = null; }
+  function lpFire(){ if (!lp) return; const { x, y, el } = lp; lp = null; el.classList.add('done'); setTimeout(() => el.remove(), 260);
+    try { if (navigator.vibrate) navigator.vibrate(12); } catch (e) {}
+    if (act && act.kind === 'brush0'){ startBrush(x, y, true); return; }   // (the brush on: hold, then drag to clear)
+    act = { kind: 'held' }; holdRemove(x, y); }
+  // a brush stroke begun by a finger, at (x, y): painting, or clearing
+  function startBrush(x, y, erase){ act = { kind: PL.kind === 'path' ? 'path' : 'paint', erase, fin: true };
+    if (act.kind === 'path') pathStroke(x, y, erase, true); else { GR.last = null; grassStroke(x, y, erase, true); } }
+  // what a right click does with each tool, for a press and hold (grass and paths, with the brush off: clear the spot)
+  function holdRemove(cx, cy){
+    if (PL.kind === 'del'){ DSEL = null; return; }
+    if (PL.kind === 'connect'){ unConnect(cx, cy); return; }
+    if (!PL.kind){ removeAt(cx, cy); return; }
+    if (PL.kind === 'grass'){ GR.last = null; grassStroke(cx, cy, true, true); return; }
+    if (PL.kind === 'path'){ pathStroke(cx, cy, true, true); return; }
+    if (isZone(PL.kind) && !oneHome()){ const h = pick(cx, cy); if (h) clearZone(h.x, h.z); } else { const p = pieceAt(cx, cy); if (p) removePiece(p); } }
   // the pointer stirring the water (the lagoon garden's pool, the grotto's): a ring wave from where it passed (glowing by
   // night), the last 8 spots kept (uRip: x, z, time), a new one each time it has moved a little over the water
   const RIP = { i: 0, x: 1e9, z: 1e9, t: 0 };
@@ -3453,17 +3517,25 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     PL.ptr = { x: e.clientX, y: e.clientY };
     stirWater(e.clientX, e.clientY);
     const p = ptrs.get(e.pointerId); if (!p || !act) return;
+    if (lp && Math.hypot(e.clientX - lp.x, e.clientY - lp.y) > LP_SLOP) lpCancel();
+    if (act.kind === 'held') return;
+    if (act.kind === 'brush0'){ if (Math.hypot(e.clientX - act.x, e.clientY - act.y) <= LP_SLOP) return; startBrush(act.x, act.y, false); }   // (moved: it's a stroke, from where the finger came down)
     if (act.kind === 'paint'){ ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); grassStroke(e.clientX, e.clientY, act.erase, false); return; }
     const dx = e.clientX - p.x, dy = e.clientY - p.y; ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (act.kind === 'path'){ pathStroke(e.clientX, e.clientY, act.erase, false); return; }
-    if (act.kind === 'del'){ if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 5) act.moved = true; const to = pick(e.clientX, e.clientY);
+    const slop = e.pointerType === 'touch' ? LP_SLOP : 5;   // (a finger wobbles more than a mouse)
+    if (act.kind === 'del'){ if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > slop) act.moved = true; const to = pick(e.clientX, e.clientY);
       if (act.moved && act.from && to) DSEL = delRect(act.from, to); return; }
-    if (act.kind === 'pinch'){ if (ptrs.size === 2){ zoomT = clamp(zoom0*pinch0/pdist(), ZMIN, ZMAX); const mx = pmidX(); yawT -= (mx - pinchX)*.008; pinchX = mx; } return; }
-    if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 5) act.moved = true;
+    if (act.kind === 'pinch'){ if (ptrs.size === 2){ zoomT = clamp(zoom0*pinch0/pdist(), ZMIN, ZMAX);
+      if (act.touch){ const a = pang2(), m = pmid2(); let da = a - act.ang; if (da > Math.PI) da -= 2*Math.PI; if (da < -Math.PI) da += 2*Math.PI; yawT += da; act.ang = a; fingerPan(m.x - act.mid.x, m.y - act.mid.y); act.mid = m; }
+      else { const mx = pmidX(); yawT -= (mx - pinchX)*.008; pinchX = mx; } } return; }
+    if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > slop) act.moved = true;
     if (act.moved){ yawT -= dx*.008; if (tiltMode) pitchT = clamp(pitchT + dy*.006, PITCH_MIN, PITCH_MAX); canvas.style.cursor = 'grabbing'; }
   });
   canvas.addEventListener('pointerleave', () => { PL.ptr = null; hlClear(); });
   const endPtr = e => {
+    lpCancel();
+    if (act && act.kind === 'brush0' && ptrs.has(e.pointerId)){ if (PL.kind === 'grass') grassStroke(act.x, act.y, false, true); }   // (a tap with the brush on: one dab)
     if (act && act.kind === 'path' && ptrs.has(e.pointerId)) endPathStroke();
     if (act && act.kind === 'del' && !act.moved && ptrs.has(e.pointerId)){ const h = pick(e.clientX, e.clientY); if (DSEL && h && inDel(DSEL, h.x, h.z)) clearArea(DSEL); DSEL = null; }   // (a click: inside the selection clears it, anywhere else lets it go)
     if (act && act.kind === 'turn' && !act.moved && ptrs.has(e.pointerId) && PL.kind === 'del' && act.b === 2){ DSEL = null; }
@@ -3471,6 +3543,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       if ((act.b === 0 || e.pointerType === 'touch') && PL.kind){ PL.ptr = { x: e.clientX, y: e.clientY };
         if (PL.kind === 'connect'){ showConnect(); placeConnect(); }
         else if (PL.kind === 'grass') grassStroke(e.clientX, e.clientY, false, true);
+        else if (PL.kind === 'path' && e.pointerType === 'touch'){}   // (a tap draws no path: it needs a drag, with the brush on; the hint says so)
         else if (isZone(PL.kind) && !oneHome()){ showZoneGhost(); placeZone(); } else { showGhost(); placeHere(); } }
       else if (act.b === 2 && PL.kind === 'connect') unConnect(e.clientX, e.clientY);
       else if (act.b === 2 && !PL.kind) removeAt(e.clientX, e.clientY);   // (no tool: take away what's under the pointer)
@@ -3534,6 +3607,88 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   document.getElementById('rotL') && document.getElementById('rotL').addEventListener('click', () => { yawT -= PI/4; });
   document.getElementById('rotR') && document.getElementById('rotR').addEventListener('click', () => { yawT += PI/4; });
 
+  /* ---------- on a touch screen (html.touch): the sky city's touch work, in the coast's own hand ---------- */
+  // - the dock: a small row (turn left, Controls "?", the brush switch, turn right) over the zones, the tools under them.
+  //   Upright, one zone at a time: swipe it sideways or tap an arrow. An arrow only browses, unless a zone is already
+  //   picked (then the next one is picked instead); a swipe picks. Sideways, all four, and the small row beside the tools.
+  // - Controls opens on a tap and says tap and press and hold; what the keys did are buttons there (bigger, smaller,
+  //   next kind, turn it, back home), since a phone has no keys
+  // - the time folds into its readout; a tap on it opens the slider and the times to jump to
+  // - the washes are painted once (see coast.html), unless ?wash=live
+  // (press and hold, and the brush, are in the pointer handlers above.) A mouse and keyboard see none of it.
+  {
+    const root = document.documentElement, mqC = matchMedia('(pointer: coarse)'), mqP = matchMedia('(orientation: portrait)');
+    const $ = id => document.getElementById(id);
+    const bar = document.querySelector('.zonebar'), zones = bar && bar.querySelector('.zones'), ctl = bar && bar.querySelector('.ctlwrap');
+    const ctlH = ctl && ctl.querySelector('.ctlhover'), panel = ctl && ctl.querySelector('.ctlpanel'), view = panel && panel.querySelector('.view');
+    const rotL = $('rotL'), rotR = $('rotR'), brand = document.querySelector('.brand'), ro = $('readout');
+    const cards = ['zoneRes', 'zoneCom', 'zoneInd', 'zoneLux'].map($).filter(Boolean);
+    const LIVE = /[?&]wash=live\b/.test(location.search);
+    if (bar && zones && ctl && ctlH && panel && view && rotL && rotR && cards.length){
+      const viewMouse = view.innerHTML, ctlText = ctlH.textContent;
+      const mk = (tag, cls, html) => { const el = document.createElement(tag); el.className = cls; if (html) el.innerHTML = html; if (tag === 'button') el.type = 'button'; return el; };
+      const trow = mk('div', 'trow');
+      const bchip = mk('button', 'bchip wash', '<b>Brush off</b><small>drag turns</small>'); bchip.id = 'brushT'; bchip.hidden = true; bchip.setAttribute('aria-pressed', 'false');
+      const bB = bchip.querySelector('b'), bS = bchip.querySelector('small');
+      const prev = mk('button', 'zarr wash', '‹'), next = mk('button', 'zarr wash', '›'); prev.setAttribute('aria-label', 'Previous zone'); next.setAttribute('aria-label', 'Next zone');
+      const close = mk('button', 'ctlclose', '✕'); close.setAttribute('aria-label', 'Close controls');
+      const tview = '<h4>The view</h4><div class="row"><kbd>drag</kbd><span>turn (with the brush off)</span></div><div class="row"><kbd>two fingers</kbd><span>pinch to zoom, twist to turn, move together to pan</span></div>'
+        + '<div class="row"><kbd>⟲ ⟳</kbd><span>turn an eighth</span></div><div class="acts"><button type="button" data-key="h">Back home</button></div>';
+      let on = false, zc = 0;
+      // the washes: each panel's ground and ink line moved into a layer of its own (.wl), drawn once; back to ::before / ::after off touch
+      const wrapAll = () => { if (LIVE) return; for (const w of document.querySelectorAll('.wash')){ if (w.querySelector(':scope > .wl')) continue;
+        const l = mk('i', 'wl', '<i class="wf"></i><i class="wb"></i>'); l.setAttribute('aria-hidden', 'true'); w.prepend(l); w.classList.add('wr'); } };
+      const unwrapAll = () => { for (const l of document.querySelectorAll('.wash > .wl')) l.remove(); for (const w of document.querySelectorAll('.wash.wr')) w.classList.remove('wr'); };
+      const zShow = () => cards.forEach((c, k) => c.classList.toggle('tcur', k === zc));
+      const zStep = (n, pickIt) => { zc = (zc + n + cards.length) % cards.length; zShow();
+        const c = cards[zc]; if ((pickIt || cards.some(x => x.classList.contains('on'))) && !c.classList.contains('on')) c.click(); };
+      const brushUI = () => { bchip.hidden = !(on && (PL.kind === 'grass' || PL.kind === 'path'));
+        bchip.classList.toggle('on', BRUSH.on); bchip.setAttribute('aria-pressed', String(BRUSH.on));
+        bB.textContent = BRUSH.on ? 'Brush on' : 'Brush off'; bS.textContent = BRUSH.on ? 'drag paints' : 'drag turns'; };
+      const tipNow = () => { const tip = $('ctrlTool'); if (tip) tip.innerHTML = controlsFor(); };
+      touchSync = () => { if (!on) return; const k = cards.findIndex(c => c.classList.contains('on')); if (k >= 0) zc = k; zShow(); brushUI(); };
+      const marks = () => { const c = mqC.matches, p = mqP.matches; root.classList.toggle('touch', c); root.classList.toggle('tport', c && p); root.classList.toggle('tland', c && !p); };
+      const apply = () => {
+        marks(); const want = TOUCHC(); if (want === on) { if (on) zShow(); return; }
+        on = want; unwrapAll();
+        if (on){
+          trow.append(rotL, ctl, bchip, rotR); bar.insertBefore(trow, zones);
+          cards[0].before(prev); cards[cards.length - 1].after(next);
+          ctlH.textContent = '?'; ctlH.setAttribute('role', 'button'); ctlH.setAttribute('aria-label', 'Controls'); panel.prepend(close); view.innerHTML = tview;
+          if (ro){ ro.setAttribute('role', 'button'); ro.setAttribute('aria-expanded', 'false'); ro.tabIndex = 0; }
+          wrapAll();
+        } else {
+          zones.prepend(rotL); zones.append(rotR); bar.insertBefore(ctl, zones); bchip.remove(); trow.remove(); prev.remove(); next.remove();
+          ctlH.textContent = ctlText; ctlH.removeAttribute('role'); ctlH.removeAttribute('aria-label'); close.remove(); view.innerHTML = viewMouse; ctl.classList.remove('open');
+          if (ro){ ro.removeAttribute('role'); ro.removeAttribute('aria-expanded'); ro.removeAttribute('tabindex'); }
+          if (brand) brand.classList.remove('topen'); BRUSH.on = false;
+          for (const c of cards) c.classList.remove('tcur');
+        }
+        refreshUI();
+      };
+      // Controls: a tap opens it, the ✕ or a tap on the city closes it; its buttons send the keys they stand for
+      ctlH.addEventListener('click', () => { if (on) ctl.classList.toggle('open'); });
+      close.addEventListener('click', e => { e.stopPropagation(); ctl.classList.remove('open'); });
+      panel.addEventListener('click', e => { const b = e.target.closest('.acts button[data-key]'); if (!b || !on) return; e.stopPropagation();
+        dispatchEvent(new KeyboardEvent('keydown', { key: b.dataset.key, shiftKey: !!b.dataset.shift, bubbles: true })); tipNow(); });
+      // the time: its readout opens and closes the slider and chips
+      const openTime = o => { if (!brand) return; brand.classList.toggle('topen', o); if (ro) ro.setAttribute('aria-expanded', String(o)); };
+      if (ro) ro.addEventListener('click', () => { if (on) openTime(!brand.classList.contains('topen')); });
+      canvas.addEventListener('pointerdown', () => { if (!on) return; ctl.classList.remove('open'); openTime(false); });
+      bchip.addEventListener('click', () => { BRUSH.on = !BRUSH.on; brushUI(); tipNow(); });
+      prev.addEventListener('click', () => zStep(-1, false)); next.addEventListener('click', () => zStep(1, false));
+      // the swipe: a sideways flick on the zone card picks the next one (its own tap doesn't then toggle it)
+      let sw = null, eat = false;
+      zones.addEventListener('pointerdown', e => { if (!on || !root.classList.contains('tport') || e.pointerType === 'mouse' || !e.target.closest('.card')) return; sw = { x: e.clientX, y: e.clientY }; });
+      zones.addEventListener('pointerup', e => { if (!sw) return; const dx = e.clientX - sw.x, dy = e.clientY - sw.y; sw = null;
+        if (Math.abs(dx) > 28 && Math.abs(dx) > Math.abs(dy)*1.3){ zStep(dx < 0 ? 1 : -1, true); eat = true; setTimeout(() => { eat = false; }, 350); } });   // (eaten after the step, so the step's own click on the card goes through)
+      zones.addEventListener('pointercancel', () => { sw = null; });
+      zones.addEventListener('click', e => { if (eat && e.target.closest('.card')){ e.stopPropagation(); e.preventDefault(); eat = false; } }, true);
+      apply();
+      if (mqC.addEventListener){ mqC.addEventListener('change', apply); mqP.addEventListener('change', apply); }
+    }
+  }
+
   /* ---------- every frame ---------- */
   // the reflection pass: everything above the water, flipped upside down about it and drawn flat in its own colors (no
   // lights, no shadows) into a target the size of the view, where the sea reads it at its own pixel, through the ripples
@@ -3587,7 +3742,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     const dt = Math.min(.1, (now - last)/1000); last = now; fNo++; let q = PROF.on ? performance.now() : 0;
     updateCamera(dt); q = tk('camera', q); stream(3); q = tk('stream', q);
     { const vk = camT.x.toFixed(3) + ',' + camT.z.toFixed(3) + ',' + yaw.toFixed(4) + ',' + zoom.toFixed(3) + ',' + pitch.toFixed(4);
-      const gk = [PL.kind || '-', PL.ptr ? PL.ptr.x + ',' + PL.ptr.y : '-', PIECES.length, linksDirty, ZONE.size, PL.seed, PL.zseed, PL.zkinds.zone, PL.zkinds.czone, PL.zkinds.izone, PL.zkinds.lzone, PL.rot, DSEL ? DSEL.key : '-', PTH.style, GR.size, GR.style, GR.pstyle, GR.istyle, PL.zoneFol, CN.type, CN.a ? CN.a.id : 0, ULINKS.length].join('|');
+      const gk = [PL.kind || '-', PL.ptr ? PL.ptr.x + ',' + PL.ptr.y : '-', PIECES.length, linksDirty, ZONE.size, PL.seed, PL.zseed, PL.zkinds.zone, PL.zkinds.czone, PL.zkinds.izone, PL.zkinds.lzone, PL.rot, DSEL ? DSEL.key : '-', PTH.style, GR.size, GR.style, GR.pstyle, GR.istyle, PL.zoneFol, CN.type, CN.a ? CN.a.id : 0, ULINKS.length, BRUSH.on].join('|');
       if (gk !== ghostKey || (vk !== ghostVK && fNo % 3 === 0) || (vk !== ghostVK && vk === lastVK)){ ghostKey = gk; ghostVK = vk;   // (the view moving alone: every third frame, and once more when it settles)   // (the ghost is worked out again only when something it shows has changed: the raycasts and checks are the costly part)
         hlClear(); if (PL.kind !== 'path') pathHover(null);
         if (PL.kind === 'connect') showConnect(); else if (PL.kind === 'path') showPath(); else if (PL.kind === 'del') showDel(); else if (PL.kind === 'grass') showGrass(); else if (isZone(PL.kind) && !oneHome()) showZoneGhost(); else if (PL.kind) showGhost(); else showRemoveHover(); } lastVK = vk; }

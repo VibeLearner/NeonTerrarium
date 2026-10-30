@@ -1307,4 +1307,6 @@ STORY.load();
   if (lab){ lab.removeAttribute('title'); lab.setAttribute('aria-describedby', 'engTip');
     const show = () => { tip.hidden = false; const r = lab.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
       const x = Math.max(8, Math.min(innerWidth - w - 8, r.left)), below = r.bottom + 8 + h < innerHeight; tip.style.left = x + 'px'; tip.style.top = (below ? r.bottom + 8 : r.top - h - 8) + 'px'; };
-    lab.addEventListener('pointerenter', show); lab.addEventListener('pointerleave', () => { tip.hidden = true; }); box.addEventListener('focus', show); box.addEventListener('blur', () => { tip.hidden = true; }); } } }
+    // (a touch screen has no hover: the explanation is on the row's "i" instead, touchui.js)
+    if (typeof TOUCH !== 'undefined' && TOUCH.on) lab.dataset.explain = 'On: time runs on its own and days pass. Off: stories, cases, crime and learning about residents pause; the day stays put, and you can set any time.';
+    else { lab.addEventListener('pointerenter', show); lab.addEventListener('pointerleave', () => { tip.hidden = true; }); box.addEventListener('focus', show); box.addEventListener('blur', () => { tip.hidden = true; }); } } } }

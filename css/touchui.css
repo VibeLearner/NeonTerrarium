@@ -146,6 +146,8 @@ html.pui.touch .pu-group .togs,html.pui.touch .pu-group .togs.pu-cols{grid-templ
 html.touch .title,html.touch .title *{touch-action:none}
 html.touch .title .t-panel,html.touch .title .t-panel *{touch-action:pan-y}
 
-/* text the interface cuts short slides along to show the rest (touchui.js adds .tmq where it doesn't fit) */
-html.touch .tmq{text-overflow:clip!important;animation:tmq var(--mqt,8s) linear infinite}
-@keyframes tmq{0%,18%{text-indent:0}50%,68%{text-indent:var(--mq,0)}100%{text-indent:0}}
+/* text the interface cuts short slides along to show the rest (touchui.js puts the words in .tmq-in where they don't fit; moved by transform only) */
+html.touch .tmq{text-overflow:clip!important}
+html.touch .tmq-in{display:inline-block;white-space:nowrap;will-change:transform}
+html.touch .tmq > .tmq-in{animation:tmq var(--mqt,8s) linear infinite}
+@keyframes tmq{0%,18%{transform:translateX(0)}50%,68%{transform:translateX(var(--mq,0))}100%{transform:translateX(0)}}

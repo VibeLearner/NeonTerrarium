@@ -41,6 +41,16 @@ def load_report(R):
     L += [f"| {lab} | {M[k]/1000:.1f} |" for k, lab in LOAD_LABELS if M.get(k) is not None]
     L += ['', f"Downloaded {F.get('n')} files, {F.get('kb', 0)/1024:.1f} MB over the network ({F.get('fromPhone')} from the phone's saved copy). Page itself after {F.get('htmlMs')} ms.", '',
           '| biggest downloads | KB | ms |', '|---|---|---|'] + [f"| {b['u']} | {b['kb']} | {b['ms']} |" for b in F.get('big', [])]
+    S = R.get('smooth')
+    if S:
+        L += ['', '## Smoothness after loading', '', f"{S.get('frames')} frames from the loading screen opening to 30 s after Continue; {S.get('over50')} slower than 50 ms, "
+              f"{S.get('over100')} slower than 100 ms, worst {S.get('worst')} ms. Continue tapped at {(M.get('played') or 0)/1000:.1f} s.", '',
+              '| at s | ms | title | loading | cool-down | merges | staged | people pending | Scan page | Scan warm | cache | scrolling |', '|---|---|---|---|---|---|---|---|---|---|---|---|']
+        L += [f"| {x['t']/1000:.1f} | {x['ms']} | {x['title']} | {x['loading']} | {x['cool']} | {x['merging']} | {x['stageQ']} | {x['people']} | {x['scan']} | {x['scanWarm']} | {x['cache']} | {x['scrolling']} |" for x in S.get('long', [])]
+        sc = sorted((S.get('scripts') or {}).items(), key=lambda kv: -kv[1]['ms'])[:15]
+        if sc:
+            L += ['', '| script in slow frames | times | total ms | longest ms |', '|---|---|---|---|'] + [f"| {k} | {v['n']} | {v['ms']} | {v['max']} |" for k, v in sc]
+        L += ['', 'Frames per second, by second: ' + ' '.join(f"{t}:{n}" + (f"({w})" if w > 50 else '') for t, n, w in S.get('perSec', []))]
     return '\n'.join(L) + '\n'
 
 

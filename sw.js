@@ -1,5 +1,6 @@
-// Neon Terrarium: the phone's own copy of the game's files (a service worker). Phones and tablets only: touch.js registers it, a computer never does.
-// After the first visit the game's scripts and pictures come from the phone itself, so a returning player isn't waiting on the network.
+// Neon Terrarium: the browser's own copy of the game's files (a service worker), registered by touch.js for every player (phones first, computers too
+// since Oct 30), not on ?full or ?bench. After the first visit the game's scripts and pictures come from the device itself, so a returning player
+// isn't waiting on the network.
 //  - files with a version in their address (?v=...) never change, so the saved copy is used straight away.
 //    When a file's version moves on, the old copy is dropped as the new one is saved.
 //  - the pages themselves (m.html, index.html) are asked for fresh each time, so an update shows on the next visit; the saved copy is only for

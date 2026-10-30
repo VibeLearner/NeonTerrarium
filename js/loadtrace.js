@@ -6,7 +6,7 @@
 // benchmark's results (the same save server and user, tools/bench/collect.py copies them into the repo).
 'use strict';
 (() => {
-  if (typeof TOUCH === 'undefined' || !TOUCH.on) return;
+  if ((typeof TOUCH === 'undefined' || !TOUCH.on) && !/[?&]loadtest\b/.test(location.search)) return;   // (a computer: only with ?loadtest)
   const SERVER = 'https://neon-terrarium-saves.ashley-jacob165.workers.dev', USER = 'ntbench-results', KEY = 'touch:nt.loadtrace';
   const TEST = /[?&]loadtest\b/.test(location.search);
   const now = () => Math.round(performance.now());

@@ -10,7 +10,9 @@
   // A device whose main pointer is a finger gets html.touch (and tport upright, tland sideways), before anything is drawn,
   // as js/touch.js does for the sky city. A mouse and keyboard see none of it. (coast.js keeps it up to date.)
   (() => { const h = document.documentElement, c = matchMedia('(pointer: coarse)').matches, p = matchMedia('(orientation: portrait)').matches;
-    h.classList.toggle('touch', c); h.classList.toggle('tport', c && p); h.classList.toggle('tland', c && !p); })();
+    h.classList.toggle('touch', c); h.classList.toggle('tport', c && p); h.classList.toggle('tland', c && !p);
+    // (the player's own Interface choices from the game's Settings: Clean signal and reduce motion, opt-in, never the device setting)
+    if (c) try { if (localStorage.getItem('touch:nt.clean') === '1') h.classList.add('nt-clean'); if (localStorage.getItem('touch:nt.calm') === '1') h.classList.add('nt-calm'); } catch (e) {} })();
 </script>
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Patrick+Hand&family=JetBrains+Mono:wght@600&display=swap" rel="stylesheet">
 <style>
@@ -259,7 +261,7 @@
 <div id="tiltChip" class="chip wash" hidden>Tilt: drag up and down, Space to go back</div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <button id="exitg" class="exitg" type="button" aria-label="Exit to the sky city"><span data-t="EXIT">EXIT</span><i></i></button>
-<script src="js/coast.js?v=2026-10-30t"></script>
+<script src="js/coast.js?v=2026-10-30c2"></script>
 <script src="js/coastmusic.js?v=2026-10-30t"></script>
 <script>
   // back up to the sky city: the television switches off, and the city comes on

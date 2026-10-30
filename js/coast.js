@@ -3457,11 +3457,18 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   const ptrs = new Map(); let act = null, pinch0 = 0, zoom0 = 0, pinchX = 0;
   const pdist = () => { const [a, b] = [...ptrs.values()]; return Math.hypot(a.x - b.x, a.y - b.y) || 1; };
   const pmidX = () => { const [a, b] = [...ptrs.values()]; return (a.x + b.x)/2; };
+  // (two fingers on a touch screen, as in the sky city: they pinch to zoom, twist to turn, and moved together they pan; a phone has no WASD)
+  const pang2 = () => { const [a, b] = [...ptrs.values()]; return Math.atan2(b.y - a.y, b.x - a.x); };
+  const pmid2 = () => { const [a, b] = [...ptrs.values()]; return { x: (a.x + b.x)/2, y: (a.y + b.y)/2 }; };
+  function fingerPan(dx, dy){
+    const k = 2*zoom/(canvas.clientHeight || 1), sy = Math.sin(yaw), cy = Math.cos(yaw), f = dy*k/Math.max(.3, Math.sin(pitch)), r = -dx*k;
+    camGoal.x += cy*r - sy*f; camGoal.z += -sy*r - cy*f; camT.copy(camGoal);
+  }
   canvas.addEventListener('contextmenu', e => e.preventDefault());
   canvas.addEventListener('pointerdown', e => {
     canvas.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (ptrs.size === 2){ lpCancel(); if (act && act.kind === 'path' && act.fin){ PTH.cur = null; liveStroke(); }   // (a second finger: the path being drawn is dropped, the view zooms)
-      act = { kind: 'pinch' }; pinch0 = pdist(); zoom0 = zoomT; pinchX = pmidX(); return; }
+      act = { kind: 'pinch', touch: e.pointerType === 'touch', ang: pang2(), mid: pmid2() }; pinch0 = pdist(); zoom0 = zoomT; pinchX = pmidX(); return; }
     act = { kind: 'turn', b: e.button, x: e.clientX, y: e.clientY, moved: false };
     // a finger with the brush on: a drag paints (or draws a path), a press and hold then a drag clears; never the view
     if (e.pointerType === 'touch' && BRUSH.on && (PL.kind === 'grass' || PL.kind === 'path') && TOUCHC()){ act = { kind: 'brush0', x: e.clientX, y: e.clientY }; lpStart(e.clientX, e.clientY); return; }
@@ -3519,7 +3526,9 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     const slop = e.pointerType === 'touch' ? LP_SLOP : 5;   // (a finger wobbles more than a mouse)
     if (act.kind === 'del'){ if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > slop) act.moved = true; const to = pick(e.clientX, e.clientY);
       if (act.moved && act.from && to) DSEL = delRect(act.from, to); return; }
-    if (act.kind === 'pinch'){ if (ptrs.size === 2){ zoomT = clamp(zoom0*pinch0/pdist(), ZMIN, ZMAX); const mx = pmidX(); yawT -= (mx - pinchX)*.008; pinchX = mx; } return; }
+    if (act.kind === 'pinch'){ if (ptrs.size === 2){ zoomT = clamp(zoom0*pinch0/pdist(), ZMIN, ZMAX);
+      if (act.touch){ const a = pang2(), m = pmid2(); let da = a - act.ang; if (da > Math.PI) da -= 2*Math.PI; if (da < -Math.PI) da += 2*Math.PI; yawT += da; act.ang = a; fingerPan(m.x - act.mid.x, m.y - act.mid.y); act.mid = m; }
+      else { const mx = pmidX(); yawT -= (mx - pinchX)*.008; pinchX = mx; } } return; }
     if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > slop) act.moved = true;
     if (act.moved){ yawT -= dx*.008; if (tiltMode) pitchT = clamp(pitchT + dy*.006, PITCH_MIN, PITCH_MAX); canvas.style.cursor = 'grabbing'; }
   });
@@ -3623,7 +3632,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       const bB = bchip.querySelector('b'), bS = bchip.querySelector('small');
       const prev = mk('button', 'zarr wash', '‹'), next = mk('button', 'zarr wash', '›'); prev.setAttribute('aria-label', 'Previous zone'); next.setAttribute('aria-label', 'Next zone');
       const close = mk('button', 'ctlclose', '✕'); close.setAttribute('aria-label', 'Close controls');
-      const tview = '<h4>The view</h4><div class="row"><kbd>drag</kbd><span>turn (with the brush off)</span></div><div class="row"><kbd>two fingers</kbd><span>pinch to zoom; slide sideways to turn</span></div>'
+      const tview = '<h4>The view</h4><div class="row"><kbd>drag</kbd><span>turn (with the brush off)</span></div><div class="row"><kbd>two fingers</kbd><span>pinch to zoom, twist to turn, move together to pan</span></div>'
         + '<div class="row"><kbd>⟲ ⟳</kbd><span>turn an eighth</span></div><div class="acts"><button type="button" data-key="h">Back home</button></div>';
       let on = false, zc = 0;
       // the washes: each panel's ground and ink line moved into a layer of its own (.wl), drawn once; back to ::before / ::after off touch

@@ -8,7 +8,7 @@
 // js/wirefs.js holds the files; the code is in git history, "Transmission log: the trace offers every step".)
 'use strict';
 const WIRELOG = (() => {
-  const KEY = 'neonIsland.wirelog', COLLAPSE_KEY = 'neonIsland.wirelog.collapsed';
+  const KEY = 'neonIsland.wirelog', COLLAPSE_KEY = (typeof TOUCH !== 'undefined' && TOUCH.on ? 'touch:' : '') + 'neonIsland.wirelog.collapsed';   // (touch screens keep their own fold)
   const MAX_LINES = 40;
   // stage timings, real seconds with the log running (WIRELOG.dev.fast() divides them)
   const T = { s1: 150, s2: 240, s3: 360, gapLo: 8, gapHi: 15 };
@@ -58,7 +58,6 @@ const WIRELOG = (() => {
     #wirelog .wl-line { grid-template-columns: 34px 46px minmax(0,1fr); gap: 4px; }
     #wirelog .wl-body { height: 150px; }
   }
-  @media (prefers-reduced-motion: reduce) { #wirelog .live { animation: none; } }
   `;
 
   /* ---------- state (saved) ---------- */

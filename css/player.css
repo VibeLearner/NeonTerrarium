@@ -86,3 +86,8 @@ html.pui #reseed{border-color:var(--pink);color:var(--pink)}
 /* (the city settings sit in two columns where there's room, so they fit without scrolling and without empty space) */
 @media (min-width:720px){ .pu-city .pu-pane{grid-template-columns:repeat(2,minmax(0,1fr));column-gap:20px;align-items:start} .pu-city .pu-pane > .pu-group:only-child{grid-column:1/-1}
   .pu-city .pu-pane > .pu-group:nth-child(3){grid-column:1/-1;grid-template-columns:repeat(3,minmax(0,1fr));column-gap:16px} .pu-city .pu-pane > .pu-group:nth-child(3) > :not(.slider){grid-column:1/-1} }
+/* ---------- phones and tablets (Oct 30, phase 1 of claude/mobile-ui-plan.md): Settings and City on touch ---------- */
+html.pui.touch .deck{max-height:min(600px,calc(100vh - 48px));max-height:min(600px,calc(100dvh - 48px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)))}
+html.pui.touch .pu-x{width:44px;height:44px;font-size:15px}
+html.pui.touch .pu-tabs button{min-height:44px;font-size:11px}
+html.touch .pu-city{max-height:min(560px,calc(100vh - 200px));max-height:min(560px,calc(100dvh - 200px))}

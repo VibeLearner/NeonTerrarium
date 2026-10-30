@@ -4,7 +4,7 @@
 const PI = Math.PI, TAU = PI * 2;
 const PITCH_MIN = 12*PI/180, PITCH_MAX = 82*PI/180;   // (the tilt limits and clamp were in input.js; the builders use them, and the plot worker does not load input.js)
 const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
-const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const reduceMotion = false;   // (the game's animations play whatever the device's reduce-motion setting says: owner's choice, Oct 30)
 
 const S = { seed: 20260930, district: 'mixed', clutter: 1, green: 1, neon: 1,
   zone: null, hour: 15.5, wind: 1, cloudQ: 2, vclouds: true, rays: true, bloom: true, rim: true, grade: true, lights: true, ao: true, mist: true, wetOn: true, rain: false, cycle: false, outlines: true, palette: false, spin: false, paint: false, res: 720, idleRest: false, autoPerf: false };

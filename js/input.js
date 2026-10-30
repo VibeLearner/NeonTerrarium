@@ -393,7 +393,7 @@ $('deckToggle').addEventListener('click', () => {
 // follows the pointer (green-lit in its colour where it fits, red where it doesn't): click to put one down, R turns
 // it, right-click or Esc stops placing.
 let megaPick = null, megaTurn = false, ptrLast = null;
-const BMENU_OPEN_KEY = 'neonIsland.bmenuOpen';
+const BMENU_OPEN_KEY = (typeof TOUCH !== 'undefined' && TOUCH.on ? 'touch:' : '') + 'neonIsland.bmenuOpen';   // (touch screens keep their own: a menu left open on a desktop doesn't open over the city on a phone)
 function selectMega(kind, quiet){
   megaPick = kind && megaPick !== kind ? kind : null;
   if (megaPick && delMode) setDelMode(false, true);
@@ -441,7 +441,7 @@ function onMegaUnlock(){
 }
 // Transport (under Buildings): arrives with the fourth megastructure, or at once in a city that already has highways
 const hwUnlocked = () => megaUnlockedKinds.size >= 4 || highways.length > 0 || metros.length > 0;
-const TMENU_OPEN_KEY = 'neonIsland.tmenuOpen';
+const TMENU_OPEN_KEY = (typeof TOUCH !== 'undefined' && TOUCH.on ? 'touch:' : '') + 'neonIsland.tmenuOpen';
 function setTmenuOpen(open){
   $('tmenuHead').setAttribute('aria-expanded', open); $('tmenuList').hidden = !open;
   try { localStorage.setItem(TMENU_OPEN_KEY, open ? '1' : '0'); } catch (e) {}

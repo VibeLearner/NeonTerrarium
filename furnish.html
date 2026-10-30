@@ -1,4 +1,5 @@
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <script>window.PODLAB_EMBED=true;window.PODCITY_NOPACK=true</script>
 <title>Furnish pod</title>
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -300,10 +301,10 @@ body[data-embed] header.bar,body[data-embed] .cat-only,body[data-embed] .pod-onl
 .slot .sn{flex:1;min-width:0}.slot .sn b{display:block;font-family:"Silkscreen",ui-monospace,monospace;font-weight:400;font-size:10.5px;color:#FFB347;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.slot .sn span{font-size:10px;color:#8e9bb2}
 body[data-view="build"] .toast{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:11px;color:#fff;background:rgba(8,12,26,.94);border:1px solid #38E8E0;border-radius:0;padding:5px 14px;bottom:calc(16px + var(--bhintH,30px) + 10px);max-width:min(560px,calc(100vw - 32px));text-align:center;
   clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)}
-@media (prefers-reduced-motion:reduce){.bstage *,.bstage *::after{animation:none!important;transition:none!important}}
+
 @media (max-width:860px){.pods{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:760px){.sheet{grid-template-columns:minmax(0,1fr)}h1{font-size:19px}.label{min-width:0;width:100%}}
-@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
 </style>
 
 <header class="bar">
@@ -16168,7 +16169,7 @@ function enter(o){o=o||{};if(C)exit();const BB=window.PodBuilder&&PodBuilder._B;
   const K2=kit();C.qs=K2.qs;C.qc=K2.qc;C.qm=K2.qm;C.P=K2.P;C.blank=K2.blank;if(KIT.T)C.T=KIT.T;if(scene)hookScene(scene);
   // the longest main-thread task during the open (all of the page, the game's too when it shares the thread)
   C.longTask=0;C.slice=0;try{if(window.PerformanceObserver&&PerformanceObserver.supportedEntryTypes&&PerformanceObserver.supportedEntryTypes.includes('longtask')){C.obs=new PerformanceObserver(l=>{for(const e of l.getEntries())if(C&&C.trans)C.longTask=Math.max(C.longTask,e.duration)});C.obs.observe({entryTypes:['longtask']})}}catch(e){}C.time=o.time==='day'?'day':'night';
-  let cellKey=o.podCell||o.cell;const rm=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches),a=now();const mark=k=>{if(C===my)C.tl[k]=Math.round(now()-C.tl.t0)};
+  let cellKey=o.podCell||o.cell;const rm=false,a=now();const mark=k=>{if(C===my)C.tl[k]=Math.round(now()-C.tl.t0)};
   return new Promise(res=>{
     if(R&&cam&&o.transition===false){try{o.onDone&&o.onDone()}catch(e){}res({skipped:true,reason:'no transition'})}   // (a late swap: the backdrop just fades in when ready)
     else if(R&&cam){api.transitioning=true;C.trans={t0:now(),vt:0,last:now(),drift:0,gate:true,rm,frames:[],onDone:o.onDone,resolve:res,skipped:false};addSkip();wantDraw();

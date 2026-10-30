@@ -151,3 +151,8 @@ html.touch .tmq{text-overflow:clip!important}
 html.touch .tmq-in{display:inline-block;white-space:nowrap;will-change:transform}
 html.touch .tmq > .tmq-in{animation:tmq var(--mqt,8s) linear infinite}
 @keyframes tmq{0%,18%{transform:translateX(0)}50%,68%{transform:translateX(var(--mq,0))}100%{transform:translateX(0)}}
+
+/* zoomed out, the first taps aim: a note by the outline (touchui.js aimTip) */
+.taim{display:none}
+html.touch .taim:not([hidden]){display:block;position:fixed;left:0;top:0;z-index:7;pointer-events:none;padding:6px 10px;font-family:var(--font-pixel);font-size:11px;letter-spacing:.08em;
+  color:#e9fbff;background:rgba(6,14,26,.9);border:1px solid rgba(90,232,255,.75);white-space:nowrap}

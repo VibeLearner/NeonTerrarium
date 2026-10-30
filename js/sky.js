@@ -1640,7 +1640,7 @@ function resize(){
   if (zk !== ZK && typeof zoom !== 'undefined'){ const r = zk/ZK; zoom *= r; zoomT *= r; }
   ZK = zk;
   // (touch, the first time: the starting zoom by the screen's size, input.js)
-  if (!resize.once && typeof TOUCH !== 'undefined' && TOUCH.on && typeof touchZoomPhys === 'function'){ resize.once = true; zoom = zoomT = touchZoomPhys()*ZK; }
+  if (!resize.once && typeof TOUCH !== 'undefined' && TOUCH.on && typeof touchZoomPhys === 'function'){ resize.once = true; zoom = zoomT = touchZoomPhys()*ZK; }   // (16 on the short side: input.js TOUCH_ZOOM0)
   renderer.setSize(DW, DH, false);
   canvas.style.width = innerWidth + 'px'; canvas.style.height = innerHeight + 'px';
   H = 0; applyRenderRes(zoomS());

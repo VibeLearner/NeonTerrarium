@@ -91,7 +91,7 @@ void main(){
     const r = new C.WebGLRenderer({ canvas, alpha: true, antialias: false, premultipliedAlpha: false });
     { const gl = r.getContext(), src = gl.shaderSource.bind(gl); if (r.capabilities.isWebGL2) gl.shaderSource = (sh, t) => src(sh, t.replace('out highp vec4 pc_fragColor;', 'layout(location = 0) out highp vec4 pc_fragColor;\nlayout(location = 1) out highp vec4 pc_fragNormal;')); }
     r.setClearColor(0x000000, 0); r.autoClear = true;
-    const mgr = new C.LoadingManager(), TL = new C.TextureLoader(mgr); mgr.onLoad = () => { api.loaded = true; }; const tex = (k, v, srgb) => { const t = TL.load(base + 'gb-' + k + '-' + v + '.png'); t.minFilter = t.magFilter = C.NearestFilter; t.generateMipmaps = false; return t; };
+    const mgr = new C.LoadingManager(), TL = new C.TextureLoader(mgr); mgr.onLoad = () => { api.loaded = true; }; const tex = (k, v, srgb) => { const t = TL.load(base + 'gb-' + k + '-' + v + (typeof TOUCH !== 'undefined' && TOUCH.on ? '.webp?v=2026-10-30' : '.png')); t.minFilter = t.magFilter = C.NearestFilter; t.generateMipmaps = false; return t; };
     const quad = new C.Mesh(new C.PlaneGeometry(2, 2)), qScene = new C.Scene(), qCam = new C.OrthographicCamera(-1, 1, 1, -1, 0, 1); quad.frustumCulled = false; qScene.add(quad);
     const U = { tCol: { value: null }, tNrm: { value: null }, tDep: { value: null }, tMat: { value: null }, tGlow: { value: null }, tBar: { value: null }, tBounce: { value: null }, tStat: { value: null }, sunDyn: { value: null }, sunMap: { value: null }, lampMap: { value: null },
       camWorld: { value: new C.Matrix4() }, sunMat: { value: new C.Matrix4() }, lampMat: { value: new C.Matrix4() }, projXY: { value: new C.Vector2() }, res: { value: new C.Vector2() },

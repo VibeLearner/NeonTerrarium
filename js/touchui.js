@@ -45,7 +45,7 @@ const TUI = (() => {
     const col = z.closest('.zcol'), pe = (col && col.querySelector('.perim')) || document.querySelector('.zones .perim'), pr = pe && pe.getBoundingClientRect();
     const w = pr && pr.width ? pr.width : r.width, h = pr && pr.height ? pr.height : 15;
     chip.style.left = Math.round(r.left + (r.width - w)/2) + 'px'; chip.style.width = Math.round(w) + 'px'; chip.style.height = Math.round(h) + 'px';
-    const top = col ? col.getBoundingClientRect().top : r.top; chip.style.bottom = Math.round(innerHeight - top + 8) + 'px'; };
+    const top = col ? col.getBoundingClientRect().top : r.top; chip.style.bottom = Math.round(innerHeight - top + (document.documentElement.classList.contains('tport') ? 18 : 8)) + 'px'; };   // (upright: clear of the zone deck's peeking edges)
   U.offerRestore = snap => { chipSnap = snap; chip.hidden = false; placeChip(); clearTimeout(chipT); chipT = setTimeout(() => { chip.hidden = true; chipSnap = null; }, 5000); };
   chip.addEventListener('click', () => { const s = chipSnap; chip.hidden = true; chipSnap = null; clearTimeout(chipT); if (s && restore(s)){ U.buzz(12); dispatchEvent(new CustomEvent('nt:restore')); } });
   function restore(s){

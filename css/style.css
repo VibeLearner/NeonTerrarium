@@ -486,12 +486,12 @@ html.cctv-out body{animation:cctvOff 1.15s forwards;transform-origin:50% 50%;ove
 @keyframes cctvUp{0%{opacity:1}100%{opacity:0}}
 /* first load: dark until the title's room is ready (the city builds behind it) */
 html.title-boot::after{content:"";position:fixed;inset:0;z-index:10000;background:#0b0a09;pointer-events:none}
-/* touch: the cover says what's happening from the first moment, with a bar that fills as the game's files arrive (touch.js --boot). On a phone's
-   first visit (itch.io's player too) the files take a few seconds, and a plain dark screen read as broken (owner, Oct 30). System font: the
+/* the cover says what's happening from the first moment, with a bar that fills as the game's files arrive (touch.js --boot). On a first visit
+   (itch.io's player too) the files take a few seconds, and a plain dark screen read as broken (owner, Oct 30; phones first, then every player). System font: the
    game's own may not have arrived yet */
-html.touch.title-boot::after{content:"NEON TERRARIUM\A\A loading";white-space:pre;display:flex;align-items:center;justify-content:center;text-align:center;
+html.title-boot::after{content:"NEON TERRARIUM\A\A loading";white-space:pre;display:flex;align-items:center;justify-content:center;text-align:center;
   font:600 15px/1.4 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.32em;color:#5ae8ff;text-shadow:0 0 12px rgba(90,232,255,.45)}
-html.touch.title-boot::before{content:"";position:fixed;z-index:10001;left:calc(50% - 30vw);top:calc(50% + 48px);height:3px;width:calc(60vw*var(--boot,.04));
+html.title-boot::before{content:"";position:fixed;z-index:10001;left:calc(50% - 30vw);top:calc(50% + 48px);height:3px;width:calc(60vw*var(--boot,.04));
   background:#5ae8ff;box-shadow:0 0 8px rgba(90,232,255,.7);transition:width .35s ease-out;pointer-events:none}
 #cctvFade.hold{animation:none;opacity:1}
 .t-layer[hidden],.t-plants[hidden],.t-signoff[hidden],.t-signglow[hidden]{display:none!important}

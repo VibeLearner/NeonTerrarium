@@ -21,12 +21,12 @@ const TITLE = (() => {
   const gD = cvDust.getContext('2d'), gS = cvSky.getContext('2d'), gP = cvPl.getContext('2d');
   let plSrc = null, plOut = null, plBase = null, plW = 0, plH = 0, clouds = [], plantAt = 0;
   const reduced = false;   // (the game's animations play whatever the device's reduce-motion setting says: owner's choice, Oct 30)
-  const VER = '2026-10-30L';
+  const VER = '2026-10-30D';
   let RAW = null, TOD = 'morning', SUNS = [], sunCv = null, gSun = null, sunH = 0, yaw0 = null, sunW = 1, sway = { x: 0, y: 0, r: 0 };
   let A = null, view = null, W = 0, H = 0, S0 = 1, OX = 0, OY = 0, raf = 0, last = 0, motes = [];
   const anchorsP = fetch('assets/title/anchors.json?v=' + VER).then(r => r.json()).catch(() => null);
   // (phone mode, touch.js: no live lighting, the baked pictures instead: a renderer less, and the surface bake's pictures are not loaded)
-  const PHONE_T = !!(self.PHONE && PHONE.on), IMG = PHONE_T || (typeof TOUCH !== 'undefined' && TOUCH.on) ? '.webp' : '.png';   // (and the pictures as lossless WebP: the same pixels, about a third of the bytes)
+  const PHONE_T = !!(self.PHONE && PHONE.on), IMG = '.webp';   // (the pictures as lossless WebP: the same pixels, about a third of the bytes; every player since Oct 30)
   const gbufP = PHONE_T ? Promise.resolve(null) : fetch('assets/title/gbuf.json?v=' + VER).then(r => r.ok ? r.json() : null).catch(() => null);   // (the surface bake: the room lit live)
   let GB = null, RTMODE = false, RT = null, rtCv = null, HOUR = 8;
 

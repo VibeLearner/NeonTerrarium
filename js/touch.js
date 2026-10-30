@@ -17,9 +17,9 @@ const TOUCH = (() => {
   // A laptop with a touch screen still has a trackpad or mouse as its main pointer, so it keeps the desktop layout.
   const mq = matchMedia('(pointer: coarse)'), mqPort = matchMedia('(orientation: portrait)');
   T.on = mq.matches;
-  // touch: the loading cover's bar (css/style.css html.touch.title-boot) fills as the page's scripts arrive, of the number the phone page has
-  // (data-nscripts, written by tools/mobile/build.js), most of the way; the rest is the title's own pictures
-  if (T.on) try { const h = document.documentElement, N = +h.dataset.nscripts || 75; let n = 0;
+  // the loading cover's bar (css/style.css html.title-boot) fills as the page's scripts arrive, of the number the page has (data-nscripts,
+  // written by tools/mobile/build.js), most of the way; the rest is the title's own pictures. Phones first, every player from Oct 30
+  try { const h = document.documentElement, N = +h.dataset.nscripts || 75; let n = 0;
     const set = v => h.style.setProperty('--boot', String(Math.max(.04, Math.min(1, v))));
     document.addEventListener('load', e => { if (e.target && e.target.tagName === 'SCRIPT'){ n++; set(.9*n/N); } }, true);   // (on the document: a file's load event never reaches the window)
     addEventListener('DOMContentLoaded', () => set(.92)); addEventListener('load', () => set(1)); } catch (e) {}
@@ -235,5 +235,5 @@ var PHONE = self.PHONE = (() => {
 })();
 // the phone's own copy of the game's files, so a second visit isn't waiting on the network (sw.js). Touch screens only, registered a few seconds
 // after the page has loaded so it never competes with the first load
-if (TOUCH.on && 'serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost'))
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost') && !/[?&](full|bench)\b/.test(location.search))   // (every player since Oct 30; not on the full-size test page or the benchmark)
   addEventListener('load', () => setTimeout(() => { try { navigator.serviceWorker.register('sw.js').catch(() => {}); } catch (e) {} }, 3000));

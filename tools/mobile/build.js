@@ -19,8 +19,8 @@ const MARK = '<!-- phone page: made from index.html by tools/mobile/build.js; do
   // every game script of the page: <script src="js/NAME.js?v=...">
   html = html.replace(/<script src="js\/([\w.-]+\.js)(\?v=[^"]*)?"><\/script>/g, (m, f, v) => { want.set(f, true); return '<script src="min/js/' + f + (v || '') + '"></script>'; });
   // the computer's way in: a computer that opens m.html goes back to index.html (the reverse of index.html's own first lines)
-  html = html.replace(/<script>\/\* phone page \*\/[\s\S]*?<\/script>/, '<script>/* computer page */if(!matchMedia(\'(pointer: coarse)\').matches){location.replace(\'./\'+location.search+location.hash);document.write(\'<plaintext hidden>\')}</script>');
-  html = html.replace(/<!-- a phone or tablet goes to m\.html[^>]*-->\n/, '');
+  html = html.replace(/<script>\/\* phone page \*\/[\s\S]*?<\/script>\n/, '');   // (index.html's way in: m.html is where every player plays)
+  html = html.replace(/<!-- every player goes to m\.html[^>]*-->\n/, '');
   html = html.replace('<meta charset="utf-8">\n', '<meta charset="utf-8">\n' + MARK + '\n');
   // the fonts' stylesheet doesn't hold up the first paint on a phone (it's on another site: on a slow first visit the page stayed blank waiting for it)
   html = html.replace(/<link href="(https:\/\/fonts\.googleapis\.com\/[^"]+)" rel="stylesheet">/, '<link href="$1" rel="stylesheet" media="print" onload="this.media=\'all\'">');

@@ -11,12 +11,11 @@ GitHub Pages takes a minute or two to publish each push, and browsers may keep t
 refresh picks up all the new files together; if a change doesn't show, do a hard refresh (Ctrl+Shift+R,
 or Cmd+Shift+R on a Mac).
 
-**Phones and tablets** are sent from `index.html` to `m.html`: the same page with smaller copies of the scripts
-(`min/js/`, comments and spaces taken out) and a saved copy of the game's files on the phone (`sw.js`), so
-they load faster. Both are made by `node tools/mobile/build.js` (needs `npm i --no-save terser@5.51.2`); the
+**Every player** is sent from `index.html` to `m.html`: the same page with smaller copies of the scripts
+(`min/js/`, comments and spaces taken out), and the browser keeps a saved copy of the game's files (`sw.js`), so
+it loads faster (phones first; computers too since Oct 30). Both are made by `node tools/mobile/build.js` (needs `npm i --no-save terser@5.51.2`); the
 "Mobile build" GitHub Action runs it on every push to main and commits the result, so a forgotten run fixes
-itself within a few minutes. Never edit `m.html` or `min/` by hand. `index.html?full` keeps a phone on the
-full page; `m.html?loadtest` shows how long a phone's load took, stage by stage, with a Send button
+itself within a few minutes. Never edit `m.html` or `min/` by hand. `index.html?full` stays on the full-size page (for testing, and the place to look at a readable error); `m.html?loadtest` shows how long a phone's load took, stage by stage, with a Send button
 (the results land with the phone benchmarks, `tools/bench/`).
 
 ## Playing it locally

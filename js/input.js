@@ -511,8 +511,10 @@ function renderBmenu(){
 $('bmenuHead').addEventListener('click', () => { setBmenuOpen($('bmenuList').hidden); $('bmenuHead').classList.remove('fresh'); });
 // a kind arriving for the first time: open the menu and make the header pulse so it gets noticed
 function onMegaUnlock(){
-  renderBmenu(); if (!document.getElementById('bmenuList')) return; setBmenuOpen(true); $('bmenuHead').classList.add('fresh');
-  if (megaUnlockedKinds.size === 4){ setTmenuOpen(true); $('tmenuHead').classList.add('fresh'); }   // the fourth: sky highways arrive
+  renderBmenu(); if (!document.getElementById('bmenuList')) return;
+  const tch = typeof TOUCH !== 'undefined' && TOUCH.on;   // (touch: the button pulses, the list doesn't open: on a phone it covered a third of the city and took the next tap)
+  if (!tch) setBmenuOpen(true); $('bmenuHead').classList.add('fresh');
+  if (megaUnlockedKinds.size === 4){ if (!tch) setTmenuOpen(true); $('tmenuHead').classList.add('fresh'); }   // the fourth: sky highways arrive
 }
 // Transport (under Buildings): arrives with the fourth megastructure, or at once in a city that already has highways
 const hwUnlocked = () => megaUnlockedKinds.size >= 4 || highways.length > 0 || metros.length > 0;

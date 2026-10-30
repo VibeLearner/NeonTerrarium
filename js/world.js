@@ -1855,8 +1855,8 @@ let _stageTick = 0;
 const stageNow = () => window.__realNow ? ++_stageTick : performance.now();   // (under the test harness, whose clock is scripted, a step budget counts steps, so two runs do the same)
 const STAGE_ON = () => !(PH.tests.stageNow || window.__STAGE_NOW);
 const FOL_KEYS = Object.keys(SPR.size);
-const stageCap = () => ({ R, buckets, emitters, carPads, curPorts, glowList, curSpots, curCover, fol: FOL_KEYS.map(k => FOL_LIST[k]), DARK, SIDE_SPLIT, PUT_KEEPOUT, STAGE, FX });
-const stageApply = s => { R = s.R; buckets = s.buckets; emitters = s.emitters; carPads = s.carPads; curPorts = s.curPorts; glowList = s.glowList; curSpots = s.curSpots; curCover = s.curCover;
+const stageCap = () => ({ R, buckets, emitters, carPads, curPorts, glowList, curSpots, curCover, curFine, fol: FOL_KEYS.map(k => FOL_LIST[k]), DARK, SIDE_SPLIT, PUT_KEEPOUT, STAGE, FX });   // (curFine too: a plot made inside another's making, its arrays read back while let go, ended the outer one with none, owner Oct 30: taps stopped building)
+const stageApply = s => { R = s.R; buckets = s.buckets; emitters = s.emitters; carPads = s.carPads; curPorts = s.curPorts; glowList = s.glowList; curSpots = s.curSpots; curCover = s.curCover; curFine = s.curFine;
   for (let q = 0; q < FOL_KEYS.length; q++) FOL_LIST[FOL_KEYS[q]] = s.fol[q]; DARK = s.DARK; SIDE_SPLIT = s.SIDE_SPLIT; PUT_KEEPOUT = s.PUT_KEEPOUT; STAGE = s.STAGE; FX = s.FX; };
 const stageGen = job => { job.gen = (function*(){ job.data = yield* collectGen(cellBody(job.c)); })(); };
 function stageStart(c, onDone){

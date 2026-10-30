@@ -46,7 +46,7 @@ function placeSun(){
   const half = 30*Math.pow(1.2, Math.max(0, Math.ceil(Math.log(reach/30)/Math.log(1.2))));
   // the sun camera's axes, as three.js's lookAt builds them: z toward the sun, x = up x z, y = z x x
   _lz.copy(SUN_DIR); _lx.crossVectors(_lUp, _lz).normalize(); _ly.crossVectors(_lz, _lx);
-  const texel = 2*half/2048, step = texel*Math.max(1, Math.round(6/texel));
+  const texel = 2*half/(SH_PX/SH_F), step = texel*Math.max(1, Math.round(6/texel));   // (SH_PX/SH_F: 2048, or 1024 in phone mode)
   const u = Math.round(camGoal.dot(_lx)/step)*step, v = Math.round(camGoal.dot(_ly)/step)*step, w = Math.round(camGoal.dot(_lz)/6)*6;   // along the sun it makes no difference to the grid
   _sunC.copy(_lx).multiplyScalar(u).addScaledVector(_ly, v).addScaledVector(_lz, w);
   shNeed.half = half; shNeed.c.copy(_sunC); shNeed.dir.copy(SUN_DIR);
@@ -62,12 +62,15 @@ function placeSun(){
 // when only the sun has crept on, into a second map) and the two are swapped when it's done; what's on screen never sees a half-drawn map. An edit, or a view that
 // outruns the map (a jump across the city), still redraws it at once, as before.
 const SH_F = 2, SH_K = 8, SH_K_SUN = 32, SH_SUN = .12/1600;   // (a map that only follows the sun is spread thinner: it has no view to keep up with)
-sun.shadow.mapSize.set(2048*SH_F, 2048*SH_F);
+// the map's texels (phone mode, touch.js: 2048 instead of 4096 over the same ground, so blockier shadows for a quarter of the memory and of the redraw)
+const SH_PX = 2048*SH_F*(self.PHONE && PHONE.on ? .5 : 1);
+sun.shadow.mapSize.set(SH_PX, SH_PX);
+if (self.PHONE && PHONE.on) sun.shadow.normalBias *= 2;   // (texels twice as big: the surface offset that keeps a face from shadowing itself grows with them)
 let shFront = null, shJob = null, shSpare = null;
 // (the two maps are never drawn into at the same time, so the second borrows the first one's depth buffer: 32 MB saved)
 let shDepth = null;
 function shTarget(){
-  const rt = new THREE.WebGLRenderTarget(2048*SH_F, 2048*SH_F, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, format: THREE.RGBAFormat });
+  const rt = new THREE.WebGLRenderTarget(SH_PX, SH_PX, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, format: THREE.RGBAFormat });
   const prev = renderer.getRenderTarget(); renderer.setRenderTarget(rt);   // (three sets its buffers up now)
   const gl = renderer.getContext(), p = renderer.properties.get(rt);
   if (!shDepth) shDepth = p.__webglDepthbuffer;
@@ -863,14 +866,18 @@ const SOFT_RAYS = SOFT_HEAD + `
     }
   }
   gl_FragColor = outv;`;
+// Phone mode (touch.js): the soft effects with fewer steps along each ray (the wet ground's reflection 12 longer steps instead of 22, the mist 5 instead of 8,
+// the light shafts 7 instead of 12): the same effects, a little coarser
+const softLite = b => !(self.PHONE && PHONE.on) ? b : b.replace('for (int i=0; i<22; i++){', 'for (int i=0; i<12; i++){').replace('t += 0.05 + t*0.14;', 't += (0.05 + t*0.14)*1.8;')
+  .replace('const int MS = 8;', 'const int MS = 5;').replace('const int RSTEPS = 12;', 'const int RSTEPS = 7;');
 const COMP_PRELUDE = comp.fragmentShader.slice(0, comp.fragmentShader.indexOf('void main(){'));
-const softMats = [SOFT_WET, SOFT_MIST, SOFT_RAYS].map(body => new THREE.ShaderMaterial({
+const softMats = [SOFT_WET, SOFT_MIST, SOFT_RAYS].map(softLite).map(body => new THREE.ShaderMaterial({
   defines: Object.assign({ SOFT_HALF: 0 }, Object.fromEntries(COMP_FX.map(f => ['FX_' + f, 1]))), uniforms: comp.uniforms, vertexShader: comp.vertexShader,
   fragmentShader: COMP_PRELUDE + 'void main(){' + body + '}', depthTest: false, depthWrite: false }));
 // All three in one pass (WebGL 2): the ray setup at the top (SOFT_HEAD: the depth, the ray through the pixel) is worked out once instead of three times,
 // and the half-size picture is gone over once. Each effect's own code is unchanged and writes its own target (the color, normal and a third output, see
 // core.js); the targets of effects at nothing this frame are left out of the draw (drawBuffers NONE), so they keep what they had, as when their pass was skipped.
-const softBody = s => '{' + s.slice(SOFT_HEAD.length).replace(/gl_FragColor = outv;\s*$/, '') + '}';
+const softBody = s => '{' + softLite(s).slice(SOFT_HEAD.length).replace(/gl_FragColor = outv;\s*$/, '') + '}';
 const softAll = MRT ? new THREE.ShaderMaterial({   // (its own defines, every effect in, compiled once: the uniforms decide per pixel, and softEffects decides per target)
   defines: Object.assign({ SOFT_HALF: 0 }, Object.fromEntries(COMP_FX.map(f => ['FX_' + f, 1]))), uniforms: Object.assign({}, comp.uniforms, { softWant: { value: new THREE.Vector3() } }), vertexShader: comp.vertexShader,
   fragmentShader: COMP_PRELUDE + 'uniform vec3 softWant;\nvoid main(){' + SOFT_HEAD +
@@ -1224,6 +1231,21 @@ const glowBlur = new THREE.ShaderMaterial({
     }`,
   depthTest: false, depthWrite: false,
 });
+// Phone mode (touch.js): one blur in both directions at once instead of two passes each for the bloom and the halation. Nine bilinear reads on a
+// ring and a centre cover about the same 7 x 7 the two 1D passes did; the halation is then the same blurred image, tinted in the mix (narrower than
+// its own wider blur, but there). 3 passes instead of 7: on a phone each pass costs more for switching targets than for its few pixels.
+const glowBlur2 = new THREE.ShaderMaterial({
+  uniforms: { t: { value: null }, texel: { value: new THREE.Vector2() } },
+  vertexShader: fsVert,
+  fragmentShader: `uniform sampler2D t; uniform vec2 texel; varying vec2 vUv;
+    void main(){
+      vec3 c = texture2D(t, vUv).rgb*.2;
+      c += (texture2D(t, vUv + texel*vec2(1.4, 1.4)).rgb + texture2D(t, vUv + texel*vec2(-1.4, 1.4)).rgb + texture2D(t, vUv + texel*vec2(1.4, -1.4)).rgb + texture2D(t, vUv + texel*vec2(-1.4, -1.4)).rgb)*.13;
+      c += (texture2D(t, vUv + texel*vec2(3.0, 0.0)).rgb + texture2D(t, vUv + texel*vec2(-3.0, 0.0)).rgb + texture2D(t, vUv + texel*vec2(0.0, 3.0)).rgb + texture2D(t, vUv + texel*vec2(0.0, -3.0)).rgb)*.07;
+      gl_FragColor = vec4(c, 1.0);
+    }`,
+  depthTest: false, depthWrite: false,
+});
 const glowCopy = new THREE.ShaderMaterial({ uniforms: { t: { value: null } }, vertexShader: fsVert,
   fragmentShader: 'uniform sampler2D t; varying vec2 vUv; void main(){ gl_FragColor = vec4(texture2D(t, vUv).rgb, 1.0); }', depthTest: false, depthWrite: false });
 const glowMix = new THREE.ShaderMaterial({
@@ -1331,6 +1353,12 @@ function renderGlow(){
   if (!S.bloom){ glowMix.uniforms.t.value = rtOut.texture; glowMix.uniforms.tB.value = rtB[0].texture; glowMix.uniforms.tH.value = rtHal[0].texture; glowPass(glowMix, fin, 'grade (no bloom)'); return; }   // no bloom, but still graded
   const [b0, b1] = rtB, [h0, h1] = rtHal;
   glowPick.uniforms.t.value = rtOut.texture; glowPick.uniforms.texel.value.set(1/W, 1/H); glowPass(glowPick, b0, 'bloom: pick bright');
+  if (self.PHONE && PHONE.on){   // (phone mode: one 2D blur, the halation from the same image; see glowBlur2)
+    glowBlur2.uniforms.t.value = b0.texture; glowBlur2.uniforms.texel.value.set(1/b0.width, 1/b0.height); glowPass(glowBlur2, b1, 'bloom: blur (phone)');
+    glowMix.uniforms.t.value = rtOut.texture; glowMix.uniforms.tB.value = b1.texture; glowMix.uniforms.tH.value = b1.texture;
+    const hk = glowMix.uniforms.halK.value; glowMix.uniforms.halK.value = hk*.6;   // (the bloom's own image is tighter and brighter than the wide halation was: a little less of it)
+    glowPass(glowMix, fin, 'bloom: mix and grade'); glowMix.uniforms.halK.value = hk; return;
+  }
   glowBlur.uniforms.t.value = b0.texture; glowBlur.uniforms.dir.value.set(1/b0.width, 0); glowPass(glowBlur, b1, 'bloom: blur across');
   glowBlur.uniforms.t.value = b1.texture; glowBlur.uniforms.dir.value.set(0, 1/b0.height); glowPass(glowBlur, b0, 'bloom: blur down');
   glowCopy.uniforms.t.value = b0.texture; glowPass(glowCopy, h0, 'halation: shrink');   // halation: the bloom, smaller and blurred twice as wide
@@ -1616,6 +1644,7 @@ function setZoomRes(v){ ZOOM_RES = v; try { localStorage.setItem(ZOOMRES_KEY, St
 const FARV_KEY = 'neonIsland.farView';
 const FARV = { on: (() => { try { return localStorage.getItem(FARV_KEY) !== '0'; } catch (e) { return true; } })(), inZ: 40, outZ: 36, far: false, sharp: false,
   lastMove: 0, p: null, pix: 3e6, ema: 16.7, t: 0, quick: 0, cut: 0, k: 0, up: 0, v0: .25, below: 0, above: 0, since: 99 };   // (k: how far the sharp view has come in, 0 to 1; v0: the speed below which it starts)
+if (self.PHONE && PHONE.on && PHONE.fps){ PERF.vs = 1000/PHONE.fps; FARV.ema = PERF.vs; }   // (phone mode, touch.js: the frames come every 33 ms on purpose, so that's on time, not late)
 let FAR_SNAP_H = 0;   // (zoomed out: the moving view's height, whose pixel grid the camera keeps to at both sizes; 0 otherwise)
 function setFarView(on){ FARV.on = !!on; try { localStorage.setItem(FARV_KEY, FARV.on ? '1' : '0'); } catch (e) {} }
 function farTrack(now){

@@ -30,7 +30,7 @@ if (!window.__OLD_PEOPLE && !window.IN_RECIPE_WORKER) PG.build();   // (the gene
 const PPL_GEN = PG.live();
 const PPL_TEX = PPL_GEN ? new THREE.CanvasTexture(PG.sheet.cv) : new THREE.TextureLoader().load('assets/sprites/people_v2.png');
 PPL_TEX.magFilter = PPL_TEX.minFilter = THREE.NearestFilter; PPL_TEX.generateMipmaps = false;
-const PPL_MAX = PPL_GEN ? 1000 : 700;          // most people drawn at once (the nearest win if more are out)
+const PPL_MAX = self.PHONE && PHONE.on ? PHONE.pplDrawn : PPL_GEN ? 1000 : 700;          // most people drawn at once (the nearest win if more are out; phone mode, touch.js: fewer)
 // People's size. The doorways they walk through (doorFrame below) open .715 high; a citizen sprite is 13 to 16 sprite pixels
 // tall (mostly 15: .83 units at PX 18), which stood taller than the doors. Drawn at PPL_S they are about 85 to 90% of a door
 // (15 px: .63, 88%; 14 px: .59; 16 px: .68), with everything that hangs off their size scaled to match (the emote bubble over

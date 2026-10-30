@@ -24,5 +24,5 @@
   // (the never-seen cache is only a cache of shapes, keyed by the shape itself: shared with the game, it changes nothing a city holds)
   try { const op = IDBFactory.prototype.open; IDBFactory.prototype.open = function (name, ...a){ return op.call(this, name === 'neonTerrariumNeverSeen' ? name : 'ntBench.' + name, ...a); }; } catch (e) {}
   try { sessionStorage.setItem('neonTerrarium.skipTitle', '1'); } catch (e) {}
-  document.addEventListener('DOMContentLoaded', () => { const sc = document.createElement('script'); sc.src = 'js/bench.js?v=2026-10-30a'; document.body.appendChild(sc); });
+  document.addEventListener('DOMContentLoaded', () => { const sc = document.createElement('script'); sc.src = 'js/bench.js?v=2026-10-30b'; document.body.appendChild(sc); });
 })();

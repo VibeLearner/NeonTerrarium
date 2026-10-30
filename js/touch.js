@@ -129,3 +129,21 @@ const TOUCH = (() => {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', setup); else setup();
   return T;
 })();
+// Phone mode: lighter settings so the city stays smooth on mid-range phones (phones and tablets only; a mouse and keyboard never get it).
+// What it changes (each in its own file, all behind PHONE.on):
+//  - a steady 30 frames a second instead of chasing 60 (main.js)
+//  - bloom and halation in 3 passes instead of 7, the halation drawn from the bloom (sky.js renderGlow)
+//  - shadows from a 2048 map instead of 4096 (sky.js SH_F); the wet ground's reflections, the steam's mist and the light shafts with fewer steps (sky.js SOFT_*)
+//  - while the view turns, small pieces drop out sooner and the finger doesn't keep full detail round it (world.js cullFrame, SD)
+//  - at most PHONE.pplDrawn people drawn at once, the nearest (people.js PPL_MAX)
+//  - a city can grow to PHONE.maxPlots plots (world.js addPlatform)
+//  - the title screen without its live lighting, and its pictures as lossless WebP (title.js)
+// Off by default until it has been looked at on a phone: ?phone=1 in the address turns it on (on any device, to check it), ?phone=0 off.
+// Once it's checked, DEFAULT_ON = true gives it to every touch device.
+var PHONE = self.PHONE = (() => {
+  const DEFAULT_ON = false;
+  const q = /[?&]phone=([01])\b/.exec(location.search);
+  const on = q ? q[1] === '1' : DEFAULT_ON && TOUCH.on;
+  if (on) document.documentElement.classList.add('phone');
+  return { on, fps: 30, maxPlots: 500, pplDrawn: 400, turnMinPx: 2, sdV0: 2, lastDraw: -1e9 };
+})();

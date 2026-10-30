@@ -220,6 +220,9 @@ canvas.addEventListener('pointerdown', e => {
   // (a mouse is one pointer: whatever an earlier press left behind, its release missed (the window lost focus mid-press, a menu or dialog took the release),
   //  is let go here, so this press starts clean instead of carrying on the old one: in delete mode that left the selection following the cursor, unpressed)
   if (e.pointerType === 'mouse' && ptrs.size){ ptrs.clear(); act = null; }
+  // (the same for a finger: the first finger down, with no other finger on the screen (isPrimary), starts clean. A lift that was missed left a finger
+  //  behind in ptrs, and every touch after it was taken as a pinch with that ghost: the view snapped in or out and taps did nothing until a reload)
+  if (e.pointerType === 'touch' && e.isPrimary && ptrs.size){ if (act && act.timer) clearTimeout(act.timer); ptrs.clear(); act = null; if (HL) hlStop(); if (typeof TUI !== 'undefined') TUI.ring(null); }
   canvas.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); dragging = true;
   if (e.pointerType === 'touch' && ptrs.size === 1 && tapWaits() && freshNear(e.clientX, e.clientY)){   // pressing the building just made: trim it, or drag for a height
     act = { kind: 'fresh2', x: FRESH.x, y: FRESH.y, sy: e.clientY, started: false, f: FRESH }; return; }
@@ -314,7 +317,8 @@ function pointerMove(e){
   }
   if (act.kind === 'paint'){ paintAt(e.clientX, e.clientY); showHover(targetOf(pickAt(e.clientX, e.clientY))); }
 }
-const endPtr = e => { const _t0 = performance.now(); try { endPtr0(e); } finally { PH.outside('pointer up', performance.now() - _t0); } };
+// (the finger is let go whatever happens in endPtr0: an error in what a tap does (building, a wall, a pick) used to skip the last lines, leaving it in ptrs)
+const endPtr = e => { const _t0 = performance.now(); try { endPtr0(e); } finally { ptrs.delete(e.pointerId); if (!ptrs.size){ dragging = false; act = null; } PH.outside('pointer up', performance.now() - _t0); } };
 function endPtr0(e){
   if (act && typeof LOADP !== 'undefined' && LOADP.on) act.moved = true;   // (a city is still being loaded from its recipes: a click edits nothing yet)
   if (act && ptrs.has(e.pointerId)){
@@ -344,6 +348,11 @@ function endPtr0(e){
   if (!ptrs.size){ dragging = false; act = null; }
 }
 canvas.addEventListener('pointerup', endPtr); canvas.addEventListener('pointercancel', endPtr);
+// (a press the canvas stops hearing about, without a release: its capture taken away, or the window losing focus mid-press, alt-tab or a system dialog.
+//  It's let go without doing anything, so the game never goes on thinking a button or a finger is held)
+const dropPtr = id => { if (!ptrs.has(id)) return; ptrs.delete(id); if (!ptrs.size){ if (act && act.timer) clearTimeout(act.timer); dragging = false; act = null; if (typeof TUI !== 'undefined') TUI.ring(null); } };
+canvas.addEventListener('lostpointercapture', e => dropPtr(e.pointerId));
+addEventListener('blur', () => { for (const id of [...ptrs.keys()]) dropPtr(id); if (HL) hlStop(); });
 canvas.addEventListener('pointerleave', () => { MON.hoverAt(null); if (!ptrs.size && !AIM){   // (a finger lifting is a leave too: an aim's outline stays)
  hover.visible = hoverFill.visible = hoverStrip.visible = false; showMegaGhost(null); hwGhost.g.visible = false; hwHighlight(null); } });
 // (no zooming while the title screen is up: its view of the city is set by the title, owner Oct 30)

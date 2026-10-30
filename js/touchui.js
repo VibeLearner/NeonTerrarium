@@ -142,7 +142,7 @@ const TUI = (() => {
   let lastSlow = 0;
   (function loop(now){
     requestAnimationFrame(loop);
-    try { placeTags(); turnChip.hidden = !megaPick; } catch (e) { if (!loop.w){ loop.w = 1; console.warn("touchui tags", e); } }
+    try { placeTags(); turnChip.hidden = !(megaPick && MEGA_TYPES[megaPick] && MEGA_TYPES[megaPick].w !== MEGA_TYPES[megaPick].h); } catch (e) { if (!loop.w){ loop.w = 1; console.warn("touchui tags", e); } }
     if (now - lastSlow > 1000){ lastSlow = now; try { syncTags(); wander(); } catch (e) {} }
   })(performance.now());
 

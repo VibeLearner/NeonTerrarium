@@ -334,6 +334,7 @@ const music = (() => {
 
   // the picture runs on its own clock (the game's frame loop stops while the panel is up)
   let rt = 0, textT = 0; const t0 = performance.now(); let lastD = t0, accD = 0;
+  let deckEl = null; const deckFolded = () => { deckEl = deckEl || document.querySelector('.gdeck'); return !deckEl || deckEl.hidden || deckEl.classList.contains('tmin'); };
   function loop(now){
     requestAnimationFrame(loop);
     const dt = Math.min(.1, (now - lastD)/1000); lastD = now; accD += dt;
@@ -341,7 +342,9 @@ const music = (() => {
     if (accD < 1/30) return;   // 30 frames a second is plenty for a trace
     const d = accD; accD = 0; rt = (now - t0)/1000;
     readBands(d);
-    ui.draw(rt, d); PANEL.draw(rt, d); if (PANEL.open && typeof GRIDVIZ !== 'undefined') GRIDVIZ.draw(rt, d, bands, on && !paused ? level : 0);
+    // (on a touch screen, the player folded to its pill shows no trace or bars: they aren't drawn then)
+    if (!(typeof TOUCH !== 'undefined' && TOUCH.on && deckFolded())) ui.draw(rt, d);
+    PANEL.draw(rt, d); if (PANEL.open && typeof GRIDVIZ !== 'undefined') GRIDVIZ.draw(rt, d, bands, on && !paused ? level : 0);
     textT -= d; if (textT <= 0){ textT = .25; ui.text(); }
   }
   requestAnimationFrame(loop);

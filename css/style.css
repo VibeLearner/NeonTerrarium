@@ -602,3 +602,84 @@ html.touch .monitor,html.touch .mon-pins{top:calc(46px + env(safe-area-inset-top
 .t-menu button.t-busy{opacity:.6;cursor:progress}
 /* the title's first button while the city loads ("Loading Harbor Row · 40%"): smaller, so it stays on one line on a short screen */
 .t-menu button.t-busy span{font-size:.62em;white-space:nowrap}
+/* ---------- phones and tablets, round three (Oct 30): sized for a thumb (claude/mobile-ui-plan.md, phase 1) ----------
+   Still all under html.touch: a mouse and keyboard never see any of it. Targets 44 px where they're used often (the dock sits on the bottom edge,
+   where a finger is least exact), text no smaller than 11 px, panels sized by the dynamic viewport (dvh: it follows the browser's toolbar as it
+   comes and goes; the vh line before each is the fallback), and clear of the notch, rounded corners and the home bar on every side. */
+/* the page: no grey flash on a tap, no text selection or callout from a long press on the controls, no double-tap zoom on them, lists that don't drag the page */
+html.touch body{-webkit-tap-highlight-color:transparent}
+html.touch button,html.touch .zone,html.touch .zarr,html.touch .perim,html.touch .bitem,html.touch .bmenu-head,html.touch .ctlhover,html.touch .pu-citybtn,
+html.touch .deck-toggle,html.touch .furnbtn,html.touch .mon-pin,html.touch .gdeck,html.touch .zonebar,html.touch .tstatus{touch-action:manipulation;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+html.touch .bmenu-list,html.touch .ctlpanel,html.touch .hwhelp,html.touch .monitor,html.touch #wirelog,html.touch .pu-city,html.pui.touch .deck{overscroll-behavior:contain}
+/* a tapped button keeps :hover until the next tap somewhere else: on touch, the hover looks are the resting ones */
+html.touch button:hover{border-color:var(--line)}
+html.touch .rot:hover{border-color:var(--line);color:var(--ink)}
+html.touch .rot.del:hover{border-color:var(--line);color:var(--ink)}
+html.touch .perim:hover{border-color:color-mix(in srgb, var(--z) 55%, transparent);color:color-mix(in srgb, var(--z) 75%, #8e9bb2)}
+html.touch .perim.on:hover{border-color:var(--z);color:#fff}
+html.touch .bmenu-head:hover{color:var(--cyan);border-color:var(--cyan)}
+html.touch .bitem:hover{border-color:color-mix(in srgb, var(--m) 45%, transparent)}
+html.touch .bitem.on:hover{border-color:var(--m)}
+html.touch .furnbtn:hover{color:var(--cyan);border-color:var(--cyan)}
+html.touch .pu-x:hover{border-color:var(--line);color:var(--muted)}
+html.touch .pu-citybtn:not(.on):hover{border-color:rgba(56,232,224,.45);color:var(--cyan);background:rgba(10,16,32,.88)}
+html.touch .t-menu button:hover{transform:none;color:#efe6d2}
+html.touch .t-menu button:hover::before{opacity:0}
+html.touch .t-menu button:active{color:#ffd0ea}
+html.touch .t-menu button:active::before{opacity:1}
+html.touch .mon-pin .x{opacity:1}   /* (the unpin ✕ showed only on hover) */
+/* the dock: a 44 px row of buttons, a 56 px zone card with 44 px arrows, clear of the home bar and the screen's sides */
+html.touch .zonebar{bottom:calc(8px + env(safe-area-inset-bottom,0px));max-width:calc(100% - 16px - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px))}
+html.touch .trow{gap:6px}
+html.touch .bmenu-head,html.touch .pu-citybtn{height:44px;padding:0 10px;font-size:11px}
+html.touch .ctlhover{width:44px;height:44px;font-size:15px}
+html.touch .rot.del{width:44px;height:44px;font-size:15px}
+html.touch .furnbtn{height:44px;padding:0 10px;font-size:11px}
+html.touch .zone b{font-size:13px}
+html.touch .zone small{font-size:11px}
+html.tport .zones{gap:6px}
+html.tport .zones > .tcur{min-width:140px}
+html.tport .zones > .tcur .zone .zin,html.tport .zones > .zone.tcur .zin{min-height:56px;box-sizing:border-box;align-content:center;padding:7px 12px}
+html.tport .zarr{width:44px;height:56px;font-size:20px}
+html.tland .zone .zin{min-height:44px;box-sizing:border-box;align-content:center;padding:5px 10px}
+html.tland .zone b{font-size:12px}
+html.tland .zone small{font-size:11px}
+/* Perimeter: the strip stays slim to look at, but takes a finger 44 px tall (its hit area reaches down past it, where nothing else is) */
+html.touch .perim{position:relative;height:24px;font-size:11px;letter-spacing:.1em}
+html.touch .perim::after{content:"";position:absolute;left:0;right:0;top:0;bottom:-20px}
+html.tland .perim{height:24px;font-size:11px}
+/* the highway's height and lanes: the only way to set them on touch */
+html.touch .hwbar button{min-width:44px;height:44px;font-size:15px}
+html.touch .hwbar .hwlanes{padding:0 12px;font-size:12px}
+html.touch .hwbar span,html.touch .hwbar small{font-size:11px}
+html.touch .hwbar b{font-size:14px}
+/* the hint: larger, on a dark plate */
+html.touch .zonebar > #modeHint{font-size:12px;line-height:1.4;padding:5px 10px;background:rgba(6,9,20,.9);border:1px solid var(--line)}
+/* the Buildings and Transport lists: 48 px rows, 12 px names, and the reason a locked one is locked shown under it (it was only in a hover title) */
+html.touch .bitem{min-height:48px;box-sizing:border-box;padding:8px 10px}
+html.touch .bitem b{font-size:12.5px}
+html.touch .bitem small{font-size:11px}
+html.touch .bmenu-list{max-height:min(52vh,420px);max-height:min(52dvh,420px)}
+html.touch .thelp{min-height:44px}
+/* Controls (?) */
+html.touch .ctlpanel{max-height:60vh;max-height:60dvh}
+html.touch .ctlpanel header button{width:44px;height:44px;font-size:15px}
+html.touch .ctlpanel dl.touchonly{font-size:13px;gap:9px 14px}
+/* the instruction boxes and their closes */
+html.touch .hwhelp{max-height:calc(100vh - 260px);max-height:calc(100dvh - 260px);right:max(8px, env(safe-area-inset-right,0px))}
+html.touch .hwhelp header button{width:44px;height:44px;font-size:15px}
+@media (max-height:480px){html.touch .bmenu-list,html.touch .ctlpanel{max-height:calc(100vh - 190px);max-height:calc(100dvh - 190px)}}
+html.tland .bmenu-list,html.tland .ctlpanel,html.tland .pu-city{max-height:calc(100vh - 120px);max-height:calc(100dvh - 120px)}
+/* the corners: gear, time chip, music pill, the log, the monitor and the pins keep clear of the notch and rounded corners on the sides too */
+html.touch .deck-toggle{width:44px;height:44px;right:max(8px, env(safe-area-inset-right,0px));top:calc(4px + env(safe-area-inset-top,0px))}
+html.touch .deck-toggle::before{width:18px;height:18px}
+html.touch .tstatus{left:max(10px, env(safe-area-inset-left,0px));font-size:11px}
+html.touch .gdeck{left:max(10px, env(safe-area-inset-left,0px))}
+html.touch #wirelog{top:calc(52px + env(safe-area-inset-top,0px));right:max(10px, env(safe-area-inset-right,0px))}
+html.touch .monitor,html.touch .mon-pins{top:calc(52px + env(safe-area-inset-top,0px));right:max(10px, env(safe-area-inset-right,0px))}
+html.touch .monitor{max-height:calc(100% - 68px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px))}
+html.touch .monitor header button{min-width:44px;min-height:44px;font-size:14px}
+html.touch #monClose{width:44px;height:44px}
+/* the big screens' closes (their own styles are added by overseer.js, policedesk.js and grid_panel.js; these win on touch) */
+html.touch #spire .close,html.touch #prec .close,html.touch #gridPanel .gx{min-height:44px;min-width:44px;font-size:12px;padding:0 14px}
+html.touch #tClose{min-height:44px;min-width:64px;font-size:12px}

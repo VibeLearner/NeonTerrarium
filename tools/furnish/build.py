@@ -22,6 +22,9 @@ if 'window.PODLAB_EMBED=true' not in html:
     sys.exit('the lab build has no embed mode (window.PODLAB_EMBED): update the lab')
 
 ver = lambda f: hashlib.sha1(open(os.path.join(REPO, 'furnish', f), 'rb').read()).hexdigest()[:10]
+# a real viewport (with viewport-fit=cover, so the safe-area insets are there on phones), unless the lab has one already
+if 'name="viewport"' not in html:
+    html = html.replace('<meta charset="utf-8">', '<meta charset="utf-8">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\">', 1)
 html = html.replace('<script>window.PODLAB_EMBED=true</script>',
                     '<script>window.PODLAB_EMBED=true;window.PODCITY_NOPACK=true</script>', 1)
 tail = ('<!-- Neon Terrarium: the game side (tools/furnish/build.py) -->\n'

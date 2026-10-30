@@ -44,6 +44,7 @@ function refreshMenu(){
 LK.onWeather = refreshMenu;
 refreshMenu();
 setInterval(() => {
+  if (typeof TOUCH !== 'undefined' && TOUCH.on && !document.body.classList.contains('deck-open')) return;   // (on a touch screen, only while Settings is open: nobody reads it otherwise)
   const w = LK.wx, wxn = w.rain > .02 || w.cloud > .02 ? (w.rain > .5 ? 'rain' : 'clouds' + (w.cloud < .98 || w.rain > .02 ? ' (changing)' : '')) : 'clear';
   status.textContent = (LK.pick === 'auto' ? 'Auto: ' : 'Locked: ') + LK.describe() + ' · weather ' + wxn;
 }, 400);

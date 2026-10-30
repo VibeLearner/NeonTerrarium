@@ -55,6 +55,11 @@ def load_report(R):
             L += ['', '| part of the game, in slow frames (perfhud) | total ms |', '|---|---|'] + [f"| {k} | {v} |" for k, v in pt]
         for f in (S.get('parts') or [])[:15]:
             L.append(f"- {f['t']/1000:.1f} s, {f['gap']} ms (sent {f.get('up')} KB, {f.get('links')} shader links): " + ', '.join(f"{k.strip()} {v}" for k, v in f['laps']))
+        fn = sorted((S.get('fn') or {}).items(), key=lambda kv: -kv[1]['ms'])
+        if fn:
+            L += ['', '| game step (includes what it calls) | calls | total ms | longest ms |', '|---|---|---|---|'] + [f"| {k} | {v['n']} | {v['ms']} | {v['max']} |" for k, v in fn]
+        if S.get('slowCalls'):
+            L += ['', 'Steps over 16 ms: ' + ', '.join(f"{t/1000:.1f}s {n} {ms}" for t, n, ms in S['slowCalls'])]
         L += ['', 'Frames per second, by second: ' + ' '.join(f"{t}:{n}" + (f"({w})" if w > 50 else '') for t, n, w in S.get('perSec', []))]
     return '\n'.join(L) + '\n'
 

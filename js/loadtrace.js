@@ -71,6 +71,17 @@
           const k = (sc.sourceURL || '').replace(location.origin, '').replace(/\?.*/, '') + ' ' + (sc.sourceFunctionName || sc.invoker || '?');
           const q = S.scripts[k] || (S.scripts[k] = { n: 0, ms: 0, max: 0 }); q.n++; q.ms += Math.round(sc.duration); q.max = Math.max(q.max, Math.round(sc.duration)); } } });
       obs.observe({ type: 'long-animation-frame', buffered: false }); } catch (e) { obs = null; }
+    // (the game's own steps, timed: each named function below is swapped for a timed copy while this records, so a slow tap or frame says which
+    //  step took the time; their times include the steps they call. Top-level functions only, which every caller reaches by name)
+    const FN = ['freshBuild', 'tapBuild', 'paintAt', 'pickAt', 'targetOf', 'applyTarget', 'addSection', 'removeAt', 'refresh', 'stageChain', 'stageStep', 'stageTake',
+      'rebuildCell', 'rebuildCellPost', 'holdRegion', 'releaseRegion', 'startAnim', 'scNote', 'rebuildRegion', 'flushSolid', 'solidStep', 'markSolidRegion',
+      'rebuildMega', 'spawnMegaAt', 'pmRestoreSync', 'syncAgents', 'rebuildConnections', 'applyRenderRes', 'freshTrim', 'freshRebuild', 'hlBuild', 'finishAnimsOn', 'stageFinishNear', 'dropView'];
+    const orig = {}; S.fn = {}; S.slowCalls = [];
+    for (const n of FN){ const f = self[n]; if (typeof f !== 'function') continue; orig[n] = f;
+      self[n] = function(){ const a = performance.now(); try { return f.apply(this, arguments); } finally { const ms = performance.now() - a, q = S.fn[n] || (S.fn[n] = { n: 0, ms: 0, max: 0 });
+        q.n++; q.ms += ms; if (ms > q.max) q.max = Math.round(ms*10)/10; if (ms > 16 && S.slowCalls.length < 150) S.slowCalls.push([Math.round(a), n, Math.round(ms)]); } }; }
+    const sp = g(() => sfx.play); if (sp){ orig.sfx = sp; sfx.play = function(){ const a = performance.now(); try { return sp.apply(this, arguments); } finally { const ms = performance.now() - a, q = S.fn['sfx.play'] || (S.fn['sfx.play'] = { n: 0, ms: 0, max: 0 }); q.n++; q.ms += ms; q.max = Math.max(q.max, Math.round(ms)); } }; }
+    const unwrap = () => { for (const n in orig) if (n === 'sfx') sfx.play = orig.sfx; else self[n] = orig[n]; for (const k in S.fn) S.fn[k].ms = Math.round(S.fn[k].ms); };
     // (the performance overlay's trace, kept hidden: each frame's time by part of the game, perfhud.js)
     const phWas = !!g(() => PH.on); g(() => { if (!PH.on) PH.toggle(); PH.traceStart(); });
     const t0 = now(); let last = performance.now(), leftAt = null, sec = { t: 0, n: 0, worst: 0 };
@@ -85,7 +96,7 @@
       const end = (leftAt !== null && ts - leftAt > 30000) || ts - t0 > 120000;
       pill.textContent = leftAt === null ? 'LOAD TEST · recording smoothness · tap Continue and play normally' : 'LOAD TEST · recording smoothness · play normally · ' + Math.max(0, Math.ceil(30 - (ts - leftAt)/1000)) + ' s';
       if (!end){ requestAnimationFrame(frame); return; }
-      if (obs) obs.disconnect(); pill.remove();
+      if (obs) obs.disconnect(); pill.remove(); unwrap();
       const tr = g(() => PH.traceStop()) || []; g(() => { if (PH.on && !phWas) PH.toggle(); });
       S.parts = tr.filter(f => f.gap > LONG).sort((a, b) => b.gap - a.gap).slice(0, 40).map(f => ({ t: Math.round(f.at), gap: f.gap, up: f.up, links: f.links, dels: f.dels,
         laps: f.laps.slice().sort((a, b) => b[1] - a[1]).slice(0, 8) }));

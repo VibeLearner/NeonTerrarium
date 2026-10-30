@@ -1,0 +1,36 @@
+# Copies phone benchmark results (?bench, js/bench.js) from the save server into the bench-results branch, every hour or on demand
+# (Actions tab, "Collect phone benchmarks", Run workflow). The branch is separate from main so results never redeploy the game.
+name: Collect phone benchmarks
+on:
+  schedule:
+    - cron: '23 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency: bench-collect
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: main
+          sparse-checkout: tools/bench
+      - name: Check out the results branch (made on the first run)
+        run: |
+          if git ls-remote --exit-code --heads "https://github.com/${{ github.repository }}" bench-results >/dev/null; then
+            git clone --depth 1 --branch bench-results "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" res
+          else
+            mkdir res && cd res && git init -b bench-results && git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}"
+          fi
+      - name: Copy new results
+        run: python3 main/tools/bench/collect.py res
+      - name: Commit
+        run: |
+          cd res
+          git config user.name "bench-collector"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then echo "nothing new"; exit 0; fi
+          git commit -m "Phone benchmark results"
+          git push origin bench-results

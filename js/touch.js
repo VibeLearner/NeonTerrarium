@@ -2,7 +2,7 @@
 // A device whose main pointer is a finger gets html.touch, and with it a layout of its own (css/style.css, the html.touch rules).
 // Upright (html.tport) or sideways (html.tland) changes the dock too. A mouse and keyboard see none of it: the desktop page is untouched.
 //  - the dock at the bottom: one row of small buttons (Buildings, Transport, City settings, ?), and under it the zones.
-//    Upright, only one zone shows at a time: swipe it (or tap the arrows) to go to the next. Sideways, all four, compact.
+//    Upright, only one zone shows at a time, the others stacked behind it: swipe it up or down for the next. Sideways, all four, compact.
 //  - no turn buttons (two fingers twist the view instead)
 //  - the hint line shows when it changes, then fades, and sits over the city instead of taking a row of its own
 //  - the time and the day in one small chip, top left; the music player as a small pill under it (tap its name to open it)
@@ -90,15 +90,46 @@ const TOUCH = (() => {
     for (const id of ['bmenuList', 'tmenuList']) if ($(id)) $(id).addEventListener('click', e => { const b = e.target.closest('.bitem'); if (b && !b.disabled) setTimeout(() => shut(), 0); });
     const view = $('view'); if (view) view.addEventListener('pointerdown', () => { shut(); open(false); });
 
-    // the zones, upright: one at a time. Swipe it sideways (or tap an arrow) for the next one; that zone is picked.
-    // A tap on the zone itself works as before (picks it, or lets it go). The arrows take the colour of the zone they lead to.
-    let items = [], cur = 0, prev = null, next = null;
+    // the zones, upright: one at a time, the others stacked behind it like a deck (their edges peek out above the card, in their colours).
+    // Swipe the card up for the next zone, down for the one before (sideways still works: left is next); it goes round, and that zone is picked.
+    // A tap on the zone itself works as before (picks it, or lets it go). The arrows (hidden on a touch screen) take the colour of the zone they lead to.
+    let items = [], cur = 0, prev = null, next = null, stack = null;
     // (items are the zone buttons; perimeter.js wraps each in a column with its Perimeter button after this runs, so the box is looked up each time)
     const zoneOf = it => it, box = z => z.closest('.zcol') || z;
+    const zc = k => zoneOf(items[(k + items.length) % items.length]).style.getPropertyValue('--z');
     const show = () => { items.forEach((it, k) => { it.classList.remove('tcur'); box(it).classList.toggle('tcur', k === cur); });
-      if (prev && next && items.length){ const z = k => zoneOf(items[(k + items.length) % items.length]).style.getPropertyValue('--z');
-        prev.style.setProperty('--z', z(cur - 1)); next.style.setProperty('--z', z(cur + 1)); } };
-    const step = n => { if (!items.length) return; cur = (cur + n + items.length) % items.length; show();
+      if (prev && next && items.length){ prev.style.setProperty('--z', zc(cur - 1)); next.style.setProperty('--z', zc(cur + 1)); }
+      // the deck: the next two zones peek out behind the card (only once the card sits in its column, so the zone button's own clipping can't hide them)
+      if (stack && !T.on) stack.remove();   // (a mouse and keyboard never get it)
+      else if (stack && items.length){ const b = box(items[cur]);
+        if (b !== items[cur]){ if (stack.parentNode !== b) b.appendChild(stack);
+          stack.style.setProperty('--z1', zc(cur + 1)); stack.style.setProperty('--z2', zc(cur + 2));
+          stack.children[0].hidden = items.length < 2; stack.children[1].hidden = items.length < 3; } } };
+    // the move between cards: short, transform and opacity only, and none at all with the player's own Reduce motion (html.nt-calm).
+    // Up (next): the card lifts away and the one behind it comes forward. Down (the one before): that zone drops in from above and the card sinks into the deck.
+    // The card going away is a copy of it, drawn over (or under) the new one for the length of the move and then removed.
+    const calm = () => root.classList.contains('nt-calm');
+    const EASE = 'cubic-bezier(.2,.7,.2,1)', MS = 220, DECK = 'translateY(-6px) scale(.92)';
+    const swap = (n, ob, r, dy) => {
+      const nb = box(items[cur]);
+      if (!zones || calm() || ob === nb || !nb.animate || !root.classList.contains('tport') || !r.width) return;
+      const zr = zones.getBoundingClientRect();
+      const g = ob.cloneNode(true); g.classList.remove('tcur'); g.classList.add('zghost'); g.setAttribute('aria-hidden', 'true');
+      for (const s of g.querySelectorAll('.zstack')) s.remove();
+      for (const e of [g, ...g.querySelectorAll('*')]){ e.removeAttribute('id'); e.removeAttribute('data-zone'); e.removeAttribute('data-perim'); if (e.tagName === 'BUTTON') e.tabIndex = -1; }
+      Object.assign(g.style, { left: (r.left - zr.left) + 'px', top: (r.top - dy - zr.top) + 'px', width: r.width + 'px', height: r.height + 'px', transform: '', zIndex: n > 0 ? 2 : 0 });
+      zones.appendChild(g);
+      const from = { transform: 'translateY(' + dy + 'px)', opacity: 1 };
+      const out = n > 0 ? [from, { transform: 'translateY(' + (Math.min(dy, 0) - 22) + 'px) scale(.97)', opacity: 0 }] : [from, { transform: DECK, opacity: 0 }];
+      const inn = n > 0 ? [{ transform: DECK, opacity: .45 }, { transform: 'none', opacity: 1 }] : [{ transform: 'translateY(-22px)', opacity: 0 }, { transform: 'none', opacity: 1 }];
+      const done = () => g.remove(), a = g.animate(out, { duration: MS, easing: EASE, fill: 'forwards' });
+      a.onfinish = done; a.oncancel = done; setTimeout(done, MS + 200);
+      nb.animate(inn, { duration: MS, easing: EASE });
+    };
+    // dy: how far the finger had already moved the card (it carries on from there)
+    const step = (n, dy) => { if (!items.length) return; dy = dy || 0;
+      const ob = box(items[cur]), r = ob.getBoundingClientRect(); ob.style.transform = '';
+      cur = (cur + n + items.length) % items.length; show(); swap(n, ob, r, dy);
       const z = zoneOf(items[cur]); if (z && !z.classList.contains('on')) z.click(); };
     T.zoneStep = step;
     if (zones){
@@ -108,15 +139,28 @@ const TOUCH = (() => {
         next = document.createElement('button'); next.className = 'zarr znext'; next.setAttribute('aria-label', 'Next zone'); next.textContent = '›';
         items[0].before(prev); items[items.length - 1].after(next);
         prev.addEventListener('click', () => step(-1)); next.addEventListener('click', () => step(1));
+        stack = document.createElement('span'); stack.className = 'zstack'; stack.setAttribute('aria-hidden', 'true'); stack.innerHTML = '<i></i><i></i>';
         // follow the zone that's picked, however it was picked
         const sync = () => { const k = items.findIndex(it => { const z = zoneOf(it); return z && z.classList.contains('on'); }); if (k >= 0 && k !== cur){ cur = k; show(); } };
         for (const it of items){ const z = zoneOf(it); if (z) new MutationObserver(sync).observe(z, { attributes: true, attributeFilter: ['class'] }); }
-        // the swipe: a sideways flick on the zone card
+        // the swipe: up or down on the zone card (the card follows the finger a little, then moves on or settles back); sideways still works.
+        // The card area keeps the gesture to itself (touch-action:none in the CSS), so it never pans the page or the city.
         let sw = null, eat = false;
-        zones.addEventListener('pointerdown', e => { if (!T.on || !root.classList.contains('tport') || e.pointerType === 'mouse') return; if (!e.target.closest('.zone,.zcol')) return; sw = { x: e.clientX, y: e.clientY }; });
-        zones.addEventListener('pointerup', e => { if (!sw) return; const dx = e.clientX - sw.x, dy = e.clientY - sw.y; sw = null;
-          if (Math.abs(dx) > 28 && Math.abs(dx) > Math.abs(dy)*1.3){ step(dx < 0 ? 1 : -1); eat = true; setTimeout(() => { eat = false; }, 350); } });
-        zones.addEventListener('pointercancel', () => { sw = null; });
+        const card = () => box(items[cur]);
+        zones.addEventListener('pointerdown', e => { if (!T.on || !root.classList.contains('tport') || e.pointerType === 'mouse') return; if (!e.target.closest('.zone,.zcol')) return;
+          sw = { x: e.clientX, y: e.clientY, id: e.pointerId, dy: 0 }; });
+        zones.addEventListener('pointermove', e => { if (!sw || e.pointerId !== sw.id) return; const dx = e.clientX - sw.x, dy = e.clientY - sw.y;
+          if (calm() || Math.abs(dy) < Math.abs(dx)){ if (sw.dy){ sw.dy = 0; card().style.transform = ''; } return; }
+          sw.dy = Math.max(-18, Math.min(18, dy*.4)); card().style.transform = 'translateY(' + sw.dy + 'px)'; });
+        const settle = () => { const c = card(), d = sw ? sw.dy : 0; c.style.transform = '';
+          if (d && !calm() && c.animate) c.animate([{ transform: 'translateY(' + d + 'px)' }, { transform: 'none' }], { duration: 160, easing: EASE }); };
+        const eatClick = () => { eat = true; setTimeout(() => { eat = false; }, 350); };
+        zones.addEventListener('pointerup', e => { if (!sw || e.pointerId !== sw.id) return; const dx = e.clientX - sw.x, dy = e.clientY - sw.y, d = sw.dy;
+          if (Math.abs(dy) > 24 && Math.abs(dy) > Math.abs(dx)*1.2){ sw = null; step(dy < 0 ? 1 : -1, d); eatClick(); return; }
+          settle(); sw = null;
+          if (Math.abs(dx) > 28 && Math.abs(dx) > Math.abs(dy)*1.3){ step(dx < 0 ? 1 : -1); eatClick(); }
+          else if (Math.abs(dx) > 12 || Math.abs(dy) > 12) eatClick(); });
+        zones.addEventListener('pointercancel', () => { if (sw){ settle(); sw = null; } });
         zones.addEventListener('click', e => { if (eat && e.target.closest('.zone,.perim')){ e.stopPropagation(); e.preventDefault(); eat = false; } }, true);   // (the swipe's own tap doesn't toggle the zone)
         show(); setTimeout(show, 0);
       }

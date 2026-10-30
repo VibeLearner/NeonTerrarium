@@ -695,6 +695,23 @@ html.touch .zones > .bmenu-head.tside[aria-expanded="true"]{background:rgba(56,2
 html.tport .zones > .tcur{min-width:0;flex:1 1 140px;max-width:180px}
 html.tland .zones > .bmenu-head.tside{height:44px;width:auto;min-width:118px;justify-content:center;padding:0 10px;flex-direction:row;gap:7px}
 html.tland .zones > .bmenu-head.tside::before{margin:0}
+/* the zone card, upright (owner, Oct 30): the other zones stacked behind it like a deck, their top edges peeking out in their colours, smaller and dimmer
+   the further back they are. Swiped up or down (touch.js); the card area keeps the gesture to itself. The move between cards is touch.js's too
+   (transform and opacity only); .zghost is the copy of the card going away, for the length of that move. */
+.zstack{display:none}
+html.tport .zones{position:relative;touch-action:none}
+html.tport .zones > .zcol.tcur{position:relative;z-index:1}
+html.tport .zones > .zcol.tcur > .zstack{display:block;position:absolute;left:0;right:0;top:0;height:0;z-index:-1;pointer-events:none}
+html.tport .zstack i{position:absolute;top:-4px;left:7%;right:7%;height:14px;--cut:6px;
+  background:linear-gradient(180deg, color-mix(in srgb, var(--z1) 70%, #0a1020) 0 1.5px, color-mix(in srgb, var(--z1) 24%, #0a1020) 1.5px);
+  clip-path:polygon(var(--cut) 0,100% 0,100% 100%,0 100%,0 var(--cut))}
+html.tport .zstack i + i{top:-8px;left:14%;right:14%;opacity:.55;
+  background:linear-gradient(180deg, color-mix(in srgb, var(--z2) 70%, #0a1020) 0 1.5px, color-mix(in srgb, var(--z2) 24%, #0a1020) 1.5px)}
+html.tport .zstack i[hidden]{display:none}
+html.tport .zones > .zcol.zghost{display:flex;position:absolute;margin:0;pointer-events:none;box-sizing:border-box}
+html.tport .zones > .zcol.zghost .zone{transition:none}
+/* (the hint line sits a little higher, clear of the deck's edges) */
+html.tport .zonebar > #modeHint{bottom:calc(100% + 14px)}
 /* the lists: a panel above the dock, full width */
 html.touch .zonebar > .bmenu-list{grid-auto-flow:row;grid-template-rows:none;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));grid-auto-columns:auto;align-content:start;
   padding:6px;background:rgba(6,9,20,.95);border:1px solid var(--line);bottom:calc(100% + 34px)}

@@ -23,7 +23,7 @@ const TUT = (() => {
   const BEATS = [
     { id: 'pan', say: 'Drag to look around', at: center, ghost: 'drag', ev: 'pan' },
     { id: 'zoom', say: 'Pinch to zoom', at: center, ghost: 'pinch', ev: 'zoom' },
-    { id: 'zone', say: 'Swipe the zone card, or tap it', at: () => rectOf(zoneCard()), ghost: 'swipe', test: () => !!S.zone },
+    { id: 'zone', say: 'Swipe the zone card up or down, or tap it', at: () => rectOf(zoneCard()), ghost: 'up', test: () => !!S.zone },
     { id: 'build', say: 'Tap anywhere on the platform to build', at: center, ghost: 'tap', ev: 'build', need: () => !!S.zone, pre: 'Pick a zone first' },
     { id: 'trim', say: 'Build, then tap it again, quickly: one floor', at: atFresh, ghost: 'tap2', ev: 'trim' },
     { id: 'resize', say: 'Build, tap it again and drag up: its height', at: atFresh, ghost: 'up', ev: 'resize' },

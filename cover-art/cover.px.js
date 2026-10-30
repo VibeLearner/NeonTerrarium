@@ -6,26 +6,26 @@ const W = 630, H = 500, FRAMES = 48
 
 const PAL = {
   // sky, blue-violet at the top -> magenta -> pink near the city
-  0: "#34389f", 1: "#4439a8", 2: "#5c3fae", 3: "#7646ac", 4: "#964ca6", 5: "#b4529f", 6: "#d0629d",
+  0: "#34389f", 1: "#4439a8", 2: "#5c3fae", 3: "#7646ac", 4: "#8e48a2", 5: "#a84c9a", 6: "#c25a98",
   // clouds: lit top, mauve, plum, shadow
   a: "#c4669f", b: "#ac518d", c: "#8f4388", d: "#6f3a7c",
   // walls as (top / lit side / shadow side), every one built from the sky: dusk rose, mauve, lavender grey,
   // periwinkle, deep plum, peach clay (warm accent), soft violet-teal (cool accent)
-  R: "#b46a86", r: "#8a4c6a", u: "#5c3049",
-  P: "#9a6aa0", p: "#74497c", q: "#4c2e56",
-  S: "#8a86b0", s: "#66628a", t: "#444064",
-  K: "#6c7cb8", k: "#4e5a8e", l: "#343c64",
-  D: "#6a3a6e", E: "#4c2852", e: "#321a38",
-  T: "#d48a86", U: "#a8646a", m: "#74404c",
-  f: "#5f8aa8", i: "#456886", j: "#2f4862",
+  R: "#62344e", r: "#4a243a", u: "#321c42",
+  P: "#54345e", p: "#36203f", q: "#2e1a3c",
+  S: "#6e3632", s: "#502a2a", t: "#3a1e2c",
+  K: "#364270", k: "#28325a", l: "#261e44",
+  D: "#3e1e46", E: "#301836", e: "#26142e",
+  T: "#7a4650", U: "#582c38", m: "#321c42",
+  f: "#2e485e", i: "#22364a", j: "#221e40",
   // homes at dusk: peach, honey, soft pink, cool white-blue, shop gold; unlit deep plum
-  y: "#ffb48a", h: "#ffd08a", z: "#ff9ac8", v: "#cfe6ff", Y: "#ffc94a", w: "#2a1838",
+  y: "#ff9a6a", h: "#ffd27a", z: "#ff8ac0", v: "#d8ecff", Y: "#ffc94a", w: "#2a1838", L: "#ffb050",
   // neon: pink, magenta, cyan, violet, mint
-  H: "#ff4fb0", M: "#e02fd0", n: "#5ef0ff", V: "#8a5bff", N: "#6dffc8",
+  H: "#ff72c8", M: "#ff64f4", n: "#7af4ff", V: "#b088ff", N: "#6dffc8",
   // dusk greens: lit, mid, shade
-  g: "#78c88a", o: "#4a9a72", O: "#2c5e58",
+  g: "#4e9066", o: "#2f6250", O: "#20423f",
   // streets and shadows, the dusk violet of the haze, the pink rim light
-  A: "#2a1a48", B: "#34205a", Q: "#61298a", Z: "#f08592",
+  A: "#2a1a48", B: "#2e1c50", Q: "#61298a", Z: "#f08592",
   // title: coral, purple, mint, ink, pale pink
   C: "#ff4a6e", X: "#3b1a5c", G: "#3dffcf", I: "#170f3a", J: "#f7c6d6",
   // star cream, pale pink-white, red lights
@@ -86,7 +86,7 @@ const paintPts = (pts, sink) => {
 // ================================================================ sky
 const SKYV = (x, y) => {
   let v = 6.2 * Math.pow(clamp(y / 400, 0, 1), 0.95)
-  v += 1.5 * Math.exp(-Math.hypot((x - 390) / 1.4, (y - 320) * 0.9) / 120)      // a pinker glow right behind the city
+  v += 0.7 * Math.exp(-Math.hypot((x - 390) / 1.4, (y - 320) * 0.9) / 120)      // a pinker glow right behind the city
   v -= 0.5 * clamp((x - 330) / 300, 0, 1) * clamp(1 - y / 260, 0, 1)      // bluer at the top right
   return clamp(v, 0, 6)
 }
@@ -168,13 +168,10 @@ const nearestKey = (r, g, b) => {
   for (const k of SNAP) { const c = KEYRGB[k]; const d = (c[0] - r) ** 2 + (c[1] - g) ** 2 + (c[2] - b) ** 2; if (d < bd) { bd = d; best = k } }
   return best
 }
-const levelFor = (yBase) => {
-  const f = yBase >= 500 ? 0 : yBase >= 470 ? 0.3 * (500 - yBase) / 30 : 0.3 + 0.25 * clamp((470 - yBase) / 140, 0, 1)
-  return Math.round(f * 20)
-}
-const darkFor = (cx, yBase) => Math.round(clamp((380 - cx) / 170, 0, 1) * clamp((yBase - 350) / 100, 0, 1) * 0.42 * 20)
+const levelFor = (yBase) => (yBase >= 400 ? 0 : Math.round(20 * (0.15 + 0.1 * clamp((400 - yBase) / 80, 0, 1))))
+const darkFor = (cx, yBase) => Math.round(clamp((380 - cx) / 170, 0, 1) * clamp((yBase - 350) / 100, 0, 1) * 0.55 * 20)
 const tintCache = new Map()
-const LIGHTKEYS = new Set("yhzvYnHMVN")
+const LIGHTKEYS = new Set("yhzvYnHMVNL")
 const tintKey = (k, hz, dk, wm) => {
   if (LIGHTKEYS.has(k)) { hz = Math.round(hz * 0.3); dk = Math.round(dk * 0.4); wm = 0 }
   if (!hz && !dk && !wm) return k
@@ -207,7 +204,7 @@ const grounded = (x, y, k) => {
 const FK = (x, y, k) => { const i = y * W + x; const kk = tintKey(k, DEPTH[i], DARK[i], WARM[i]); return CITY[i] ? grounded(x, y, kk) : kk }
 
 // ---------------------------------------------------------------- glow
-const EMIT = new Set("yhzvYVNHMn")
+const EMIT = new Set("yhzvYVNHMnL")
 const glowAround = (pts, k, reach = 2, sink) => {
   const set = new Set(pts.map(([x, y]) => x + y * W))
   for (const [x, y] of pts) for (let dy = -reach; dy <= reach; dy++) for (let dx = -reach; dx <= reach; dx++) {
@@ -268,15 +265,16 @@ const wallXY = (side, m, u, r) => side === "L"
 
 // ---------------------------------------------------------------- colours of the buildings
 const FAMS = {
-  rose: { top: "R", L: "r", R: "u" }, mauve: { top: "P", L: "p", R: "q" }, lav: { top: "S", L: "s", R: "t" },
+  rose: { top: "R", L: "r", R: "u" }, mauve: { top: "P", L: "p", R: "q" }, terra: { top: "S", L: "s", R: "t" },
   peri: { top: "K", L: "k", R: "l" }, plum: { top: "D", L: "E", R: "e" }, peach: { top: "T", L: "U", R: "m" }, teal: { top: "f", L: "i", R: "j" },
 }
-const FAMMAIN = ["rose", "mauve", "lav", "peri", "plum"]
+const FAMMAIN = ["rose", "plum", "peach", "terra", "rose", "plum", "terra", "peach", "mauve"]
 const ACCENTS = ["H", "H", "H", "H", "M", "M", "n", "n", "n", "V", "N"]
-const WCOLS = ["h", "h", "h", "y", "y", "z", "z", "v", "v"]
+const WCOLS = ["L", "L", "h", "h", "y", "y", "z", "z", "v", "v"]      // six in ten warm
 const WALLSET = new Set("RruPpqSstKklDEeTUmfijAB")
-const HALO = { h: "T", y: "T", z: "R", v: "S", Y: "T" }
-const HALO2 = { h: "U", y: "U", z: "r", v: "s", Y: "U" }
+const HALO = { L: "y", h: "L", y: "y", z: "H", v: "n", Y: "L" }
+const HALO2 = { L: "T", h: "T", y: "T", z: "R", v: "K", Y: "T" }
+const HALO3 = { L: "U", h: "U", y: "U", z: "r", v: "k", Y: "U" }
 
 // ---------------------------------------------------------------- foliage, dusk greens
 const canopy = (cx, cy, r, seed) => {
@@ -307,14 +305,14 @@ const vine = (x, y, len, seed) => {
   }
 }
 const stringLights = (x1, y1, x2, y2, sag, seed) => {
-  const dx = x2 - x1, n = Math.max(2, Math.floor(Math.abs(dx) / 7)), cols = ["h", "z", "y", "v"]
+  const dx = x2 - x1, n = Math.max(2, Math.floor(Math.abs(dx) / 7)), cols = ["h", "L", "y", "z"]
   for (let x = Math.min(x1, x2); x <= Math.max(x1, x2); x++) { const t = (x - x1) / dx; put(x, Math.round(y1 + (y2 - y1) * t + sag * (1 - Math.pow(2 * t - 1, 2))), "E") }
   const pts = []
   for (let i = 0; i <= n; i++) {
     const t = i / n, x = Math.round(x1 + dx * t), y = Math.round(y1 + (y2 - y1) * t + sag * (1 - Math.pow(2 * t - 1, 2))) + 1
     rectK(x, y, 2, 2, cols[(i + seed) % cols.length]); pts.push([x, y], [x + 1, y], [x, y + 1], [x + 1, y + 1])
   }
-  glowAround(pts, "T", 2)
+  glowAround(pts, "T", 3)
 }
 const GROUNDSET = new Set("AB")
 const pool = (cx, cy, rx, ry, k, dens) => {
@@ -344,7 +342,7 @@ const TANKS = (x, y, rx, h, fam) => {
 const acUnit = (side, m, u, r) => {
   for (let i = 0; i < 7; i++) for (let j = 0; j < 5; j++) {
     const [x, y] = wallXY(side, m, u + i, r + j)
-    put(x, y, j === 0 ? "S" : (i > 1 && i < 5 && j > 1) ? "t" : i === 6 ? "s" : "S")
+    put(x, y, j === 0 ? "K" : (i > 1 && i < 5 && j > 1) ? "l" : i === 6 ? "k" : "K")
   }
 }
 const antenna = (x, y, L, id) => {
@@ -429,17 +427,25 @@ const haloPass = () => {
       if (!WALLSET.has(get(nx, ny)) || ((nx + ny) & 1)) continue
       ring.push([nx, ny, hk, get(nx, ny)])
     }
-    // a second, fainter ring a little further out
+    // a second and a third, fainter ring further out
     const R1 = new Set(ring.map((q) => q[0] + q[1] * W))
-    const hk2 = HALO2[rec.on] || "U", ring2 = []
+    const hk2 = HALO2[rec.on] || "U", hk3 = HALO3[rec.on] || "m", ring2 = [], ring3 = []
+    const R2 = new Set()
     for (const q of ring) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]) {
       const nx = q[0] + dx, ny = q[1] + dy, ni = nx + ny * W
       if (!inb(nx, ny) || P.has(ni) || R1.has(ni) || seen.has(ni)) continue
-      seen.add(ni)
+      seen.add(ni); R2.add(ni)
       if (!WALLSET.has(get(nx, ny)) || (nx & 1) || (ny & 1)) continue
       ring2.push([nx, ny, hk2, get(nx, ny)])
     }
-    for (const q of [...ring, ...ring2]) { rec.pts.push(q); if (rec.lit) put(q[0], q[1], q[2]) }
+    for (const q of ring2) for (const [dx, dy] of [[2, 0], [-2, 0], [0, 2], [0, -2]]) {
+      const nx = q[0] + dx, ny = q[1] + dy, ni = nx + ny * W
+      if (!inb(nx, ny) || P.has(ni) || R1.has(ni) || seen.has(ni)) continue
+      seen.add(ni)
+      if (!WALLSET.has(get(nx, ny)) || ((nx + 2 * ny) % 5)) continue
+      ring3.push([nx, ny, hk3, get(nx, ny)])
+    }
+    for (const q of [...ring, ...ring2, ...ring3]) { rec.pts.push(q); if (rec.lit) put(q[0], q[1], q[2]) }
   }
   curWins = []
 }
@@ -449,7 +455,7 @@ const newWin = (lit, on, halo = true) => { const rec = { pts: [], lit, on, halo 
 function stack(o) {
   const { a, b, w, d, n, fh, fam, id } = o
   const plate = o.plate ?? 3, ins = o.ins ?? 0.15
-  const pw = o.pw ?? 4, pier = o.pier ?? 3, per = pw + pier
+  const pw = o.pw ?? 4, pier = o.pier ?? 2, per = pw + pier
   const wcol = o.wcol ?? "h"
   let z = o.z0 || 0
   const post = []
@@ -459,7 +465,7 @@ function stack(o) {
     const last = f === n - 1
     const fhf = o.fhFor ? o.fhFor(f) : fh
     const hb = fhf - plate
-    const wh = o.wh ?? Math.min(5, hb - 3), wy0 = o.wy0 ?? 2
+    const wh = o.wh ?? Math.min(6, hb - 3), wy0 = o.wy0 ?? 2
     const dx = o.twist ? Math.round(o.twist * Math.sin(f * 1.37 + id)) : 0
     const grow = o.over && f >= n * 0.45 ? o.over : 0
     const A = a + dx / (2 * ISO) - grow, B = b - dx / (2 * ISO) - grow, Wd = w + 2 * grow, Dd = d + 2 * grow
@@ -478,8 +484,8 @@ function stack(o) {
       let rec = panes.get(pk)
       if (!rec) {
         const q = ih(id * 131 + col, f * 7 + (side === "L" ? 1 : 2), 17), t = ih(id + col * 3, f, 5)
-        const lit = o.bright ? (fq < (o.litP ?? 0.85) && q < 0.92) : (col % 5 !== 4 && q < 0.5 * ff)
-        const on = o.bright ? (o.glass === "white" ? (t < 0.3 ? "h" : "F") : t < 0.12 ? "Y" : t < 0.55 ? "h" : "y") : (t < 0.84 ? wcol : ["h", "y", "z", "v"][Math.floor(t * 40) % 4])
+        const lit = o.bright ? (fq < (o.litP ?? 0.85) && q < 0.92) : fq < 0.2 ? q < 0.1 : fq < 0.68 ? q < 0.94 : (col % 5 !== 4 && q < 0.55)      // dark floors, glowing bands, mixed floors
+        const on = o.bright ? (o.glass === "white" ? (t < 0.3 ? "h" : "F") : t < 0.12 ? "Y" : t < 0.55 ? "h" : "y") : (t < 0.86 ? wcol : ["L", "h", "y", "v"][Math.floor(t * 40) % 4])
         rec = newWin(lit, on, !o.bright)
         panes.set(pk, rec)
       }
@@ -559,7 +565,7 @@ function cylinder(o) {
           if (mull) k = fam.R
           else {
             const q = ih(id * 131 + col, f * 7, 17)
-            k = col % 4 !== 3 && q < 0.5 * ff ? (t > 0.45 ? "y" : wcol) : "w"
+            k = (fq < 0.28 ? q < 0.1 : fq < 0.6 ? q < 0.93 : (col % 4 !== 3 && q < 0.5)) ? (t > 0.45 ? "y" : wcol) : "w"
           }
         }
         put(x, y, k)
@@ -674,11 +680,11 @@ for (const bd of blds) bd.h = heightOf(bd)
 // ---------------------------------------------------------------- what each type puts on its walls
 const pickFam = (bd, i) => {
   const r = ih(bd.id, 2, 3)
-  if (r < 0.16) return "peach"
-  if (r < 0.28) return "teal"
   let k = Math.floor(ih(bd.id, 12, 3) * FAMMAIN.length)
   if (bd.type === "glass") return "peri"
-  if (bd.type === "industrial") return ["plum", "peri", "lav"][k % 3]
+  if (r < 0.09) return "teal"
+  if (r < 0.17) return "peri"
+  if (bd.type === "industrial") return ["plum", "plum", "mauve", "terra"][k % 4]
   return FAMMAIN[(k + i) % FAMMAIN.length]
 }
 const wallBoards = (bd, m, n, accent, wk, kinds, base = 8) => {
@@ -707,7 +713,7 @@ const drawBuilding = (bd) => {
   const accent = ACCENTS[Math.floor(ih(id, 5, 3) * ACCENTS.length)]
   const trims = [accent, accent]
   const wcol = WCOLS[Math.floor(ih(id, 6, 3) * WCOLS.length)]
-  const trimB = ih(id, 52, 3) < 0.35
+  const trimB = ih(id, 52, 3) < 0.45
   const wk = [fam.L, fam.R, "A"]
   const type = bd.type
   const H0 = bd.h
@@ -720,7 +726,7 @@ const drawBuilding = (bd) => {
     for (let k = 0; k < 3; k++) {
       const tw = Math.min(0.4 * k, (w - 0.7) / 2), td = Math.min(0.4 * k, (d - 0.7) / 2)
       const ma = a0 + tw, mb = b0 + td, mw = w - 2 * tw, md = d - 2 * td
-      st = stack({ a: ma, b: mb, w: mw, d: md, z0: z, n: ns[k], fh, fam, id: id * 3 + k, trims, pw: 2, pier: 3, wcol, trimB: trimB && k === 2, plantP: 0.34, vineP: 0.2 })
+      st = stack({ a: ma, b: mb, w: mw, d: md, z0: z, n: ns[k], fh, fam, id: id * 3 + k, trims, pw: 3, pier: 2, wcol, trimB: trimB && k === 2, plantP: 0.34, vineP: 0.2 })
       mods.push({ a: ma, b: mb, w: mw, d: md, z, h: ns[k] * fh, n: ns[k], fh })
       z = st.z
     }
@@ -753,7 +759,7 @@ const drawBuilding = (bd) => {
         let rec = panes.get(pk)
         if (!rec) {
           const q = ih(id * 131 + col, f * 7 + (side === "L" ? 1 : 2), 17), t = ih(id + col, f, 5)
-          rec = newWin(q < 0.5 && col % 4 !== 3, t < 0.86 ? wcol : "v", true)
+          rec = newWin(ih(id, f, 3) < 0.28 ? q < 0.1 : ih(id, f, 3) < 0.6 ? q < 0.93 : (q < 0.5 && col % 4 !== 3), t < 0.86 ? wcol : "v", true)
           panes.set(pk, rec)
         }
         rec.pts.push([x, y, rec.on, "w"])
@@ -776,7 +782,7 @@ const drawBuilding = (bd) => {
     mods.push(top)
     const [rx, ry] = [PXs(a0 + w / 2, b0 + d / 2), PYs(a0 + w / 2, b0 + d / 2) - h]
     antenna(rx + 4, ry - 2, 16 + Math.floor(ih(id, 100, 6) * 10), id)
-    spr(rx - 10, ry + 2, ["SSSSSs", "SttttS", "SttttS", "ssssss"])
+    spr(rx - 10, ry + 2, ["KKKKKk", "KllllK", "KllllK", "kkkkkk"])
     if (ih(id, 102, 6) < 0.5) hedge(rx + 12, ry + 6, 8, id)
   } else if (type === "pod") {
     const fh = 12, n = Math.max(5, Math.round(H0 / fh))
@@ -838,7 +844,7 @@ const drawBuilding = (bd) => {
     wallBoards(bd, m0, 2, accent, wk, ["board", "icon"], 22)
     // warm shop light pooling on the street in front
     const [px, py] = [PXs(a0, b0 + d) + Math.round(ISO * w * 0.5), PYs(a0, b0 + d) + 3]
-    pool(px, py + 3, 22, 7, "y", 0.7)
+    pool(px, py + 3, 30, 9, "L", 0.85); pool(px, py + 3, 20, 6, "y", 0.8)
     const rb = st.roofBox
     const [x1, y1] = rb.pt(a0 + 0.2, b0 + d - 0.2), [x2, y2] = rb.pt(a0 + w - 0.2, b0 + d - 0.2)
     stringLights(x1 + 2, y1 - 8, x2 - 2, y2 - 8, 4, id)
@@ -860,7 +866,7 @@ const drawBuilding = (bd) => {
     const rb = st.roofBox
     const [cx2, cy2] = rb.pt(a0 + w / 2, b0 + d / 2)
     wallBoards(bd, m0, 1, accent, wk, ["board", "strip"], 16)
-    TANKS(cx2 - 14, cy2 + 2, 7, 12, FAMS.lav)
+    TANKS(cx2 - 14, cy2 + 2, 7, 12, FAMS.mauve)
     TANKS(cx2 + 6, cy2 + 6, 5, 9, FAMS.peri)
     rectK(cx2 + 16, cy2 - 4, 8, 6, "t"); hlineK(cx2 + 16, cy2 - 4, 8, "S"); for (let i = 0; i < 3; i++) hlineK(cx2 + 17, cy2 - 2 + i * 2, 6, "l")
     for (let j = 0; j < 22; j++) rectK(cx2 - 2, cy2 - 6 - j, 5, 1, j % 6 < 2 ? "S" : "s")
@@ -880,7 +886,7 @@ const drawTower = () => {
   // a stepped, wide base with plants
   stack({ a: 90, b: 21, w: 4, d: 4, n: 3, fh: 8, plate: 2, ins: 0.22, fam: F.rose, id: 9901, bright: true, trimAll: true, trims: ["H", "n"], pw: 6, pier: 1, wh: 4, wy0: 1, litP: 0.8, plantP: 0.7 })
   // the white-lit body, windows in pale rows
-  stack({ a: 90.3, b: 21.3, w: 3.4, d: 3.4, z0: 24, n: 13, fh: 8, plate: 2, ins: 0.22, fam: F.lav, id: 9902, bright: true, trimAll: true, trims: ["h", "z"], pw: 4, pier: 1, wh: 4, wy0: 1, litP: 0.95, plantP: 0.55, glass: "white" })
+  stack({ a: 90.3, b: 21.3, w: 3.4, d: 3.4, z0: 24, n: 13, fh: 8, plate: 2, ins: 0.22, fam: F.terra, id: 9902, bright: true, trimAll: true, trims: ["h", "z"], pw: 4, pier: 1, wh: 4, wy0: 1, litP: 0.95, plantP: 0.55, glass: "white" })
   // a twisting stack of thick plates
   stack({ a: 90.75, b: 21.75, w: 2.5, d: 2.5, z0: 128, n: 10, fh: 9, plate: 2, ins: 0.22, fam: F.mauve, id: 9903, bright: true, trimAll: true, trims: ["h", "H"], pw: 4, pier: 1, wh: 5, wy0: 1, litP: 0.7, plantP: 0.3, twist: 3 })
   // a warm peach block with a lit crown line
@@ -929,7 +935,7 @@ for (let a = 12; a <= 70; a++) for (let b = 0; b <= 40; b++) {
   curLevel = levelFor(cy); curDark = darkFor(cx, cy)
   if (q < 0.18) pool(cx, cy, 12, 5, "H", 0.5)
   else if (q < 0.36) pool(cx, cy, 12, 5, "n", 0.5)
-  else if (q < 0.46) pool(cx, cy, 10, 4, "y", 0.5)
+  else if (q < 0.62) { pool(cx, cy, 14, 6, "L", 0.8); pool(cx, cy, 8, 3, "y", 0.7) }
 }
 curLevel = 0
 const props = []
@@ -958,7 +964,7 @@ for (const e of order) {
     hedge(pcx - 58, pcy + 8, 14, 3); hedge(pcx + 44, pcy + 8, 14, 5)
     for (const [tx, ty, r] of [[pcx - 52, pcy - 2, 6], [pcx - 22, pcy - 10, 5], [pcx + 20, pcy - 14, 6], [pcx + 54, pcy - 4, 5], [pcx - 34, pcy + 14, 5], [pcx + 40, pcy + 14, 6]]) tree(tx, ty + r + 2, r, tx + ty)
     const posts = [[pcx - 62, pcy], [pcx, pcy - 30], [pcx + 62, pcy], [pcx, pcy + 30]]
-    for (const [x, y] of posts) { vlineK(x, y - 24, 24, "E"); rectK(x - 1, y - 26, 3, 2, "h"); pool(x, y + 2, 12, 5, "y", 0.5) }
+    for (const [x, y] of posts) { vlineK(x, y - 24, 24, "E"); rectK(x - 1, y - 26, 3, 2, "h"); pool(x, y + 2, 16, 6, "L", 0.8) }
     for (let i = 0; i < 4; i++) { const [x1, y1] = posts[i], [x2, y2] = posts[(i + 1) % 4]; stringLights(x1, y1 - 22, x2, y2 - 22, 6, i) }
     curLevel = 0; curDark = 0
   } else drawBuilding(e.b)
@@ -981,15 +987,20 @@ for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
   const i = y * W + x
   if (!CITY[i] || TOWER_MASK[i]) continue
   const d = Math.hypot((x - 552) / 1.25, y - 410)
-  WARM[i] = Math.round(20 * 0.26 * Math.pow(clamp(1 - d / 120, 0, 1), 1.2))
+  WARM[i] = Math.round(20 * 0.11 * Math.pow(clamp(1 - d / 120, 0, 1), 1.2))
 }
 recordCity = false
 for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = y * W + x; if (CITY[i]) fb[i] = IDX[FK(x, y, KEYS[fb[i]])] }
-// a 1 px soft pink rim along the skyline against the clouds, and along the left edge
-for (let y = 1; y < H; y++) for (let x = 1; x < W; x++) {
+// a 1 px pink rim along the skyline against the clouds, a warm edge under it, and the last dusk light on the left sides
+const LITK = new Set("LhzvyYnHMVN")
+for (let y = 2; y < H; y++) for (let x = 1; x < W; x++) {
   const i = y * W + x
   if (!CITY[i] || TOWER_MASK[i]) continue
-  if (!CITY[i - W] || (!CITY[i - 1] && ((x + y) & 1) === 0)) fb[i] = IDX.Z
+  const here = KEYS[fb[i]]
+  if (!CITY[i - W]) fb[i] = IDX.Z
+  else if (!CITY[i - 2 * W] && bay(x, y) < 0.6 && !LITK.has(here)) fb[i] = IDX.y
+  else if (!CITY[i - 1] && bay(x, y) < 0.7 && !LITK.has(here)) fb[i] = IDX.y
+  else if (!CITY[i - 2] && bay(x, y) < 0.3 && !LITK.has(here)) fb[i] = IDX.T
 }
 
 // ================================================================ title: the letters are Archivo Black outlines

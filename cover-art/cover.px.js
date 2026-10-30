@@ -223,16 +223,25 @@ const bank = (o) => {
 // five separate clouds, each its own layer so each drifts on its own; [buffer, amplitude, phase]
 const CLOUDS = []
 const cloudAt = (amp, ph, o) => { const buf = cloudLayer(); drawInto(buf, () => bank(o)); CLOUDS.push([buf, amp, ph]) }
-// E: a small, faint fragment between B and the title, clear of the tagline
-cloudAt(1.2, 5.3, { base: 148, env: [[292, 148], [294, 140], [302, 132], [314, 128], [326, 132], [334, 142], [336, 148]], seed: 55, scale: 0.55, shade: 0.85, frag: 2 })
-// C: a small, high cloud near the top centre
-cloudAt(1.8, 3.0, { base: 64, env: [[298, 64], [298, 52], [306, 38], [322, 24], [342, 18], [362, 26], [376, 42], [384, 64]], seed: 56, scale: 0.7, shade: 0.2, frag: 3 })
-// B: a medium cloud behind the middle of the city
-cloudAt(1.0, 1.8, { base: 310, env: [[296, 310], [298, 262], [306, 214], [322, 176], [346, 154], [376, 148], [404, 160], [424, 190], [434, 236], [434, 310]], seed: 57, sp: 12, shade: 0.4, frag: 5 })
-// A: the tall tower behind and right of the hero tower, cropped by the right edge
-cloudAt(1.4, 0.5, { base: 340, env: [[528, 340], [526, 262], [530, 196], [544, 136], [562, 88], [586, 54], [614, 40], [646, 46], [676, 78], [690, 130], [694, 340]], seed: 58, sp: 14, frag: 10 })
-// D: the low cool bank at the bottom left, bumpy, with two warm billows poking up
-cloudAt(1.6, 4.2, { base: 508, env: [[-10, 508], [-10, 372], [6, 360], [20, 348], [38, 356], [54, 344], [72, 352], [90, 366], [108, 356], [128, 372], [152, 384], [178, 396], [206, 412], [234, 432], [262, 458], [264, 508]], seed: 59, sp: 13, shade: 0.55, lift: 1.1, warmP: 0.25, warmLift: 0.8, frag: 4, peaks: [[34, 345, 10], [108, 352, 9]] })
+// 1: a wide bank in the upper right; its main peak is left of the hero tower, the right side steps down so the tower's crown stays in open sky
+cloudAt(1.4, 0.5, { base: 112, env: [[360, 112], [356, 100], [368, 86], [384, 76], [396, 62], [410, 44], [432, 28], [456, 22], [478, 36], [494, 52], [512, 62], [524, 70], [548, 78], [580, 68], [612, 60], [640, 66], [662, 80], [664, 112]], seed: 61, sp: 11, frag: 8 })
+// 2: a long, low horizon bank the city stands in front of; cooler, with warm rims on its tops
+cloudAt(1.0, 1.8, { base: 330, env: [[290, 300], [286, 268], [298, 246], [316, 236], [330, 222], [350, 214], [372, 228], [392, 214], [414, 196], [438, 206], [458, 222], [480, 208], [504, 226], [528, 216], [552, 230], [580, 214], [606, 226], [632, 210], [656, 222], [662, 300]], seed: 62, sp: 12, shade: 0.45, warmP: 0.5, warmLift: 0.4, frag: 5 })
+// 3: a small, wide, flat cloud at the top centre
+cloudAt(1.8, 3.0, { base: 52, env: [[290, 52], [292, 44], [302, 38], [316, 30], [334, 25], [352, 30], [368, 38], [380, 46], [382, 52]], seed: 56, scale: 0.6, shade: 0.2, frag: 3 })
+// 4: the low cool shelf at the bottom left, with a few small warm lit bumps
+cloudAt(1.6, 4.2, { base: 508, env: [[-10, 508], [-10, 374], [8, 368], [24, 360], [40, 366], [58, 372], [74, 364], [94, 374], [118, 372], [140, 380], [166, 378], [192, 388], [220, 386], [250, 398], [276, 410], [290, 430], [292, 508]], seed: 59, sp: 13, shade: 0.55, lift: 1.1, warmP: 0.2, warmLift: 0.8, frag: 3, peaks: [[24, 361, 6], [94, 372, 6], [166, 377, 5]] })
+// 5: thin horizontal wisps between the banks
+{
+  const buf = cloudLayer()
+  drawInto(buf, () => {
+    for (const [x, y, len] of [[430, 152, 54], [298, 168, 36]]) for (let i = 0; i < len; i++) {
+      const t = i / len, ta = Math.sin(Math.PI * t), yy = y + Math.round(Math.sin(i * 0.2))
+      if (ta > 0.25) put(x + i, yy, "a"); if (ta > 0.1) put(x + i, yy + 1, "b"); if (ta > 0.5 && i % 7 < 5) put(x + i, yy + 2, "c")
+    }
+  })
+  CLOUDS.push([buf, 1.2, 5.3])
+}
 const composeSky = (f, out) => {
   const t = (2 * Math.PI * f) / FRAMES
   const dxs = CLOUDS.map(([, amp, ph]) => Math.round(amp * Math.sin(t + ph)))
@@ -1985,7 +1994,7 @@ const scanlines = () => {
 
 const DRONES = [[318, 128, 12, 3, 0, "x"], [205, 262, 10, 2, 5, "n"], [405, 52, 14, 3, 9, "x"]]
 const LANTERNS = [[278, 268, 3], [335, 226, 17], [420, 218, 31], [470, 206, 9], [365, 200, 40]]
-const SPARKLES = [[430, 52, 3], [346, 96, 2], [456, 178, 2]]
+const SPARKLES = [[322, 120, 3], [512, 164, 2], [400, 182, 2]]
 const drawLife = (f) => {
   const t = (2 * Math.PI * f) / FRAMES
   // four-point sparkle stars that slowly swell and shrink

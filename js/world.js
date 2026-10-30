@@ -110,7 +110,8 @@ function cullFrame(camera = cam, area = camera){   // (for the camera about to d
   CULL.cam = camera; area.updateMatrixWorld(); _cullM.multiplyMatrices(area.projectionMatrix, area.matrixWorldInverse); _cullF.setFromProjectionMatrix(_cullM);
   for (let i = 0; i < 6; i++){ const p = _cullF.planes[i]; CULL.pl.set([p.normal.x, p.normal.y, p.normal.z, p.constant], i*4); }
   CULL.pad = 4*(2*zoom/H);   // (a few screen pixels of room, in world units)
-  { const lim = (2*zoom/H)*CULL.minPx; let lv = -1; for (let k = 0; k < SMALL_N; k++) if (SMALL_E[k] <= lim) lv = k; CULL.lvl = PH.tests.noSmall ? -1 : lv; }   // (triangles with no edge as long as a pixel's worth are left out)
+  { const lim = (2*zoom/H)*(self.PHONE && PHONE.on && camera === cam && Math.abs(SD.dYaw) + Math.abs(SD.dZoom) + Math.abs(SD.dPitch) > 1e-6 ? PHONE.turnMinPx : CULL.minPx); let lv = -1;   // (phone mode, touch.js: while the view turns, triangles under two pixels go too; the still picture keeps them all)
+    for (let k = 0; k < SMALL_N; k++) if (SMALL_E[k] <= lim) lv = k; CULL.lvl = PH.tests.noSmall ? -1 : lv; }   // (triangles with no edge as long as a pixel's worth are left out)
   CULL.stamp++; CULL.total = CULL.drawn = CULL.tris = 0;
 }
 // (6) Speed-based detail while the view turns, tilts or zooms (a cheat: the overlay test "no speed-based detail" turns it off). Frames drawn the
@@ -123,6 +124,7 @@ function cullFrame(camera = cam, area = camera){   // (for the camera about to d
 // cursor), SD.hys (margin round a threshold), SD.on = false.
 const SD = { on: true, tinyPx: 3, v0: 6, step: 2, max: 2, fast: 40, fastMax: 1, cursorPx: 200, hys: .25, hist: [0, 0, 0, 0, 0, 0], top: 0, pieces: 0, moving: false,
   dYaw: 0, dZoom: 0, dPitch: 0, pY: null, pZ: 0, pP: 0, list: [], stamp: -1 };
+if (self.PHONE && PHONE.on){ SD.v0 = PHONE.sdV0; SD.cursorPx = 0; }   // (phone mode, touch.js: a slow turn drops the smallest pieces too, and the finger keeps no full-detail patch round it)
 function sdTrack(){   // every frame: how far the view turned, tilted and zoomed since the last one
   SD.dYaw = SD.pY === null ? 0 : yaw - SD.pY; SD.dZoom = SD.pY === null ? 0 : (zoom - SD.pZ)/zoom; SD.dPitch = SD.pY === null ? 0 : PITCH - SD.pP;
   SD.pY = yaw; SD.pZ = zoom; SD.pP = PITCH;
@@ -2551,6 +2553,8 @@ const newCell = (i, j, sections = []) => ({ i, j, x: i*LOT, z: j*LOT, green: GRE
 const PLAT_BOTTOM = -5.6;
 function addPlatform(i, j, zone = null){
   if (Math.abs(i) > GRID_MAX || Math.abs(j) > GRID_MAX || cells.has(ckey(i,j))) return null;
+  // phone mode (touch.js): a city grows to PHONE.maxPlots plots at most, so it stays smooth and fits a phone's memory (a bigger one loaded from a file still loads)
+  if (self.PHONE && PHONE.on && cells.size >= PHONE.maxPlots){ const h = document.getElementById('modeHint'); if (h) h.textContent = 'This city is as big as a phone can keep smooth (' + PHONE.maxPlots + ' plots) · build up, or rebuild what\'s there'; return null; }
   const c = newCell(i, j, zone ? [{ zone, seed: (Math.random()*1e9)|0, style: styleNow() }] : []);
   c.style = styleNow();
   cells.set(ckey(i,j), c);

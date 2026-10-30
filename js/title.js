@@ -25,7 +25,9 @@ const TITLE = (() => {
   let RAW = null, TOD = 'morning', SUNS = [], sunCv = null, gSun = null, sunH = 0, yaw0 = null, sunW = 1, sway = { x: 0, y: 0, r: 0 };
   let A = null, view = null, W = 0, H = 0, S0 = 1, OX = 0, OY = 0, raf = 0, last = 0, motes = [];
   const anchorsP = fetch('assets/title/anchors.json?v=' + VER).then(r => r.json()).catch(() => null);
-  const gbufP = fetch('assets/title/gbuf.json?v=' + VER).then(r => r.ok ? r.json() : null).catch(() => null);   // (the surface bake: the room lit live)
+  // (phone mode, touch.js: no live lighting, the baked pictures instead: a renderer less, and the surface bake's pictures are not loaded)
+  const PHONE_T = !!(self.PHONE && PHONE.on), IMG = PHONE_T ? '.webp' : '.png';   // (and the pictures as lossless WebP: the same pixels, about a third of the bytes)
+  const gbufP = PHONE_T ? Promise.resolve(null) : fetch('assets/title/gbuf.json?v=' + VER).then(r => r.ok ? r.json() : null).catch(() => null);   // (the surface bake: the room lit live)
   let GB = null, RTMODE = false, RT = null, rtCv = null, HOUR = 8;
 
   /* ---------- the picture, fitted to the screen ---------- */
@@ -34,7 +36,7 @@ const TITLE = (() => {
     if (!A) return;
     W = innerWidth; H = innerHeight;
     const v = W/H < .85 ? 'tall' : 'wide';
-    if (v !== view){ view = v; const f = k => 'assets/title/' + k + '-' + v + '-' + TOD + '.png?v=' + VER;
+    if (v !== view){ view = v; const f = k => 'assets/title/' + k + '-' + v + '-' + TOD + IMG + '?v=' + VER;
       if (!RTMODE){ imRoom.src = f('room'); imGlass.src = f('glass'); if (A[v].signRect) imOff.src = f('signoff'); } imRoom.hidden = imGlass.hidden = RTMODE; cvPl.hidden = true; live && live.view(v);
       SUNS = (A[v].heads || []).map((h, i) => { const im = new Image(); im.src = 'assets/title/sun-' + v + '-' + TOD + '-' + i + '.jpg?v=' + VER; return im; }); }
     const a = A[v], iw = a.w, ih = a.h; S0 = Math.max(W/iw, H/ih);
@@ -295,7 +297,7 @@ const TITLE = (() => {
       plW = cvPl.width = im.width; plH = cvPl.height = im.height; gP.clearRect(0, 0, plW, plH); gP.drawImage(im, 0, 0);
       const d = gP.getImageData(0, 0, plW, plH); plSrc = new Uint32Array(d.data.buffer.slice(0)); plOut = d; plBase = new Int16Array(plW).fill(-1);
       for (let x = 0; x < plW; x++) for (let y = plH - 1; y >= 0; y--) if (plSrc[y*plW + x] >>> 24){ plBase[x] = y; break; } };
-    im.src = 'assets/title/plants-' + v + '-' + TOD + '.png?v=' + VER;
+    im.src = 'assets/title/plants-' + v + '-' + TOD + IMG + '?v=' + VER;
   }
   function drawPlants(now){
     if (!plSrc || reduced || now - plantAt < 33) return; plantAt = now;
@@ -505,7 +507,7 @@ const TITLE = (() => {
   }
   function unwiden(){ const v = document.getElementById('view'); if (v){ v.style.transition = 'transform 1.2s ease-in-out'; v.style.transform = ''; setTimeout(() => { v.style.transition = ''; }, 1300); } }
   // the pictures for an hour, fetched ahead (they're cached, so the room shows at once when it's needed)
-  function preload(t){ const v = innerWidth/innerHeight < .85 ? 'tall' : 'wide'; for (const k of ['room', 'glass', 'signoff']){ const im = new Image(); im.src = 'assets/title/' + k + '-' + v + '-' + t + '.png?v=' + VER; (preload.keep = preload.keep || []).push(im); } }
+  function preload(t){ const v = innerWidth/innerHeight < .85 ? 'tall' : 'wide'; for (const k of ['room', 'glass', 'signoff']){ const im = new Image(); im.src = 'assets/title/' + k + '-' + v + '-' + t + IMG + '?v=' + VER; (preload.keep = preload.keep || []).push(im); } }
   function finish(){ T.leaving = false; try { if (scWas !== null){ SC.mode = scWas; scWas = null; } } catch (e) {} try { WARP.k.value = 0; } catch (e) {} stage.style.opacity = ''; stage.style.scale = ''; stage.style.visibility = ''; unwiden(); document.documentElement.classList.remove('title-boot'); T.on = false; cancelAnimationFrame(raf); root.hidden = true; root.classList.remove('leaving'); document.documentElement.classList.remove('title-on'); restoreScene(); try { LAST_INPUT = performance.now(); } catch (e) {} try { applyRenderRes(zoom); } catch (e) {} try { freeLive(); } catch (e){ console.warn('title room: letting go', e); } }
 
   /* ---------- the menu ---------- */

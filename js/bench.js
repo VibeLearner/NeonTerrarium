@@ -82,6 +82,7 @@
       d.floatRT = !!gl.getExtension('EXT_color_buffer_float'); d.halfFloatRT = !!gl.getExtension('EXT_color_buffer_half_float');
       d.precisionHighFrag = (() => { const p = gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT); return p ? p.precision : null; })(); } catch (e) { d.gpuErr = String(e); }
     d.battery = await battery();
+    d.phoneMode = self.PHONE ? Object.assign({}, PHONE) : null;
     return d;
   }
   async function battery(){ try { if (!navigator.getBattery) return null; const b = await navigator.getBattery(); return { level: round(b.level, 2), charging: b.charging }; } catch (e) { return null; } }
@@ -95,21 +96,27 @@
     return { frames: n, fps: round(1000/mean, 1), mean: round(mean), p50: round(q(.5)), p95: round(q(.95)), p99: round(q(.99)), worst: round(a[n - 1]),
       over20: round(100*ms.filter(v => v > 20).length/n, 1), over33: round(100*ms.filter(v => v > 33.4).length/n, 1), over50: round(100*ms.filter(v => v > 50).length/n, 1) };
   }
+  // the frames the game actually draws (in phone mode it draws every other screen frame or fewer: main.js), timed by wrapping its frame body
+  const DRAWN = [];
+  try { const fb = frameBody; frameBody = function (now){ DRAWN.push(now); if (DRAWN.length > 20000) DRAWN.splice(0, 10000); return fb.apply(this, arguments); }; } catch (e) {}
   let longTasks = [];
   try { new PerformanceObserver(l => { for (const e of l.getEntries()) longTasks.push(e.duration); }).observe({ entryTypes: ['longtask'] }); } catch (e) {}
   // run for ms milliseconds, calling each(dt) every frame; returns the frame times (the first warm ms not counted)
   async function run(ms, each, warm = 0){
     ms *= QUICK; warm *= QUICK;
-    const out = []; let last = null, hidden = false; const t0 = now(); longTasks = [];
+    let last = null, hidden = false, tw = null; const t0 = now(); longTasks = [];
     let lt0 = 0;
     for (;;){
       const t = await sleepFrames();
       if (document.hidden) hidden = true;
-      if (last !== null){ const dt = t - last; if (each) each(dt/1000, t - t0); if (t - t0 > warm) out.push(dt); }
-      if (last === null || t - t0 <= warm) lt0 = longTasks.length;
+      if (last !== null){ const dt = t - last; if (each) each(dt/1000, t - t0); }
+      if (last === null || t - t0 <= warm){ lt0 = longTasks.length; tw = t; }
       last = t;
       if (t - t0 >= ms + warm) break;
     }
+    // the intervals between the frames drawn in the measured part (the screen's own frames when nothing is skipped)
+    const d = DRAWN.filter(x => x >= tw && x <= last), out = [];
+    for (let k = 1; k < d.length; k++) out.push(d[k] - d[k - 1]);
     const lts = longTasks.slice(lt0);
     return { ms: out, hidden, longTasks: lts.length, longTaskMs: round(lts.reduce((s, v) => s + v, 0), 0) };
   }

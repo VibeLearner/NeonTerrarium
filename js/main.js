@@ -26,6 +26,9 @@ function frame(now){
   if (typeof GRIDPANEL !== 'undefined' && GRIDPANEL.hold) return;   // (so does the Acoustic Panel; the broadcast plays on)
   if (typeof FURN !== 'undefined' && FURN.hold) return;   // (and the apartment being furnished: furnish.js)
   if (typeof TITLE !== 'undefined' && TITLE.on && TITLE.cityHalf && TITLE.cityHalf()){ TITLE_SKIP = !TITLE_SKIP; if (TITLE_SKIP) return; }   // (under the title only the porthole shows the city: half the frames do)
+  // phone mode (touch.js): a steady 30 a second. A frame is drawn once a thirtieth of a second has gone (less 4 ms, so the screen's own frames line up:
+  // every 2nd at 60 Hz, every 3rd at 90, every 4th at 120); a steady 30 feels smoother than 40 to 60 that comes and goes, and the phone runs cooler
+  if (PHONE.on && PHONE.fps){ if (now - PHONE.lastDraw < 1000/PHONE.fps - 4) return; PHONE.lastDraw = now; }
   if (idleNow(now)){ IDLE_SKIP = !IDLE_SKIP; if (IDLE_SKIP) return; } else IDLE_SKIP = false;
   const TP = window.TPERF; if (TP && TP.off.has('city')) return;
   try { if (TP){ const t0 = performance.now(); frameBody(now); if (TP.sync) TP.finish(renderer); TP.add('city', performance.now() - t0); } else frameBody(now); }

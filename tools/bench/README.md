@@ -13,3 +13,6 @@ Open **https://vibelearner.github.io/NeonTerrarium/?bench** on the phone, press 
 
 Testing the benchmark itself (not real numbers): `?bench&benchquick` runs every step at a tenth of its length, `&benchonly=island,city` runs only those cities.
 Fetch one run by hand: `python3 tools/bench/collect.py some/folder --id r202610300812-ab12`.
+
+Phone mode (js/touch.js `PHONE`, off by default for now): `?phone=1` turns it on for that page load, on any device, and `?bench&phone=1` benchmarks it.
+In phone mode the benchmark's frame times are the frames actually drawn (a steady 30 a second is the goal: under 33.4 ms).

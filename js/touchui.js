@@ -69,7 +69,7 @@ const TUI = (() => {
   const LINE = { radio: 'Broadcasting to the district.', spire: 'Ledger online. City records current.', police: 'Desk staffed. Calls logged.', lidar: 'Array sweeping. Pods in range can be scanned.',
     wirenest: 'Relay up. Traffic logged.', club: 'Doors open after dark.', square: 'Stalls trading.', market: 'Stalls trading.', mall: 'Floors open.', greenhouse: 'Crops cycling.', foundry: 'Furnaces lit.' };
   const card = el('div', 'tpeek'); card.hidden = true; card.setAttribute('role', 'dialog');
-  card.innerHTML = '<div class="tp-h"><b></b><button class="tp-x" type="button" aria-label="Close">✕</button></div><p class="tp-l"></p><div class="tp-b"><button class="tp-go" type="button">ACCESS</button><button class="tp-turn" type="button">TURN</button></div>';
+  card.innerHTML = '<div class="tp-h"><b></b><button class="tp-x" type="button" aria-label="Close">✕</button></div><p class="tp-l"></p><div class="tp-b"><button class="tp-go" type="button">ACCESS</button><button class="tp-turn" type="button">TURN</button><button class="tp-scan" type="button" hidden>SCAN A POD</button></div>';
   document.body.appendChild(card);
   let peekM = null;
   U.peek = m => {
@@ -78,11 +78,14 @@ const TUI = (() => {
     card.querySelector('b').textContent = (t.name || m.kind).toUpperCase();
     card.querySelector('.tp-l').textContent = (LINE[m.kind] || 'Online.') + ' ' + m.w + ' × ' + m.h + ' plots.';
     const go = card.querySelector('.tp-go'); go.hidden = !scr; if (scr) go.textContent = 'ACCESS ' + scr[0];
+    // (the LIDAR Array: Scan lives here on touch, not as a button by the dock, owner Oct 30)
+    const fb = $('furnBtn'), sc = card.querySelector('.tp-scan'); sc.hidden = !(m.kind === 'lidar' && fb && !fb.hidden); sc.classList.toggle('off', !!(fb && fb.classList.contains('off')));
     card.hidden = false; dispatchEvent(new CustomEvent('nt:peek', { detail: m.kind })); return true;
   };
   const closePeek = () => { card.hidden = true; peekM = null; };
   card.querySelector('.tp-x').addEventListener('click', closePeek);
   card.querySelector('.tp-go').addEventListener('click', () => { const m = peekM, s = m && SCREEN[m.kind]; closePeek(); if (s) s[1](m); });
+  card.querySelector('.tp-scan').addEventListener('click', () => { const fb = $('furnBtn'); closePeek(); if (fb && !fb.classList.contains('on')) fb.click(); U.buzz(8); });
   card.querySelector('.tp-turn').addEventListener('click', () => { if (peekM && typeof turnMega === 'function'){ if (turnMega(peekM)) U.buzz(12); } });
   // (a press on the city closes the card)
   $('view').addEventListener('pointerdown', () => { if (!card.hidden) closePeek(); }, true);

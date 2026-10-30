@@ -717,6 +717,8 @@ html.touch .zonebar > .bmenu-list{grid-auto-flow:row;grid-template-rows:none;gri
   padding:6px;background:rgba(6,9,20,.95);border:1px solid var(--line);bottom:calc(100% + 34px)}
 /* Scan pod: a small chip above the dock's right end, so it doesn't widen the row */
 html.touch .zones > .furnbtn{position:absolute;right:0;bottom:calc(100% + 6px);height:44px}
+/* (touch: Scan is in the LIDAR Array's card (touchui.js); by the dock only while a scan is on, to stop it) */
+html.touch .zones > .furnbtn:not(.on){display:none}
 /* the gear in the middle of its button (the button's hidden word was a second grid cell that pushed it up) */
 html.touch .deck-toggle{display:flex;align-items:center;justify-content:center}
 

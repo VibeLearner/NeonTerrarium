@@ -180,3 +180,5 @@ html.touch .hwbar button{min-width:40px}
 html.touch .hwbar .hwlanes{margin-left:6px}
 html.tland .zonebar > .hwbar{left:50%;right:auto;transform:translateX(-50%);width:max-content}
 @media (max-width:370px){html.touch .zonebar > .hwbar small{display:none}html.touch .zonebar > .hwbar{gap:4px;padding:6px 8px}}
+/* the LIDAR Array's card: Scan a pod (touchui.js) */
+html.touch .tpeek .tp-b .tp-scan.off{opacity:.55}

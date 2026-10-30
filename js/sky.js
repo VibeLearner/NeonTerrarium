@@ -1099,7 +1099,7 @@ const cloudScene = new THREE.Scene(); cloudScene.add(new THREE.Mesh(new THREE.Pl
 // before, and once it stops the full-size image builds up again from that one, a share a frame
 const CLOUDT = { reset: true, i: 0, slot: 0, VP: new THREE.Matrix4(), drift: new THREE.Vector2(), cover: -1, prev: null, yaw: null, pitch: null, old: null };
 function cloudFrame(){
-  const U = cloudMat.uniforms, n = S.cloudQ === 1 ? 4 : S.cloudQ === 3 ? 16 : 8;   // (Settings, cloud quality: sharp, balanced, fast; all at the frame's own size)
+  const U = cloudMat.uniforms, n = S.cloudQ === 1 ? 4 : S.cloudQ === 3 || (PORTRAIT_T() && S.cloudQ === 2) ? 16 : 8;   // (a touch screen upright at Balanced: one pixel in 16 marched a frame, the rest carried over; the same picture, its new sky filling in a little slower)   // (Settings, cloud quality: sharp, balanced, fast; all at the frame's own size)
   if (Math.abs(U.cover.value - CLOUDT.cover) > .02){ CLOUDT.cover = U.cover.value; CLOUDT.reset = true; }   // (a look's change of cover: everything at once)
   // a picture from another view altogether can't be carried over: coming in from the title screen (its window's view of the city), the sky went black for
   // about eight frames (owner, Oct 25), one block in eight coming right each frame. Leaving or entering the title, or a sudden big zoom: everything at once
@@ -1711,6 +1711,10 @@ function applyRenderRes(z){
   if (ZOOM_RES > 0) f = Math.min(f, ZOOM_RES);
   if (z > 30) f = Math.max(1, f*Math.pow(30/z, .3));   // (past zoom 30, out to 60: a little fewer pixels, eased (1.6 down to 1.3 times the base), so the far view doesn't outrun the card; much lower and the grass tufts went under a render pixel)
   if (S.autoPerf !== false) f = Math.min(f, PERF.grow);
+  // (a touch screen held upright: one render size at every zoom, 720 across. Its base is already four times the pixels it had upright before the short
+  //  side counted, more than it ever reached zoomed out, and growing on from there (up to 1.6 times each way) cost the card more than the phone can
+  //  spare. On its side it grows as before)
+  if (PORTRAIT_T()) f = 1;
   PERF.f = f;
   const step = Math.round(Math.log(f)/Math.log(1.04));   // 4% steps, so targets aren't remade every frame
   let h = Math.min(DH, Math.round(BASE_H*Math.pow(1.04, step)));

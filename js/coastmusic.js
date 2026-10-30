@@ -28,6 +28,21 @@ const COASTMUSIC = (() => {
   .cmus .vol svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; flex: none; }
   .cmus .vol input { width: 58px; height: 14px; margin: 0; accent-color: var(--ink, #33413a); cursor: pointer; }
   @media (max-width: 600px) { .cmus { top: 56px; right: 10px; width: 200px; } .cmus .vol input { width: 44px; } }
+  /* on a touch screen (html.touch, set in coast.html's head): under EXIT, narrow, with buttons a finger can hit, on a
+     ground solid enough to read over the sea without a hover to bring it up. The time and the volume are left out: the
+     phone's own volume buttons do that (and iPhones ignore a page's volume anyway). */
+  html.touch .cmus { top: calc(max(10px, env(safe-area-inset-top)) + 54px); right: max(16px, env(safe-area-inset-right)); width: 156px; box-sizing: border-box; padding: 6px 6px 4px;
+    background: rgba(251,246,236,.72); -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+  html.touch .cmus .tt { font-size: 18px; margin: 0 4px; }
+  html.touch .cmus .seek { height: 28px; margin: 0 4px; }
+  html.touch .cmus .seek::before, html.touch .cmus .seek i { top: 13px; }
+  html.touch .cmus .seek b { top: 8px; width: 12px; height: 12px; margin-left: -6px; }
+  html.touch .cmus .row { margin-top: 0; gap: 4px; justify-content: center; }
+  html.touch .cmus button { width: 44px; height: 44px; border-radius: 10px; }
+  html.touch .cmus button:hover { background: transparent; }
+  html.touch .cmus button:active { background: rgba(51,65,58,.14); }
+  html.touch .cmus button svg { width: 18px; height: 18px; }
+  html.touch .cmus .time, html.touch .cmus .vol { display: none; }
   `;
   let tracks = [], order = [], idx = -1, lastFile = null, played = new Set(), vol = .55, level = 0, fadeIn = FADE_IN, want = true, blocked = false, leaving = false;
   try { const v = parseFloat(localStorage.getItem(VOL_KEY)); if (v >= 0 && v <= 1) vol = v; } catch (e) {}

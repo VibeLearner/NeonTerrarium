@@ -22,8 +22,10 @@ const PAL = {
   y: "#ff9a6a", h: "#ffd27a", z: "#ff8ac0", v: "#d8ecff", Y: "#ffc94a", w: "#2a1838", L: "#ffb050",
   // neon: pink, magenta, cyan, violet, mint
   H: "#ff72c8", M: "#ff64f4", n: "#7af4ff", V: "#b088ff", N: "#6dffc8",
-  // dusk greens: lit, mid, shade
-  g: "#4e9066", o: "#2f6250", O: "#20423f",
+  // foliage, five steps: warm highlight (7), lit leaf (g), mid (o), shadow (O), indigo deep shadow (8); pink-lavender rim (9)
+  7: "#b8e07a", g: "#78c25a", o: "#3f9450", O: "#23604a", 8: "#1c2e44", 9: "#d89ac0",
+  // terracotta pots, greenhouse glass glow
+  "!": "#c0644a", "@": "#8a4232", "$": "#cfeec8",
   // streets and shadows, the dusk violet of the haze, the pink rim light
   A: "#2a1a48", B: "#2e1c50", Q: "#61298a", Z: "#f08592",
   // title: coral, purple, mint, ink, pale pink
@@ -40,8 +42,9 @@ let fb = new Uint8Array(W * H)
 let recordCity = false, curLevel = 0, curDark = 0
 const DEPTH = new Uint8Array(W * H), CITY = new Uint8Array(W * H), DARK = new Uint8Array(W * H), WARM = new Uint8Array(W * H)
 const inb = (x, y) => x >= 0 && x < W && y >= 0 && y < H
+let CLIP = null
 const put = (x, y, k) => {
-  if (!inb(x, y)) return
+  if (!inb(x, y) || (CLIP && !CLIP(x, y))) return
   const i = IDX[k]
   if (i === undefined) throw new Error("no palette key " + k)
   const p = y * W + x
@@ -171,7 +174,7 @@ const nearestKey = (r, g, b) => {
 const levelFor = (yBase) => (yBase >= 400 ? 0 : Math.round(20 * (0.15 + 0.1 * clamp((400 - yBase) / 80, 0, 1))))
 const darkFor = (cx, yBase) => Math.round(clamp((380 - cx) / 170, 0, 1) * clamp((yBase - 350) / 100, 0, 1) * 0.55 * 20)
 const tintCache = new Map()
-const LIGHTKEYS = new Set("yhzvYnHMVNL")
+const LIGHTKEYS = new Set("yhzvYnHMVNL$7")
 const tintKey = (k, hz, dk, wm) => {
   if (LIGHTKEYS.has(k)) { hz = Math.round(hz * 0.3); dk = Math.round(dk * 0.4); wm = 0 }
   if (!hz && !dk && !wm) return k
@@ -204,7 +207,7 @@ const grounded = (x, y, k) => {
 const FK = (x, y, k) => { const i = y * W + x; const kk = tintKey(k, DEPTH[i], DARK[i], WARM[i]); return CITY[i] ? grounded(x, y, kk) : kk }
 
 // ---------------------------------------------------------------- glow
-const EMIT = new Set("yhzvYVNHMnL")
+const EMIT = new Set("yhzvYVNHMnL$")
 const glowAround = (pts, k, reach = 2, sink) => {
   const set = new Set(pts.map(([x, y]) => x + y * W))
   for (const [x, y] of pts) for (let dy = -reach; dy <= reach; dy++) for (let dx = -reach; dx <= reach; dx++) {
@@ -276,32 +279,202 @@ const HALO = { L: "y", h: "L", y: "y", z: "H", v: "n", Y: "L" }
 const HALO2 = { L: "T", h: "T", y: "T", z: "R", v: "K", Y: "T" }
 const HALO3 = { L: "U", h: "U", y: "U", z: "r", v: "k", Y: "U" }
 
-// ---------------------------------------------------------------- foliage, dusk greens
-const canopy = (cx, cy, r, seed) => {
-  for (let y = -r; y <= r; y++) for (let x = -r; x <= r; x++) {
-    const dd = Math.hypot(x, y)
-    if (dd > r + 0.2) continue
-    if (dd > r - 0.9 && ih(cx + x, cy + y, seed) < 0.3) continue
-    const l = (-(x * 0.55) - (y * 0.85)) / r
-    let k = l > 0.42 ? "g" : l > -0.2 ? "o" : "O"
-    if (k === "g" && y <= -r * 0.5 && x <= 0 && ((x + y) & 1) === 0) k = "Z"     // a hint of sky pink on the lit crown
-    put(cx + x, cy + y, k)
+// ---------------------------------------------------------------- foliage: clumps of leaves on a five-step green ramp
+// every clump is a union of small lumps, each lit from the top and dark underneath, the lower ones overlapping the upper,
+// so the outline stays bumpy and there are always light, mid and shadow values. 7 warm highlight, g lit, o mid, O shadow,
+// 8 indigo deep shadow, 9 pink-lavender rim on the pixels that face the sky
+const GREENRAMP = ["7", "g", "o", "O", "8"]
+const leafMass = (cx, cy, r, seed, o = {}) => {
+  const ramp = o.ramp ?? GREENRAMP, rimK = o.rim ?? "9"
+  const rxx = o.rx ?? r, lr = clamp(o.lr ?? r * 0.42, 2, 4.4), sq = o.sq ?? 0.85, warm = o.warm ?? 0
+  const R = Math.ceil(Math.max(r, rxx) + lr + 2), S = 2 * R + 1
+  const val = new Float32Array(S * S).fill(-9)
+  const at = (x, y) => (x < 0 || y < 0 || x >= S || y >= S ? -9 : val[y * S + x])
+  const ex = Math.max(1, rxx - lr * 0.55), ey = Math.max(1, (r - lr * 0.55) * sq)
+  const lumps = []
+  const step = lr * 1.1
+  for (let gy = -ey; gy <= ey + 0.01; gy += step * 0.85) for (let gx = -ex; gx <= ex + 0.01; gx += step) {
+    const px = gx + (ih(seed, Math.round(gx * 7), Math.round(gy * 11)) - 0.5) * lr * 0.9
+    const py = gy + (ih(seed + 3, Math.round(gx * 5), Math.round(gy * 13)) - 0.5) * lr * 0.9
+    if ((px * px) / (ex * ex) + (py * py) / (ey * ey) > 1.08) continue
+    lumps.push([Math.round(px), Math.round(py), lr * (0.85 + 0.35 * ih(seed + 5, Math.round(gx * 3), Math.round(gy * 3)))])
+  }
+  if (!lumps.length) lumps.push([0, 0, Math.max(1.5, r)])
+  lumps.sort((p, q) => p[1] - q[1])
+  for (const [pcx, pcy, lrr] of lumps) {
+    const ry = lrr * 0.92
+    for (let dy = Math.floor(-ry); dy <= Math.ceil(ry); dy++) for (let dx = Math.floor(-lrr); dx <= Math.ceil(lrr); dx++) {
+      if ((dx * dx) / (lrr * lrr) + (dy * dy) / (ry * ry) > 1) continue
+      const l = (-dx * 0.45 - dy * 0.9) / lrr, gl = (-(pcx + dx) * 0.3 - (pcy + dy) * 0.95) / Math.max(2, r)
+      val[(R + pcy + dy) * S + R + pcx + dx] = 0.62 * l + 0.45 * gl
+    }
+  }
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const v = val[y * S + x]
+    if (v < -8) continue
+    const up = at(x, y - 1) < -8
+    const edge = up || at(x, y + 1) < -8 || at(x - 1, y) < -8 || at(x + 1, y) < -8
+    const gx = cx + x - R, gy = cy + y - R
+    const hh = ih(gx, gy, seed + 9)
+    if (edge && !up && hh < 0.12) continue
+    let k = v > 0.42 ? ramp[1] : v > -0.02 ? ramp[2] : v > -0.5 ? ramp[3] : ramp[4]
+    if (k === ramp[2] && hh < 0.07) k = ramp[3]
+    else if (k === ramp[3] && hh > 0.93) k = ramp[2]
+    if (up && v > -0.2 && ((x + seed) & 3) !== 0) k = rimK
+    else if (warm && k === ramp[1] && ((warm < 0 ? at(x - 1, y) : at(x + 1, y)) < -8 || ((x - R) * warm > rxx * 0.3 && hh < 0.55))) k = ramp[0]
+    else if (k === ramp[1] && v > 0.85 && hh < 0.4) k = ramp[0]
+    if (o.fleck && k === ramp[3] && hh > 0.8) k = o.fleck
+    put(gx, gy, k)
+  }
+  // blossoms or fruit scattered over the crown
+  if (o.dots) for (let i = 0; i < o.dots[1]; i++) {
+    const a = ih(seed, i, 41) * Math.PI * 2, d = Math.sqrt(ih(seed, i, 42)) * 0.8
+    const px = Math.round(cx + Math.cos(a) * d * rxx), py = Math.round(cy + Math.sin(a) * d * r * sq)
+    if (get(px, py) !== null && "7goO89".includes(get(px, py))) { put(px, py, o.dots[0][i % o.dots[0].length]); if (r > 4 && i % 2) put(px + 1, py, o.dots[0][(i + 1) % o.dots[0].length]) }
   }
 }
-const tree = (x, y, r, seed) => { rectK(x - 1, y - r, 2, r, "E"); canopy(x, y - r - r, r, seed) }
-const hedge = (x, y, len, seed) => {
-  for (let i = 0; i < len; i++) {
-    const ht = (i === 0 || i === len - 1 ? 2 : 3) + (ih(x + i, seed, 4) < 0.3 ? 1 : 0)
-    for (let j = 0; j < ht; j++) put(x + i, y - j, j === ht - 1 ? "g" : j === 0 ? "O" : "o")
-    if (i % 5 === 2 && ih(x + i, seed, 5) < 0.7) { const fk = ih(x, i, seed) < 0.5 ? "H" : "W"; put(x + i, y - ht, fk); put(x + i + 1, y - ht, fk) }
+const PINKRAMP = ["W", "J", "z", "9", "Z"]
+const trunk = (x, y, h, w, seed) => {
+  for (let j = 0; j < h; j++) {
+    const ww = j < 2 && w > 1 ? w + 1 : w
+    for (let i = 0; i < ww; i++) put(x - (ww >> 1) + i, y - j, i === 0 && ww > 1 ? "U" : i === ww - 1 && ww > 2 ? "e" : "E")
   }
 }
-const planter = (x, y, len, seed) => { rectK(x, y - 1, len, 2, "U"); hedge(x, y - 2, len, seed) }
-const vine = (x, y, len, seed) => {
+// a round street tree: trunk, a few branches, a lumpy crown 8 to 16 px across
+const streetTree = (x, y, r, seed, o = {}) => {
+  const th = Math.max(3, Math.round(r * 0.9))
+  trunk(x, y, th, r > 6 ? 3 : 2, seed)
+  if (r > 5) for (let k = 1; k <= 3; k++) { put(x - k, y - th - k + 2, "E"); put(x + k, y - th - k + 2, "E") }
+  leafMass(x, y - th - Math.round(r * 0.5), r, seed, { warm: o.warm ?? 0, sq: o.sq ?? 0.82 })
+}
+// blossom tree: a pink crown with a few leaves showing through
+const sakura = (x, y, r, seed, o = {}) => {
+  const th = Math.max(3, Math.round(r * 0.9))
+  trunk(x, y, th, r > 6 ? 3 : 2, seed)
+  if (r > 5) for (let k = 1; k <= 3; k++) { put(x - k, y - th - k + 2, "E"); put(x + k, y - th - k + 2, "E") }
+  leafMass(x, y - th - Math.round(r * 0.5), r, seed, { ramp: PINKRAMP, rim: "W", fleck: "g", warm: o.warm ?? 0, sq: 0.82, dots: [["W", "J", "z"], Math.round(r * 2.2)] })
+  // petals fallen at the foot
+  for (let i = 0; i < 5; i++) put(x - 6 + Math.floor(ih(seed, i, 51) * 13), y + 1 + (i % 2), i % 2 ? "J" : "z")
+}
+const lineK = (x0, y0, x1, y1, k) => {
+  const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)); if (!n) { put(x0, y0, k); return }
+  for (let i = 0; i <= n; i++) put(Math.round(x0 + ((x1 - x0) * i) / n), Math.round(y0 + ((y1 - y0) * i) / n), k)
+}
+// a palm: thin curved trunk, a crown of 4 to 6 drooping fronds
+const palm = (x, y, h, seed, lean = 0) => {
+  const tx = (u) => Math.round(x + lean * Math.pow(u, 1.7))
+  for (let t = 0; t <= h; t++) {
+    const u = t / h
+    put(tx(u), y - t, "E"); if (h > 14 && t < h * 0.45) put(tx(u) + 1, y - t, "e"); if (t % 3 === 1) put(tx(u) - 1, y - t, "U")
+  }
+  const ex = tx(1), ey = y - h
+  const dirs = [[-1, -0.3, 1], [-0.62, -0.78, 1], [0.05, -0.9, 0.7], [0.62, -0.78, 1], [1, -0.3, 1]]
+  if (seed % 2) dirs.push([-0.35, -0.9, 0.8])
+  const L = Math.round(5 + h * 0.3)
+  dirs.forEach(([dx, dy, ls], fi) => {
+    const FL = L * ls
+    for (let s = 0; s <= FL; s++) {
+      const t = s / FL
+      const px = Math.round(ex + dx * FL * t), py = Math.round(ey + dy * FL * t + 0.9 * FL * t * t)
+      const up = dy < -0.7
+      put(px, py, up && t < 0.7 ? "g" : "o"); put(px, py + 1, t > 0.5 ? "O" : "o")
+      if (s % 2 === 1) { put(px, py - 1, up ? "g" : "o"); put(px - Math.sign(dx || 1), py + 2, "O") }
+      if (up && t > 0.15 && t < 0.5 && s % 3 === 0) put(px, py - 1, fi % 2 ? "7" : "g")
+    }
+    put(Math.round(ex + dx * FL), Math.round(ey + dy * FL + 0.9 * FL) + 1, "8")
+  })
+  put(ex, ey - 2, "9"); put(ex + 1, ey - 1, "7"); put(ex, ey, "g")
+  rectK(ex - 1, ey + 1, 2, 2, "U")      // coconuts
+}
+// bamboo: tall thin stalks with nodes and tufts of leaves
+const bamboo = (x, y, h, n, seed) => {
+  for (let i = 0; i < n; i++) {
+    const sx = x + Math.round((i - (n - 1) / 2) * 3 + (ih(seed, i, 61) - 0.5) * 2), hh = Math.round(h * (0.7 + 0.3 * ih(seed, i, 62)))
+    const lean = ih(seed, i, 63) < 0.5 ? -1 : 1
+    for (let j = 0; j < hh; j++) {
+      const px = sx + (j > hh * 0.6 ? lean : 0)
+      put(px, y - j, j % 5 === 4 ? "O" : "o"); if (j % 2 === 0) put(px - 1, y - j, "g")
+    }
+    for (let t = 0; t < 3; t++) {
+      const yy = y - hh + 3 + t * 4, side = (t + i) % 2 ? 1 : -1, px = sx + lean
+      put(px + side, yy, "g"); put(px + 2 * side, yy + 1, "g"); put(px + 3 * side, yy + 2, "o"); put(px + 4 * side, yy + 3, "O"); put(px + 2 * side, yy + 2, "O")
+      if (t === 0) put(px + side, yy - 1, "7")
+    }
+    put(sx + lean, y - hh - 1, "g"); put(sx + lean, y - hh - 2, "9")
+  }
+}
+// a hanging strand of pothos or ivy: leaves on alternating sides
+const pothos = (x, y, len, seed) => {
   for (let k = 0; k < len; k++) {
-    put(x, y + k, k % 3 === 2 ? "g" : "o"); put(x + 1, y + k, (k + seed) % 2 ? "O" : "o")
-    if (k % 4 === 1) put(x - 1, y + k, "o")
-    if (k % 4 === 3) put(x + 2, y + k, "g")
+    const sx = x + Math.round(Math.sin(k * 0.6 + seed) * 0.8)
+    put(sx, y + k, "O")
+    if (k % 3 === 1) {
+      const d = (k / 3 + seed) % 2 < 1 ? 1 : -1
+      put(sx + d, y + k, "g"); put(sx + 2 * d, y + k, k % 6 === 1 ? "7" : "g"); put(sx + d, y + k + 1, "o"); put(sx + 2 * d, y + k + 1, "O")
+    }
+  }
+  put(x, y - 1, "o")
+}
+const vine = pothos
+// a terracotta pot with a clump on top, bottom centre at (x, y)
+const potPlant = (x, y, w, seed, o = {}) => {
+  const hgt = w >= 5 ? 4 : 3
+  for (let j = 0; j < hgt; j++) {
+    const ww = j === 0 ? w + 2 : j === hgt - 1 ? w - 2 : w
+    for (let i = 0; i < ww; i++) put(x - (ww >> 1) + i, y - j, j === hgt - 1 ? "@" : i >= ww - Math.max(1, Math.round(ww * 0.35)) ? "@" : "!")
+  }
+  const r = w >= 5 ? 3.4 : 2.6
+  if (o.tall) bamboo(x, y - hgt, 7 + (seed % 3), 2, seed)
+  else leafMass(x, y - hgt - 1, r, seed, { sq: 0.9, warm: o.warm ?? 0, dots: o.bloom ? [["z", "W", "Y"], 2] : null })
+}
+const potRow = (x, y, n, gap, seed, o = {}) => {
+  for (let i = 0; i < n; i++) potPlant(x + i * gap, y, 5 + (ih(seed, i, 71) < 0.3 ? 1 : 0), seed + i * 3, { bloom: ih(seed, i, 72) < 0.35, tall: ih(seed, i, 73) < 0.12, warm: o.warm ?? 0 })
+}
+// a bush in a row: x is the left end, y the base line
+const hedge = (x, y, len, seed, o = {}) => {
+  const hh = o.h ?? 3.2
+  leafMass(x + len / 2, y - Math.round(hh) + 1, hh, seed, { rx: len / 2 + 0.5, sq: 0.8, lr: 2.4, warm: o.warm ?? 0, dots: o.bloom ? [["z", "W"], Math.round(len / 3)] : null })
+}
+// a planter box with terracotta sides and a bush
+const planter = (x, y, len, seed, o = {}) => {
+  for (let i = 0; i < len; i++) for (let j = 0; j < 3; j++) put(x + i, y - j, j === 0 ? "@" : i < len * 0.65 ? "!" : "@")
+  hlineK(x - 1, y - 2, len + 2, "!")
+  hedge(x, y - 3, len, seed, { h: 3.4, warm: o.warm ?? 0, bloom: ih(seed, len, 81) < 0.5 })
+}
+// small ferns tucked into corners, moss along ledges
+const fern = (x, y, seed) => {
+  const arcs = [[-1, -1], [-2, -1], [0, -1], [1, -1], [2, -1]]
+  for (const [i] of arcs) {
+    const len = 3 + ((seed + i * 3) & 1)
+    for (let s = 1; s <= len; s++) {
+      const px = x + Math.round(i * s * 0.8), py = y - Math.round(s * (1 - Math.abs(i) * 0.25)) + (s > 3 ? 1 : 0)
+      put(px, py, s === len ? "O" : s % 2 ? "g" : "o")
+    }
+  }
+  put(x, y - 4, "7"); put(x, y, "O"); put(x - 1, y, "8"); put(x + 1, y, "8")
+}
+const moss = (x, y, len, seed) => {
+  for (let i = 0; i < len; i++) {
+    const hh = ih(x + i, seed, 91) < 0.55 ? 1 : 2
+    put(x + i, y, "O"); put(x + i, y - 1, "o"); if (hh > 1) put(x + i, y - 2, i % 3 ? "g" : "7")
+    if (ih(x + i, seed, 92) < 0.22) { put(x + i, y + 1, "o"); put(x + i, y + 2, "O") }
+  }
+}
+// a mottled lawn: patches of lit, mid and shaded grass, tufts, clover flowers
+const lawn = (lx, ly, rx, ry, seed) => {
+  for (let y = -ry; y <= ry; y++) for (let x = -rx; x <= rx; x++) {
+    const dd = (x * x) / (rx * rx) + (y * y) / (ry * ry)
+    if (dd > 1) continue
+    const nz = Math.sin((lx + x) * 0.23 + seed) + Math.sin((ly + y) * 0.55 + (lx + x) * 0.07) + 0.9 * (y / ry)
+    let k = dd > 0.8 ? (y > 0 ? "8" : "O") : nz < -0.7 ? "g" : nz < 0.9 ? "o" : "O"
+    if (dd > 0.8 && y < 0) k = "o"
+    if (dd < 0.8 && ih(lx + x, ly + y, seed) < 0.1) { put(lx + x, ly + y - 1, "g"); k = "g" }
+    put(lx + x, ly + y, k)
+  }
+  for (let i = 0; i < Math.round(rx * ry / 45); i++) {
+    const px = Math.round(lx + (ih(seed, i, 31) * 2 - 1) * rx * 0.75), py = Math.round(ly + (ih(seed, i, 32) * 2 - 1) * ry * 0.7)
+    if (i % 3 === 0) put(px, py, ["z", "W", "Y"][i % 3 + (i % 2)] || "W")
+    else leafMass(px, py, 2.6, seed + i, { sq: 0.8, lr: 2 })
   }
 }
 const stringLights = (x1, y1, x2, y2, sag, seed) => {
@@ -510,10 +683,14 @@ function stack(o) {
     if (o.plantP && (!last || o.roofPlants)) post.push(() => {
       for (const side of ["L", "R"]) {
         const ww = side === "L" ? pl.wl : pl.wr
-        for (let u = 5; u < ww - 12; u += 10 + Math.floor(ih(id, u + f, 12) * 6)) {
-          const q = ih(id * 17 + f, u + (side === "L" ? 0 : 99), 8)
-          if (q < o.plantP) { const [x, y] = pl[side](u, -1); planter(x, y, 6 + Math.floor(ih(id, u, 3) * 5), id * 7 + u + f) }
-          else if (q < o.plantP + (o.vineP ?? 0.15)) { const [x, y] = pl[side](u, plate); vine(x, y, 6 + Math.floor(ih(id, u + f, 6) * 9), u + f) }
+        for (let u = 5; u < ww - 12; u += 9 + Math.floor(ih(id, u + f, 12) * 6)) {
+          const q = ih(id * 17 + f, u + (side === "L" ? 0 : 99), 8), sd = id * 7 + u + f
+          const [x, y] = pl[side](u, -1)
+          if (o.far) { if (q < o.plantP) hedge(x, y, 5 + (sd % 4), sd, { h: 2.6 }); else if (q < o.plantP + (o.vineP ?? 0.15)) pothos(...pl[side](u, plate), 6 + (sd % 6), sd); continue }
+          if (q < o.plantP * 0.5) potRow(x, y, 2 + (sd % 2), 8, sd)
+          else if (q < o.plantP * 0.8) planter(x, y, 6 + (sd % 5), sd)
+          else if (q < o.plantP) { if (sd % 2) fern(x + 2, y, sd); else moss(x, y, 5 + (sd % 4), sd) }
+          else if (q < o.plantP + (o.vineP ?? 0.15)) { const [vx, vy] = pl[side](u, plate); pothos(vx, vy, 8 + Math.floor(ih(id, u + f, 6) * 13), sd) }
         }
       }
     })
@@ -542,21 +719,29 @@ function podTop(x, y, rx, hgt, fam, wk) {
   hlineK(x - rx - 1, y, rx * 2 + 3, fam.top); hlineK(x - rx, y + 1, rx * 2 + 1, fam.R)
 }
 function cylinder(o) {
+  // a round tower, or a pill (a round tower stretched along the a axis by sx, sy), with a balcony slab every floor
   const { cx, cy0, rx, ry, n, fh, fam, id, wcol } = o
+  const sx = o.sx || 0, sy = o.sy || 0, SM = sx ? 14 : 0
   let z = 0
   const hb = fh - 3
   const ncol = Math.max(7, Math.round(rx / 3.2))
+  const rb = 0.9
   const pk = (x, rr) => Math.floor((Math.asin(clamp((x - cx) / rr, -1, 1)) + Math.PI / 2) / (Math.PI / ncol))
+  const lowAt = (x, rxx, ryy) => { let best = -1e9; for (let i = 0; i <= SM; i++) { const u = SM ? i / SM - 0.5 : 0, t = (x + 0.5 - (cx + u * sx)) / rxx; if (Math.abs(t) < 1) best = Math.max(best, cy0 + u * sy + ryy * Math.sqrt(1 - t * t)) } return best }
+  const upAt = (x, rxx, ryy) => { let best = 1e9; for (let i = 0; i <= SM; i++) { const u = SM ? i / SM - 0.5 : 0, t = (x + 0.5 - (cx + u * sx)) / rxx; if (Math.abs(t) < 1) best = Math.min(best, cy0 + u * sy - ryy * Math.sqrt(1 - t * t)) } return best }
+  const hw = sx / 2 + rx * rb, hwS = sx / 2 + rx
+  const post = []
   for (let f = 0; f < n; f++) {
     const last = f === n - 1
-    const fq = ih(id, f, 3), ff = fq < 0.3 ? 0.4 : fq < 0.7 ? 1.0 : 1.6, rb = 0.9
+    const fq = ih(id, f, 3)
     const trimOn = o.trimB && f >= n - 2
-    for (let x = Math.ceil(cx - rx * rb); x <= Math.floor(cx + rx * rb); x++) {
-      const t = (x + 0.5 - cx) / (rx * rb)
-      if (Math.abs(t) >= 1) continue
-      const dy = ry * rb * Math.sqrt(1 - t * t)
-      const yb = Math.round(cy0 - z + dy)
-      const col = pk(x, rx * rb), mull = col !== pk(x - 1, rx * rb)
+    for (let x = Math.ceil(cx - hw); x <= Math.floor(cx + hw); x++) {
+      const lw = lowAt(x, rx * rb, ry * rb)
+      if (lw < -1e8) continue
+      const t = (x + 0.5 - cx) / hw
+      const yb = Math.round(lw - z)
+      const x0 = Math.ceil(cx - hw)
+      const col = sx ? Math.floor((x - x0) / 5) : pk(x, rx * rb), mull = sx ? (x - x0) % 5 === 0 : col !== pk(x - 1, rx * rb)
       for (let r = 0; r < hb; r++) {
         const y = yb - hb + r
         let k = t < -0.25 ? fam.L : t > 0.35 ? fam.R : (bay(x, y) < 0.5 ? fam.L : fam.R)
@@ -572,24 +757,168 @@ function cylinder(o) {
       }
     }
     const rec = { pts: [], glow: [] }
-    const yTopC = cy0 - (z + fh)
-    for (let x = Math.ceil(cx - rx); x <= Math.floor(cx + rx); x++) {
-      const t = (x + 0.5 - cx) / rx
-      if (Math.abs(t) >= 1) continue
-      const dy = ry * Math.sqrt(1 - t * t)
-      const yw = Math.round(cy0 - (z + hb) + dy)
+    for (let x = Math.ceil(cx - hwS); x <= Math.floor(cx + hwS); x++) {
+      const lw = lowAt(x, rx, ry)
+      if (lw < -1e8) continue
+      const t = (x + 0.5 - cx) / hwS
+      const yw = Math.round(lw - (z + hb))
       put(x, yw - 3, t < 0.3 ? fam.top : fam.L); put(x, yw - 2, t < 0.1 ? fam.L : fam.R); put(x, yw - 1, fam.R)
-      for (let y = Math.round(yTopC - dy); y <= Math.round(yTopC + dy) - 1; y++) {
-        const low = y === Math.round(yTopC + dy) - 1
+      const ya = Math.round(upAt(x, rx, ry) - (z + fh)), yz = Math.round(lw - (z + fh)) - 1
+      for (let y = ya; y <= yz; y++) {
+        const low = y === yz
         const k = low && trimOn ? o.accent : fam.top
         if (low && trimOn) rec.pts.push([x, y, o.accent, fam.top])
         put(x, y, k)
+      }
+      if (o.plants && !last) {
+        const q = ih(id * 3 + f, x >> 3, 19)
+        if ((x - Math.ceil(cx - hwS)) % 8 === 4 && q < o.plants && t > -0.8 && t < 0.8) post.push([x, yw - 3, f, q])
       }
     }
     if (rec.pts.length) { glowDown(rec.pts, o.accent, rec.glow); REC.trims.push(rec) }
     z += fh
   }
+  // pots, bushes and hanging strands along the curved balconies
+  for (const [x, y, f, q] of post) {
+    const sd = id * 13 + f * 5 + x
+    if (q < o.plants * 0.4) potRow(x, y, 1, 6, sd)
+    else if (q < o.plants * 0.75) hedge(x - 3, y, 6, sd, { h: 2.8 })
+    else pothos(x, y + 2, 7 + (sd % 9), sd)
+  }
   return { z, top: [cx, cy0 - z] }
+}
+
+// ---------------------------------------------------------------- roofs and other silhouettes
+const P3 = (a, b, z) => [PXs(a, b), PYs(a, b) - z]
+const fillPoly = (pts, fn) => {
+  let y0 = Infinity, y1 = -Infinity
+  for (const p of pts) { y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]) }
+  for (let y = Math.floor(y0); y <= Math.ceil(y1); y++) {
+    const xs = []
+    for (let i = 0; i < pts.length; i++) {
+      const [ax, ay] = pts[i], [bx, by] = pts[(i + 1) % pts.length]
+      if ((ay <= y + 0.5) === (by <= y + 0.5)) continue
+      xs.push(ax + ((y + 0.5 - ay) / (by - ay)) * (bx - ax))
+    }
+    xs.sort((p, q) => p - q)
+    for (let i = 0; i + 1 < xs.length; i += 2) for (let x = Math.ceil(xs[i] - 0.5); x < Math.ceil(xs[i + 1] - 0.5); x++) { const k = fn(x, y); if (k) put(x, y, k) }
+  }
+}
+// a roof that rises to the back edge (axis "b") or the back-right edge (axis "a"), with one gable wall
+const slantRoof = (a0, b0, w, d, z, hh, fam, axis, edgeK) => {
+  const e = 0.1
+  const roofK = (x, y) => (y % 3 === 0 ? fam.L : fam.top)
+  if (axis === "b") {
+    fillPoly([P3(a0 + w, b0, z), P3(a0 + w, b0, z + hh), P3(a0 + w, b0 + d, z)], () => fam.R)
+    fillPoly([P3(a0 - e, b0 - e, z + hh), P3(a0 + w + e, b0 - e, z + hh), P3(a0 + w + e, b0 + d + e, z - 1), P3(a0 - e, b0 + d + e, z - 1)], roofK)
+    const [x1, y1] = P3(a0 - e, b0 + d + e, z - 1), [x2, y2] = P3(a0 + w + e, b0 + d + e, z - 1)
+    lineK(x1, y1, x2, y2, edgeK); lineK(x1, y1 - 1, x2, y2 - 1, fam.top)
+    const [x3, y3] = P3(a0 - e, b0 - e, z + hh), [x4, y4] = P3(a0 + w + e, b0 - e, z + hh)
+    lineK(x3, y3, x4, y4, "Z")
+  } else {
+    fillPoly([P3(a0, b0 + d, z), P3(a0, b0 + d, z + hh), P3(a0 + w, b0 + d, z)], () => fam.L)
+    fillPoly([P3(a0 - e, b0 - e, z + hh), P3(a0 - e, b0 + d + e, z + hh), P3(a0 + w + e, b0 + d + e, z - 1), P3(a0 + w + e, b0 - e, z - 1)], (x, y) => (y % 3 === 0 ? fam.R : fam.L))
+    const [x1, y1] = P3(a0 + w + e, b0 - e, z - 1), [x2, y2] = P3(a0 + w + e, b0 + d + e, z - 1)
+    lineK(x1, y1, x2, y2, edgeK)
+    const [x3, y3] = P3(a0 - e, b0 - e, z + hh), [x4, y4] = P3(a0 - e, b0 + d + e, z + hh)
+    lineK(x3, y3, x4, y4, "Z")
+  }
+}
+// a gabled roof, ridge along "a" or "b", tiles in terracotta
+const gableRoof = (a0, b0, w, d, z, hh, axis, id) => {
+  const e = 0.12
+  const tile = (x, y) => (y % 3 === 0 ? "t" : (x + 2 * y) % 8 === 0 ? "T" : (y & 4) ? "s" : "U")
+  if (axis === "a") {
+    fillPoly([P3(a0 + w, b0, z), P3(a0 + w, b0 + d, z), P3(a0 + w, b0 + d / 2, z + hh)], (x, y) => ((x + y) % 11 === 0 ? "E" : "t"))
+    fillPoly([P3(a0 - e, b0 + d / 2, z + hh), P3(a0 + w + e, b0 + d / 2, z + hh), P3(a0 + w + e, b0 + d + e, z - 1), P3(a0 - e, b0 + d + e, z - 1)], tile)
+    const [x1, y1] = P3(a0 - e, b0 + d / 2, z + hh), [x2, y2] = P3(a0 + w + e, b0 + d / 2, z + hh)
+    lineK(x1, y1 - 1, x2, y2 - 1, "Z"); lineK(x1, y1, x2, y2, "T")
+    const [x3, y3] = P3(a0 - e, b0 + d + e, z - 1), [x4, y4] = P3(a0 + w + e, b0 + d + e, z - 1)
+    lineK(x3, y3 + 1, x4, y4 + 1, "e")
+    // the gable end: a round window
+    const [wx, wy] = P3(a0 + w, b0 + d * 0.55, z + hh * 0.4)
+    for (let j = -2; j <= 2; j++) for (let i = -2; i <= 2; i++) if (i * i + j * j <= 5) put(wx + i, wy + j, i * i + j * j > 3 ? "E" : "h")
+    return { eave: [[x3, y3 + 1], [x4, y4 + 1]], win: [wx, wy] }
+  }
+  fillPoly([P3(a0, b0 + d, z), P3(a0 + w, b0 + d, z), P3(a0 + w / 2, b0 + d, z + hh)], (x, y) => ((x + y) % 11 === 0 ? "E" : "t"))
+  fillPoly([P3(a0 + w / 2, b0 - e, z + hh), P3(a0 + w / 2, b0 + d + e, z + hh), P3(a0 + w + e, b0 + d + e, z - 1), P3(a0 + w + e, b0 - e, z - 1)], tile)
+  const [x1, y1] = P3(a0 + w / 2, b0 - e, z + hh), [x2, y2] = P3(a0 + w / 2, b0 + d + e, z + hh)
+  lineK(x1, y1 - 1, x2, y2 - 1, "Z"); lineK(x1, y1, x2, y2, "T")
+  const [x3, y3] = P3(a0 + w + e, b0 - e, z - 1), [x4, y4] = P3(a0 + w + e, b0 + d + e, z - 1)
+  lineK(x3, y3 + 1, x4, y4 + 1, "e")
+  const [wx, wy] = P3(a0 + w * 0.45, b0 + d, z + hh * 0.4)
+  for (let j = -2; j <= 2; j++) for (let i = -2; i <= 2; i++) if (i * i + j * j <= 5) put(wx + i, wy + j, i * i + j * j > 3 ? "E" : "h")
+  return { eave: [[x3, y3 + 1], [x4, y4 + 1]], win: [wx, wy] }
+}
+// a paper lantern on a cord, with a soft glow
+const lantern = (x, y, col) => {
+  put(x, y, "E")
+  const pts = [[x - 1, y + 1], [x, y + 1], [x + 1, y + 1], [x - 1, y + 2], [x, y + 2], [x + 1, y + 2], [x, y + 3]]
+  put(x - 1, y + 1, col); put(x, y + 1, col); put(x + 1, y + 1, "x"); put(x - 1, y + 2, col); put(x, y + 2, "h"); put(x + 1, y + 2, "x"); put(x, y + 3, "E")
+  glowAround(pts, "T", 3)
+}
+// a water tank on stilts: legs with cross braces, a banded tank and a conical lid
+const waterTower = (x, y, seed) => {
+  for (const lx of [-4, 4]) vlineK(x + lx, y - 9, 10, "E")
+  vlineK(x, y - 9, 10, "e")
+  lineK(x - 4, y - 1, x, y - 8, "e"); lineK(x + 4, y - 1, x, y - 8, "e"); lineK(x - 4, y - 8, x, y - 1, "e")
+  for (let j = 0; j < 9; j++) for (let i = -5; i <= 5; i++) {
+    const t = i / 5
+    put(x + i, y - 10 - j, (j % 4 === 3 && Math.abs(t) < 0.95) ? "A" : t < -0.4 ? "T" : t < 0.3 ? "U" : "m")
+  }
+  for (let j = 0; j < 4; j++) hlineK(x - 4 + j, y - 19 - j, 9 - 2 * j, j === 0 ? "T" : j < 3 ? "U" : "m")
+  put(x - 3, y - 20, "Z"); put(x - 2, y - 21, "Z"); vlineK(x, y - 24, 2, "E"); put(x, y - 25, "x")
+  vlineK(x + 6, y - 14, 14, "E"); for (let j = 1; j < 14; j += 3) hlineK(x + 5, y - j, 3, "E")
+}
+// a cluster of antennas of different heights with a dish
+const antennaCluster = (x, y, id) => {
+  antenna(x - 7, y, 11 + (id % 5), id); antenna(x, y, 21 + (id % 7), id + 1); antenna(x + 7, y, 8 + (id % 4), id + 2)
+  for (const [i, j, k] of [[0, 0, "K"], [1, 0, "K"], [2, 0, "K"], [0, 1, "k"], [1, 1, "l"], [2, 1, "k"], [1, 2, "E"]]) put(x + 12 + i, y - 8 + j, k)
+  vlineK(x + 13, y - 5, 5, "E")
+}
+// a person-sized glow of leaves behind glass: used by the greenhouse
+const greenhouse = (cx, cy, rxD, Dh, seed) => {
+  const ryD = Math.round(rxD / 2)
+  const inside = (x, y) => { const t = (x + 0.5 - cx) / rxD; if (Math.abs(t) >= 1) return false; const s = Math.sqrt(1 - t * t); return y + 0.5 >= cy - Dh * s && y + 0.5 <= cy + ryD * s }
+  const pts = []
+  for (let x = cx - rxD; x <= cx + rxD; x++) {
+    const t = (x + 0.5 - cx) / rxD; if (Math.abs(t) >= 1) continue
+    const s = Math.sqrt(1 - t * t)
+    for (let y = Math.floor(cy - Dh * s); y <= Math.ceil(cy + ryD * s); y++) {
+      if (!inside(x, y)) continue
+      const ty = (y - (cy - Dh)) / (Dh + ryD)
+      put(x, y, ty < 0.35 ? (bay(x, y) < 0.7 ? "$" : "v") : ty < 0.72 ? "$" : (bay(x, y) < 0.6 ? "$" : "7"))
+    }
+  }
+  // plants seen through the glass, clipped to the dome
+  CLIP = inside
+  const base = cy + Math.round(ryD * 0.55)
+  const IR = GREENRAMP
+  palm(cx - Math.round(rxD * 0.35), base, Math.round(Dh * 0.75), seed + 1, -2)
+  leafMass(cx + Math.round(rxD * 0.45), base - 2, Math.max(5, Math.round(rxD * 0.3)), seed + 2, { sq: 0.8, warm: -1, ramp: IR })
+  leafMass(cx - Math.round(rxD * 0.62), base - 1, Math.max(4, Math.round(rxD * 0.22)), seed + 3, { sq: 0.8, ramp: IR })
+  leafMass(cx + Math.round(rxD * 0.05), base + 1, Math.max(5, Math.round(rxD * 0.26)), seed + 4, { sq: 0.75, dots: [["z", "W"], 4], ramp: IR })
+  fern(cx + Math.round(rxD * 0.22), base + 3, seed); fern(cx - Math.round(rxD * 0.2), base + 4, seed + 1)
+  bamboo(cx + Math.round(rxD * 0.28), base, Math.round(Dh * 0.7), 2, seed + 7)
+  CLIP = null
+  // ribs, hoop and outline in dark frame metal, glints on the sky side
+  for (let f = -2; f <= 2; f++) {
+    for (let y = Math.floor(cy - Dh); y <= cy + ryD; y++) {
+      const yo = y + 0.5 - cy, s = yo < 0 ? Math.sqrt(Math.max(0, 1 - (yo / Dh) ** 2)) : Math.sqrt(Math.max(0, 1 - (yo / ryD) ** 2))
+      const x = Math.round(cx + (f / 2.6) * rxD * s)
+      if (inside(x, y)) put(x, y, "A")
+    }
+  }
+  for (let x = cx - rxD; x <= cx + rxD; x++) {
+    const t = (x + 0.5 - cx) / rxD; if (Math.abs(t) >= 1) continue
+    const s = Math.sqrt(1 - t * t)
+    const yt = Math.round(cy - Dh * s), yb = Math.round(cy + ryD * s)
+    put(x, yt, t < 0.2 ? "W" : "A"); pts.push([x, yt])
+    put(x, yb, "A"); put(x, yb + 1, "K"); pts.push([x, yb])
+    put(x, Math.round(cy - Dh * s * 0.5 - 0.0), (x & 1) ? "A" : "$")
+  }
+  for (let j = Math.round(cy - Dh * 0.4); j < cy; j++) { const x = Math.round(cx - rxD * 0.55 + (j - cy) * 0.3); if (inside(x, j)) put(x, j, "W") }
+  glowAround(pts, "f", 3)
 }
 
 // ---------------------------------------------------------------- the layout: streets, a plaza, lots
@@ -629,12 +958,13 @@ for (let b = 0; b <= 40; b++) for (let a = 12; a <= 70; a++) {
   for (let i = 0; i < w; i++) for (let j = 0; j < d; j++) occ.add(ck(a + i, b + j))
   blds.push({ a0: a, b0: b, w, d, id: blds.length + 1 })
 }
-// the type of each: Kowloon tenements, pod towers, glass offices, terraced garden blocks, shophouses, industrial blocks
+// the type of each: pagoda tenements (two at most), glass offices, round pods, pills with curved balconies, terraced garden blocks,
+// flat shophouses, gabled teahouses, boxy apartment grids, slim slanted towers, greenhouse domes, industrial blocks
+const TYPES = { tenement: 2, glass: 5, pod: 4, pill: 4, terrace: 5, shop: 6, tea: 5, grid: 7, slim: 5, dome: 4, industrial: 3 }
 for (const bd of blds) {
   const [cx, cy] = cellXY(bd.a0 + bd.w / 2 - 0.5, bd.b0 + bd.d / 2 - 0.5)
   bd.cx = cx; bd.cy = cy
   bd.back = 8 * (bd.a0 + bd.b0) + 8 - backLine(cx) < 46
-  const r = ih(bd.id, 1, 3)
   bd.vis = PYs(bd.a0 + bd.w / 2, bd.b0 + bd.d / 2) - 40 < H && bd.cx < 700 && bd.cx > 100
   bd.lowCap = 0
   const mid = bd.a0 + bd.w / 2 + bd.b0 + bd.d / 2
@@ -642,46 +972,100 @@ for (const bd of blds) {
     const aa = bd.a0 + i, bb = bd.b0 + j
     if ((isStreet(aa, bb) || inRect(PLAZA, aa, bb)) && mid > aa + bb) { bd.lowCap = inRect(PLAZA, aa, bb) ? 34 : 54; break }      // only the near side of a canyon stays low
   }
-  bd.type = bd.back ? (r < 0.3 ? "tenement" : r < 0.58 ? "glass" : r < 0.82 ? "pod" : "terrace")
-    : (r < 0.3 ? "shop" : r < 0.5 ? "terrace" : r < 0.68 ? "industrial" : r < 0.86 ? "tenement" : "pod")
-  if (bd.lowCap && !bd.back) bd.type = r < 0.55 ? "shop" : r < 0.8 ? "industrial" : "terrace"
-  if (Math.min(bd.w, bd.d) === 1 && !bd.lowCap) bd.type = r < 0.6 ? "tenement" : "glass"
-  if (Math.min(bd.w, bd.d) === 1 && bd.lowCap) bd.type = "shop"
 }
 {
-  const need = { tenement: 6, pod: 4, glass: 4, terrace: 5, shop: 6, industrial: 4 }
-  const count = (t) => blds.filter((x) => x.vis && x.type === t).length
-  const tall = { tenement: 1, pod: 1, glass: 1 }
-  for (const t of Object.keys(need)) {
-    let guard = 0
-    while (count(t) < need[t] && guard++ < 40) {
-      const cand = blds.filter((x) => x.type !== t && count(x.type) > need[x.type] && x.vis && (tall[t] ? (x.back || x.cy < 440) && !x.lowCap : !x.back)).sort((p, q) => ih(p.id, 77, 3) - ih(q.id, 77, 3))[0]
-      if (!cand) break
-      cand.type = t
-    }
+  const allowed = (bd) => allowed0(bd).filter((t) => t !== "tea" || bd.w * bd.d <= 6)
+  const allowed0 = (bd) => {
+    const m = Math.min(bd.w, bd.d), M = Math.max(bd.w, bd.d)
+    if (bd.cy > 400 && !bd.back) return ["shop", "tea", "grid", "terrace", "dome", "industrial"].filter((t) => m > 1 || t === "shop" || t === "tea")
+    if (m === 1) return bd.back ? ["shop", "tea", "slim", "grid", "dome", "pod", "glass"] : bd.lowCap ? ["shop", "tea", "dome"] : ["slim", "tea", "shop", "grid", "dome", "pod", "glass"]
+    if (bd.lowCap) return ["shop", "tea", "grid", "terrace", "dome", "industrial"]
+    if (bd.back) return ["tenement", "glass", "pod", "pill", "slim", "grid", "terrace", "grid", "terrace"].filter((t) => t !== "pill" || bd.w * bd.d >= 4)
+    return ["tenement", "glass", "pod", "pill", "slim", "grid", "terrace", "shop", "tea", "dome", "industrial"].filter((t) => t !== "pill" || bd.w * bd.d >= 4)
+  }
+  const adj = (p, q) => p.a0 - 1 <= q.a0 + q.w && q.a0 - 1 <= p.a0 + p.w && p.b0 - 1 <= q.b0 + q.d && q.b0 - 1 <= p.b0 + p.d
+  const used = {}
+  // the cylinder tower and two pagoda tenements stay where they were
+  for (const [pid, t] of [[48, "pod"], [24, "tenement"], [21, "tenement"]]) { const bd = blds.find((x) => x.id === pid); if (bd) { bd.type = t; used[t] = (used[t] || 0) + 1 } }
+  const order0 = [...blds].sort((p, q) => (q.vis - p.vis) || (ih(p.id, 5, 5) - ih(q.id, 5, 5)))
+  for (const bd of order0) {
+    if (bd.type) continue
+    const al = allowed(bd)
+    const nb = new Set(blds.filter((o) => o.type && o !== bd && adj(bd, o)).map((o) => o.type))
+    const sc = (t) => (used[t] || 0) / TYPES[t] + ih(bd.id, t.length * 7 + t.charCodeAt(0), 5) * 0.7
+    let c = al.filter((t) => !nb.has(t) && (used[t] || 0) < TYPES[t])
+    if (!c.length) c = al.filter((t) => !nb.has(t) && t !== "tenement")
+    if (!c.length) c = al.filter((t) => t !== "tenement")
+    c.sort((p, q) => sc(p) - sc(q))
+    bd.type = c[0]; used[bd.type] = (used[bd.type] || 0) + 1
   }
 }
+{
+  // at least two pills with curved balconies must be in view
+  const vis = (b) => b.vis && b.cx > 200 && b.cx < 560 && b.cy < 470
+  const have = blds.filter((b) => vis(b) && b.type === "pill").length
+  const pick = blds.filter((b) => vis(b) && b.type !== "pill" && ![48, 24, 21].includes(b.id) && b.w * b.d >= 3 && (b.back || !b.lowCap)).sort((p, q) => q.w * q.d - p.w * p.d || p.id - q.id)
+  for (const b of pick.slice(0, Math.max(0, 2 - have))) b.type = "pill"
+}
+for (const bd of blds) {
+  // the footprint a building really stands on (slim towers stand narrower than their lot)
+  bd.fp = { a: bd.a0, b: bd.b0, w: bd.w, d: bd.d }
+  if (bd.type === "slim") {
+    const mw = Math.max(1.2, bd.w * 0.6), md = Math.max(1.2, bd.d * 0.6)
+    bd.fp = { a: bd.a0 + (bd.w - mw) / 2, b: bd.b0 + (bd.d - md) / 2, w: mw, d: md }
+  }
+}
+const HRANGE = { tenement: [100, 160], glass: [130, 180], pod: [90, 130], pill: [110, 170], slim: [150, 240], grid: [60, 130], terrace: [55, 115], shop: [30, 46], tea: [28, 40], dome: [58, 80], industrial: [56, 96] }
 const heightOf = (bd) => {
   const r1 = ih(bd.id, 3, 9), r2 = ih(bd.id, 4, 9)
   const ac = bd.a0 + bd.w / 2, bc = bd.b0 + bd.d / 2
   const cyc = PYs(ac, bc)
-  let h
-  if (bd.back) h = cyc - (roofLine(bd.cx) + (r2 - 0.5) * 20)
-  else h = { shop: 30 + 14 * r2, terrace: 70 + 60 * r1, industrial: 56 + 40 * r1, tenement: 100 + 60 * r1, pod: 100 + 40 * r1, glass: 130 + 50 * r1 }[bd.type]
-  if (bd.back) h = { shop: 40, industrial: 80, terrace: Math.max(h, 70) }[bd.type] ?? h
-  if (bd.type === "shop") h = Math.min(h, 46)
+  const [lo, hi] = HRANGE[bd.type]
+  let h = lo + (hi - lo) * r1
+  if (bd.back) {
+    const fit = cyc - (roofLine(bd.cx) + (r2 - 0.5) * 20)
+    h = ["grid", "terrace"].includes(bd.type) ? Math.max(70, fit * (0.55 + 0.2 * r1)) : ["shop", "tea", "dome"].includes(bd.type) ? h : Math.max(70, fit + (bd.type === "slim" ? 14 : 0))
+  }
   if (bd.lowCap && !bd.back) h = Math.min(h, bd.lowCap)
-  if (!bd.back && !bd.lowCap && bd.type !== "shop") h = Math.max(h, 70)
+  if (!bd.back && !bd.lowCap && !["shop", "tea", "dome", "grid", "terrace"].includes(bd.type)) h = Math.max(h, 70)
+  if (!bd.back) h = Math.min(h, bd.cy > 440 ? 64 : bd.cy > 400 ? 96 : bd.cy > 360 ? 150 : 999)
   const nearTower = Math.abs(bd.cx - 552) < 62 && bd.cy > 380
   return clamp(Math.round(nearTower ? Math.min(h, 64) : h), 24, 270)
 }
 for (const bd of blds) bd.h = heightOf(bd)
+// skybridges: lit tubes between pairs of towers that stand side by side on screen; the pair is retyped as a glass tower and a boxy apartment block
+const BRIDGES = []
+{
+  const eR = (b) => PXs(b.a0 + b.w, b.b0) - 1, eL = (b) => PXs(b.a0, b.b0 + b.d)
+  const bot = (b, x) => (x === "R" ? PYs(b.a0 + b.w, b.b0) : PYs(b.a0, b.b0 + b.d))
+  const cand = blds.filter((b) => b.vis && ![48, 24, 21].includes(b.id) && b.type !== "pill" && (b.back || !b.lowCap) && b.cx > 170 && b.cx < 520 && b.cy < 470 && b.w * b.d >= 2)
+  const pairs = []
+  for (const p of cand) for (const q of cand) {
+    if (p === q) continue
+    const hp = Math.max(p.h, 120), hq = Math.max(q.h, 110), g = eL(q) - eR(p)
+    if (g < 12 || g > 44) continue
+    const top = Math.max(bot(p, "R") - hp, bot(q, "L") - hq), btm = Math.min(bot(p, "R"), bot(q, "L"))
+    if (btm - top < 60 || top < 140) continue
+    pairs.push({ p, q, g, hp, hq, y: Math.round(top + 22 + 0.15 * (btm - top - 22)), score: Math.abs(g - 24) + Math.abs(top - 260) * 0.2 })
+  }
+  pairs.sort((u, v) => u.score - v.score)
+  const used = new Set()
+  for (const pr of pairs) {
+    if (used.has(pr.p.id) || used.has(pr.q.id) || BRIDGES.length >= 1) continue
+    used.add(pr.p.id); used.add(pr.q.id)
+    pr.p.type = "glass"; pr.q.type = "grid"; pr.p.h = pr.hp; pr.q.h = pr.hq
+    pr.p.fp = { a: pr.p.a0, b: pr.p.b0, w: pr.p.w, d: pr.p.d }; pr.q.fp = { a: pr.q.a0, b: pr.q.b0, w: pr.q.w, d: pr.q.d }
+    BRIDGES.push({ x1: eR(pr.p) + 1, x2: eL(pr.q) - 1, y: pr.y, key: Math.max(pr.p.a0 + pr.p.w + pr.p.b0 + pr.p.d, pr.q.a0 + pr.q.w + pr.q.b0 + pr.q.d) + 0.1, lvl: levelFor(PYs(pr.q.a0 + pr.q.w, pr.q.b0 + pr.q.d)) })
+  }
+  const cnt = {}; for (const b of blds.filter((x) => x.vis)) cnt[b.type] = (cnt[b.type] || 0) + 1
+}
 
 // ---------------------------------------------------------------- what each type puts on its walls
 const pickFam = (bd, i) => {
   const r = ih(bd.id, 2, 3)
   let k = Math.floor(ih(bd.id, 12, 3) * FAMMAIN.length)
   if (bd.type === "glass") return "peri"
+  if (bd.type === "grid") return ["rose", "plum", "peach", "terra", "mauve"][k % 5]
   if (r < 0.09) return "teal"
   if (r < 0.17) return "peri"
   if (bd.type === "industrial") return ["plum", "plum", "mauve", "terra"][k % 4]
@@ -701,6 +1085,61 @@ const wallBoards = (bd, m, n, accent, wk, kinds, base = 8) => {
   }
 }
 
+// rooftop gardens: beds in terracotta boxes either side of a stone path, with bushes, small trees, flowers
+let SAKURAS = 0
+const gardenRoofFn = (a, b, w, d) => (x, y, i) => {
+  if (i.low || i.up || i.side) return null
+  const mid = b + d / 2
+  if (Math.abs(i.b - mid) < 0.2) return ((x + y) % 6 === 0 ? "U" : (x >> 1) % 3 === 0 ? "T" : "S")
+  return null
+}
+const gardenBeds = (z, a, b, w, d, seed, far) => {
+  const beds = []
+  const mid = b + d / 2
+  for (const [b1, b2] of [[b + 0.22, mid - 0.26], [mid + 0.26, b + d - 0.22]]) {
+    if (b2 - b1 < 0.3) continue
+    const na = Math.max(1, Math.floor((w - 0.3) / 1.1)), aw0 = (w - 0.4) / na
+    for (let i = 0; i < na; i++) beds.push({ a1: a + 0.2 + i * aw0, aw: aw0 - 0.16, b1, bw: b2 - b1, i, j: b1 > mid ? 1 : 0 })
+  }
+  beds.sort((p, q) => (p.a1 + p.b1) - (q.a1 + q.b1))
+  for (const bd of beds) {
+    isoBox(bd.a1, bd.b1, bd.aw, bd.bw, 3, z, { L: (u, r) => (r === 0 ? "T" : "!"), R: (u, r) => (r === 0 ? "!" : "@"), T: () => "e" })
+    const [px, py] = P3(bd.a1 + bd.aw / 2, bd.b1 + bd.bw / 2, z + 3)
+    const sd = seed * 11 + bd.i * 5 + bd.j, q = ih(seed, bd.i * 3 + bd.j, 7)
+    const rxw = Math.max(3, Math.min(11, Math.round(ISO * (bd.aw + bd.bw) * 0.32)))
+    if (far) { leafMass(px, py - 1, 3, sd, { rx: rxw, sq: 0.8, lr: 2.2 }); continue }
+    if (q < 0.3) streetTree(px, py + 1, 4 + (sd % 2), sd)
+    else if (q < 0.5 && SAKURAS < 3) { SAKURAS++; sakura(px, py + 1, 5, sd) }
+    else if (q < 0.62) bamboo(px, py + 1, 11 + (sd % 4), 3, sd)
+    else if (q < 0.72) palm(px, py + 1, 12 + (sd % 4), sd, 3)
+    else leafMass(px, py - 2, 4.2, sd, { rx: rxw + 2, sq: 0.8, lr: 2.6, dots: q < 0.88 ? [["z", "W", "Y"], 3] : null })
+    if (q > 0.45) { fern(px - rxw, py + 1, sd) }
+  }
+}
+// a skybridge: a lit tube between two towers, with struts, a neon edge and little windows
+const drawBridge = (br) => {
+  const { x1, x2, y } = br
+  curWins = []
+  const len = x2 - x1
+  for (let x = x1; x <= x2; x++) {
+    for (let j = -5; j <= 4; j++) {
+      const k = j === -5 ? "K" : j === -4 ? "k" : j === 4 ? "A" : j === 3 ? "l" : "w"
+      put(x, y + j, k)
+    }
+    put(x, y - 6, "Z")
+    const px = x - x1
+    if (px > 1 && px < len - 1 && px % 5 !== 4) {
+      const rec = newWin(true, px % 15 < 5 ? "z" : "h", false)
+      for (let j = -3; j <= 1; j++) { rec.pts.push([x, y + j, rec.on, "w"]); put(x, y + j, rec.on) }
+    }
+  }
+  for (let x = x1; x <= x2; x += 2) put(x, y + 5, "H")
+  lineK(x1 + 2, y + 5, x1 - 4, y + 12, "E"); lineK(x2 - 2, y + 5, x2 + 4, y + 12, "E")
+  vlineK(x1, y - 9, 14, "E"); vlineK(x2, y - 9, 14, "E")
+  glowAround([...Array(len + 1).keys()].map((i) => [x1 + i, y + 5]), "H", 2)
+  haloPass()
+}
+
 const drawBuilding = (bd) => {
   const { a0, b0, w, d, id } = bd
   const left = PXs(a0, b0 + d), right = PXs(a0 + w, b0)
@@ -717,7 +1156,14 @@ const drawBuilding = (bd) => {
   const wk = [fam.L, fam.R, "A"]
   const type = bd.type
   const H0 = bd.h
+  const far = bd.back
   const mods = []     // wall planes for signs and details
+  const roofBits = (rx, ry, kind) => {
+    const q = ih(id, 101, 6)
+    if (kind === "tank") TANKS(rx - 8, ry + 2, 5, 9, fam)
+    if (q < 0.3) waterTower(rx + 12, ry + 3, id)
+    else if (q < 0.6) hedge(rx + 6, ry + 4, 9, id, { h: far ? 2.6 : 3.2 })
+  }
   if (type === "tenement") {
     const fh = 11, total = Math.max(5, Math.round(H0 / fh))
     const ns = [Math.max(2, Math.round(total * 0.5)), Math.max(1, Math.round(total * 0.3))]
@@ -726,12 +1172,11 @@ const drawBuilding = (bd) => {
     for (let k = 0; k < 3; k++) {
       const tw = Math.min(0.4 * k, (w - 0.7) / 2), td = Math.min(0.4 * k, (d - 0.7) / 2)
       const ma = a0 + tw, mb = b0 + td, mw = w - 2 * tw, md = d - 2 * td
-      st = stack({ a: ma, b: mb, w: mw, d: md, z0: z, n: ns[k], fh, fam, id: id * 3 + k, trims, pw: 3, pier: 2, wcol, trimB: trimB && k === 2, plantP: 0.34, vineP: 0.2 })
+      st = stack({ a: ma, b: mb, w: mw, d: md, z0: z, n: ns[k], fh, fam, id: id * 3 + k, trims, pw: 3, pier: 2, wcol, trimB: trimB && k === 2, plantP: 0.5, vineP: 0.2, far })
       mods.push({ a: ma, b: mb, w: mw, d: md, z, h: ns[k] * fh, n: ns[k], fh })
       z = st.z
     }
     const top = st.roofBox, [rx, ry] = top.pt(a0 + w / 2, b0 + d / 2)
-    // wall clutter: AC units, laundry poles, many signs
     for (const m of mods) {
       for (let f = 0; f < m.n; f++) {
         const q = ih(id, f + m.z, 50)
@@ -741,14 +1186,12 @@ const drawBuilding = (bd) => {
       }
     }
     wallBoards(bd, mods[0], 5, accent, wk, ["board", "strip", "icon", "board"], 14)
-    TANKS(rx - 8, ry + 2, 5, 9, fam)
     antenna(rx + 6, ry, 12 + Math.floor(ih(id, 100, 6) * 8), id)
-    if (ih(id, 101, 6) < 0.6) planter(rx + 12, ry, 7, id)
+    roofBits(rx, ry, "tank")
   } else if (type === "glass") {
     const fh = 12, n = Math.max(6, Math.round(H0 / fh)), h = n * fh
     const lam = FAMS.peri
     const panes = new Map()
-    const wl = Math.round(ISO * w), wr = Math.round(ISO * d)
     const glassKey = (side) => (u, r, wW, hh, x, y) => {
       const base = side === "L" ? lam.L : lam.R
       if (r % fh === 0 && r > 0) return side === "L" ? lam.R : "l"
@@ -765,7 +1208,6 @@ const drawBuilding = (bd) => {
         rec.pts.push([x, y, rec.on, "w"])
         return rec.lit ? rec.on : "w"
       }
-      // smooth glass: a lighter sheen toward the top and the lit edge
       const sheen = (1 - r / hh) * 0.55 + (side === "L" ? (1 - u / wW) * 0.25 : 0)
       return bay(x, y) < sheen * 0.7 ? (side === "L" ? lam.top : lam.L) : base
     }
@@ -774,67 +1216,65 @@ const drawBuilding = (bd) => {
       T: (x, y, i) => ((i.low || i.up) ? accent : (i.side ? lam.top : (bay(x, y) < 0.15 ? lam.L : lam.top))),
     })
     const top = { a: a0, b: b0, w, d, z: 0, h }
-    // a neon stripe up the front corner
     const cells = []
-    const [fx, fy] = wallXY("R", top, 0, 0)
     for (let r = 2; r < h - 2; r++) { const x = PXs(a0 + w, b0 + d), y = PYs(a0 + w, b0 + d) - h + r; cells.push([x - 1, y, accent], [x, y, "W"], [x + 1, y, accent]) }
     addSign(cells, accent, wk)
     mods.push(top)
     const [rx, ry] = [PXs(a0 + w / 2, b0 + d / 2), PYs(a0 + w / 2, b0 + d / 2) - h]
     antenna(rx + 4, ry - 2, 16 + Math.floor(ih(id, 100, 6) * 10), id)
     spr(rx - 10, ry + 2, ["KKKKKk", "KllllK", "KllllK", "kkkkkk"])
-    if (ih(id, 102, 6) < 0.5) hedge(rx + 12, ry + 6, 8, id)
-  } else if (type === "pod") {
+    hedge(rx + 8, ry + 5, 10, id, { h: far ? 2.6 : 3.2 })
+    if (!far) { const [vx, vy] = wallXY("L", top, 12 + (id % 3) * 12, 2); pothos(vx, vy, 10 + (id % 8), id) }
+  } else if (type === "pod" || type === "pill") {
     const fh = 12, n = Math.max(5, Math.round(H0 / fh))
-    const R = Math.min(w, d) * 0.5 * 0.92
-    const rx = 22.6 * R * (ih(id, 10, 3) < 0.3 ? 1.35 : 1), ry = 11.3 * R
+    const long = Math.max(w, d), short = Math.min(w, d)
+    let R = short * 0.5 * 0.92, s = 0
+    if (type === "pill") { s = (long - short) + (long === short ? 0.8 : 0); R = short * 0.5 * (long === short ? 0.78 : 0.92) }
+    const rx = 22.6 * R * (type === "pod" && ih(id, 10, 3) < 0.3 ? 1.35 : 1), ry = 11.3 * R
     const cx = PXs(a0 + w / 2, b0 + d / 2), cy0 = PYs(a0 + w / 2, b0 + d / 2)
-    const top = cylinder({ cx, cy0, rx, ry, n, fh, fam, id, wcol, trimB, accent })
+    const top = cylinder({ cx, cy0, rx, ry, n, fh, fam, id, wcol, trimB, accent, plants: far ? 0 : (type === "pill" ? 0.95 : 0.6), sx: s ? (w >= d ? 1 : -1) * Math.round(ISO * s) : 0, sy: Math.round(ISO * s / 2) })
     const [tx, ty] = top.top
-    podTop(tx, ty + 2, 5 + Math.floor(ih(id, 11, 3) * 3), 13 + Math.floor(ih(id, 12, 3) * 3), fam, ih(id, 13, 3) < 0.3 ? "v" : wcol)
-    if (ih(id, 14, 3) < 0.7) { tree(tx - Math.round(rx * 0.55), ty + 4, 4, id); }
+    if (type === "pod") {
+      podTop(tx, ty + 2, 5 + Math.floor(ih(id, 11, 3) * 3), 13 + Math.floor(ih(id, 12, 3) * 3), fam, ih(id, 13, 3) < 0.3 ? "v" : wcol)
+      if (ih(id, 14, 3) < 0.7) streetTree(tx - Math.round(rx * 0.55), ty + 4, 4, id)
+    } else {
+      hedge(tx - Math.round(rx * 0.6), ty + 3, 12, id, { h: 3.4, bloom: true })
+      streetTree(tx + Math.round(rx * 0.35), ty + 5, 4, id + 3)
+      palm(tx - 2, ty + 3, 14, id, 3)
+    }
     mods.push({ a: a0, b: b0, w, d, z: 0, h: n * fh })
   } else if (type === "terrace") {
-    // wide, stepped, every step planted
-    const fh = 12, steps = Math.max(2, Math.min(4, Math.round(H0 / 40)))
+    // a staircase of wide steps toward the back, each with a roof garden
+    const fh = 12, steps = Math.max(2, Math.min(3, Math.round(H0 / 40)))
     const per = Math.max(2, Math.round(H0 / fh / steps))
     let z = 0, st = null
     for (let k = 0; k < steps; k++) {
-      const tw = Math.min(0.5 * k, (w - 0.8) / 2), td = Math.min(0.5 * k, (d - 0.8) / 2)
-      const ma = a0 + tw, mb = b0 + td, mw = w - 2 * tw, md = d - 2 * td
+      const ta = Math.min(0.55 * k, w - 1.0)
+      const ma = a0 + ta, mb = b0, mw = w - ta, md = d - Math.min(0.3 * k, d - 1)
       const lastStep = k === steps - 1
       st = stack({
         a: ma, b: mb, w: mw, d: md, z0: z, n: per, fh, fam, id: id * 5 + k, trims, pw: 4, pier: 3, wcol,
-        ins: 0.4, trimB: trimB && lastStep, plantP: 0.9, vineP: 0.4, roofPlants: true,
-        ringFn: (x, y, i, f) => ((i.low || i.up || i.side) ? (bay(x, y) < 0.5 ? "o" : "g") : (((x >> 1) + y * 5 + id) % 17 === 0 ? (ih(x, y, id) < 0.5 ? "H" : "W") : (bay(x, y) < 0.3 ? "o" : "g"))),
-        roofFn: (x, y, i) => ((i.low || i.up || i.side) ? "g" : (((x >> 1) + y * 5 + id) % 13 === 0 ? (ih(x, y, id) < 0.5 ? "H" : "W") : (bay(x, y) < 0.35 ? "o" : "g"))),
+        ins: 0.3, trimB: trimB && lastStep, plantP: 0.8, vineP: 0.4, roofPlants: true, far,
+        roofFn: gardenRoofFn(ma, mb, mw, md),
       })
       mods.push({ a: ma, b: mb, w: mw, d: md, z, h: per * fh })
-      // trees and hedges on this step's roof
-      const rb = st.roofBox
-      const nt = 1 + Math.floor(mw * md * 0.8)
-      for (let t = 0; t < nt; t++) {
-        const [px, py] = rb.pt(ma + 0.4 + ih(id * 9 + k, t, 20) * Math.max(0.2, mw - 0.8), mb + 0.4 + ih(id * 9 + k, t, 21) * Math.max(0.2, md - 0.8))
-        const q = ih(id * 9 + k, t, 22)
-        if (q < 0.55) tree(px, py, 3 + Math.floor(ih(id, t + k, 23) * 3), id + t)
-        else hedge(px - 4, py, 8 + Math.floor(ih(id, t, 24) * 4), id + t)
-      }
+      gardenBeds(st.z, ma, mb, mw, md, id * 9 + k, far)
       z = st.z
     }
   } else if (type === "shop") {
     const fh = 12, n = 2 + (ih(id, 15, 3) < 0.5 ? 1 : 0)
     const awn = accent === "N" ? "H" : accent
     const st = stack({
-      a: a0, b: b0, w, d, n, fh, fhFor: (f) => (f === 0 ? 16 : fh), fam, id, trims, pw: 4, pier: 3, wcol, trimB, plantP: 0.5, vineP: 0.2, ins: 0.2,
+      a: a0, b: b0, w, d, n, fh, fhFor: (f) => (f === 0 ? 16 : fh), fam, id, trims, pw: 4, pier: 3, wcol, trimB, plantP: 0.6, vineP: 0.2, ins: 0.2, far,
       groundWall: (side, u, r, wW, h) => {
         if (side === "R") {
           if (r === 0) return fam.R
-          if (u >= 3 && u < wW - 3 && r >= 5 && r < h - 1) return (u - 3) % 9 < 3 ? "w" : (u % 11 < 6 ? "h" : "y")     // a lit door and a window
+          if (u >= 3 && u < wW - 3 && r >= 5 && r < h - 1) return (u - 3) % 9 < 3 ? "w" : (u % 11 < 6 ? "h" : "y")
           return null
         }
         if (r === 0) return fam.R
-        if (r >= 1 && r <= 4) return Math.floor(u / 3) % 2 === 0 ? awn : "W"                                         // striped awning
-        if (u >= 3 && u < wW - 3 && r >= 5 && r < h - 1) return (u - 3) % 9 === 8 ? "A" : (r === 5 ? "Y" : (u % 17 < 9 ? "h" : "Y"))         // warm shopfront glass
+        if (r >= 1 && r <= 4) return Math.floor(u / 3) % 2 === 0 ? awn : "W"
+        if (u >= 3 && u < wW - 3 && r >= 5 && r < h - 1) return (u - 3) % 9 === 8 ? "A" : (r === 5 ? "Y" : (u % 17 < 9 ? "h" : "Y"))
         return null
       },
       roofFn: (x, y, i) => ((i.low || i.up || i.side) ? null : ((x + y) % 5 === 0 ? fam.L : fam.top)),
@@ -842,7 +1282,6 @@ const drawBuilding = (bd) => {
     const m0 = { a: a0, b: b0, w, d, z: 0, h: 16 + (n - 1) * fh }
     mods.push(m0)
     wallBoards(bd, m0, 2, accent, wk, ["board", "icon"], 22)
-    // warm shop light pooling on the street in front
     const [px, py] = [PXs(a0, b0 + d) + Math.round(ISO * w * 0.5), PYs(a0, b0 + d) + 3]
     pool(px, py + 3, 30, 9, "L", 0.85); pool(px, py + 3, 20, 6, "y", 0.8)
     const rb = st.roofBox
@@ -850,10 +1289,105 @@ const drawBuilding = (bd) => {
     stringLights(x1 + 2, y1 - 8, x2 - 2, y2 - 8, 4, id)
     const [cx2, cy2] = rb.pt(a0 + w / 2, b0 + d / 2)
     planter(cx2 - 12, cy2 + 2, 8, id); spr(cx2 + 6, cy2 + 3, ["UUUUU", ".E.E."])
+    if (!far) { const [wx, wy] = wallXY("L", m0, 5, 15); potRow(wx, wy + 2, 2, 7, id) }
+  } else if (type === "tea") {
+    // a low gabled teahouse with paper lanterns under the eaves
+    const hh = clamp(Math.round(ISO * Math.min(w, d) * 0.3) + 3, 9, 17)
+    const body = Math.max(14, H0 - hh)
+    const n = body >= 28 ? 2 : 1, fh = Math.round((body - (n === 2 ? 16 : 0)) / (n === 2 ? 1 : 1))
+    const awn = accent === "N" ? "H" : accent
+    const st = stack({
+      a: a0, b: b0, w, d, n, fh: 16, fhFor: (f) => (f === 0 ? 16 : 13), fam, id, trims, pw: 4, pier: 3, wcol, trimB: false, plantP: 0.5, vineP: 0.1, ins: 0.2, far,
+      groundWall: (side, u, r, wW, h) => {
+        if (r === 0) return side === "L" ? fam.R : "A"
+        if (side === "R") return (u >= 3 && u < wW - 3 && r >= 5 && r < h - 1) ? ((u - 3) % 9 < 3 ? "w" : (u % 11 < 6 ? "h" : "y")) : null
+        if (r >= 1 && r <= 3) return Math.floor(u / 3) % 2 === 0 ? awn : "W"
+        if (u >= 3 && u < wW - 3 && r >= 5 && r < h - 1) return (u - 3) % 9 === 8 ? "E" : (r === 5 ? "Y" : (u % 17 < 9 ? "h" : "Y"))
+        return null
+      },
+      roofFn: () => fam.top,
+    })
+    mods.push({ a: a0, b: b0, w, d, z: 0, h: st.z })
+    const axis = w >= d ? "a" : "b"
+    const rf = gableRoof(a0, b0, w, d, st.z, hh, axis, id)
+    const [ex1, ey1] = rf.eave[0], [ex2, ey2] = rf.eave[1]
+    const nL = Math.max(2, Math.round(Math.abs(ex2 - ex1) / 11))
+    for (let i = 0; i <= nL; i++) { const t = (i + 0.5) / (nL + 1); lantern(Math.round(ex1 + (ex2 - ex1) * t), Math.round(ey1 + (ey2 - ey1) * t) + 1, ["z", "y", "L"][(i + id) % 3]) }
+    const [px, py] = [PXs(a0, b0 + d) + Math.round(ISO * w * 0.5), PYs(a0, b0 + d) + 3]
+    pool(px, py + 3, 26, 8, "L", 0.85); pool(px, py + 3, 16, 5, "y", 0.8)
+    if (!far) { const [wx, wy] = wallXY("L", { a: a0, b: b0, w, d, z: 0, h: st.z }, 6, 15); potRow(wx, wy + 2, 2, 7, id + 4); const [mx, my] = wallXY("R", { a: a0, b: b0, w, d, z: 0, h: st.z }, 4, 15); fern(mx, my + 2, id) }
+  } else if (type === "grid") {
+    // a boxy apartment block: a grid of small pink, peach and blue windows, each with a balcony rail and a tiny plant
+    const FH = 9, n = Math.max(4, Math.round(H0 / FH)), h = n * FH
+    const GW = ["z", "y", "v", "z", "y", "h", "v", "z"]
+    const panes = new Map()
+    const gk = (side) => (u, r, wW, hh, x, y) => {
+      const base = side === "L" ? fam.L : fam.R
+      const rt = r - (hh - h), f = Math.floor(rt / FH), fr = rt % FH, cu = (u - 2) % 7, col = Math.floor((u - 2) / 7)
+      if (r === 0) return side === "L" ? fam.top : fam.L
+      if (u < 2 || u >= wW - 3 || col < 0) return base
+      if (fr === 0) return side === "L" ? fam.R : "A"
+      if (cu >= 1 && cu <= 3 && fr >= 2 && fr <= 5 && u < wW - 6) {
+        const pk = side + f + "_" + col
+        let rec = panes.get(pk)
+        if (!rec) {
+          const q = ih(id * 131 + col, f * 7 + (side === "L" ? 1 : 2), 17)
+          rec = newWin(q < 0.8, GW[Math.floor(ih(id + col * 3, f, 5) * GW.length)], true)
+          panes.set(pk, rec)
+        }
+        rec.pts.push([x, y, rec.on, "w"])
+        return rec.lit ? rec.on : "w"
+      }
+      if (fr === 6 && cu <= 4) return fam.top
+      return base
+    }
+    const gr = w * d >= 4 ? gardenRoofFn(a0, b0, w, d) : null
+    isoBox(a0, b0, w, d, h, 0, { L: gk("L"), R: gk("R"), T: (x, y, i) => ((i.low || i.up) ? accent : (i.side ? fam.top : ((gr && gr(x, y, i)) || (bay(x, y) < 0.15 ? fam.L : fam.top)))) })
+    if (gr) gardenBeds(h, a0, b0, w, d, id * 13, far)
+    const top = { a: a0, b: b0, w, d, z: 0, h }
+    // a balcony plant sits on each rail
+    for (const side of ["L", "R"]) {
+      const wW = Math.round(ISO * (side === "L" ? w : d))
+      for (let f = 0; f < n; f++) for (let col = 0; col < Math.floor((wW - 8) / 7); col++) {
+        const q = ih(id * 3 + col, f * 5 + (side === "L" ? 1 : 2), 33)
+        if (q > (far ? 0.4 : 0.8)) continue
+        const [x, y] = wallXY(side, top, 2 + col * 7 + 2, (n - 1 - f) * FH + 6)
+        put(x - 1, y - 1, "o"); put(x, y - 1, "g"); put(x + 1, y - 1, "o"); put(x, y - 2, q < 0.2 ? "7" : "g"); put(x - 1, y - 2, "O")
+        if (q < 0.15) put(x + 1, y - 2, "z")
+        if (q > 0.55 && !far) { put(x - 1, y + 1, "g"); put(x - 1, y + 2, "o") }
+      }
+    }
+    mods.push(top)
+    const [rx, ry] = [PXs(a0 + w / 2, b0 + d / 2), PYs(a0 + w / 2, b0 + d / 2) - h]
+    if (id % 2) waterTower(rx - 6, ry + 4, id); else { TANKS(rx - 8, ry + 2, 5, 9, fam); antenna(rx + 8, ry, 12, id) }
+    hedge(rx + 6, ry + 5, 9, id, { h: far ? 2.6 : 3.2 })
+    wallBoards(bd, top, 1, accent, wk, ["strip", "board"], 14)
+  } else if (type === "slim") {
+    // a slim tower with a slanted roof, a neon edge and a cluster of antennas
+    const { a: ma, b: mb, w: mw, d: md } = bd.fp
+    const fh = 10, hh = 14 + (id % 4) * 3
+    const n = Math.max(5, Math.round((H0 - hh) / fh))
+    const st = stack({ a: ma, b: mb, w: mw, d: md, n, fh, fam, id, trims, pw: 3, pier: 2, wcol, trimAll: true, trimP: 0.25, plantP: 0.35, vineP: 0.15, far, ins: 0.12 })
+    mods.push({ a: ma, b: mb, w: mw, d: md, z: 0, h: n * fh })
+    const axis = id % 2 ? "a" : "b"
+    slantRoof(ma, mb, mw, md, st.z, hh, fam, axis, accent)
+    const [ax, ay] = axis === "b" ? P3(ma + mw / 2, mb + 0.12, st.z + hh) : P3(ma + 0.12, mb + md / 2, st.z + hh)
+    antennaCluster(ax + 2, ay + 1, id)
+    wallBoards(bd, mods[0], 1, accent, wk, ["strip", "icon"], 18)
+  } else if (type === "dome") {
+    // a low block under a glass dome: ferns, palms and a pink-white glow inside
+    const rxD = Math.round(ISO * Math.min(w, d) * 0.5 * 0.92 * 1.414)
+    const Dh = clamp(Math.round(rxD * 0.8), 12, Math.max(12, H0 - 14))
+    const body = Math.max(14, H0 - Dh)
+    const n = Math.max(1, Math.round(body / 12))
+    const st = stack({ a: a0, b: b0, w, d, n, fh: 12, fam, id, trims, pw: 4, pier: 3, wcol, trimB, plantP: 0.6, vineP: 0.3, ins: 0.2, far })
+    mods.push({ a: a0, b: b0, w, d, z: 0, h: st.z })
+    const [cx2, cy2] = st.roofBox.pt(a0 + w / 2, b0 + d / 2)
+    greenhouse(cx2, cy2, rxD, Dh, id)
   } else {
-    // industrial: pipes, tanks, vents, a chimney, slit windows
+    // industrial: pipes, tanks, vents, a chimney, slit windows, moss on the ledges
     const fh = 14, n = Math.max(3, Math.round(H0 / fh))
-    const st = stack({ a: a0, b: b0, w, d, n, fh, fam, id, trims, pw: 10, pier: 4, wh: 2, wy0: 5, wcol, trimB, plantP: 0.1, vineP: 0.25, litP: 0.3,
+    const st = stack({ a: a0, b: b0, w, d, n, fh, fam, id, trims, pw: 10, pier: 4, wh: 2, wy0: 5, wcol, trimB, plantP: 0.2, vineP: 0.3, litP: 0.3, far,
       roofFn: (x, y, i) => ((i.low || i.up || i.side) ? null : (((i.a * 3) % 1 < 0.1 || (i.b * 3) % 1 < 0.1) ? fam.L : null)) })
     const m0 = { a: a0, b: b0, w, d, z: 0, h: n * fh }
     mods.push(m0)
@@ -867,10 +1401,11 @@ const drawBuilding = (bd) => {
     const [cx2, cy2] = rb.pt(a0 + w / 2, b0 + d / 2)
     wallBoards(bd, m0, 1, accent, wk, ["board", "strip"], 16)
     TANKS(cx2 - 14, cy2 + 2, 7, 12, FAMS.mauve)
-    TANKS(cx2 + 6, cy2 + 6, 5, 9, FAMS.peri)
+    waterTower(cx2 + 8, cy2 + 6, id)
     rectK(cx2 + 16, cy2 - 4, 8, 6, "t"); hlineK(cx2 + 16, cy2 - 4, 8, "S"); for (let i = 0; i < 3; i++) hlineK(cx2 + 17, cy2 - 2 + i * 2, 6, "l")
     for (let j = 0; j < 22; j++) rectK(cx2 - 2, cy2 - 6 - j, 5, 1, j % 6 < 2 ? "S" : "s")
     const tipRec = []; paintPts([[cx2, cy2 - 29, "x"], [cx2 + 1, cy2 - 29, "x"], [cx2 - 1, cy2 - 29, "4"], [cx2 + 2, cy2 - 29, "4"]], tipRec); REC.tips.push({ pts: tipRec, ph: (id * 5) % 12 })
+    if (!far) { const [mx, my] = wallXY("L", m0, 10, 3); moss(mx, my, 10, id); fern(mx + 14, my, id + 1) }
   }
   haloPass()
   curLevel = 0; curDark = 0
@@ -943,26 +1478,60 @@ for (let a = 12; a <= 70; a++) for (let b = 0; b <= 40; b++) if (cellOK(a, b) &&
 // the plaza is drawn as one prop, in its own place in the back-to-front order
 const order = blds.map((b) => ({ t: "b", b, k: b.a0 + b.w + b.b0 + b.d, k2: b.a0 + b.w }))
 for (const p of props) order.push({ t: "lamp", p, k: p.a + p.b + 1.5, k2: p.a })
+// trees, palms, bamboo and shrubs along the streets
+let streetSakura = 0
+for (let a = 12; a <= 70; a++) for (let b = 0; b <= 40; b++) {
+  if (!cellOK(a, b) || !isStreet(a, b) || ih(a, b, 64) > 0.7) continue
+  const q = ih(a, b, 65), [cx, cy] = cellXY(a, b)
+  if (cy < 250) continue
+  const kind = q < 0.38 ? "tree" : q < 0.56 ? "palm" : q < 0.7 ? "bamboo" : q < 0.88 ? "shrub" : "sakura"
+  if (kind === "sakura" && ++streetSakura > 1) continue
+  order.push({ t: "flora", kind, a, b, k: a + b + 1.5, k2: a + 0.5 })
+}
 order.push({ t: "T", k: 59.5, k2: 0 })
+for (const br of BRIDGES) order.push({ t: "bridge", br, k: br.key, k2: 0 })
 order.push({ t: "plaza", k: PLAZA.a0 + PLAZA.w + PLAZA.b0 + PLAZA.d - 0.5, k2: 0 })
 order.sort((p, q) => p.k - q.k || p.k2 - q.k2)
 for (const e of order) {
   if (e.t === "T") drawTower()
   else if (e.t === "lamp") { const [cx, cy] = cellXY(e.p.a, e.p.b); curLevel = levelFor(cy); curDark = darkFor(cx, cy); streetLamp(cx, cy + 6) }
+  else if (e.t === "bridge") { curLevel = e.br.lvl; drawBridge(e.br) }
+  else if (e.t === "flora") {
+    const [cx0, cy0] = cellXY(e.a, e.b), sd = e.a * 31 + e.b * 7
+    const x = cx0 + Math.round((ih(e.a, e.b, 66) - 0.5) * 14), y = cy0 + 5 + Math.round(ih(e.a, e.b, 67) * 4)
+    curLevel = levelFor(cy0); curDark = darkFor(cx0, cy0)
+    const wm = ih(e.a, e.b, 68) < 0.5 ? -1 : 1
+    if (e.kind === "tree") streetTree(x, y, 5 + Math.floor(ih(e.a, e.b, 69) * 4), sd, { warm: wm })
+    else if (e.kind === "palm") palm(x, y, 16 + Math.floor(ih(e.a, e.b, 69) * 10), sd, wm * 4)
+    else if (e.kind === "bamboo") bamboo(x, y, 16 + Math.floor(ih(e.a, e.b, 69) * 8), 3 + (sd % 2), sd)
+    else if (e.kind === "sakura") sakura(x, y, 7, sd, { warm: wm })
+    else { hedge(x - 6, y, 12, sd, { h: 3.6, bloom: true }); fern(x + 8, y, sd); moss(x - 9, y + 1, 5, sd) }
+  }
   else if (e.t === "plaza") {
     const pcx = 16 * (PLAZA.a0 + PLAZA.w / 2 - PLAZA.b0 - PLAZA.d / 2), pcy = 8 * (PLAZA.a0 + PLAZA.w / 2 + PLAZA.b0 + PLAZA.d / 2)
     curLevel = levelFor(pcy); curDark = darkFor(pcx, pcy)
-    // two lawns, benches, hedges, trees, and string lights hung between four lamp posts
-    for (const [lx, ly, rx, ry] of [[pcx - 30, pcy + 4, 26, 10], [pcx + 34, pcy - 2, 22, 8]]) {
-      for (let y = -ry; y <= ry; y++) for (let x = -rx; x <= rx; x++) {
-        const dd = (x * x) / (rx * rx) + (y * y) / (ry * ry)
-        if (dd > 1) continue
-        put(lx + x, ly + y, dd > 0.82 ? "O" : bay(lx + x, ly + y) < 0.5 ? "o" : "g")
-      }
-    }
-    spr(pcx - 4, pcy + 14, ["UUUUUUUU", ".E....E."]); spr(pcx + 22, pcy + 4, ["UUUUUUUU", ".E....E."])
-    hedge(pcx - 58, pcy + 8, 14, 3); hedge(pcx + 44, pcy + 8, 14, 5)
-    for (const [tx, ty, r] of [[pcx - 52, pcy - 2, 6], [pcx - 22, pcy - 10, 5], [pcx + 20, pcy - 14, 6], [pcx + 54, pcy - 4, 5], [pcx - 34, pcy + 14, 5], [pcx + 40, pcy + 14, 6]]) tree(tx, ty + r + 2, r, tx + ty)
+    // two mottled lawns; then, back to front, bamboo, palms, a pair of blossom trees, round trees, benches, pots, ferns
+    lawn(pcx - 30, pcy + 5, 30, 12, 3); lawn(pcx + 34, pcy - 2, 26, 10, 7)
+    const bench = (x, y) => { spr(x, y, ["UUUUUUUU", ".E....E."]); hlineK(x - 4, y - 2, 8, "T") }
+    const items = [
+      [pcy - 10, () => bamboo(pcx - 70, pcy - 10, 30, 5, 5)],
+      [pcy - 12, () => bamboo(pcx + 70, pcy - 12, 26, 4, 9)],
+      [pcy - 14, () => streetTree(pcx + 20, pcy - 14, 8, 11, { warm: -1 })],
+      [pcy - 10, () => streetTree(pcx - 22, pcy - 10, 7, 12, { warm: 1 })],
+      [pcy - 4, () => palm(pcx + 6, pcy - 4, 30, 3, 6)],
+      [pcy - 2, () => sakura(pcx - 52, pcy - 2, 9, 13, { warm: 1 })],
+      [pcy - 4, () => sakura(pcx + 54, pcy - 4, 8, 14, { warm: -1 })],
+      [pcy + 4, () => palm(pcx - 64, pcy + 6, 34, 2, -6)],
+      [pcy + 6, () => palm(pcx + 62, pcy + 8, 28, 1, 6)],
+      [pcy + 8, () => { hedge(pcx - 58, pcy + 8, 14, 3, { bloom: true }); hedge(pcx + 44, pcy + 8, 14, 5, { bloom: true }) }],
+      [pcy + 4, () => bench(pcx + 22, pcy + 4)],
+      [pcy + 14, () => { bench(pcx - 4, pcy + 14); potRow(pcx - 16, pcy + 14, 3, 6, 21) }],
+      [pcy + 14, () => streetTree(pcx - 34, pcy + 18, 7, 15, { warm: 1 })],
+      [pcy + 16, () => { streetTree(pcx + 40, pcy + 20, 9, 16, { warm: -1 }); fern(pcx + 30, pcy + 22, 4); moss(pcx + 24, pcy + 24, 6, 4) }],
+      [pcy + 18, () => { potRow(pcx + 4, pcy + 24, 4, 7, 33); planter(pcx - 50, pcy + 26, 9, 8) }],
+    ]
+    items.sort((p, q) => p[0] - q[0])
+    for (const it of items) it[1]()
     const posts = [[pcx - 62, pcy], [pcx, pcy - 30], [pcx + 62, pcy], [pcx, pcy + 30]]
     for (const [x, y] of posts) { vlineK(x, y - 24, 24, "E"); rectK(x - 1, y - 26, 3, 2, "h"); pool(x, y + 2, 16, 6, "L", 0.8) }
     for (let i = 0; i < 4; i++) { const [x1, y1] = posts[i], [x2, y2] = posts[(i + 1) % 4]; stringLights(x1, y1 - 22, x2, y2 - 22, 6, i) }
@@ -1266,7 +1835,7 @@ const drawTitle = (f) => {
   for (const [x, y] of TITLE.ter.body) put(x, y, "G")
 }
 
-const DARKER = { 6: "5", 5: "4", 4: "3", 3: "2", 2: "1", 1: "0", a: "b", b: "c", c: "d", d: "3", R: "r", r: "u", P: "p", p: "q", S: "s", s: "t", K: "k", k: "l", D: "E", E: "e", T: "U", U: "m", f: "i", i: "j", g: "o", o: "O", B: "A" }
+const DARKER = { 6: "5", 5: "4", 4: "3", 3: "2", 2: "1", 1: "0", a: "b", b: "c", c: "d", d: "3", R: "r", r: "u", P: "p", p: "q", S: "s", s: "t", K: "k", k: "l", D: "E", E: "e", T: "U", U: "m", f: "i", i: "j", 7: "g", g: "o", o: "O", O: "8", "!": "@", B: "A" }
 const scanlines = () => {
   for (let y = 2; y < H; y += 3) for (let x = (y >> 1) & 1; x < W; x += 2) {
     const i = y * W + x

@@ -564,14 +564,14 @@ function setTmenuOpen(open){
   try { localStorage.setItem(TMENU_OPEN_KEY, open ? '1' : '0'); } catch (e) {}
 }
 $('tmenuHead').addEventListener('click', () => { setTmenuOpen($('tmenuList').hidden); $('tmenuHead').classList.remove('fresh'); });
-{ let open = false; try { open = localStorage.getItem(TMENU_OPEN_KEY) === '1'; } catch (e) {} setTmenuOpen(open); }
+setTmenuOpen(false);   // (shut when the game opens, owner Oct 30: it was remembered open and came up open every time; it still opens when Transit first arrives)
 function setHwHelp(on){ $('hwHelp').hidden = !on; $('hwHelpBtn').setAttribute('aria-expanded', on); if (on && $('mtHelp')) $('mtHelp').hidden = true, $('mtHelpBtn').setAttribute('aria-expanded', false); }
 $('hwHelpBtn').addEventListener('click', () => setHwHelp($('hwHelp').hidden));
 $('hwHelpClose').addEventListener('click', () => setHwHelp(false));
 function setMtHelp(on){ $('mtHelp').hidden = !on; $('mtHelpBtn').setAttribute('aria-expanded', on); if (on) setHwHelp(false); }
 $('mtHelpBtn').addEventListener('click', () => setMtHelp($('mtHelp').hidden));
 $('mtHelpClose').addEventListener('click', () => setMtHelp(false));
-{ let open = false; try { open = localStorage.getItem(BMENU_OPEN_KEY) === '1'; } catch (e) {} setBmenuOpen(open); renderBmenu(); }
+setBmenuOpen(false); renderBmenu();   // (shut when the game opens, as Transport; a new megastructure arriving still opens it on a computer)
 
 /* ---------- delete mode ---------- */
 // X (or the button by the zones) switches to deleting: drag across the city to select a block of plots, click

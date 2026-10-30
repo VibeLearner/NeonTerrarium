@@ -117,6 +117,74 @@ const OVERSEER = (() => {
   #ovsBars { position: fixed; inset: 0; z-index: 58; pointer-events: none; mix-blend-mode: screen;
     background: repeating-linear-gradient(0deg, rgba(255,181,71,.0) 0 18px, rgba(255,181,71,.14) 18px 20px, rgba(0,255,220,.0) 20px 46px, rgba(120,255,230,.1) 46px 47px); animation: ovsBarsMove .7s linear both; }
   @keyframes ovsBarsMove { from { background-position: 0 0; opacity: 0; } 20% { opacity: 1; } to { background-position: 0 220px; opacity: .8; } }
+  /* ---------- on a touch screen (html.touch; the .tch class is only ever set there) ---------- */
+  /* the tab strip and the touch-only headline figures exist only on touch, and show only on a phone-width screen */
+  #spire .ttabs, #spire .tbig { display: none; }
+  html.touch #spire button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; user-select: none; }
+  html.touch #spire .acc { min-height: 44px; padding: 0 22px 0 24px; font-size: 13px; }
+  /* the question: lifted out of the plan so it shows whatever tab is up; a finger-sized YES and NO, no keyboard letters under them */
+  html.touch #spire > .ask { position: fixed; z-index: 15; width: min(420px, calc(100% - 32px)); max-height: calc(100% - 32px); overflow-y: auto; overscroll-behavior: contain; padding: 18px 20px 20px; }
+  html.touch #spire .ask .k, html.touch #spire .ask .sub { font-size: 12px; letter-spacing: .2em; }
+  html.touch #spire .ask p { font-size: 15px; line-height: 1.55; min-height: 4.7em; }
+  html.touch #spire .ask button { min-height: 48px; font-size: 14px; padding: 0 0 0 .4em; touch-action: manipulation; }
+  html.touch #spire .ask button small { display: none; }
+  @media (max-width: 760px){
+    /* the top: the name, the clock line, then the tabs, all of it staying put while a tab scrolls under it */
+    html.touch #spire.tch .top .clock { font-size: 20px; }
+    html.touch #spire.tch .top .mid span { font-size: 12px; }
+    html.touch #spire.tch .ttabs { display: grid; order: 4; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; width: calc(100% + 96px); margin: 4px -96px 4px 0; }
+    html.touch #spire.tch .ttabs button { min-height: 44px; min-width: 0; padding: 0 2px; font: 600 12px/1 'Chakra Petch', 'JetBrains Mono', sans-serif; letter-spacing: .08em; color: var(--ink); background: rgba(20,16,12,.9); border: 1px solid var(--faint); cursor: pointer; }
+    html.touch #spire.tch .ttabs button[aria-selected="true"] { color: var(--bg); background: var(--amb); border-color: var(--amb); }
+    /* one tab's panels at a time */
+    html.touch #spire.tch .col, html.touch #spire.tch .bot { margin-bottom: 0; }
+    html.touch #spire.tch .pn[data-tab] { display: none; margin: 0 0 10px; }
+    html.touch #spire.tch[data-tab="plan"] .pn[data-tab="plan"], html.touch #spire.tch[data-tab="people"] .pn[data-tab="people"], html.touch #spire.tch[data-tab="city"] .pn[data-tab="city"],
+    html.touch #spire.tch[data-tab="police"] .pn[data-tab="police"], html.touch #spire.tch[data-tab="archive"] .pn[data-tab="archive"] { display: block; }
+    /* the plan fills what's left of the screen under the top (its height measured into --tophd) */
+    html.touch #spire.tch .map { height: calc(100vh - var(--tophd, 150px) - 24px); height: calc(100dvh - var(--tophd, 150px) - 24px - env(safe-area-inset-bottom, 0px)); min-height: 260px; }
+    html.touch #spire.tch .map canvas.mp { top: 30px; height: calc(100% - 30px); }
+    /* the panels' headings: labels at 12, the coded tab a little bigger */
+    html.touch #spire.tch .pn { padding: 40px 12px 16px; }
+    html.touch #spire.tch .pn.map { padding: 30px 0 0; }
+    html.touch #spire.tch .pn > .tab { height: 30px; padding-left: 18px; }
+    html.touch #spire.tch .pn > .tab::before { top: 9px; height: 11px; }
+    html.touch #spire.tch .pn > .tab code { font-size: 12px; padding: 1px 5px; }
+    html.touch #spire.tch .pn > .tab .hd { font-size: 13px; letter-spacing: .14em; }
+    html.touch #spire.tch .pn > .tab .m { font-size: 12px; letter-spacing: .1em; }
+    /* one figure leads each tab; the rest reads as label (12) and value (15) */
+    html.touch #spire.tch .tbig { display: block; margin: 0 0 10px; }
+    html.touch #spire.tch .big { font-size: 44px; }
+    html.touch #spire.tch .unit { font-size: 12px; letter-spacing: .16em; }
+    html.touch #spire.tch .kv { gap: 7px 12px; font-size: 15px; align-items: baseline; }
+    html.touch #spire.tch .kv > :nth-child(odd) { font-size: 12px; }
+    html.touch #spire.tch .meter { height: 10px; margin: 10px 0 12px; }
+    html.touch #spire.tch .bars { gap: 9px; }
+    html.touch #spire.tch .bar { grid-template-columns: 104px minmax(0, 1fr) 56px; font-size: 15px; }
+    html.touch #spire.tch .bar > span:first-child { font-size: 12px; }
+    html.touch #spire.tch .bar .tr { height: 10px; }
+    /* (the busiest places: the name on a line of its own, whole, instead of cut short with the full name only in a hover title) */
+    html.touch #spire.tch .bar.wide { grid-template-columns: minmax(0, 1fr) 56px; row-gap: 3px; }
+    html.touch #spire.tch .bar.wide > span:first-child { grid-column: 1 / -1; white-space: normal; overflow: visible; }
+    html.touch #spire.tch .spark { grid-template-columns: 76px minmax(0, 1fr) 70px; min-height: 40px; font-size: 15px; }
+    html.touch #spire.tch .spark > span:first-child { font-size: 12px; }
+    html.touch #spire.tch .spark canvas { height: 30px; }
+    html.touch #spire.tch .spark em { font-size: 12px; }
+    html.touch #spire.tch .inc .it { grid-template-columns: 26px minmax(0, 1fr) auto; gap: 10px; padding: 9px 0; }
+    html.touch #spire.tch .inc .n { width: 22px; height: 22px; font-size: 12px; }
+    html.touch #spire.tch .inc .t1 { font-size: 14px; white-space: normal; }
+    html.touch #spire.tch .inc .t2, html.touch #spire.tch .inc .w { font-size: 12px; white-space: normal; }
+    html.touch #spire.tch .empty { font-size: 14px; line-height: 1.55; }
+    html.touch #spire.tch .legend { font-size: 12px; letter-spacing: .1em; max-width: calc(100% - 20px); gap: 6px 14px; padding: 6px 9px; }
+    html.touch #spire.tch .legend i { width: 10px; height: 10px; }
+    html.touch #spire.tch .coast .disp { font-size: 26px; margin: 4px 0 8px; }
+    html.touch #spire.tch .coast p { font-size: 15px; line-height: 1.55; color: var(--ink); margin-bottom: 16px; }
+    html.touch #spire.tch .acc { min-width: 160px; }
+  }
+  /* the player's own toggles (Settings): reduce motion stops the view's movement; Clean signal takes off the glitches */
+  html.nt-calm #spire .blink, html.nt-calm #spire .ask h1.glitch, html.nt-calm #spire .ask p .cur, html.nt-calm #spire .boot, html.nt-calm #spire.leave, html.nt-calm canvas.ovs-glitch { animation: none; }
+  html.nt-calm #ovsBars, html.nt-clean #ovsBars { display: none; }
+  html.nt-clean #spire .ask h1.glitch { animation: none; text-shadow: none; }
+  html.nt-clean canvas.ovs-glitch, html.nt-clean #spire.leave { animation: none; }
   `;
   let built = false, root = null, raf = 0, last = 0, keyH = null, typingT = 0, resizeH = null, t0 = 0, D = null;
   const HEX = '0123456789ABCDEF', GLY = 'アイウエオカキクケコサシスセソ01#%&*+=<>/\\[]{}';
@@ -128,6 +196,12 @@ const OVERSEER = (() => {
   const safe = (f, d) => { try { const v = f(); return v === undefined || Number.isNaN(v) ? d : v; } catch (e) { return d; } };
   const DPR = () => Math.min(2, window.devicePixelRatio || 1);
   const accessed = () => { try { return localStorage.getItem(ACCESS_KEY); } catch (e) { return null; } };
+  // a touch screen (touch.js): the ledger becomes five tabs on a phone, the text bigger, the plan's lettering bigger too
+  const TCH = typeof TOUCH !== 'undefined' && TOUCH.on, FS = TCH ? 1.45 : 1, TAB_KEY = 'neonIsland.spireTab';
+  const TABS = [['plan', 'PLAN'], ['people', 'PEOPLE'], ['city', 'CITY'], ['police', 'POLICE'], ['archive', 'ARCHIVE']];
+  const tb = k => TCH ? ` data-tab="${k}"` : '';
+  // the player's own toggles (Settings): reduce motion, and Clean signal (decoration off)
+  const calm = () => document.documentElement.classList.contains('nt-calm'), clean = () => document.documentElement.classList.contains('nt-clean');
   function build(){
     const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
     if (!document.querySelector('link[href*="Chakra+Petch"]')){ const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600&display=swap'; document.head.appendChild(l); }
@@ -174,53 +248,62 @@ const OVERSEER = (() => {
     const zrow = (lbl, v) => `<div class="bar"><span>${lbl}</span><span class="tr"><i style="width:${(100*v/Math.max(1, Math.max(d.zf.low, d.zf.mid, d.zf.high, d.zf.ind))).toFixed(1)}%"></i></span><span>${fmt(v)}</span></div>`;
     const topMax = Math.max(1, ...d.cr.top.map(t => t.n));
     const metroMax = Math.max(1, ...d.tr.metro.map(l => l.riders));
-    const incs = d.inc.slice(0, 7);
+    const incs = d.inc.slice(0, 7), incToday = d.inc.filter(x => Math.floor(x.c/1440) === Math.floor(d.clock/1440)).length;
     root = document.createElement('div'); root.id = 'spire'; root.setAttribute('role', 'dialog'); root.setAttribute('aria-label', 'Data Spire: city ledger');
     root.innerHTML = `
       <div class="top boot"><div class="brand"><span class="hd">DATA SPIRE</span><small>CIVIC LEDGER · NODE 07</small></div>
         <div class="mid"><span>DAY ${d.day}</span><span class="clock disp">${hm(d.hour)}</span><span>${esc(safe(() => phaseName(d.hour), '').toUpperCase())}${safe(() => S.rain, false) ? ' · RAIN' : ''}</span></div>
-        <button class="close" type="button">CLOSE · ESC</button></div>
+        <button class="close" type="button">CLOSE · ESC</button>${TCH ? `<nav class="ttabs" role="tablist" aria-label="Ledger sections">${TABS.map(([k, l]) => `<button type="button" role="tab" data-go="${k}">${l}</button>`).join('')}</nav>` : ''}</div>
       <div class="col">
-        <div class="pn boot"><div class="tab"><code>L-01</code><span class="hd">POPULATION</span><span class="m">${fmt(d.count.plots)} PLOTS</span></div>
+        <div class="pn boot"${tb('people')}><div class="tab"><code>L-01</code><span class="hd">POPULATION</span><span class="m">${fmt(d.count.plots)} PLOTS</span></div>
           <div><span class="big">${fmt(d.pop)}</span><span class="unit">RESIDENTS</span></div>
           <div class="meter">${Array.from({ length: 24 }, (_, k) => `<i class="${k < Math.round(d.awake/Math.max(1, d.pop)*24) ? 'on' : 'sl'}"></i>`).join('')}</div>
           <div class="kv"><span>AWAKE</span><span class="amb">${fmt(d.awake)}</span><span>ASLEEP</span><span>${fmt(asl)}</span><span>OUT AND ABOUT</span><span>${fmt(d.out)}</span><span>AT HOME</span><span>${fmt(d.pop - d.out)}</span></div></div>
-        <div class="pn boot"><div class="tab"><code>L-02</code><span class="hd">FLOORS BY ZONE</span><span class="m">${fmt(tot)} TOTAL</span></div>
+        <div class="pn boot"${tb('city')}><div class="tab"><code>L-02</code><span class="hd">FLOORS BY ZONE</span><span class="m">${fmt(tot)} TOTAL</span></div>
+          ${TCH ? `<div class="tbig"><span class="big">${fmt(d.zf.low + d.zf.mid + d.zf.high + d.zf.ind)}</span><span class="unit">FLOORS BUILT</span></div>` : ''}
           <div class="bars">${zrow('RESIDENTIAL', d.zf.low)}${zrow('COMMERCIAL', d.zf.mid)}${zrow('LUXURY', d.zf.high)}${zrow('INDUSTRIAL', d.zf.ind)}</div>
           <div class="kv" style="margin-top:8px"><span>MEGASTRUCTURES</span><span>${d.megs.length}</span><span>TALLEST</span><span>${Math.max(0, ...d.plots.map(p => p.lv))} FLOORS</span></div></div>
-        <div class="pn boot"><div class="tab"><code>L-03</code><span class="hd">GROWTH</span><span class="m gm"></span></div><div class="sparks"></div></div>
+        <div class="pn boot"${tb('city')}><div class="tab"><code>L-03</code><span class="hd">GROWTH</span><span class="m gm"></span></div><div class="sparks"></div></div>
       </div>
-      <div class="pn map boot"><div class="tab"><code>L-04</code><span class="hd">CITY PLAN</span><span class="m">${d.ni} × ${d.nj} · N ↑ · ${fmt(d.cr.out)} OUT NOW</span></div>
+      <div class="pn map boot"${tb('plan')}><div class="tab"><code>L-04</code><span class="hd">CITY PLAN</span><span class="m">${d.ni} × ${d.nj} · N ↑ · ${fmt(d.cr.out)} OUT NOW</span></div>
         <canvas class="mp"></canvas>
         <div class="legend"><span><i style="background:rgba(243,165,58,.8);border-radius:50%"></i>CROWDS</span><span><i style="background:var(--red);clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)"></i>INCIDENTS</span>
           <span><i style="border:1px solid var(--ink)"></i>STRUCTURES</span><span><i style="background:rgba(243,165,58,.45);height:3px"></i>SKY HIGHWAY</span><span><i style="border-top:2px dashed var(--teal);height:0"></i>METRO</span></div>
         ${first ? `<div class="ask"><div class="k">ARCHIVE REQUEST · COASTAL SECTOR</div><h1 class="glitch">HIGH OVERSEER</h1><div class="sub">MEMORY ARCHIVE // FRAGMENT 03</div><p class="say"></p>
           <div class="btns"><button class="yes" type="button">YES<small>Y</small></button><button class="no" type="button">NO<small>N</small></button></div></div>` : ''}</div>
       <div class="col">
-        <div class="pn boot" style="flex:1.7"><div class="tab"><code>L-05</code><span class="hd">INCIDENTS</span><span class="m">${d.inc.length ? 'LAST ' + incs.length + ' OF ' + d.inc.length : 'NONE LOGGED'}</span></div>
+        <div class="pn boot" style="flex:1.7"${tb('police')}><div class="tab"><code>L-05</code><span class="hd">INCIDENTS</span><span class="m">${d.inc.length ? 'LAST ' + incs.length + ' OF ' + d.inc.length : 'NONE LOGGED'}</span></div>
+          ${TCH ? `<div class="tbig"><span class="big${incToday ? ' red' : ''}">${incToday}</span><span class="unit">INCIDENTS TODAY · ${fmt(d.inc.length)} ON RECORD</span></div>` : ''}
           ${incs.length ? `<div class="inc">${incs.map((x, k) => `<div class="it ${k > 2 ? 'old' : ''}"><span class="n">${k + 1}</span><div><div class="t1">${esc(x.title)}</div><div class="t2">${esc(x.kase)} · ${esc(x.place)} · ${d.sector(Math.round(x.x/LOT), Math.round(x.z/LOT))}</div></div><div class="w">${whenTxt(x.c)}<br><span class="dim">${agoTxt(x.c)}</span></div></div>`).join('')}</div>`
             : `<div class="empty">No police matters on record yet.<br>The Spire logs each incident as it happens: where, when, and which case.${d.po.stations ? '' : '<br><span class="amb">No police station stands in the city.</span>'}</div>`}</div>
-        <div class="pn boot"><div class="tab"><code>L-06</code><span class="hd">POLICE</span><span class="m">${d.po.stations} STATION${d.po.stations === 1 ? '' : 'S'}</span></div>
+        <div class="pn boot"${tb('police')}><div class="tab"><code>L-06</code><span class="hd">POLICE</span><span class="m">${d.po.stations} STATION${d.po.stations === 1 ? '' : 'S'}</span></div>
           <div class="kv"><span>OFFICERS</span><span>${fmt(d.po.officers)}</span><span>ON THE STREETS</span><span class="amb">${fmt(d.po.beat)}</span><span>OPEN CASE</span><span>${d.po.caseOpen ? esc(d.po.caseOpen) : '<span class="dim">NONE</span>'}</span>
-            ${d.po.caseDay ? `<span>CASE DAY</span><span>${d.po.caseDay} / 21</span>` : ''}<span>INCIDENTS TODAY</span><span class="red">${d.inc.filter(x => Math.floor(x.c/1440) === Math.floor(d.clock/1440)).length}</span></div></div>
+            ${d.po.caseDay ? `<span>CASE DAY</span><span>${d.po.caseDay} / 21</span>` : ''}<span>INCIDENTS TODAY</span><span class="red">${incToday}</span></div></div>
       </div>
       <div class="bot">
-        <div class="pn boot"><div class="tab"><code>L-07</code><span class="hd">WHERE PEOPLE ARE</span><span class="m">${d.hot ? 'HOTSPOT ' + d.sector(d.hot.i, d.hot.j) : ''}</span></div>
+        <div class="pn boot"${tb('people')}><div class="tab"><code>L-07</code><span class="hd">WHERE PEOPLE ARE</span><span class="m">${d.hot ? 'HOTSPOT ' + d.sector(d.hot.i, d.hot.j) : ''}</span></div>
           ${d.cr.top.length ? `<div class="bars">${d.cr.top.slice(0, 5).map(t => `<div class="bar wide"><span title="${esc(t.name)}">${esc(t.name.toUpperCase())}${t.pl ? ' <span class="amb">' + d.sector(Math.round(t.pl.x/LOT), Math.round(t.pl.z/LOT)) + '</span>' : ''}</span><span class="tr"><i style="width:${(100*t.n/topMax).toFixed(1)}%"></i></span><span>${t.n}</span></div>`).join('')}</div>` : '<div class="empty">Everyone is at home.</div>'}</div>
-        <div class="pn boot"><div class="tab"><code>L-08</code><span class="hd">TRANSIT</span><span class="m">${d.tr.air} DRONES AIRBORNE</span></div>
+        <div class="pn boot"${tb('city')}><div class="tab"><code>L-08</code><span class="hd">TRANSIT</span><span class="m">${d.tr.air} DRONES AIRBORNE</span></div>
           <div class="kv" style="margin-bottom:7px"><span>SKY HIGHWAYS</span><span>${d.tr.hwRoutes ? d.tr.hwRoutes + ' ROUTES · <span class="amb">' + d.tr.hwCars + ' CARS</span>' : '<span class="dim">NONE BUILT</span>'}</span><span>METRO</span><span>${d.tr.metro.length ? d.tr.metro.length + ' LINES' : '<span class="dim">NONE BUILT</span>'}</span></div>
           <div class="bars">${d.tr.metro.slice(0, 3).map(l => `<div class="bar teal"><span>LINE ${l.n}</span><span class="tr"><i style="width:${(100*l.riders/metroMax).toFixed(1)}%"></i></span><span>${l.riders}</span></div>`).join('')}</div></div>
-        <div class="pn boot"><div class="tab"><code>L-09</code><span class="hd">MARKETS · NIGHTLIFE</span><span class="m"></span></div>
+        <div class="pn boot"${tb('people')}><div class="tab"><code>L-09</code><span class="hd">MARKETS · NIGHTLIFE</span><span class="m"></span></div>
           <div class="kv"><span>STALLS OPEN</span><span>${d.mk.tot ? d.mk.act + ' / ' + d.mk.tot : '<span class="dim">NO MARKET</span>'}</span><span>NEON DOME</span><span>${d.dome ? (d.domeOpen ? '<span class="amb">OPEN</span> · ' + d.clubbers + ' INSIDE' : 'CLOSED · OPENS 19:00') : '<span class="dim">NOT BUILT</span>'}</span>
             <span>FOOT TRAFFIC</span><span>${d.pop ? Math.round(100*d.out/d.pop) : 0}% OUT</span></div>
           <div class="meter">${meter(d.mk.tot ? d.mk.act/d.mk.tot : 0)}</div></div>
-        <div class="pn boot coast"><div class="tab"><code>L-10</code><span class="hd">ARCHIVE</span><span class="m">${first ? 'UNOPENED' : 'FRAGMENT 03'}</span></div>
+        <div class="pn boot coast"${tb('archive')}><div class="tab"><code>L-10</code><span class="hd">ARCHIVE</span><span class="m">${first ? 'UNOPENED' : 'FRAGMENT 03'}</span></div>
           <div class="disp">THE COAST</div><p>A record that survives in the archive. ${first ? 'Not yet accessed.' : 'Accessed before. Incomplete.'}</p>
           <button class="acc" type="button">ACCESS</button></div>
       </div>`;
     document.body.appendChild(root);
     root.querySelectorAll('.boot').forEach((el, k) => { el.style.animationDelay = (.05*k) + 's'; });
     $('.close').addEventListener('click', close); $('.acc').addEventListener('click', yes);
+    if (TCH){
+      // the question is lifted out of the plan, so it's there whichever tab is up; the tabs remember the last one
+      root.classList.add('tch'); const ask = $('.ask'); if (ask) root.appendChild(ask);
+      $('.ttabs').addEventListener('click', e => { const b = e.target.closest('[data-go]'); if (b) setTab(b.dataset.go); });
+      let k0 = null; try { k0 = localStorage.getItem(TAB_KEY); } catch (e) {}
+      setTab(TABS.some(t => t[0] === k0) ? k0 : 'plan', true);
+    }
     if (first){
       $('.yes').addEventListener('click', yes); $('.no').addEventListener('click', dismiss);
       const say = $('.say'), Q = 'A record of the coast survives in the archive. It is incomplete. Would you like to remember?'; let qi = 0;
@@ -228,6 +311,16 @@ const OVERSEER = (() => {
       typingT = setTimeout(tick, 800);
     }
   }
+  // the tabs, on a phone: one section of the ledger at a time. The plan and the growth lines are drawn to their canvases' size,
+  // so they're drawn again once their tab is showing (a hidden canvas has no size)
+  function setTab(k, quiet){
+    if (!root) return; root.dataset.tab = k; root.scrollTop = 0;
+    for (const b of root.querySelectorAll('.ttabs [data-go]')) b.setAttribute('aria-selected', b.dataset.go === k ? 'true' : 'false');
+    if (!quiet) try { localStorage.setItem(TAB_KEY, k); } catch (e) {}
+    requestAnimationFrame(() => { if (!O.open || !root) return; fitTop(); if (k === 'plan') setupMap(); if (k === 'city') sparks(); });
+  }
+  // the top's height (it wraps on a phone), so the plan can fill the rest of the screen in dvh
+  function fitTop(){ if (!TCH || !root) return; const t = $('.top'); if (t) root.style.setProperty('--tophd', Math.round(t.getBoundingClientRect().height) + 'px'); }
   // growth: one small line per measure, by day (by hour while there's less than two days of record)
   function sparks(){
     const box = $('.sparks'), g = D.grow.concat([Object.assign({ c: D.clock }, D.count)]).sort((a, b) => a.c - b.c);
@@ -254,7 +347,9 @@ const OVERSEER = (() => {
   /* ---------- the plan: drawn once, then a light overlay each frame ---------- */
   let cv = null, cg = null, base = null, F = null;
   function setupMap(){
-    cv = $('canvas.mp'); const r = cv.getBoundingClientRect(), dp = DPR(); cv.width = Math.max(1, Math.round(r.width*dp)); cv.height = Math.max(1, Math.round(r.height*dp)); cg = cv.getContext('2d');
+    cv = $('canvas.mp'); const r = cv.getBoundingClientRect(), dp = DPR();
+    if (r.width < 40 || r.height < 40){ base = null; return; }   // (its tab isn't showing, on a phone: drawn when it is)
+    cv.width = Math.max(1, Math.round(r.width*dp)); cv.height = Math.max(1, Math.round(r.height*dp)); cg = cv.getContext('2d');
     const W = cv.width, H = cv.height, pad = 30*dp, d = D;
     const t = Math.min((W - pad*2)/d.ni, (H - pad*2 - 26*dp)/d.nj, 40*dp), ox = (W - t*d.ni)/2, oy = (H - 26*dp - t*d.nj)/2 + 4*dp;
     F = { t, P: (i, j) => [ox + (i - d.i0 + .5)*t, oy + (j - d.j0 + .5)*t], X: x => x/LOT, dp };
@@ -264,7 +359,7 @@ const OVERSEER = (() => {
     g.strokeStyle = 'rgba(235,225,204,.05)'; g.lineWidth = 1;
     for (let i = 0; i <= d.ni; i++){ const x = ox + i*t; g.beginPath(); g.moveTo(x, oy); g.lineTo(x, oy + d.nj*t); g.stroke(); }
     for (let j = 0; j <= d.nj; j++){ const y = oy + j*t; g.beginPath(); g.moveTo(ox, y); g.lineTo(ox + d.ni*t, y); g.stroke(); }
-    g.fillStyle = '#8d8170'; g.font = (8*dp) + 'px JetBrains Mono, monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillStyle = '#8d8170'; g.font = (8*FS*dp) + 'px JetBrains Mono, monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
     for (let i = 0; i <= d.ni; i++){ const x = ox + i*t; g.fillRect(x, oy - 6*dp, 1, i % 5 ? 3*dp : 6*dp); if (i % 5 === 0 && i < d.ni) g.fillText(String(d.i0 + i), x + t/2, oy - 13*dp); }
     for (let j = 0; j <= d.nj; j++){ const y = oy + j*t; g.fillRect(ox - 6*dp, y, j % 5 ? 3*dp : 6*dp, 1); if (j % 5 === 0 && j < d.nj){ g.save(); g.translate(ox - 15*dp, y + t/2); g.fillText(String(d.j0 + j), 0, 0); g.restore(); } }
     // the plots: bone, a little warmer the taller they are; luxury rose, industry olive
@@ -285,24 +380,25 @@ const OVERSEER = (() => {
       gr.addColorStop(0, `rgba(243,165,58,${(.05 + .38*Math.pow(f, .8)).toFixed(3)})`); gr.addColorStop(1, 'rgba(243,165,58,0)'); g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); }
     g.globalCompositeOperation = 'source-over';
     // the megastructures: outlined, named where there's room
-    g.font = '600 ' + (8.5*dp) + 'px Chakra Petch, JetBrains Mono, sans-serif'; g.textAlign = 'left'; g.textBaseline = 'top';
+    g.font = '600 ' + (8.5*FS*dp) + 'px Chakra Petch, JetBrains Mono, sans-serif'; g.textAlign = 'left'; g.textBaseline = 'top';
     for (const m of d.megs){ const [x0, y0] = F.P(m.i, m.j), w = m.w*t, h = m.h*t, x = x0 - t/2 + 1.5, y = y0 - t/2 + 1.5;
       g.fillStyle = 'rgba(11,9,7,.55)'; g.fillRect(x, y, w - 3, h - 3);
       g.strokeStyle = m.m.kind === 'police' ? 'rgba(134,212,198,.9)' : 'rgba(235,225,204,.7)'; g.lineWidth = dp; g.strokeRect(x, y, w - 3, h - 3);
-      if (w > 46*dp){ g.fillStyle = m.m.kind === 'police' ? '#86d4c6' : 'rgba(235,225,204,.85)'; g.fillText(m.name.toUpperCase(), x + 3*dp, y + 3*dp, w - 8*dp); } }
+      if (w > 46*FS*dp){ g.fillStyle = m.m.kind === 'police' ? '#86d4c6' : 'rgba(235,225,204,.85)'; g.fillText(m.name.toUpperCase(), x + 3*dp, y + 3*dp, w - 8*dp); } }
     // every incident on record as a faint mark; the latest seven numbered
     for (const x of d.inc.slice(7)){ const [px, py] = F.P(x.x/LOT, x.z/LOT); g.fillStyle = 'rgba(255,91,69,.4)'; g.fillRect(px - 1.5*dp, py - 1.5*dp, 3*dp, 3*dp); }
-    d.inc.slice(0, 7).reverse().forEach((x, kk, arr) => { const k = arr.length - 1 - kk, [px, py] = F.P(x.x/LOT, x.z/LOT), s = (k < 3 ? 8 : 6)*dp;
+    d.inc.slice(0, 7).reverse().forEach((x, kk, arr) => { const k = arr.length - 1 - kk, [px, py] = F.P(x.x/LOT, x.z/LOT), s = (k < 3 ? 8 : 6)*(TCH ? 1.3 : 1)*dp;
       g.fillStyle = k < 3 ? '#ff5b45' : '#a8473a'; g.beginPath(); g.moveTo(px, py - s); g.lineTo(px + s, py); g.lineTo(px, py + s); g.lineTo(px - s, py); g.closePath(); g.fill();
-      g.fillStyle = '#1a0703'; g.font = '600 ' + (8.5*dp) + 'px Chakra Petch, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(k + 1), px, py + .5*dp); });
+      g.fillStyle = '#1a0703'; g.font = '600 ' + (8.5*FS*dp) + 'px Chakra Petch, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(k + 1), px, py + .5*dp); });
     // the hotspot
     if (d.hot && d.hot.n > 2){ const [x, y] = F.P(d.hot.i, d.hot.j); g.strokeStyle = '#ffd08a'; g.lineWidth = dp; g.strokeRect(x - t*.9, y - t*.9, t*1.8, t*1.8);
-      g.fillStyle = '#ffd08a'; g.font = (8.5*dp) + 'px JetBrains Mono, monospace'; g.textAlign = 'left'; g.textBaseline = 'bottom'; g.fillText('HOTSPOT · ' + d.hot.n + ' PEOPLE', x + t, y - t); }
+      g.fillStyle = '#ffd08a'; g.font = (8.5*FS*dp) + 'px JetBrains Mono, monospace'; g.textAlign = 'left'; g.textBaseline = 'bottom'; g.fillText('HOTSPOT · ' + d.hot.n + ' PEOPLE', x + t, y - t); }
     // north
-    g.fillStyle = '#8d8170'; g.font = '600 ' + (10*dp) + 'px Chakra Petch, sans-serif'; g.textAlign = 'right'; g.textBaseline = 'top'; g.fillText('N ↑', W - 10*dp, 8*dp);
+    g.fillStyle = '#8d8170'; g.font = '600 ' + (10*FS*dp) + 'px Chakra Petch, sans-serif'; g.textAlign = 'right'; g.textBaseline = 'top'; g.fillText('N ↑', W - 10*dp, 8*dp);
   }
   function drawMap(t){
     if (!base) return; const g = cg, W = cv.width, H = cv.height, dp = F.dp; g.drawImage(base, 0, 0);
+    if (calm()) return;   // (reduce motion: the plan holds still)
     // the newest incident breathes; a survey line crosses the plan
     const x0 = D.inc[0]; if (x0){ const [px, py] = F.P(x0.x/LOT, x0.z/LOT), k = (t*.6) % 1; g.strokeStyle = `rgba(255,91,69,${.8*(1 - k)})`; g.lineWidth = 1.5*dp; g.beginPath(); g.arc(px, py, (8 + k*22)*dp, 0, 7); g.stroke(); }
     const sx = ((t*.08) % 1)*W, gr = g.createLinearGradient(sx - 40*dp, 0, sx, 0); gr.addColorStop(0, 'rgba(243,165,58,0)'); gr.addColorStop(1, 'rgba(243,165,58,.08)'); g.fillStyle = gr; g.fillRect(sx - 40*dp, 0, 40*dp, H);
@@ -318,6 +414,7 @@ const OVERSEER = (() => {
   /* ---------- in and out ---------- */
   // the curtain: glyphs falling in columns, each column's black following its glyph down, closing over the city
   function curtain(ms, then){
+    if (calm() || clean()) ms = 1;   // (reduce motion or Clean signal: no falling glyphs, the view simply comes up)
     const c = document.createElement('canvas'); c.id = 'ovsCurtain'; const dpr = DPR(); c.width = innerWidth*dpr; c.height = innerHeight*dpr; c.style.width = '100%'; c.style.height = '100%';
     document.body.appendChild(c); const g = c.getContext('2d'), cw = 14*dpr, cols = Math.ceil(c.width/cw), sp = Array.from({ length: cols }, () => .55 + Math.random()*.9), dl = Array.from({ length: cols }, () => Math.random()*.35);
     const ts = performance.now();
@@ -339,7 +436,7 @@ const OVERSEER = (() => {
     setTimeout(() => curtain(650, (c) => {
       O.open = true; O.hold = true; t0 = performance.now(); read(); dom(); last = 0;
       requestAnimationFrame(() => { if (!O.open) return; setupMap(); sparks(); raf = requestAnimationFrame(loop); });
-      resizeH = () => { if (O.open && root){ setupMap(); sparks(); } }; addEventListener('resize', resizeH);
+      resizeH = () => { if (O.open && root){ fitTop(); setupMap(); sparks(); } }; addEventListener('resize', resizeH);
       if (city) city.classList.remove('ovs-glitch'); bars.remove();
       c.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, delay: 150, fill: 'forwards' }).onfinish = () => c.remove();
       keyH = e => { if (!O.open) return; e.stopPropagation(); const k = e.key.toLowerCase(), ask = root && root.querySelector('.ask');

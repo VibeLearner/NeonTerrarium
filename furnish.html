@@ -15507,7 +15507,22 @@ async function compareGen(items){if(!await wkStart())return {worker:false,why:WK
     const sa=sig(A.b.g),sb=sig(Bp.b.g);const fa=JSON.stringify([A.center,A.minZ,A.wall,A.wallOnly,A.W,A.D,A.H]),fb=JSON.stringify([Bp.center,Bp.minZ,!!Bp.wall,!!Bp.wallOnly,Bp.W,Bp.D,Bp.H]);
     out.push({key:it.arch+'#'+it.seed,same:JSON.stringify(sa)===JSON.stringify(sb)&&fa===fb,worker:sa,page:sb});L.freeGroup(Bp.b.g)}
   job.release();return {worker:true,n:out.length,mismatches:out.filter(x=>!x.same),ok:out.every(x=>x.same)}}
-window.PodBuilder={version:1,enter:enterView,editPlan,newHome,load:(rc,o)=>loadRecipe(rc,o),recipe,save:saveSlot,loadSlot,slots,undo,redo,setWalls,rotateView,setPitch,select:id=>select(id?{t:'piece',id}:null),
+/* Neon Terrarium (tools/furnish/build.py): hooks for the phone layout, furnish/touch.js. Nothing here runs unless it is called. */
+const TOUCHAPI=(()=>{const v=new T.Vector3();
+  const aim=(x,y)=>{const r=$('bCanvas').getBoundingClientRect();B.ptr.x=x-r.left;B.ptr.y=y-r.top;B.ptr.nx=B.ptr.x/r.width*2-1;B.ptr.ny=-(B.ptr.y/r.height)*2+1;B.mods.shift=B.mods.ctrl=B.mods.alt=false;B.ptr.dirty=true;B.ptr.in=true};
+  return {ov:()=>OV,bad:()=>C_BAD,aim,
+    state:()=>({on:B.on,ready:!!B.s&&!B.loading,trans:!!B.trans,asleep:!!(B.warming||B.paused),mode:B.mode,sel:B.sel,drag:B.drag?B.drag.type:null,ctx:B.place?B.place.ctx:B.drag&&B.drag.type==='move'?B.drag.ctx:null,home:B.home}),
+    place:()=>{if(B.mode!=='place'||!B.place)return false;B.ptr.dirty=false;setRay();floatUpdate(B.place.ctx);placeGhost(false);return B.mode!=='place'},
+    startPlace:(it,o)=>startPlace(it,o),cancel:()=>cancelPlace(),rot:d=>{rot90(d);hint()},dup:()=>dupSel(),del:()=>delSel(),
+    surface:(x,y)=>{if(B.mode!=='select'||!B.s)return;B.drag=null;aim(x,y);setRay();if(!pickPiece(0))selectSurface();hint()},
+    pan:(dx,dy)=>{if(B.s)panBy(dx,dy)},
+    zoomAt:(f,x,y)=>{if(!B.s)return;const p={x:B.ptr.x,y:B.ptr.y,nx:B.ptr.nx,ny:B.ptr.ny};aim(x,y);setRay();const ok=ground(0,_v1),p0x=_v1.x,p0z=_v1.z;B.zoom=clamp(B.zoom*f,.6,5);updateCam();
+      if(ok){setRay();if(ground(0,_v1)){B.tx+=p0x-_v1.x;B.tz+=p0z-_v1.z;updateCam()}}Object.assign(B.ptr,p);B.ptr.dirty=true;B.needs=true},
+    drop:()=>{const D=B.drag;if(!D)return;if(D.type==='move'){D.ctx.hit=false;endMove()}else{if(D.type==='orbit'){B.az=D.az;setPitch(D.pitch)}
+      else if(D.type==='ring'){prCall('picking',false);const i=selInst();if(i&&D.before){Object.assign(i.rec,clone(D.before));syncInst(i.rec.id)}}B.drag=null}$('bStage').dataset.cur='';hint()},
+    anchor:()=>{const i=B.place?B.place.inst:B.drag&&B.drag.type==='move'?B.inst.get(B.drag.id):selInst();if(!i||!i.pivot.visible||!i.lbox)return null;const lb=i.lbox;
+      v.set((lb.min.x+lb.max.x)/2,lb.max.y,(lb.min.z+lb.max.z)/2).applyMatrix4(i.pivot.matrixWorld).project(B.cam);const r=$('bCanvas').getBoundingClientRect();return {x:r.left+(v.x+1)/2*r.width,y:r.top+(1-v.y)/2*r.height}}}})();
+window.PodBuilder={version:1,touch:TOUCHAPI,enter:enterView,editPlan,newHome,load:(rc,o)=>loadRecipe(rc,o),recipe,save:saveSlot,loadSlot,slots,undo,redo,setWalls,rotateView,setPitch,select:id=>select(id?{t:'piece',id}:null),
   pieces:()=>[...B.recs.values()].map(r=>clone(r)),piece:id=>{const i=B.inst.get(id);return i?{rec:clone(i.rec),kind:i.kind,name:i.name,slots:i.slots.map(s=>({key:s.key,kind:s.kind,orig:s.orig})),lights:i.lights.length,visible:i.pivot.visible,run:i.run}:null},
   openCat,closeFly,items:k=>loadItems(k),itemsDone:k=>!!(ITEMS[k]&&ITEMS[k].done),startPlace:(arch,seed)=>startPlace({id:arch+'#'+seed,arch,seed}),cancel:()=>cancelPlace(),setTool,
   setColor:(id,key,hex)=>{const i=B.inst.get(id);if(!i)return false;const b=pick(i.rec,F_ALL);i.rec.colors[key]=hex;applyColors(i);applyLight(i);pushCmd(cmdUpdate(id,b,pick(i.rec,F_ALL),'Recolor '+i.name));return true},
@@ -17587,3 +17602,5 @@ window.PodRender=api})();
 <!-- Neon Terrarium: the game side (tools/furnish/build.py) -->
 <link rel="stylesheet" href="furnish/bridge.css?v=44f97dea39">
 <script src="furnish/bridge.js?v=d840f9a1d1"></script>
+<link rel="stylesheet" href="furnish/touch.css?v=b961a9c78f">
+<script src="furnish/touch.js?v=9a9951c6a0"></script>

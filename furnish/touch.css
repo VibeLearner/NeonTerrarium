@@ -1,0 +1,147 @@
+/* Neon Terrarium: furnish.html on a touch screen. Every rule is under html.ftouch, which furnish/touch.js sets only when the main pointer is a
+   finger (html.ftland too when it is held sideways with little height), so a mouse and keyboard see the lab exactly as it was.
+   The room on top; a tray under it with the lab's catalog rail as icon tabs and its flyout as a strip of tiles that scrolls sideways; Exit,
+   Save and the home controls along the top; a bar over the selected piece; the inspector and our Stored and Home panels as sheets over the
+   bottom of the room. The lab's own elements are moved or restyled here, not rebuilt. Solid tinted plates instead of live blur. */
+html.ftouch{--ftTabs:52px;--ftStrip:136px;--ftSafeB:env(safe-area-inset-bottom,0px);--ftTray:calc(var(--ftTabs) + var(--ftStrip) + var(--ftSafeB));
+  --ftL:max(16px,env(safe-area-inset-left,0px));--ftR:max(16px,env(safe-area-inset-right,0px));--ftT:max(10px,env(safe-area-inset-top,0px));--ftPlate:rgba(5,5,12,.94)}
+html.ftouch.ftland{--ftTabs:50px;--ftStrip:88px}
+
+/* the stage is the room only: the tray hangs below it (overflow shown), so the camera frames the room in the space that is left */
+html.ftouch .bstage{height:calc(100vh - var(--ftTray));height:calc(100dvh - var(--ftTray));min-height:0;overflow:visible}
+html.ftouch .bstage::after{content:"";position:absolute;left:0;right:0;top:100%;height:var(--ftTray);z-index:3;background:rgba(5,5,12,.97);border-top:1px solid rgba(56,232,224,.4);box-shadow:0 -1px 10px rgba(56,232,224,.12)}
+html.ftouch .bstage button,html.ftouch .nt-bar button,html.ftouch .ftsheet button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;user-select:none;-webkit-user-select:none}
+html.ftouch .bpanel,html.ftouch header.bar{backdrop-filter:none;-webkit-backdrop-filter:none}
+
+/* top: Exit and Save at the left inside the safe area, the home controls (undo, walls, view, time, work light) in a row under them that scrolls sideways */
+html.ftouch .btl{left:var(--ftL);top:var(--ftT)}
+html.ftouch .nt-bar button{height:44px;padding:0 14px;font-size:12px;letter-spacing:.06em}
+html.ftouch .bset,html.ftouch .bhintw,html.ftouch .bexit{display:none!important}
+html.ftouch .bbar{top:calc(var(--ftT) + 50px);left:var(--ftL);right:var(--ftR);transform:none;max-width:none;height:52px;gap:4px;padding:0 4px;overflow-x:auto;overflow-y:hidden;overscroll-behavior:contain;scrollbar-width:none;background:var(--ftPlate);
+  -webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);mask-image:linear-gradient(90deg,#000 88%,transparent)}
+html.ftouch .bbar::-webkit-scrollbar{display:none}
+html.ftouch .bbar .lbl{display:none}
+html.ftouch .bbar .grp,html.ftouch .bbar .sep,html.ftouch .bbar>button{flex:none}
+html.ftouch .bbar button{min-height:44px;min-width:44px;padding:0 10px;font-size:12px}
+html.ftouch .bbar .ico{width:44px;font-size:19px}
+html.ftouch.ftland .bbar{top:var(--ftT);left:calc(var(--ftL) + var(--ftBtlW,250px) + 10px)}
+
+/* the tray, bottom row: the lab's five catalog groups and our Stored and Home, as icon tabs (the group's name shows over its strip) */
+html.ftouch .brail{top:calc(100% + var(--ftStrip));left:var(--ftL);right:var(--ftR);width:auto;height:var(--ftTabs);max-height:none;display:flex;align-items:center;justify-content:space-between;gap:4px;overflow:visible;z-index:6}
+html.ftouch .brail .sep,html.ftouch .brail [data-tool]{display:none}
+html.ftouch .rb{position:relative;flex:1 1 0;width:auto;max-width:64px;height:44px;min-height:44px;padding:0!important;align-content:center}
+html.ftouch .rb span{display:none}
+html.ftouch .rb svg{width:24px;height:24px}
+html.ftouch .rb .ftn{position:absolute;top:-6px;right:-4px;min-width:20px;height:20px;padding:0 5px;font:12px/20px var(--font-mono);font-style:normal;color:#0b1226;background:var(--amber);text-align:center}
+html.ftouch .rb .ftn:empty{display:none}
+html.ftouch.ftland .brail{right:auto;width:calc(7 * 50px);justify-content:flex-start}
+html.ftouch.ftland .rb{flex:0 0 46px}
+
+/* the tray, top: the flyout as a strip. Category chips in a row (sideways in landscape, beside the tabs), then one row of 64 px tiles */
+html.ftouch .bfly{top:100%;bottom:auto;left:0;right:0;width:auto;height:var(--ftStrip);z-index:5;clip-path:none;border:0;border-radius:0;background:transparent}
+html.ftouch .bstage.placing .bfly{opacity:1}
+html.ftouch .bfly header{padding:8px var(--ftR) 4px var(--ftL);border-bottom:0;gap:0}
+html.ftouch .bfly .fh{display:none;min-height:36px}
+html.ftouch .bfly header:has(#bCatTabs[hidden]) .fh{display:flex}
+html.ftouch .bfly .fh h2{font-size:12px}
+html.ftouch .bfly .fh small{font-size:12px}
+html.ftouch .bfly .xbtn,html.ftouch .bfly input[type=search],html.ftouch .bfly .filters{display:none}
+html.ftouch .bfly .tabs{flex-wrap:nowrap;align-items:center;gap:6px;min-height:36px;overflow-x:auto;overflow-y:hidden;overscroll-behavior:contain;scrollbar-width:none}
+html.ftouch .bfly .tabs::-webkit-scrollbar{display:none}
+html.ftouch .bfly .tabs button{position:relative;flex:none;min-height:36px;padding:0 12px;font-size:12px}
+html.ftouch .bfly .tabs button::after{content:"";position:absolute;left:0;right:0;top:-4px;bottom:-4px}
+html.ftouch .fbody{overflow-x:auto;overflow-y:hidden;overscroll-behavior:contain;touch-action:pan-x;padding:4px var(--ftR) 8px var(--ftL);scrollbar-width:none}
+html.ftouch .fbody::-webkit-scrollbar{display:none}
+html.ftouch .tiles{display:flex;gap:8px;width:max-content}
+html.ftouch .tile{flex:none;width:64px}
+html.ftouch .tile .tn{padding:3px 4px 5px;font-family:var(--font-mono);font-size:12px;letter-spacing:0}
+html.ftouch .tile .ts{display:none}
+html.ftouch .tile .tb{font-size:12px}
+html.ftouch .fnote{font-size:13px;white-space:nowrap}
+html.ftouch.ftland .bfly header{position:absolute;top:100%;left:calc(var(--ftL) + 7 * 50px + 8px);right:0;height:var(--ftTabs);padding:6px var(--ftR) 6px 0;display:flex;align-items:center}
+html.ftouch.ftland .bfly header .tabs{flex:1;min-width:0}
+html.ftouch.ftland .fbody{padding-top:6px}
+html.ftouch #ftEmpty{position:absolute;top:100%;left:0;right:0;height:var(--ftStrip);z-index:4;display:flex;align-items:center;justify-content:center;padding:0 var(--ftR) 0 var(--ftL);font-size:13px;line-height:1.4;color:var(--muted);text-align:center}
+html.ftouch #bFly:not([hidden])~#ftEmpty{display:none}
+
+/* the bar over the selected piece (or the ghost being placed): 44 px and up, icon over a short word */
+html.ftouch .ftbar{position:absolute;left:0;top:0;z-index:7;display:flex;gap:3px;padding:4px;background:var(--ftPlate);border:1px solid var(--cyan);box-shadow:0 0 12px rgba(56,232,224,.22);clip-path:var(--cutp);will-change:transform}
+html.ftouch .ftbar[hidden]{display:none}
+html.ftouch .ftbar button{display:grid;justify-items:center;align-content:center;gap:3px;width:52px;min-height:50px;padding:2px 0;border-color:transparent;background:transparent;color:#fff;font-family:var(--font-mono);font-size:12px;line-height:1}
+html.ftouch .ftbar button svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 3px var(--cyan))}
+html.ftouch .ftbar button.danger svg{filter:drop-shadow(0 0 3px var(--pink))}
+html.ftouch .ftbar button.go{background:rgba(56,232,224,.2);border-color:var(--cyan)}
+html.ftouch .ftbar.bad{border:1px dashed #ff3df2;box-shadow:0 0 12px rgba(255,61,242,.25)}
+html.ftouch .ftbar.bad button.go{background:transparent;border:1px dashed #ff3df2;color:#ffd6fb}
+html.ftouch .ftbar.bad button.go svg{filter:drop-shadow(0 0 3px #ff3df2)}
+
+/* the line over the tray: what a tap does now, and why a spot is blocked (dashed, magenta) */
+html.ftouch .fthint{position:absolute;left:50%;bottom:10px;z-index:6;transform:translateX(-50%);width:max-content;max-width:calc(100% - 32px);margin:0;padding:6px 12px;font-size:13px;line-height:1.4;text-align:center;color:#fff;
+  background:var(--ftPlate);border:1px solid rgba(56,232,224,.6);pointer-events:none;transition:opacity .35s}
+html.ftouch .fthint.fade{opacity:0}
+html.ftouch .fthint.bad{border:1px dashed #ff3df2;color:#ffe0fc}
+html.ftouch .fthint[hidden]{display:none}
+
+/* sheets over the bottom of the room: the inspector (Tint), and Stored and Home */
+html.ftouch #bStage:not(.ft-insp) #bInsp{display:none!important}
+html.ftouch .binsp{left:0;right:0;bottom:0;top:auto!important;width:auto;max-height:min(64%,480px)!important;z-index:8;padding:12px var(--ftR) 14px var(--ftL);clip-path:none;border:0;border-top:1px solid var(--pink);background:var(--ftPlate);overscroll-behavior:contain}
+html.ftouch .ftsheet{position:absolute;left:0;right:0;bottom:0;z-index:8;max-height:min(64%,480px);overflow-y:auto;overscroll-behavior:contain;display:grid;gap:16px;align-content:start;padding:8px var(--ftR) 16px var(--ftL);
+  font-size:13px;line-height:1.5;background:var(--ftPlate);border-top:1px solid var(--cyan)}
+html.ftouch .ftsheet[hidden]{display:none}
+html.ftouch .ftsheet .fthd{display:flex;align-items:center;justify-content:space-between;gap:10px;position:sticky;top:-8px;margin-top:-8px;padding-top:8px;background:var(--ftPlate);z-index:1}
+html.ftouch .ftsheet .fthd h2{font-size:12px}
+html.ftouch .ftsheet .ftx,html.ftouch .binsp .xbtn{width:44px;height:44px;min-height:44px;padding:0;display:grid;place-items:center;font-size:16px}
+html.ftouch .binsp .xbtn{top:8px;right:var(--ftR)}
+html.ftouch .ftsheet section{display:grid;gap:8px}
+html.ftouch .ftsheet .breadout{max-width:none;font-size:13px;line-height:1.5;opacity:1;text-shadow:none}
+html.ftouch .ftsheet .breadout b{font-size:12px}
+html.ftouch .ftsheet .bres{width:auto;max-height:none;padding:10px 12px;font-size:13px;clip-path:none}
+html.ftouch .ftsheet .bres summary{min-height:44px;font-size:12px}
+html.ftouch .ftsheet .bres .tr i{font-size:12px;line-height:20px;padding:0 6px}
+html.ftouch .ftsheet .bresv b{font-size:12px}
+html.ftouch .ftsheet #bSettings,html.ftouch .ftsheet #bSettings[hidden]{display:grid!important;position:static;width:auto;max-height:none;padding:0;border:0;background:transparent;overflow:visible}
+html.ftouch .ftsheet .ftctl dl{margin:0;display:grid;grid-template-columns:minmax(0,1fr);gap:2px}
+html.ftouch .ftsheet .ftctl dt{color:#fff;font-weight:600;margin-top:6px}
+html.ftouch .ftsheet .ftctl dd{margin:0;color:var(--muted)}
+html.ftouch .ftsheet .ftrow{display:flex;align-items:center;gap:8px;border-top:1px solid var(--line);padding-top:8px}
+html.ftouch .ftsheet .ftrow span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#fff}
+html.ftouch .ftsheet .ftrow button{min-height:44px;min-width:44px;padding:0 14px}
+html.ftouch .ftsheet .ftnone{margin:0;color:var(--muted)}
+
+/* text and target floors in the lab's panels (12 px for short capitals, 13 px and up for sentences, 16 px in inputs, 44 px for frequent controls) */
+html.ftouch .bstage h2,html.ftouch .bstage h3{font-size:12px}
+html.ftouch .bstage .note,html.ftouch .bpanel .foot{font-size:13px}
+html.ftouch .bstage .tog,html.ftouch .bpanel details.fold>summary{min-height:44px}
+html.ftouch .bstage .tog input{width:22px;height:22px}
+html.ftouch .bstage select{min-height:44px;font-size:16px}
+html.ftouch .bstage input[type=range]{min-height:44px}
+html.ftouch .bslider{grid-template-columns:56px 1fr 44px;font-size:13px}
+html.ftouch .binsp h3{font-size:13px;padding-right:56px}
+html.ftouch .binsp .sub,html.ftouch .binsp .status,html.ftouch .isec .label{font-size:12px}
+html.ftouch .binsp .tgl{min-height:44px;font-size:13px}
+html.ftouch .binsp .tgl input{width:22px;height:22px}
+html.ftouch .dial{width:72px;height:72px}
+html.ftouch .irow output{font-size:13px}
+html.ftouch .num{width:76px;min-height:44px;font-size:16px}
+html.ftouch .irot button{min-width:48px;min-height:44px;font-size:13px}
+html.ftouch .sw{width:44px!important;height:44px}
+html.ftouch .cpick .pal button{min-height:36px}
+html.ftouch .cpick input[type=color],html.ftouch .binsp input[type=color]{width:56px!important;height:44px!important}
+html.ftouch .cpick .irow .btn{min-height:44px;font-size:13px!important}
+html.ftouch .ibtns button{min-height:44px;font-size:12px}
+html.ftouch body[data-view="build"] .toast{bottom:calc(var(--ftTray) + 60px);font-size:13px}
+html.ftouch .nt-toast{font-size:13px}
+html.ftouch .nt-sim,html.ftouch .nt-sim b{font-size:12px}
+
+/* a long press on a button says what it does (there is no hover on glass) */
+html.ftouch .ftexp{position:fixed;z-index:40;max-width:min(320px,calc(100vw - 32px));padding:8px 12px;font:13px/1.4 "JetBrains Mono",ui-monospace,monospace;color:#fff;background:var(--ftPlate,rgba(5,5,12,.94));border:1px solid #38E8E0;pointer-events:none}
+html.ftouch .ftexp[hidden]{display:none}
+
+/* the hologram: our parts step aside with the lab's */
+html.ftouch .bstage .ftbar,html.ftouch .bstage .fthint,html.ftouch .bstage .ftsheet,html.ftouch .bstage #ftEmpty{transition:opacity .45s ease}
+html.ftouch .bstage.trans .ftbar,html.ftouch .bstage.trans .fthint,html.ftouch .bstage.trans .ftsheet,html.ftouch .bstage.trans #ftEmpty{opacity:0;pointer-events:none}
+
+/* the player's opt-in toggles from the game's Settings (mirrored from the game's page by touch.js): Reduce motion stops the tile shimmer,
+   Clean signal the LIDAR note's flicker */
+html.ftouch.nt-calm .tile .tc::after{animation:none}
+html.ftouch.nt-clean .nt-sim.in{animation:none}

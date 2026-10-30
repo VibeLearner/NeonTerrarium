@@ -11,6 +11,12 @@ from inside the game.
   files below. It runs three.js r149 from the CDN inside an iframe, so the two versions never meet.
 - **furnish/bridge.js, furnish/bridge.css**: the game's side of furnish.html: the Exit to city and Save bar, in the game's
   colors and fonts, and the messages. They hide the lab's own Home menu (the game owns saving).
+- **furnish/touch.js, furnish/touch.css**: the phone layout, only when the main pointer is a finger (`html.ftouch`): a bottom
+  tray of icon tabs and a sideways strip of tiles (the lab's own rail and flyout, restyled), Stored and Home tabs, a bar over the
+  selected piece or the ghost (place, turn, copy, tint, store, delete), cyan solid or magenta dashed ghost outlines, press and hold
+  a floor or wall to tint it, pinch and two-finger pan. They reach into the builder through `PodBuilder.touch`, a few hooks
+  `tools/furnish/build.py` adds to the lab's builder.js (`TOUCH_API`). After editing any furnish/ file,
+  `python3 tools/furnish/build.py --refresh` updates the tags and their `?v=` in furnish.html without the lab.
 
 ### Picking
 

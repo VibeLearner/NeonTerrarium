@@ -139,3 +139,7 @@ html.touch .ttut .g-two i:last-child{animation:ttTwoB 1.6s ease-in-out infinite}
 html.touch .ttip:not([hidden]){display:block;position:fixed;left:0;top:0;z-index:140;padding:8px 11px;font:500 14px/1.4 'Chakra Petch',sans-serif;color:#ffe2b8;background:rgba(18,10,4,.94);
   border:1px dashed #ffb347;pointer-events:none}
 html.pui.touch .pu-group .togs,html.pui.touch .pu-group .togs.pu-cols{grid-template-columns:minmax(0,1fr)}
+
+/* ---------- the title screen can't be zoomed (owner, Oct 30): no pinch or double-tap zoom on it; the Cities list still scrolls ---------- */
+html.touch .title,html.touch .title *{touch-action:none}
+html.touch .title .t-panel,html.touch .title .t-panel *{touch-action:pan-y}

@@ -334,12 +334,16 @@ let FX_REPLAY = null;   // set by the caller of collectGen when the draws of an 
 // Is this piece a fine detail? Sticks (two thin sides: posts, rails, cables, frames, pipes) and tiny bits
 // (small in every direction). Flat panels, with only one thin side, are kept: they read even when small.
 let LAST_STICK = false, LAST_BIG = 0; const STICK_W = .06;
+// (KEEP_FINE: while a pod's scaffold is built (world.js), its legs, ledgers and braces are never thinned out as the view pulls back: a tall tower on
+//  scaffolding read as floating once its thin legs went, owner Oct 30)
+let KEEP_FINE = 0;
 function detailId(geo, m){
   let s = geo.userData._size;
   if (!s){ geo.computeBoundingBox(); const bb = geo.boundingBox; s = geo.userData._size = [bb.max.x - bb.min.x, bb.max.y - bb.min.y, bb.max.z - bb.min.z]; }
   const e = m.elements;
   const d = [Math.hypot(e[0], e[1], e[2])*s[0], Math.hypot(e[4], e[5], e[6])*s[1], Math.hypot(e[8], e[9], e[10])*s[2]].sort((a, b) => a - b);
-  LAST_STICK = d[1] < STICK_W && d[2] >= .14; LAST_BIG = d[2];   // (a long piece thin in two directions: see FAR_CFG; LAST_BIG: its longest side, for the stand-in tier)
+  LAST_STICK = !KEEP_FINE && d[1] < STICK_W && d[2] >= .14; LAST_BIG = d[2];   // (a long piece thin in two directions: see FAR_CFG; LAST_BIG: its longest side, for the stand-in tier)
+  if (KEEP_FINE){ if (d[1] < .09 || d[2] < .14) fxRand(); return 0; }   // (the same random draw is still taken, so every other piece's detail stays as it was)
   return (d[1] < .09 || d[2] < .14) ? 1 + Math.floor(fxRand()*255) : 0;
 }
 // which lights flicker: some neon, fewer lamps and trims, the odd window (Math.random, so the city's layout

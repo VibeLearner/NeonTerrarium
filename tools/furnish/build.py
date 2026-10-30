@@ -25,6 +25,9 @@ ver = lambda f: hashlib.sha1(open(os.path.join(REPO, 'furnish', f), 'rb').read()
 # a real viewport (with viewport-fit=cover, so the safe-area insets are there on phones), unless the lab has one already
 if 'name="viewport"' not in html:
     html = html.replace('<meta charset="utf-8">', '<meta charset="utf-8">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\">', 1)
+# the animations play whatever the device's reduce-motion setting says (owner's choice, Oct 30)
+for a, b in [('@media (prefers-reduced-motion:reduce){.bstage *,.bstage *::after{animation:none!important;transition:none!important}}', ''), ('@media (prefers-reduced-motion:reduce){*{transition:none!important}}', ''), ("const rm=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)", 'const rm=false')]:
+    html = html.replace(a, b)
 html = html.replace('<script>window.PODLAB_EMBED=true</script>',
                     '<script>window.PODLAB_EMBED=true;window.PODCITY_NOPACK=true</script>', 1)
 tail = ('<!-- Neon Terrarium: the game side (tools/furnish/build.py) -->\n'

@@ -212,7 +212,6 @@ const GRIDPANEL = (() => {
   #gridPanel .gtab:hover { background: rgba(95,216,222,.14); } #gridPanel .gtab.on { background: var(--cy); color: #04141a; }
   #gridPanel .gtab.beckon:not(.on) { animation: gtBeckon 2.4s ease-in-out infinite; }   /* the Booth tab, until the player first opens it */
   @keyframes gtBeckon { 0%, 100% { background: transparent; color: var(--cy2); box-shadow: none; } 50% { background: rgba(80,240,140,.28); color: #b8ffd2; box-shadow: 0 0 14px rgba(80,240,140,.55), inset 0 0 0 1px #5df09a; } }
-  @media (prefers-reduced-motion: reduce) { #gridPanel .gtab.beckon:not(.on) { animation: none; background: rgba(80,240,140,.22); color: #b8ffd2; } }
   #gridPanel .gtab:focus-visible { outline: 2px solid var(--yl); outline-offset: -2px; }
   /* the Booth: setup on the left, the loop and the magic keys in the middle, the shelf on the right */
   #gridPanel .gbooth { flex: 1; min-height: 0; display: grid; gap: 10px; padding: 4px 2px 6px;
@@ -272,7 +271,6 @@ const GRIDPANEL = (() => {
   #gridPanel.boot .gtop, #gridPanel.boot .gbot { animation: gpBoot .26s ease-out both; }
   #gridPanel.boot .gp { animation: gpBoot .32s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--i, 0) * 30ms + 40ms); }
   @keyframes gpBoot { 0% { opacity: 0; clip-path: inset(0 100% 0 0); filter: brightness(2.4) saturate(1.6); } 55% { opacity: 1; filter: brightness(1.6); } 100% { opacity: 1; clip-path: inset(0 0 0 0); filter: none; } }
-  @media (prefers-reduced-motion: reduce) { #view.gp-glitch, #gridPanel.boot .gtop, #gridPanel.boot .gbot, #gridPanel.boot .gp { animation: none; } }
   `;
   const knob = (id, name, min, max, step, val, tip, cls = '', out = true) => `<label class="gk ${cls}" title="${tip} (drag up or down, scroll, double-click to reset)"><svg viewBox="0 0 48 48" aria-hidden="true"></svg><input type="range" id="g-${id}" min="${min}" max="${max}" step="${step}" value="${val}" aria-label="${name}"><output${out ? ` id="g-${id.replace(/Slider$/, '')}Val"` : ''}></output><span>${name}</span></label>`;
   const html = `

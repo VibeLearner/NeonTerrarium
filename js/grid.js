@@ -287,7 +287,7 @@ const music = (() => {
     }
     P.show = () => {
       if (P.open || busy) return; busy = true;
-      const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const reduce = false;   // (the game's animations play whatever the device's reduce-motion setting says: owner's choice, Oct 30)
       if (reduce){ openNow(); busy = false; const b = $q('gpClose'); if (b) b.focus({ preventScroll: true }); return; }
       canvas.classList.add('gp-glitch'); setTimeout(() => canvas.classList.remove('gp-glitch'), 340);
       addEventListener('keydown', swallow, true);

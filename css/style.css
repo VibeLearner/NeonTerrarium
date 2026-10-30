@@ -290,7 +290,6 @@ body.deck-open:not(.watching) .mon-pins{right:304px}
 @keyframes pinGlow{50%{opacity:.35}}
 .mon-pin .x{background:none;border:0;color:var(--muted);font:inherit;cursor:pointer;padding:0 2px;opacity:0}
 .mon-pin:hover .x{opacity:1}
-@media (prefers-reduced-motion:reduce){.mon-pin.live .st{animation:none}}
 #monFeed{display:block;width:calc(100% - 20px);margin:0 10px;aspect-ratio:16/9;image-rendering:pixelated;border:1px solid #1d2a3d;background:#05080f}
 #monTabs{display:flex;gap:4px;padding:8px 10px 4px}
 #monTabs button{flex:1;background:transparent;border:1px solid var(--line);color:var(--muted);font-family:var(--font-pixel);font-size:10px;letter-spacing:.1em;padding:4px;border-radius:3px;cursor:pointer;text-transform:uppercase}
@@ -454,8 +453,6 @@ html.title-on.title-deck #deckToggle{visibility:visible!important;pointer-events
   .t-side{width:100%;background:linear-gradient(to top,rgba(16,20,18,.7),rgba(16,20,18,.3) 45%,transparent 70%);padding:0 0 calc(28px + env(safe-area-inset-bottom,0px)) 24px}
   .t-panel{left:12px;right:12px;width:auto}
 }
-}
-@media (prefers-reduced-motion:reduce){.title *,.title{transition:none!important;animation:none!important}}
 
 .deck .to-title{margin:0 0 14px}
 html.title-on #toTitle{display:none}
@@ -514,7 +511,6 @@ body.furnishing #view{cursor:pointer}
   68%{clip-path:inset(49.5% 0 49.5% 0);filter:brightness(2.2) saturate(.2);opacity:1}100%{clip-path:inset(49.5% 50% 49.5% 50%);filter:brightness(2.2) saturate(.2);opacity:0}}
 @keyframes derez-scan{0%{inset:0;opacity:0}10%{opacity:1}68%{inset:49.5% 0 49.5% 0;opacity:1}100%{inset:49.5% 50% 49.5% 50%;opacity:0}}
 @keyframes derez-edge{0%{inset:0;opacity:0}18%{opacity:.9}68%{inset:calc(50% - 1px) 0 calc(50% - 1px) 0;opacity:1}100%{inset:calc(50% - 1px) 50% calc(50% - 1px) 50%;opacity:0}}
-@media (prefers-reduced-motion:reduce){.furnish.derez .furnish-frame{animation:none;opacity:0;transition:opacity .2s}.furnish.derez::before,.furnish.derez::after{display:none}}
 body.furnish-open .zonebar,body.furnish-open .deck-toggle,body.furnish-open .hud{visibility:hidden}
 @media (max-width:700px){.furnbtn{height:34px;padding:0 10px;font-size:10px}}
 /* the storylet engine on: the time can't be set (story.js lockTime) */

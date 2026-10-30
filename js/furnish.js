@@ -11,7 +11,7 @@ const FURN = (() => {
   // detail by distance from the home, in game units (x3.16 in the lab). The lab's backdrop is sharp only within about 45 m (14 units):
   // full detail to NEAR, clustered on a CG grid to MID, simple blocks (the clustered stand-in clustered again on a CG_FAR grid) beyond.
   // F.lightCity = false sends the city as before (full detail to 46, clustered beyond) to compare.
-  const SAVE_KEY = 'neonIsland.furnish', NEAR = 18, MID = 60, CG = .22, CG_FAR = .9, PAGE = 'furnish.html?v=2026-10-25w';
+  const SAVE_KEY = 'neonIsland.furnish', NEAR = 18, MID = 60, CG = .22, CG_FAR = .9, PAGE = 'furnish.html?v=2026-10-30w';
   const btn = document.getElementById('furnBtn'), hint = document.getElementById('modeHint');
   // The LIDAR Array unlocks Scan pod (mega.js): the button shows once the array is unlocked, greyed out while none stands, and only the homes in an array's range
   // can be picked. What the card shows of who lives there is what has been learned (lidar.js: the scan, the person cam, a trace
@@ -574,7 +574,7 @@ const FURN = (() => {
   }
   // leaving: when the apartment was on screen, a short hologram power-down plays over its last frame (furnish/bridge.js stops drawing
   // it and lets the home go after) while the city wakes up underneath; reduced motion gets a plain quick fade (css: .furnish.derez)
-  const DEREZ_MS = matchMedia('(prefers-reduced-motion: reduce)').matches ? 220 : 560;
+  const DEREZ_MS = 560;   // (the game's animations play whatever the device's reduce-motion setting says: owner's choice, Oct 30)
   function close(){
     const shown = !!(F.frame && ov.classList.contains('live'));
     F.busy = false; F.hold = false; F.open = false;

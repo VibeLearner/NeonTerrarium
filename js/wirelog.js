@@ -58,7 +58,6 @@ const WIRELOG = (() => {
     #wirelog .wl-line { grid-template-columns: 34px 46px minmax(0,1fr); gap: 4px; }
     #wirelog .wl-body { height: 150px; }
   }
-  @media (prefers-reduced-motion: reduce) { #wirelog .live { animation: none; } }
   `;
 
   /* ---------- state (saved) ---------- */

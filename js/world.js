@@ -3283,7 +3283,7 @@ function applyTarget(t){
   if (!t) return null;
   if (t.type === 'wallNew' || t.type === 'wallUp' || t.type === 'wallGate') return perimApply(t);
   const zone = S.zone;
-  if (t.type === 'empty') return addPlatform(t.i, t.j, zone);
+  if (t.type === 'empty'){ const c = addPlatform(t.i, t.j, zone); if (c && typeof tEmit === 'function') tEmit('tile'); return c; }   // (nt:tile, nt:surface: the touch tutorial, tutorial.js)
   if (t.type === 'megaUp'){ if (zone) addMegaTier(t.m); return null; }
   if (t.type === 'podDown') return zone ? addPodDown(t.c, zone) : null;
   if (t.type === 'belowUp') return zone ? addBelowUp(t.c, zone) : null;
@@ -3293,7 +3293,7 @@ function applyTarget(t){
     if (c && c.lift && c.lift.v === 2) return addFloatPod(c, t.y, zone);
     const opt = t.from ? { d: [t.i - t.from.i, t.j - t.from.j], mf: 1 } : {};   // (a single pod on brackets, every zone)
     return c ? addLift(c, t.y, zone, opt) : null; }
-  if (!zone && t.type === 'onto' && !t.c.mega && !t.c.sections.length){ cycleGreen(t.c); return t.c; }   // no zone picked: an empty plot's greenery cycles
+  if (!zone && t.type === 'onto' && !t.c.mega && !t.c.sections.length){ cycleGreen(t.c); if (typeof tEmit === 'function') tEmit('surface'); return t.c; }   // no zone picked: an empty plot's greenery cycles
   if (!zone || t.c.mega) return null;
   addSection(t.c, zone, t.after !== undefined ? { after: t.after } : {}); return t.c;
 }

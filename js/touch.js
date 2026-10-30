@@ -47,8 +47,9 @@ const TOUCH = (() => {
     const flash = () => { if (!hint) return; hint.classList.remove('tfade'); clearTimeout(fadeT); if (T.on) fadeT = setTimeout(() => hint.classList.add('tfade'), 3500); };
     // (on a touch screen only the hint's first part shows: the rest is for the keyboard and mouse, and the tutorial and Settings, Controls explain the gestures.
     //  Erase mode's line is kept whole: it's the only place that says how to get around while it's on)
-    const short = s => /^Erase:/.test(s) ? s : s.split(' · ')[0];
-    if (hint) new MutationObserver(() => { if (!T.on) return; const w = short(words(hint.textContent)); if (w !== hint.textContent){ hint.textContent = w; return; } flash(); }).observe(hint, { childList: true, characterData: true, subtree: true });
+    // (and not the sky-to-grow line (owner, Oct 30): the tutorial teaches it, so the line is left empty and faded)
+    const short = s => /^Erase:/.test(s) ? s : /^(Click|Tap) the sky to grow/.test(s) ? '' : s.split(' · ')[0];
+    if (hint) new MutationObserver(() => { if (!T.on) return; const w = short(words(hint.textContent)); if (w !== hint.textContent){ hint.textContent = w; return; } if (!w){ clearTimeout(fadeT); hint.classList.add('tfade'); return; } flash(); }).observe(hint, { childList: true, characterData: true, subtree: true });
 
     // the highway and metro instructions: tap for click, and the rows that are keyboard keys hidden
     for (const id of ['hwHelp', 'mtHelp']){ const box = $(id); if (!box) continue;

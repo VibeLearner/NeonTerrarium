@@ -86,7 +86,13 @@ input[type=range]{width:100%;accent-color:var(--cyan);margin:0}
 .zone:hover{filter:none}
 .rot{align-self:center;width:38px;height:38px;padding:0;font-size:18px;line-height:1;color:var(--ink);background:rgba(10,16,32,.88);border:1px solid var(--line);border-radius:0;clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)}
 .rot:hover{border-color:var(--cyan);color:var(--cyan)}
-.zone.on{transform:translateY(-3px);filter:drop-shadow(0 0 6px var(--z))}
+.zone.on{filter:none}
+/* the selected zone, clearly (owner, Oct 30): a thicker border at full strength, the card lit from inside in its colour, and it lifts and grows a
+   little. (A glow outside the card is cut off by its corner clip.) translate and scale, not transform: touch.js moves the card with transform */
+.zone.on{padding:3px;translate:0 -4px;scale:1.05;transition:transform .15s, filter .15s, translate .15s, scale .15s}
+.zone.on .zin{box-shadow:inset 0 0 18px color-mix(in srgb, var(--z) 55%, transparent),inset 0 0 0 1px color-mix(in srgb, var(--z) 60%, transparent)}
+.zone.on b{text-shadow:0 0 8px var(--z)}
+.zone.on small{color:var(--ink)}
 .zone.on .zin{background:linear-gradient(180deg, color-mix(in srgb, var(--z) 22%, #0a1020), rgba(10,16,32,.92))}
 .zone:focus-visible{outline:none;filter:drop-shadow(0 0 0 var(--z)) drop-shadow(0 0 4px #fff)}
 /* the thin Perimeter button under each zone button (perimeter.js) */

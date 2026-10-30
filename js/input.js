@@ -131,7 +131,7 @@ function hlBuild(){
 // Space with Residential picked: one more single home on the plot, roof or pod under the pointer (a building as tall as you like, a floor at a time)
 function unitAt(px, py){
   const t = targetOf(pickAt(px, py)); if (!t) return false;
-  if (t.type === 'empty'){ const c = addPlatform(t.i, t.j, null); if (c){ finishAnimsOn(c); addSection(c, S.zone, { mf: 1 }); } return true; }
+  if (t.type === 'empty'){ const c = addPlatform(t.i, t.j, null); if (c){ finishAnimsOn(c); addSection(c, S.zone, { mf: 1 }); tEmit('tile'); } return true; }
   if (t.type === 'belowUp' && t.c && t.c.lift){ addBelowUp(t.c, S.zone, { mf: 1 }); return true; }   // (under a pod: one home on the ground or on the building there, a floor's gap kept)
   if ((t.type === 'up' || (t.type === 'onto' && !t.c.sections.length)) && t.c && !t.c.mega){ addSection(t.c, S.zone, Object.assign({ mf: 1 }, t.after !== undefined ? { after: t.after } : {})); return true; }
   return false;

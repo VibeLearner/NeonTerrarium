@@ -22,6 +22,8 @@ const MARK = '<!-- phone page: made from index.html by tools/mobile/build.js; do
   html = html.replace(/<script>\/\* phone page \*\/[\s\S]*?<\/script>/, '<script>/* computer page */if(!matchMedia(\'(pointer: coarse)\').matches){location.replace(\'./\'+location.search+location.hash);document.write(\'<plaintext hidden>\')}</script>');
   html = html.replace(/<!-- a phone or tablet goes to m\.html[^>]*-->\n/, '');
   html = html.replace('<meta charset="utf-8">\n', '<meta charset="utf-8">\n' + MARK + '\n');
+  // the fonts' stylesheet doesn't hold up the first paint on a phone (it's on another site: on a slow first visit the page stayed blank waiting for it)
+  html = html.replace(/<link href="(https:\/\/fonts\.googleapis\.com\/[^"]+)" rel="stylesheet">/, '<link href="$1" rel="stylesheet" media="print" onload="this.media=\'all\'">');
   // the phone page's own extra: the load timeline (js/loadtrace.js), straight after touch.js
   want.set('loadtrace.js', true);
   html = html.replace(/(<script src="min\/js\/touch\.js[^"]*"><\/script>)/, '$1\n<script src="min/js/loadtrace.js"></script>   <!-- how long this load took, stage by stage -->');
@@ -39,6 +41,7 @@ const MARK = '<!-- phone page: made from index.html by tools/mobile/build.js; do
     out.set('min/js/recipe.js', out.get('min/js/recipe.js') + '/* worker ' + crypto.createHash('sha1').update(ws).digest('hex').slice(0, 10) + ' */\n'); }
   // each script's ?v= is its own content's fingerprint, so a phone (and its saved copy, sw.js) never keeps an old one, ?v bumped or not
   html = html.replace(/<script src="min\/js\/([\w.-]+\.js)(\?v=[^"]*)?"><\/script>/g, (m, f) => '<script src="min/js/' + f + '?v=' + crypto.createHash('sha1').update(out.get('min/js/' + f)).digest('hex').slice(0, 10) + '"></script>');
+  html = html.replace('<html lang="en">', '<html lang="en" data-nscripts="' + (html.match(/<script src="min\/js\//g) || []).length + '">');
   out.set('m.html', html);
   // what's there now
   const dir = path.join(ROOT, 'min/js'), have = fs.existsSync(dir) ? fs.readdirSync(dir).map(n => 'min/js/' + n) : [];

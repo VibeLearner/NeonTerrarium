@@ -121,48 +121,134 @@ const MON = (() => {
 
   /* ---------- open, close, follow ---------- */
   let openSeq = 0;
-  M.open = id => {
+  // (stay: on a touch screen, switch the cam to them but leave it folded to its chip: a swipe on the chip)
+  M.open = (id, stay) => {
     if (!M.ready()) return;
     if (M.id !== id){ FC.init = false; rwOpen.clear(); }   // (a new subject: the feed's camera starts from the view's angle)
     M.id = id; M.rev = -1; M.lastDoor = null; el.hidden = false; openSeq++;
     if (!TS) document.body.classList.add('watching');   // (the room the log and the pins make for it, top right; on touch it's at the bottom)
     if (window.STORY) STORY.setWatch(id);
-    if (TS) sheetUp();
+    if (TS && !stay) sheetUp();
     render(true); drawPins(true);
   };
-  const closeNow = () => { M.id = null; sel.hidden = true; el.hidden = true; document.body.classList.remove('watching'); MON_FOCUS.on = false; if (window.STORY) STORY.setWatch(null); if (chip) chip.hidden = true; };
+  const closeNow = () => { M.id = null; sel.hidden = true; el.hidden = true; document.body.classList.remove('watching'); MON_FOCUS.on = false; if (window.STORY) STORY.setWatch(null); if (chip) chipSync(); };
   M.close = () => { closeNow(); if (TS) TS.close(el); };
   M.refresh = () => { if (M.id) render(false); };
   M.userPan = () => {};   // (the main view is the player's own: the feed has its own camera)
 
   /* ---------- on a touch screen: the monitor is the bottom sheet ----------
-     Peek: the feed, full width, with the name and Pin over it. Half: the Log and Notebook tabs as well. A tap on the city
-     (not on someone) folds it to a slim follow chip (their picture and name, and a ✕) above the dock, so the whole city shows
-     while the cam keeps them; a tap on the chip brings the sheet back. If the log or the music sheet opens over it, the
-     monitor waits as its chip and comes back after. */
-  let chip = null, chipCv = null, chipG = null, wrap = null, noise = null;
+     It opens at a height that shows the feed and the newest lines of the log together: the feed gets smaller on a short screen
+     so the log still fits under it, and in landscape it sits beside the log. Peek is the feed alone, full the whole sheet.
+     The header has arrows either side of the name that go round the starred people, and a minimize next to the ✕.
+     Minimized (or a tap on the city that doesn't pick anyone) it folds to the follow chip above the dock, so the whole city shows
+     while the cam keeps them: their picture, their name small (a star if they're starred) and the newest log line. There's no ✕
+     on the chip: a tap opens the sheet, and the cam closes from there. With no cam running the chip is a starred person waiting
+     (a tap opens the cam on them), and with more than one to show it's the top card of a stack: a swipe up brings the next.
+     If the log or the music sheet opens over it, the monitor waits as its chip and comes back after. */
+  let chip = null, chipCv = null, chipG = null, wrap = null, noise = null, prevB = null, nextB = null;
   const rwOpen = new Set();   // (the "rewritten" marks tapped open, on touch)
   const feedVisible = () => !TS || TS.isOpen(el);
   const topH = () => el.querySelector('header').offsetHeight + (wrap ? wrap.offsetHeight : cv.offsetHeight) + $m('monTrace').offsetHeight;
+  // a short screen on its side (a phone in landscape): the feed goes beside the log (the same test as in touch-sheets.css)
+  const landMQ = TS && window.matchMedia ? matchMedia('(orientation: landscape) and (max-height: 540px)') : null;
+  const isLand = () => !!(landMQ && landMQ.matches);
+  const LOG_MIN = 96, LOG_MAX = 170;   // (how tall the log is when the sheet opens: about three lines, and five at most)
+  let fedW = -1;
+  // the feed's width in the sheet: the sheet's whole width when the log still fits under it, narrower when it wouldn't
+  function fitFeed(){
+    const W = el.clientWidth || Math.min(640, innerWidth), room = TS.room ? TS.room() : innerHeight - 104;
+    const hd = el.querySelector('header').offsetHeight, tabs = $m('monTabs').offsetHeight, tr = $m('monTrace').offsetHeight;
+    const fh = isLand() ? Math.min(room - hd, W*.56*9/16) : Math.min(W*9/16, room - hd - tabs - tr - LOG_MIN);
+    const fw = Math.max(128, Math.floor(Math.min(W, fh*16/9)));
+    if (fw !== fedW){ fedW = fw; el.style.setProperty('--mon-fw', fw + 'px'); }
+    return room;
+  }
+  const peekH = () => { fitFeed(); return isLand() ? el.querySelector('header').offsetHeight + wrap.offsetHeight + 2 : topH() + 6; };
+  const halfH = () => { const room = fitFeed(); if (isLand()) return peekH();
+    const t = topH() + $m('monTabs').offsetHeight; return t + Math.max(LOG_MIN, Math.min(LOG_MAX, room - t)); };
   function sheetUp(){
     if (TS.isOpen(el)) return;
-    TS.open(el, { key: 'monitor', title: '', detent: 'peek', detents: ['peek', 'half', 'full'], closeBtn: false, scroll: false, parkOnReplace: true,
-      peek: () => topH() + 6, half: () => topH() + $m('monTabs').offsetHeight + 210,   // (half: about four log rows under the tabs)
+    TS.open(el, { key: 'monitor', title: '', detent: 'half', detents: ['peek', 'half', 'full'], closeBtn: false, scroll: false, parkOnReplace: true,
+      peek: peekH, half: halfH,   // (it opens at half: the feed and the log at once)
       onClose: () => { if (M.id) closeNow(); },
-      onCover: c => { if (chip) chip.hidden = c || !M.id; } });
-    if (chip) chip.hidden = true;
+      onCover: () => chipSync() });
+    chipSync();
   }
-  function park(){ if (!M.id || !TS.isOpen(el)) return; TS.park(el); chipName(); chipPic(); chip.hidden = false; }
-  const chipName = () => { if (chip) chip.querySelector('b').textContent = $m('monName').textContent; };
+  function park(){ if (!M.id || !TS.isOpen(el)) return; TS.park(el); chipSync(); chipPic(); }
   // the chip's picture: the middle of the newest feed frame, a square of it
-  function chipPic(){ if (!chipG || !off || !FC.shown) return; chipG.drawImage(off, (RW - RH)/2, 0, RH, RH, 0, 0, chipCv.width, chipCv.height); chipG.fillStyle = 'rgba(20,60,70,.18)'; chipG.fillRect(0, 0, chipCv.width, chipCv.height); }
+  // (fresh: a new frame from the feed. Just after the cam switches, the next one can still be of the last person: chipHold skips it)
+  let chipHold = 0;
+  function chipPic(fresh){ if (!chipG || !off || !FC.shown || !M.id) return; if (chipHold){ if (fresh) chipHold--; return; } chipG.drawImage(off, (RW - RH)/2, 0, RH, RH, 0, 0, chipCv.width, chipCv.height); chipG.fillStyle = 'rgba(20,60,70,.18)'; chipG.fillRect(0, 0, chipCv.width, chipCv.height); }
+  // no picture yet (a starred person with no cam on them, or the cam just switched): a dark square with their star
+  function chipBlank(){ if (!chipG) return; const W = chipCv.width, H = chipCv.height; chipG.fillStyle = '#05080f'; chipG.fillRect(0, 0, W, H); look(chipG, W, H);
+    chipG.fillStyle = 'rgba(255,210,58,.55)'; chipG.font = '18px sans-serif'; chipG.textAlign = 'center'; chipG.textBaseline = 'middle'; chipG.fillText('★', W/2, H/2 + 1); chipG.textAlign = 'left'; chipG.textBaseline = 'alphabetic'; }
+  // who the chip shows: the person on the cam, or with no cam running, one of the starred (chipFront, until it's unstarred)
+  let chipFront = null, chipSig = '', chipBusy = false;
+  const chipWho = () => M.id || (pins.includes(chipFront) ? chipFront : (chipFront = pins[0] || null));
+  const deckN = () => { const s = new Set(pins); if (M.id) s.add(M.id); return s.size; };
+  // the next starred person after this one (dir -1: the one before), or null when there's nowhere else to go
+  function starStep(from, dir){
+    const n = pins.length; if (!n) return null;
+    const i = pins.indexOf(from); if (i < 0) return dir > 0 ? pins[0] : pins[n - 1];
+    return n < 2 ? null : pins[(i + dir + n) % n];
+  }
+  function chipSync(){
+    if (!chip) return;
+    const id = chipWho(), ready = typeof pplReady !== 'undefined' && pplReady;
+    const show = !!id && ready && (!!M.id || M.ready()) && !TS.covered();
+    if (chip.hidden === show) chip.hidden = !show;
+    if (prevB){ const can = !!M.id && !!starStep(M.id, 1); if (prevB.hidden === can){ prevB.hidden = nextB.hidden = !can; } }
+    if (!show) return;
+    const p = typeof people !== 'undefined' && people.get(id), L = window.STORY ? STORY.log(id) : [], last = L[L.length - 1];
+    const nm = pinName(id), line = last ? STORY.render(last) : 'Nothing logged yet.', star = pins.includes(id), stack = Math.min(2, deckN() - 1);
+    const sig = [id, nm, line, star, stack, !!(p && p.scene), !!M.id].join('|'); if (sig === chipSig) return;
+    const wasCam = chipSig && chipSig.endsWith('|true'); chipSig = sig;
+    chip.querySelector('.mc-nm').textContent = nm; chip.querySelector('.mc-log').textContent = line;
+    chip.classList.toggle('star', star); chip.classList.toggle('live', !!(p && p.scene)); chip.classList.toggle('cam', !!M.id); chip.dataset.stack = String(Math.max(0, stack));
+    chip.querySelector('.mc-open').setAttribute('aria-label', (M.id ? 'Open the person cam on ' : 'Watch ') + nm + (stack > 0 ? '. Swipe up for the next starred person' : ''));
+    if (!M.id || !wasCam) chipBlank();
+    if (M.id) chipPic();
+  }
+  // a swipe up on the chip: the top card goes and the next starred person comes forward from the stack (the cam switches to them if it's running)
+  function chipNext(){
+    if (chipBusy || deckN() < 2) return;
+    const cur = chipWho(), nx = starStep(cur, 1); if (!nx || nx === cur) return;
+    const ob = chip.querySelector('.mc-open');
+    const swap = () => { if (M.id){ chipHold = 1; M.open(nx, true); chipSig = ''; chipSync(); chipBlank(); } else { chipFront = nx; chipSync(); } };
+    if (!ob.animate || document.documentElement.classList.contains('nt-calm')){ swap(); return; }
+    chipBusy = true;
+    const out = ob.animate([{ transform: 'none', opacity: 1 }, { transform: 'translateY(-22px)', opacity: 0 }], { duration: 130, easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards' });
+    out.onfinish = () => { swap();
+      const inn = ob.animate([{ transform: 'translateY(-7px) scaleX(.94)', opacity: .35 }, { transform: 'none', opacity: 1 }], { duration: 190, easing: 'cubic-bezier(.2,.8,.2,1)' });
+      out.cancel(); inn.onfinish = inn.oncancel = () => { chipBusy = false; }; };
+  }
   if (TS){
     chip = document.createElement('div'); chip.id = 'monChip'; chip.className = 'mon-chip'; chip.hidden = true;
-    chip.innerHTML = '<button class="mc-open" type="button" aria-label="Open the monitor"><canvas width="36" height="36" aria-hidden="true"></canvas><b></b></button><button class="x" type="button" aria-label="Stop following">✕</button>';
+    chip.innerHTML = '<button class="mc-open" type="button" aria-label="Open the person cam"><canvas width="44" height="44" aria-hidden="true"></canvas>' +
+      '<span class="mc-tx"><b><i class="mc-st" aria-hidden="true">★</i><span class="mc-nm"></span></b><span class="mc-log"></span></span></button>';
     document.body.appendChild(chip);
     chipCv = chip.querySelector('canvas'); chipG = chipCv.getContext('2d'); chipG.imageSmoothingEnabled = false;
-    chip.querySelector('.mc-open').addEventListener('click', () => { if (M.id) sheetUp(); });
-    chip.querySelector('.x').addEventListener('click', () => M.close());
+    // a tap opens (the cam's sheet, or the cam on the starred person shown); a swipe up goes to the next card
+    { const ob = chip.querySelector('.mc-open'); let sw = null, swiped = false;
+      ob.addEventListener('pointerdown', e => { swiped = false; sw = { id: e.pointerId, x: e.clientX, y: e.clientY }; try { ob.setPointerCapture(e.pointerId); } catch (er){} });
+      ob.addEventListener('pointermove', e => { if (!sw || e.pointerId !== sw.id) return; const dy = e.clientY - sw.y;
+        if (Math.abs(dy) > 10 || Math.abs(e.clientX - sw.x) > 10) swiped = true;   // (a drag, not a tap)
+        if (dy < -22 && -dy > Math.abs(e.clientX - sw.x)){ sw = null; chipNext(); } });
+      const end = e => { if (sw && e.pointerId === sw.id) sw = null; };
+      ob.addEventListener('pointerup', end); ob.addEventListener('pointercancel', end);
+      ob.addEventListener('click', () => { if (swiped){ swiped = false; return; }
+        if (M.id) sheetUp(); else { const id = chipWho(); if (id && typeof people !== 'undefined' && people.has(id)) M.open(id); } }); }
+    // (the chip steps aside while any sheet is up, and comes back when the last one goes)
+    if (typeof MutationObserver !== 'undefined') new MutationObserver(() => chipSync()).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    // the header in the sheet: arrows round the starred people either side of the name, and minimize beside the ✕
+    { const hdr = el.querySelector('header'), ttl = hdr.querySelector('.mon-title');
+      const btn = (cls, html, label) => { const b = document.createElement('button'); b.type = 'button'; b.className = cls; b.innerHTML = html; b.setAttribute('aria-label', label); b.title = label; return b; };
+      prevB = btn('mon-cyc', '‹', 'Previous starred person'); nextB = btn('mon-cyc', '›', 'Next starred person'); prevB.hidden = nextB.hidden = true;
+      const minB = btn('mon-min', '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"/></svg>', 'Minimize: keep following from the chip');
+      ttl.before(prevB); ttl.after(nextB); $m('monClose').before(minB);
+      prevB.addEventListener('click', () => { const id = starStep(M.id, -1); if (id && people.has(id)) M.open(id); });
+      nextB.addEventListener('click', () => { const id = starStep(M.id, 1); if (id && people.has(id)) M.open(id); });
+      minB.addEventListener('click', () => park()); }
     // the feed in a frame of its own, with the static over it as a baked tile that moves (nothing drawn for it): see M.blit
     wrap = document.createElement('div'); wrap.className = 'mon-feedwrap'; cv.before(wrap); wrap.appendChild(cv);
     noise = document.createElement('div'); noise.className = 'mon-noise'; noise.hidden = true; noise.setAttribute('aria-hidden', 'true'); wrap.appendChild(noise);
@@ -196,6 +282,7 @@ const MON = (() => {
   function drawPins(force){
     if (typeof people !== 'undefined' && typeof pplReady !== 'undefined' && pplReady && people.size){ const n = pins.length; pins = pins.filter(id => people.has(id)); if (pins.length !== n) savePins(); }   // (someone gone from the city)
     if (pinBtn){ const on = !!M.id && pins.includes(M.id); pinBtn.classList.toggle('on', on); pinBtn.textContent = on ? '★' : '☆'; pinBtn.title = on ? 'Unpin' : 'Pin: keep them a click away'; }
+    if (chip) chipSync();   // (on a touch screen the starred wait in the follow chip, and the sheet's arrows go round them)
     const rows = pins.map(id => { const p = typeof people !== 'undefined' && people.get(id); return [id, pinName(id), !!(p && p.scene), id === M.id]; });
     const sig = JSON.stringify(rows); if (!force && sig === pinSig) return; pinSig = sig;
     pinBox.innerHTML = rows.map(([id, nm, live, on]) => '<div class="mon-pin' + (live ? ' live' : '') + (on ? ' on' : '') + '" data-id="' + esc(id) + '" title="' + esc(nm) + (live ? ': something is happening' : '') + '"><span class="st">★</span><b>' + esc(nm) + '</b><button class="x" aria-label="Unpin" title="Unpin">✕</button></div>').join('');
@@ -308,7 +395,7 @@ const MON = (() => {
     const vis = feedVisible();
     // (folded to its chip on a touch screen: the cam keeps them at a quarter of the rate, for the chip's picture)
     if (at && ++FC.frame % (vis ? EVERY : EVERY*4) === 0){ try { drawFeed(at); } catch (e){ if (!M.feedErr){ M.feedErr = true; console.warn('monitor feed:', e); } } }
-    if (fresh && chip && !chip.hidden) chipPic();
+    if (fresh && chip && !chip.hidden) chipPic(true);
     if (!vis){ if (window.STORY && (STORY.rev !== M.rev || now - M.drawnAt > 1500)) render(false); return; }   // (nothing of the panel on screen)
     const shown = !!(at && FC.shown), noisy = !shown || !!(at && at.inside);
     // the look of a camera feed: a cold tint, scanlines, a vignette, static when there's nothing to see.
@@ -363,7 +450,7 @@ const MON = (() => {
     const k = STORY.known(M.id) || {};
     $m('monName').textContent = k.first ? (k.first + (k.last ? ' ' + k.last : '')).toUpperCase() : 'SUBJECT';
     $m('monSub').textContent = k.first ? (k.firstVia && k.firstVia.verified ? 'name verified' : 'name unconfirmed') : 'unknown';
-    if (chip) chipName();
+    if (chip) chipSync();
     const body = $m('monBody'), atBottom = body.scrollTop + body.clientHeight >= body.scrollHeight - 8;
     const top = M.tab !== 'log' && force;   // (the notebook opens at its top)
     if (M.tab === 'log'){

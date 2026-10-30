@@ -1,7 +1,7 @@
 /* Neon Terrarium: the shared bottom sheet and what opens in it, on a touch screen (js/tsheet.js; claude/mobile-ui-plan.md,
    "Sheets keep the city alive"). The person cam (monitor.js), the transmission log (wirelog.js) and the music player (grid.js)
    each open here, one at a time, and the city above stays live. With them: the music pill, the log's ticker along the top,
-   the pinned people as a strip above the dock, and the follow chip the person cam folds to.
+   and the follow chip the person cam folds to (where the starred people wait too).
    Everything is under html.touch, which a mouse and keyboard never get: the desktop layout doesn't change.
    Numbers: 44 px for anything tapped often (48 for the sheet's handle), text 12 px at the least for short all-caps labels and
    13 to 14 px for lines you read; solid tinted plates instead of a live blur over the city. */
@@ -35,18 +35,35 @@ html.touch .tsheet.ts-scroll .ts-body{overflow-y:auto;overscroll-behavior:contai
 html.touch .monitor{backdrop-filter:none;-webkit-backdrop-filter:none;background:rgba(5,5,12,.88)}
 html.touch #tsheet .monitor{position:static;width:auto;height:100%;max-height:none;border:0;border-radius:0;background:transparent;box-shadow:none;overscroll-behavior:contain}
 html.touch #tsheet .monitor header{min-height:60px;box-sizing:border-box;padding:12px 6px 4px 14px;gap:6px}
-/* the sheet's handle lies over the name, so the monitor gives no extra row to it: the name's side of the header is the 48 px drag strip, Pin and ✕ stay tappable */
-html.touch #tsheet[data-key=monitor] .ts-bar{position:absolute;left:0;top:0;right:112px;z-index:1}
-html.touch #tsheet[data-key=monitor] .ts-grip{left:calc(50% + 56px)}   /* (still in the middle of the sheet) */
+/* the sheet's handle lies over the name, so the monitor gives no extra row to it: the name's side of the header is the 48 px drag strip;
+   Pin, minimize and ✕ stay tappable, and so do the arrows either side of the name (above the strip) */
+html.touch #tsheet[data-key=monitor] .ts-bar{position:absolute;left:0;top:0;right:160px;z-index:1}
+html.touch #tsheet[data-key=monitor] .ts-grip{left:calc(50% + 80px)}   /* (still in the middle of the sheet) */
+html.touch #tsheet .mon-title{flex:0 1 auto}
+html.touch #tsheet #monPin{margin-left:auto}
+html.touch #tsheet .monitor header .mon-cyc{position:relative;z-index:2;flex:none;width:44px;height:44px;padding:0 0 3px;font-size:24px;line-height:1;color:var(--cyan);border-color:rgba(56,232,224,.35)}
+html.touch #tsheet .monitor header .mon-cyc[hidden]{display:none}
+html.touch #tsheet .monitor header .mon-min{flex:none;width:44px;height:44px;padding:0;display:grid;place-items:center;color:var(--ink)}
+html.touch #tsheet .monitor header .mon-cyc:active,html.touch #tsheet .monitor header .mon-min:active{background:rgba(56,232,224,.18)}
 /* off the sheet (folded to its chip, or waiting under another sheet) the monitor isn't shown at all */
 html.touch body > #monitor{display:none}
 html.touch #tsheet .mon-title b{font-size:13px}
 html.touch #tsheet .mon-title small{font-size:12px}
 html.touch #tsheet #monPin{font-size:18px}
 html.touch #tsheet #monClose{font-size:15px}
-/* the feed: 16:9, the sheet's whole width */
+/* the feed: 16:9, the sheet's whole width, or narrower (--mon-fw, monitor.js) so the log fits under it when the sheet opens */
 .mon-feedwrap{position:relative}
 html.touch .mon-feedwrap #monFeed{width:100%;margin:0;border-left:0;border-right:0}
+html.touch #tsheet .mon-feedwrap{width:var(--mon-fw, 100%);max-width:100%;margin:0 auto}
+/* a phone on its side: the feed on the left under the header, the tabs and the log beside it (the same test as monitor.js) */
+@media (orientation: landscape) and (max-height: 540px){
+  html.touch #tsheet .monitor{grid-template-columns:var(--mon-fw, 50%) minmax(0,1fr);grid-template-rows:auto auto auto minmax(0,1fr)}
+  html.touch #tsheet .monitor > header{grid-column:1 / -1}
+  html.touch #tsheet .mon-feedwrap{grid-column:1;grid-row:2 / -1;align-self:start;margin:0}
+  html.touch #tsheet .mon-trace,html.touch #tsheet #monTabs,html.touch #tsheet .mon-body{grid-column:2;min-width:0}
+  html.touch #tsheet #monTabs{padding-top:0}
+  html.touch #tsheet .mon-body{min-height:0}
+}
 html.touch:not(:has(#tsheet .monitor)) .mon-feedwrap{margin:0 10px}
 /* the static over a lost signal: a tile baked once (monitor.js), moved in jumps; faded at the edges the way the vignette darkens them */
 .mon-noise{position:absolute;inset:0;overflow:hidden;pointer-events:none;
@@ -79,34 +96,39 @@ html.touch #tsheet .ml i{position:relative;font-size:12px;padding:2px 7px;cursor
 html.touch #tsheet .ml i::after{content:"";position:absolute;left:-8px;right:-8px;top:-12px;bottom:-12px}
 html.touch #tsheet .ml-orig{display:block;margin-top:4px;font-size:13px;color:var(--muted)}
 
-/* ---------- the follow chip: the person cam folded away (a tap on the city), their picture and name; a tap brings the sheet back ---------- */
+/* ---------- the follow chip: the person cam minimized (a tap on the city, or its minimize), and with no cam running, the starred people waiting ----------
+   Their picture, their name small (a star when they're starred) and the newest log line under it, two lines at most. A tap opens the
+   cam; there's no ✕ on it (the cam closes from the open sheet). With more than one person to show, cards stack behind it, peeking
+   over its top edge (data-stack, monitor.js), and a swipe up brings the next one forward. The starred have no strip of their own. */
 .mon-chip{display:none}
-html.touch .mon-chip{position:fixed;z-index:4;left:max(10px, env(safe-area-inset-left,0px));bottom:calc(var(--tdock-h, 140px) + 8px);display:flex;align-items:stretch;height:48px;
-  max-width:min(280px, calc(100vw - 20px));box-sizing:border-box;background:rgba(5,5,12,.9);border:1px solid rgba(255,79,106,.6);box-shadow:0 0 10px rgba(255,79,106,.25)}
+html.touch .mon-chip{position:fixed;z-index:4;left:max(10px, env(safe-area-inset-left,0px));bottom:calc(var(--tdock-h, 140px) + 8px);display:block;
+  width:min(300px, calc(100vw - 20px));height:58px;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 html.touch .mon-chip[hidden]{display:none}
-html.touch .mon-chip button{background:transparent;border:0;border-radius:0;color:var(--ink);font:inherit;padding:0}
-html.touch .mon-chip .mc-open{display:flex;align-items:center;gap:8px;min-width:0;padding:0 6px 0 5px}
-html.touch .mon-chip canvas{flex:none;width:36px;height:36px;image-rendering:pixelated;border:1px solid #1d2a3d;background:#05080f}
-html.touch .mon-chip b{min-width:0;font-family:var(--font-pixel);font-weight:400;font-size:12px;letter-spacing:.1em;color:#ffd0d7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-html.touch .mon-chip .x{flex:none;width:44px;font-size:15px;border-left:1px solid rgba(255,79,106,.35)}
-/* above the pinned strip when there is one */
-html.touch:has(#monPins:not(:empty)) .mon-chip{bottom:calc(var(--tdock-h, 140px) + 64px)}
+html.touch .mon-chip .mc-open{position:relative;display:flex;align-items:center;gap:9px;width:100%;height:100%;box-sizing:border-box;padding:0 10px 0 6px;text-align:left;
+  background:rgba(5,5,12,.95);border:1px solid rgba(255,79,106,.6);border-radius:0;box-shadow:0 0 10px rgba(255,79,106,.25);color:var(--ink);font:inherit;touch-action:none}
+html.touch .mon-chip canvas{flex:none;width:44px;height:44px;image-rendering:pixelated;border:1px solid #1d2a3d;background:#05080f}
+html.touch .mon-chip .mc-tx{flex:1;min-width:0;display:grid;gap:2px}
+html.touch .mon-chip b{display:flex;align-items:center;gap:5px;min-width:0;font-family:var(--font-pixel);font-weight:400;font-size:12px;line-height:14px;letter-spacing:.1em;color:#ffd0d7;white-space:nowrap}
+html.touch .mon-chip .mc-nm{min-width:0;overflow:hidden;text-overflow:ellipsis;text-transform:uppercase}
+html.touch .mon-chip .mc-st{display:none;flex:none;font-style:normal;font-size:11px;letter-spacing:0;color:#ffd23a}
+html.touch .mon-chip.star .mc-st{display:inline}
+html.touch .mon-chip.live .mc-st{animation:pinGlow 1.4s ease-in-out infinite}
+html.touch .mon-chip .mc-log{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;max-height:30px;overflow:hidden;font-size:12px;line-height:15px;color:#c9d3e2;overflow-wrap:anywhere}
+/* the stack: up to two cards behind, their top edges showing (painted under the chip's own card) */
+html.touch .mon-chip::before,html.touch .mon-chip::after{content:"";position:absolute;inset:0;z-index:-1;display:none;box-sizing:border-box;pointer-events:none;transform-origin:50% 100%;
+  background:rgba(12,8,18,.95);border:1px solid rgba(255,79,106,.38)}
+html.touch .mon-chip::after{transform:translateY(-6px) scaleX(.94)}
+html.touch .mon-chip::before{transform:translateY(-12px) scaleX(.88);border-color:rgba(255,79,106,.22)}
+html.touch .mon-chip[data-stack="1"]::after,html.touch .mon-chip[data-stack="2"]::after,html.touch .mon-chip[data-stack="2"]::before{display:block}
+html.nt-calm .mon-chip.live .mc-st{animation:none}
 
-/* ---------- pinned people: a strip of 44 px chips just above the dock, each with its ✕ in view ---------- */
-html.touch #monPins{top:auto;left:max(10px, env(safe-area-inset-left,0px));right:max(10px, env(safe-area-inset-right,0px));bottom:calc(var(--tdock-h, 140px) + 8px);
-  flex-direction:row;align-items:center;justify-content:flex-start;gap:8px;overflow-x:auto;overscroll-behavior:contain;scrollbar-width:none}
-html.touch #monPins::-webkit-scrollbar{display:none}
-html.touch #monPins .mon-pin{flex:none;height:44px;max-width:190px;box-sizing:border-box;padding:0 0 0 10px;gap:6px;font-size:13px;border-radius:0;
-  background:rgba(5,5,12,.88);backdrop-filter:none;-webkit-backdrop-filter:none}
-html.touch #monPins .mon-pin .st{font-size:14px}
-html.touch #monPins .mon-pin .x{flex:none;width:44px;height:44px;padding:0;opacity:1;font-size:14px;color:var(--ink);border-left:1px solid var(--line)}
-/* the hint line floats over the dock: up past the strip and the chip */
-html.touch:has(#monPins:not(:empty)) .zonebar > #modeHint{bottom:calc(100% + 60px)}
-html.touch:has(#monChip:not([hidden])) .zonebar > #modeHint{bottom:calc(100% + 64px)}
-html.touch:has(#monPins:not(:empty)):has(#monChip:not([hidden])) .zonebar > #modeHint{bottom:calc(100% + 120px)}
-/* out of the way while a sheet is up, or a list from the dock opens over where they sit */
-html.touch.tsheet-on #monPins,html.touch.tsheet-on .mon-chip,
-html.touch:has(#bmenuList:not([hidden])) #monPins,html.touch:has(#tmenuList:not([hidden])) #monPins,html.touch:has(.ctlwrap.open) #monPins,
+/* ---------- pinned people: on a touch screen they wait in the follow chip's stack instead (the sheet's arrows go round them) ---------- */
+html.touch #monPins{display:none}
+/* the hint line floats over the dock: up past the chip and its stack */
+html.touch:has(#monChip:not([hidden])) .zonebar > #modeHint{bottom:calc(100% + 74px)}
+html.touch:has(#monChip:not([hidden]):not([data-stack="0"])) .zonebar > #modeHint{bottom:calc(100% + 86px)}
+/* out of the way while a sheet is up, or a list from the dock opens over where it sits */
+html.touch.tsheet-on .mon-chip,
 html.touch:has(#bmenuList:not([hidden])) .mon-chip,html.touch:has(#tmenuList:not([hidden])) .mon-chip,html.touch:has(.ctlwrap.open) .mon-chip{visibility:hidden}
 
 /* ---------- the music player: a 44 px pill (the pattern's name, hold/play); a tap on it opens the sheet ---------- */

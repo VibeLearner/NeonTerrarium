@@ -21,6 +21,8 @@ const PAL = {
   T: "#a85a5a", U: "#7a3e48", m: "#4a2a50",
   // warm dusky stone for plazas and paths: lit, mid, shade
   "*": "#8a5a78", "(": "#64405c", ")": "#3e2840",
+  // window pane highlights: warm cream, cool pale cyan; headlights
+  ":": "#ffe6b0", ";": "#c8f4ff", "<": "#e8fbff",
   // glass: pale cyan-white lit, mid, shade, frame, pink sky reflection
   "$": "#cfeff0", "-": "#8fc4d0", "+": "#5a8aa8", "=": "#3a4a6a", "[": "#e8a0c8",
   // homes at dusk: peach, honey, soft pink, cool white-blue, shop gold; unlit deep plum
@@ -179,7 +181,7 @@ const nearestKey = (r, g, b) => {
 const levelFor = (yBase) => (yBase >= 400 ? 0 : Math.round(20 * (0.15 + 0.1 * clamp((400 - yBase) / 80, 0, 1))))
 const darkFor = (cx, yBase) => Math.round(clamp((380 - cx) / 170, 0, 1) * clamp((yBase - 350) / 100, 0, 1) * 0.55 * 20)
 const tintCache = new Map()
-const LIGHTKEYS = new Set("yhzvYnHMVNL$7-[+=")
+const LIGHTKEYS = new Set("yhzvYnHMVNL$7-[+=:;<")
 const tintKey = (k, hz, dk, wm) => {
   if (LIGHTKEYS.has(k)) { hz = Math.round(hz * 0.3); dk = Math.round(dk * 0.4); wm = 0 }
   if (!hz && !dk && !wm) return k
@@ -214,7 +216,7 @@ const WALLDIM = new Set("RruPpqSstKklDEe%^&fijTUm")
 const FK = (x, y, k) => { const i = y * W + x; const kk = tintKey(k, DEPTH[i], Math.min(20, DARK[i] + (WALLDIM.has(k) ? DIMW : 0)), WARM[i]); return CITY[i] ? grounded(x, y, kk) : kk }
 
 // ---------------------------------------------------------------- glow
-const EMIT = new Set("yhzvYVNHMnL$-")
+const EMIT = new Set("yhzvYVNHMnL$-:;<")
 const glowAround = (pts, k, reach = 2, sink) => {
   const set = new Set(pts.map(([x, y]) => x + y * W))
   for (const [x, y] of pts) for (let dy = -reach; dy <= reach; dy++) for (let dx = -reach; dx <= reach; dx++) {
@@ -281,7 +283,7 @@ const FAMS = {
 const FAMMAIN = ["rose", "plum", "peach", "terra", "rose", "plum", "terra", "peach", "mauve"]
 const ACCENTS = ["H", "H", "H", "H", "M", "M", "n", "n", "n", "V", "N"]
 const WCOLS = ["L", "L", "h", "h", "y", "y", "z", "z", "v", "v"]      // six in ten warm
-const WALLSET = new Set("RruPpqSstKklDEeTUmfijAB")
+const WALLSET = new Set("RruPpqSstKklDEeTUmfijAB%^&")
 const HALO = { L: "y", h: "L", y: "y", z: "H", v: "n", Y: "L" }
 const HALO2 = { L: "T", h: "T", y: "T", z: "R", v: "K", Y: "T" }
 const HALO3 = { L: "U", h: "U", y: "U", z: "r", v: "k", Y: "U" }
@@ -592,10 +594,23 @@ const addWallSign = (side, m, kind, u0, r0, col, id, seed, wk) => {
 }
 
 // ---------------------------------------------------------------- windows with a soft halo
+// one window pane, (cu, cr) counted from its top-left corner: a dark recess on the top and left, a lighter top row of glass,
+// sometimes a dark mullion, a curtain, a plant pot or a faint reflection; v is a hash that picks the variety
+const paneAt = (cu, cr, pw, wh, on, lit, v) => {
+  if (cu === 0 || cr === 0) return "A"
+  const pot = v >= 0.28 && v < 0.36
+  if (pot && cu === 1 && cr === wh - 1) return "!"
+  if (pot && cu === 1 && cr === wh - 2) return "o"
+  if (!lit) return v < 0.12 && cu === pw - 2 && cr === 2 ? "l" : "w"
+  const big = wh >= 6
+  if (big && ((v >= 0.5 && v < 0.75 && cr === (wh + 1) >> 1) || (v >= 0.75 && (cr === (wh + 1) >> 1 || cu === (pw + 1) >> 1)))) return "A"
+  if (v >= 0.12 && v < 0.24 && cu <= pw >> 1 && cr > 1) return "@"
+  return cr === 1 ? (on === "v" || on === "n" ? ";" : ":") : on
+}
 let curWins = []
 const haloPass = () => {
   for (const rec of curWins) {
-    if (!rec.halo) continue
+    if (!rec.halo || !rec.pts.length || (rec.pts[0][0] * 7 + rec.pts[0][1] * 13) % 3) continue
     const hk = HALO[rec.on] || "T"
     const P = new Set(rec.pts.map((p) => p[0] + p[1] * W))
     const seen = new Set()
@@ -607,25 +622,7 @@ const haloPass = () => {
       if (!WALLSET.has(get(nx, ny)) || ((nx + ny) & 1)) continue
       ring.push([nx, ny, hk, get(nx, ny)])
     }
-    // a second and a third, fainter ring further out
-    const R1 = new Set(ring.map((q) => q[0] + q[1] * W))
-    const hk2 = HALO2[rec.on] || "U", hk3 = HALO3[rec.on] || "m", ring2 = [], ring3 = []
-    const R2 = new Set()
-    for (const q of ring) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]) {
-      const nx = q[0] + dx, ny = q[1] + dy, ni = nx + ny * W
-      if (!inb(nx, ny) || P.has(ni) || R1.has(ni) || seen.has(ni)) continue
-      seen.add(ni); R2.add(ni)
-      if (!WALLSET.has(get(nx, ny)) || (nx & 1) || (ny & 1)) continue
-      ring2.push([nx, ny, hk2, get(nx, ny)])
-    }
-    for (const q of ring2) for (const [dx, dy] of [[2, 0], [-2, 0], [0, 2], [0, -2]]) {
-      const nx = q[0] + dx, ny = q[1] + dy, ni = nx + ny * W
-      if (!inb(nx, ny) || P.has(ni) || R1.has(ni) || seen.has(ni)) continue
-      seen.add(ni)
-      if (!WALLSET.has(get(nx, ny)) || ((nx + 2 * ny) % 5)) continue
-      ring3.push([nx, ny, hk3, get(nx, ny)])
-    }
-    for (const q of [...ring, ...ring2, ...ring3]) { rec.pts.push(q); if (rec.lit) put(q[0], q[1], q[2]) }
+    for (const q of ring) { rec.pts.push(q); if (rec.lit) put(q[0], q[1], q[2]) }
   }
   curWins = []
 }
@@ -654,7 +651,8 @@ function stack(o) {
       const base = side === "L" ? fam.L : fam.R
       if (o.groundWall && f === 0) { const k = o.groundWall(side, u, r, wW, h, x, y); if (k) return k }
       if (r === 0) return side === "L" ? fam.R : "A"                          // shadow under the plate above
-      if (r < wy0 || r >= wy0 + wh || u < 2) return base
+      const pane = wh >= 4 && pw <= 6
+      if (r < wy0 || r > wy0 + wh || (r === wy0 + wh && !pane) || u < 2) return base
       const rel = (u - 2) % per
       if (rel >= pw) return base
       const u0 = u - rel
@@ -667,10 +665,14 @@ function stack(o) {
         const lit = o.bright ? (fq < (o.litP ?? 0.85) && q < 0.92) : fq < 0.2 ? q < 0.1 : fq < 0.68 ? q < 0.94 : (col % 5 !== 4 && q < 0.55)      // dark floors, glowing bands, mixed floors
         const on = o.bright ? (o.glass === "white" ? (t < 0.3 ? "h" : "F") : t < 0.12 ? "Y" : t < 0.55 ? "h" : "y") : (t < 0.86 ? wcol : ["L", "h", "y", "v"][Math.floor(t * 40) % 4])
         rec = newWin(lit, on, !o.bright)
+        rec.v = ih(id * 17 + col, f * 5 + (side === "L" ? 3 : 4), 99)
         panes.set(pk, rec)
       }
-      rec.pts.push([x, y, rec.on, "w"])
-      return rec.lit ? rec.on : "w"
+      if (!pane) { rec.pts.push([x, y, rec.on, "w"]); return rec.lit ? rec.on : "w" }
+      if (r === wy0 + wh) return rec.lit ? (side === "L" ? fam.top : fam.L) : base      // a lighter sill under a lit window
+      const on = paneAt(rel, r - wy0, pw, wh, rec.on, true, rec.v), off = paneAt(rel, r - wy0, pw, wh, rec.on, false, rec.v)
+      if (on !== "A") rec.pts.push([x, y, on, off])
+      return rec.lit ? on : off
     }
     isoBox(A + ins, B + ins, Wd - 2 * ins, Dd - 2 * ins, hb, z, { L: mk("L"), R: mk("R") })
     const trimOn = o.trimAll ? (last ? true : ih(id, f, 9) < (o.trimP ?? 0.4)) : (o.trimB && f >= n - 2)
@@ -1185,7 +1187,7 @@ const drawBuilding = (bd) => {
     for (let k = 0; k < 3; k++) {
       const tw = Math.min(0.4 * k, (w - 0.7) / 2), td = Math.min(0.4 * k, (d - 0.7) / 2)
       const ma = a0 + tw, mb = b0 + td, mw = w - 2 * tw, md = d - 2 * td
-      st = stack({ a: ma, b: mb, w: mw, d: md, z0: z, n: ns[k], fh, fam, id: id * 3 + k, trims, pw: 3, pier: 2, wcol, trimB: trimB && k === 2, plantP: 0.5, vineP: 0.2, far })
+      st = stack({ a: ma, b: mb, w: mw, d: md, z0: z, n: ns[k], fh, fam, id: id * 3 + k, trims, pw: 4, pier: 2, wcol, trimB: trimB && k === 2, plantP: 0.5, vineP: 0.2, far })
       mods.push({ a: ma, b: mb, w: mw, d: md, z, h: ns[k] * fh, n: ns[k], fh })
       z = st.z
     }
@@ -1210,16 +1212,20 @@ const drawBuilding = (bd) => {
       if (r % fh === 0 && r > 0) return side === "L" ? lam.R : "l"
       if (u % 8 === 0) return side === "L" ? lam.R : "l"
       const col = Math.floor(u / 8), f = Math.floor(r / fh), rr = r % fh
-      if (u % 8 >= 2 && u % 8 <= 6 && rr >= 3 && rr <= 9 && u > 2 && u < wW - 3) {
+      if (u % 8 >= 2 && u % 8 <= 6 && rr >= 3 && rr <= 10 && u > 2 && u < wW - 3) {
         const pk = side + f + "_" + col
         let rec = panes.get(pk)
         if (!rec) {
           const q = ih(id * 131 + col, f * 7 + (side === "L" ? 1 : 2), 17), t = ih(id + col, f, 5)
           rec = newWin(ih(id, f, 3) < 0.28 ? q < 0.1 : ih(id, f, 3) < 0.6 ? q < 0.93 : (q < 0.5 && col % 4 !== 3), t < 0.86 ? wcol : "v", true)
+          rec.v = ih(id * 17 + col, f * 5 + (side === "L" ? 3 : 4), 99)
           panes.set(pk, rec)
         }
-        rec.pts.push([x, y, rec.on, "w"])
-        return rec.lit ? rec.on : "w"
+        const cu = u % 8 - 2, cr = rr - 3
+        if (cr === 8) return rec.lit ? lam.top : base
+        const on = paneAt(cu, cr, 5, 8, rec.on, true, rec.v), off = paneAt(cu, cr, 5, 8, rec.on, false, rec.v)
+        if (on !== "A") rec.pts.push([x, y, on, off])
+        return rec.lit ? on : off
       }
       const sheen = (1 - r / hh) * 0.55 + (side === "L" ? (1 - u / wW) * 0.25 : 0)
       return bay(x, y) < sheen * 0.7 ? (side === "L" ? lam.top : lam.L) : base
@@ -1340,16 +1346,18 @@ const drawBuilding = (bd) => {
       if (r === 0) return side === "L" ? fam.top : fam.L
       if (u < 2 || u >= wW - 3 || col < 0) return base
       if (fr === 0) return side === "L" ? fam.R : "A"
-      if (cu >= 1 && cu <= 3 && fr >= 2 && fr <= 5 && u < wW - 6) {
+      if (cu >= 0 && cu <= 3 && fr >= 1 && fr <= 5 && u < wW - 6) {
         const pk = side + f + "_" + col
         let rec = panes.get(pk)
         if (!rec) {
           const q = ih(id * 131 + col, f * 7 + (side === "L" ? 1 : 2), 17)
           rec = newWin(q < 0.8, GW[Math.floor(ih(id + col * 3, f, 5) * GW.length)], true)
+          rec.v = ih(id * 17 + col, f * 5 + (side === "L" ? 3 : 4), 99)
           panes.set(pk, rec)
         }
-        rec.pts.push([x, y, rec.on, "w"])
-        return rec.lit ? rec.on : "w"
+        const on = paneAt(cu, fr - 1, 4, 5, rec.on, true, rec.v), off = paneAt(cu, fr - 1, 4, 5, rec.on, false, rec.v)
+        if (on !== "A") rec.pts.push([x, y, on, off])
+        return rec.lit ? on : off
       }
       if (fr === 6 && cu <= 4) return fam.top
       return base
@@ -1380,7 +1388,7 @@ const drawBuilding = (bd) => {
     const { a: ma, b: mb, w: mw, d: md } = bd.fp
     const fh = 10, hh = 14 + (id % 4) * 3
     const n = Math.max(5, Math.round((H0 - hh) / fh))
-    const st = stack({ a: ma, b: mb, w: mw, d: md, n, fh, fam, id, trims, pw: 3, pier: 2, wcol, trimAll: true, trimP: 0.25, plantP: 0.35, vineP: 0.15, far, ins: 0.12 })
+    const st = stack({ a: ma, b: mb, w: mw, d: md, n, fh, fam, id, trims, pw: 4, pier: 2, wcol, trimAll: true, trimP: 0.25, plantP: 0.35, vineP: 0.15, far, ins: 0.12 })
     mods.push({ a: ma, b: mb, w: mw, d: md, z: 0, h: n * fh })
     const axis = id % 2 ? "a" : "b"
     slantRoof(ma, mb, mw, md, st.z, hh, fam, axis, accent)
@@ -1432,16 +1440,16 @@ const drawTower = () => {
   ISO = 8
   const F = FAMS
   // a stepped, wide base with plants
-  stack({ a: 90, b: 21, w: 4, d: 4, n: 3, fh: 8, plate: 2, ins: 0.22, fam: F.rose, id: 9901, bright: true, trimAll: true, trims: ["H", "n"], pw: 6, pier: 1, wh: 4, wy0: 1, litP: 0.8, plantP: 0.7 })
+  stack({ a: 88.75, b: 19.75, w: 6.5, d: 6.5, n: 3, fh: 8, plate: 2, ins: 0.22, fam: F.rose, id: 9901, bright: true, trimAll: true, trims: ["H", "n"], pw: 3, pier: 1, wh: 4, wy0: 1, litP: 0.8, plantP: 0.7 })
   // the white-lit body, windows in pale rows
-  stack({ a: 90.3, b: 21.3, w: 3.4, d: 3.4, z0: 24, n: 13, fh: 8, plate: 2, ins: 0.22, fam: F.terra, id: 9902, bright: true, trimAll: true, trims: ["h", "z"], pw: 4, pier: 1, wh: 4, wy0: 1, litP: 0.95, plantP: 0.55, glass: "white" })
+  stack({ a: 89.25, b: 20.25, w: 5.5, d: 5.5, z0: 24, n: 13, fh: 8, plate: 2, ins: 0.22, fam: F.terra, id: 9902, bright: true, trimAll: true, trims: ["h", "z"], pw: 3, pier: 1, wh: 4, wy0: 1, litP: 0.95, plantP: 0.55, glass: "white" })
   // a twisting stack of thick plates
-  stack({ a: 90.75, b: 21.75, w: 2.5, d: 2.5, z0: 128, n: 10, fh: 9, plate: 2, ins: 0.22, fam: F.mauve, id: 9903, bright: true, trimAll: true, trims: ["h", "H"], pw: 4, pier: 1, wh: 5, wy0: 1, litP: 0.7, plantP: 0.3, twist: 3 })
+  stack({ a: 89.75, b: 20.75, w: 4.5, d: 4.5, z0: 128, n: 10, fh: 9, plate: 2, ins: 0.22, fam: F.mauve, id: 9903, bright: true, trimAll: true, trims: ["h", "H"], pw: 3, pier: 1, wh: 4, wy0: 1, litP: 0.7, plantP: 0.3, twist: 3 })
   // a warm peach block with a lit crown line
-  stack({ a: 91, b: 22, w: 2, d: 2, z0: 218, n: 4, fh: 10, plate: 2, ins: 0.22, fam: F.peach, id: 9904, bright: true, trimAll: true, trims: ["z", "H"], pw: 4, pier: 1, wh: 6, wy0: 1, litP: 0.85, plantP: 0.2 })
+  stack({ a: 90.1, b: 21.1, w: 3.8, d: 3.8, z0: 218, n: 4, fh: 10, plate: 2, ins: 0.22, fam: F.peach, id: 9904, bright: true, trimAll: true, trims: ["z", "H"], pw: 3, pier: 1, wh: 4, wy0: 1, litP: 0.85, plantP: 0.2 })
   // a dark stack with cyan and pink trims
-  stack({ a: 91, b: 22, w: 2, d: 2, z0: 258, n: 12, fh: 9, plate: 2, ins: 0.22, fam: F.plum, id: 9905, bright: true, trimAll: true, trims: ["n", "H"], pw: 4, pier: 1, wh: 5, wy0: 1, litP: 0.6, trimP: 0.7, plantP: 0.15, twist: 2 })
-  const st = stack({ a: 91.2, b: 22.2, w: 1.6, d: 1.6, z0: 366, n: 2, fh: 9, plate: 2, ins: 0.22, fam: F.peach, id: 9906, bright: true, trimAll: true, trims: ["n", "H"], pw: 4, pier: 1, wh: 5, wy0: 1, litP: 0.95 })
+  stack({ a: 90.3, b: 21.3, w: 3.4, d: 3.4, z0: 258, n: 12, fh: 9, plate: 2, ins: 0.22, fam: F.plum, id: 9905, bright: true, trimAll: true, trims: ["n", "H"], pw: 3, pier: 1, wh: 4, wy0: 1, litP: 0.6, trimP: 0.7, plantP: 0.15, twist: 2 })
+  const st = stack({ a: 90.6, b: 21.6, w: 2.8, d: 2.8, z0: 366, n: 2, fh: 9, plate: 2, ins: 0.22, fam: F.peach, id: 9906, bright: true, trimAll: true, trims: ["n", "H"], pw: 3, pier: 1, wh: 4, wy0: 1, litP: 0.95 })
   const [cx, cy] = st.roofBox.pt(92, 23)
   // crown: an antenna with a red tip, and a small screen on a frame
   vlineK(cx + 6, cy - 16, 16, "E")
@@ -1771,51 +1779,46 @@ const drawHolo = (f) => {
 
 const drawTaxi = (f) => {
   const bob = Math.round(Math.sin((2 * Math.PI * f) / FRAMES))
-  ISO = 8      // the taxi keeps the finer grid
-  // draw it level into a scratch buffer, then shear it so it climbs toward the city
+  // drawn level in profile, nose to the right, into a scratch buffer; then sheared so the nose dives toward the city
   const saved = fb
   fb = new Uint8Array(W * H).fill(255)
-  const a0 = 20, b0 = 10, z0 = 5
-  const lights = []
-  // skids
-  isoBox(a0 + 0.2, b0 + 0.4, 0.45, 3.3, 3, 2, { L: () => "w", R: () => "w", T: () => "w" })
-  isoBox(a0 + 1.35, b0 + 0.4, 0.45, 3.3, 3, 2, { L: () => "w", R: () => "w", T: () => "w" })
-  // body: the short rear face looks down-left, the long side down-right
-  const body = isoBox(a0, b0, 2.2, 4.6, 8, z0, {
-    L: (u, r, wW, h) => {
-      if (r === h - 1) return "w"
-      if (r >= 2 && r <= 4 && (u >= 1 && u <= 3 || u >= wW - 4 && u <= wW - 2)) { lights.push([u, r]); return "x" }
-      if (r === 3 && u >= 6 && u <= 9) return "W"
-      return u === 0 ? "h" : "Y"
-    },
-    R: (u, r, wW, h) => (r === h - 1 ? "w" : r === 0 ? "h" : u > wW - 3 ? "U" : r > h - 3 ? "U" : "Y"),
-    T: (x, y, i) => ((i.low || i.up) ? "h" : "Y"),
-  })
-  // cabin and roof sign
-  isoBox(a0 + 0.45, b0 + 0.9, 1.1, 2.2, 6, z0 + 7, {
-    L: (u, r, wW, h) => (r === 0 || r === h - 1 || u < 1 || u > wW - 2 ? "Y" : (r === 2 && u > 2 && u < 5 ? "n" : "I")),
-    R: (u, r, wW, h) => (r === 0 || r === h - 1 || u % 9 === 0 ? "Y" : (r === 2 && u % 9 === 2 ? "n" : "I")),
-    T: (x, y, i) => ((i.low || i.up) ? "W" : "h"),
-  })
-  isoBox(a0 + 0.7, b0 + 1.5, 0.6, 1.0, 3, z0 + 13, { L: () => "W", R: (u, r) => (r === 1 ? "H" : "W"), T: () => "W" })
-  // collect the sprite, shear it, place it
+  const K = 1.12, X = 20, Y = 20
+  const pt = (x, y) => [Math.round(X + x * K), Math.round(Y + y * K)]
+  const poly = (pts, fn) => fillPoly(pts.map(([x, y]) => pt(x, y)), fn)
+  // body: squared-off tail, cabin toward the back, sloped windshield, a hood that tapers and drops to the nose
+  poly([[0, 8], [9, 8], [10, 2], [29, 2], [37, 8], [45, 10], [52, 13], [54, 15], [51, 17], [2, 17], [0, 16]], (x, y) => (y < pt(0, 3)[1] ? "h" : "Y"))
+  poly([[0, 8], [0, 4], [5, 4], [6, 8]], () => "Y")                        // rear spoiler
+  lineK(...pt(0, 4), ...pt(5, 4), "h"); lineK(...pt(0, 6), ...pt(5, 6), "E")
+  poly([[11, 3.5], [28, 3.5], [35, 8], [11, 8]], (x, y) => "I")             // cabin glass
+  lineK(...pt(20, 3.5), ...pt(20, 8), "Y")                                // door pillar
+  lineK(...pt(13, 4.5), ...pt(18, 4.5), "n"); lineK(...pt(23, 4.5), ...pt(27, 4.5), "n")
+  lineK(...pt(30, 4), ...pt(34, 7.5), "n")                                // windshield glint
+  lineK(...pt(1, 9), ...pt(46, 9), "h")                                   // beltline
+  lineK(...pt(2, 16), ...pt(50, 16), "E")                                 // darker belly
+  lineK(...pt(2, 17), ...pt(50, 17), "I")
+  // roof sign
+  const [sx, sy] = pt(15, -1)
+  rectK(sx, sy, 11, 4, "W"); for (let i = 1; i < 11; i += 3) put(sx + i, sy + 1, "x"); hlineK(sx, sy + 3, 11, "h")
+  // tail lights on the squared-off back, headlights on the nose
+  const tail = [pt(0, 10), pt(0, 13)]
+  for (const [tx, ty] of tail) rectK(tx, ty, 2, 2, "x")
+  const head = [pt(52, 12), pt(47, 11)]
+  rectK(head[0][0], head[0][1], 3, 3, "<"); rectK(head[1][0], head[1][1], 3, 2, "<")
   const sc = fb
   fb = saved
   let minx = 1e9, maxx = -1, miny = 1e9, maxy = -1
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (sc[y * W + x] !== 255) { minx = Math.min(minx, x); maxx = Math.max(maxx, x); miny = Math.min(miny, y); maxy = Math.max(maxy, y) }
-  const SL = 0.27, X0 = 42, Y0top = 226
-  const shear = (x) => Math.floor((x - minx) * SL)
-  const dest = (x, y) => [X0 + x - minx, Y0top + (y - miny) - shear(x) + (shear(maxx) ) + bob - 12]
-  // the tail-light trails run back off the left edge, thin and red, shimmering every other frame pair
+  const SL = 0.22, X0 = 36, Y0 = 212
+  const dest = (x, y) => [X0 + x - minx, Y0 + (y - miny) + Math.floor((x - minx) * SL) + bob]
   const ph = f >> 1
-  const lamps = []
-  for (const [u, r] of [[2, 3], [13, 3]]) { const [x, y] = body.L(u, r); lamps.push(dest(x, y)) }
-  for (const [lx, ly] of lamps) {
+  // trails start at the two tail lights and stream up and back to the left edge
+  for (const [tx, ty] of tail) {
+    const [lx, ly] = dest(tx, ty + 1)
     const pts = []
     for (let i = 0; i < 120 && lx - i >= 0; i++) {
       if (i > 55 && i % 3 === 0) continue
       if (i > 80 && i % 2 === 0) continue
-      pts.push([lx - 1 - i, Math.round(ly + 2 + i * 0.36)])
+      pts.push([lx - 1 - i, Math.round(ly - i * SL)])
     }
     for (const [xx, yy] of pts) put(xx, yy, "x")
     for (const [xx, yy] of pts) { if (((xx + ph) & 1) === 0) put(xx, yy - 1, "C"); if (((xx + ph) & 3) === 1) put(xx, yy + 1, "5") }
@@ -1826,9 +1829,10 @@ const drawTaxi = (f) => {
     const [dx, dy] = dest(x, y)
     if (inb(dx, dy)) fb[dy * W + dx] = v
   }
-  // hover glow under the skids
-  for (const [lx, ly] of lamps) for (let k = -2; k <= 2; k++) if (bay(lx + k, ly) < 0.6) put(lx + k - 1, ly + 3, "C")
-  ISO = 16
+  // hover glow under the belly, and a short soft beam ahead of the headlights
+  for (let x = minx + 4; x < maxx - 4; x += 1) { const [dx, dy] = dest(x, maxy + 2); if (((x + ph) & 3) < 3) { put(dx, dy + 1, "C"); if ((x & 1) === 0) put(dx, dy + 2, "5") } }
+  const [hx, hy] = dest(head[0][0] + 2, head[0][1])
+  for (let i = 1; i <= 6; i++) for (let j = -1; j <= 1; j++) if (((i + j) & 1) === 0 && Math.abs(j) <= (i > 3 ? 1 : 0) + (i > 0 ? 0 : 0)) put(hx + i, hy + j + Math.round(i * SL), i > 3 ? "v" : "<")
 }
 const wlast = (arr) => arr.length ? arr[arr.length - 1] : [13, 3]
 

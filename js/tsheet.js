@@ -14,7 +14,7 @@
 //     el is moved into the sheet and put back where it was when the sheet lets it go. peek / half: the body's height in px
 //     at that detent (a number or a function), instead of the defaults (a third, half of the screen).
 //   TSHEET.close(el)   (el left out: whatever is open)   TSHEET.park(el)   TSHEET.setDetent(d)
-//   TSHEET.isOpen(el)  TSHEET.isParked(el)  TSHEET.detent  TSHEET.on (false on a desktop: nothing should call it there)
+//   TSHEET.isOpen(el)  TSHEET.isParked(el)  TSHEET.covered()  TSHEET.room()  TSHEET.detent  TSHEET.on (false on a desktop: nothing should call it there)
 // Loaded in the head, right after touch.js (it needs TOUCH.on).
 'use strict';
 const TSHEET = (() => {
@@ -44,8 +44,10 @@ const TSHEET = (() => {
   const safe = () => { if (!probe) return { t: 0, b: 0 }; const cs = getComputedStyle(probe); return { t: parseFloat(cs.height) || 0, b: parseFloat(cs.paddingBottom) || 0 }; };
   // the body's height at each detent (the handle's row and the home bar's strip come on top)
   const val = v => typeof v === 'function' ? v() : v;
+  // the most the body can be (at full): the screen less the top bar's room, the handle and the safe areas
+  const room = () => { const s = safe(); return Math.max(120, vh() - s.t - 56 - BAR - s.b); };
   function bodyH(d){
-    const s = safe(), max = Math.max(120, vh() - s.t - 56 - BAR - s.b);
+    const max = room();
     let h;
     if (d === 'full') h = max;
     else if (d === 'fit') h = body.firstElementChild ? body.firstElementChild.scrollHeight : max/2;
@@ -156,6 +158,7 @@ const TSHEET = (() => {
   S.isOpen = el => !!cur && (!el || cur.el === el);
   S.isParked = el => !!parked && (!el || parked.el === el);
   S.covered = () => !!cur;
+  S.room = room;   // (an owner sizing what it puts in, so it fits at a detent: the person cam's feed and log)
 
   /* ---------- the dock's height, for the chips and strips that sit just above it ---------- */
   function dockH(){

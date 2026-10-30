@@ -206,6 +206,6 @@ if (wx) wx.addEventListener('click', () => lsSet(K + 'wxset', '1'));
     ['Pick a height', 'Shift'], ['Remove', 'Right-click · X'], ['Center view', 'H'], ['Cancel', 'Esc']].map(([a, b]) => '<dt>' + a + '</dt><dd>' + b + '</dd>').join('');
   const t = document.querySelector('.ctlpanel dl.touchonly');
   if (t) t.innerHTML = [['Move', 'Drag'], ['Zoom', 'Pinch'], ['Rotate', 'Twist two fingers'], ['Build', 'Tap a zone, then a plot'], ['Stack', 'Tap a roof'],
-    ['One floor', 'Double tap'], ['Pick a height', 'Double tap, drag up'], ['Next zone', 'Swipe the zone'],
+    ['One floor', 'Double tap'], ['Pick a height', 'Double tap, drag up'], ['Next zone', 'Swipe the zone card up or down'],
     ['Grow the platform', 'Tap the sky'], ['Remove', 'Press and hold'], ['Delete mode', '✕']].map(([a, b]) => '<dt>' + a + '</dt><dd>' + b + '</dd>').join(''); }
 })();

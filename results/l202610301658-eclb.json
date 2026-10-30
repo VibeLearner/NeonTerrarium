@@ -1,0 +1,846 @@
+{
+ "id": "L202610301658-eclb",
+ "kind": "load",
+ "started": "2026-10-30T16:58:38.270Z",
+ "page": "https://vibelearner.github.io/NeonTerrarium/m.html",
+ "swControlled": false,
+ "marks": {
+  "title": 1593,
+  "scripts": 1604,
+  "allFiles": 1704,
+  "worker": 2122,
+  "firstPlot": 2056,
+  "allPlots": 4822,
+  "people": 4895,
+  "open": 29155,
+  "played": 36121
+ },
+ "files": {
+  "n": 134,
+  "kb": 4408,
+  "bodyKb": 6626,
+  "fromPhone": 6,
+  "by": {
+   "script": {
+    "n": 75,
+    "bytes": 905238
+   },
+   "link": {
+    "n": 6,
+    "bytes": 2626
+   },
+   "other": {
+    "n": 2,
+    "bytes": 2751
+   },
+   "fetch": {
+    "n": 40,
+    "bytes": 1349778
+   },
+   "iframe": {
+    "n": 1,
+    "bytes": 706554
+   },
+   "img": {
+    "n": 10,
+    "bytes": 1547028
+   }
+  },
+  "big": [
+   {
+    "u": "/NeonTerrarium/assets/audio/sfx/mega-arrive.wav",
+    "kb": 864,
+    "ms": 496
+   },
+   {
+    "u": "/NeonTerrarium/furnish.html?v=2026-10-30ft#build",
+    "kb": 690,
+    "ms": 1002
+   },
+   {
+    "u": "/NeonTerrarium/assets/title/gb-depth-wide.webp?v=2026-10-30",
+    "kb": 530,
+    "ms": 421
+   },
+   {
+    "u": "/NeonTerrarium/assets/title/gb-normal-wide.webp?v=2026-10-30",
+    "kb": 273,
+    "ms": 516
+   },
+   {
+    "u": "/NeonTerrarium/assets/title/gb-color-wide.webp?v=2026-10-30",
+    "kb": 250,
+    "ms": 351
+   },
+   {
+    "u": "/NeonTerrarium/assets/title/room-wide-morning.webp?v=2026-10-30D",
+    "kb": 227,
+    "ms": 370
+   },
+   {
+    "u": "/NeonTerrarium/assets/audio/sfx/radio-on.wav",
+    "kb": 189,
+    "ms": 345
+   },
+   {
+    "u": "/NeonTerrarium/assets/title/gb-bounce-wide.webp?v=2026-10-30",
+    "kb": 179,
+    "ms": 457
+   },
+   {
+    "u": "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js",
+    "kb": 118,
+    "ms": 185
+   },
+   {
+    "u": "/NeonTerrarium/min/js/mega.js?v=4a99422d19",
+    "kb": 95,
+    "ms": 669
+   }
+  ],
+  "htmlMs": 385,
+  "redirectMs": 0
+ },
+ "device": {
+  "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+  "cores": 8,
+  "memGB": 8,
+  "dpr": 2,
+  "inner": [
+   1710,
+   876
+  ],
+  "gpu": null,
+  "phoneMode": false,
+  "connection": {
+   "type": "4g",
+   "down": 10,
+   "rtt": 250,
+   "saveData": false
+  }
+ },
+ "city": {
+  "plots": 363,
+  "built": 171
+ },
+ "smooth": {
+  "frames": 1989,
+  "over50": 5,
+  "over100": 2,
+  "worst": 167,
+  "long": [
+   {
+    "t": 42071,
+    "ms": 67,
+    "title": false,
+    "cool": 0,
+    "loading": false,
+    "merging": 2,
+    "stageQ": 1,
+    "people": false,
+    "scan": true,
+    "scanWarm": true,
+    "cache": "reuse",
+    "scrolling": 0
+   },
+   {
+    "t": 47321,
+    "ms": 167,
+    "title": false,
+    "cool": 0,
+    "loading": false,
+    "merging": 14,
+    "stageQ": 0,
+    "people": false,
+    "scan": true,
+    "scanWarm": true,
+    "cache": "reuse",
+    "scrolling": 0
+   },
+   {
+    "t": 50605,
+    "ms": 50,
+    "title": false,
+    "cool": 0,
+    "loading": false,
+    "merging": 15,
+    "stageQ": 0,
+    "people": false,
+    "scan": true,
+    "scanWarm": true,
+    "cache": "reuse",
+    "scrolling": 0
+   },
+   {
+    "t": 57205,
+    "ms": 67,
+    "title": false,
+    "cool": 0,
+    "loading": false,
+    "merging": 0,
+    "stageQ": 0,
+    "people": false,
+    "scan": true,
+    "scanWarm": true,
+    "cache": "reuse",
+    "scrolling": 0
+   },
+   {
+    "t": 60205,
+    "ms": 167,
+    "title": false,
+    "cool": 0,
+    "loading": false,
+    "merging": 1,
+    "stageQ": 0,
+    "people": false,
+    "scan": true,
+    "scanWarm": true,
+    "cache": "reuse",
+    "scrolling": 0
+   }
+  ],
+  "scripts": {
+   "/NeonTerrarium/min/js/input.js endPtr": {
+    "n": 3,
+    "ms": 278,
+    "max": 155
+   },
+   "/NeonTerrarium/min/js/main.js frame": {
+    "n": 4,
+    "ms": 77,
+    "max": 38
+   },
+   "/NeonTerrarium/min/js/furnish.js FrameRequestCallback": {
+    "n": 1,
+    "ms": 68,
+    "max": 68
+   },
+   "/NeonTerrarium/furnish.html loop": {
+    "n": 1,
+    "ms": 36,
+    "max": 36
+   },
+   "/NeonTerrarium/furnish.html Worker.onmessage": {
+    "n": 1,
+    "ms": 26,
+    "max": 26
+   }
+  },
+  "perSec": [
+   [
+    -1,
+    1,
+    0
+   ],
+   [
+    0,
+    60,
+    18
+   ],
+   [
+    1,
+    60,
+    18
+   ],
+   [
+    2,
+    60,
+    17
+   ],
+   [
+    3,
+    60,
+    17
+   ],
+   [
+    4,
+    60,
+    17
+   ],
+   [
+    5,
+    60,
+    18
+   ],
+   [
+    6,
+    60,
+    18
+   ],
+   [
+    7,
+    60,
+    18
+   ],
+   [
+    8,
+    60,
+    18
+   ],
+   [
+    9,
+    57,
+    67
+   ],
+   [
+    10,
+    60,
+    18
+   ],
+   [
+    11,
+    60,
+    18
+   ],
+   [
+    12,
+    60,
+    18
+   ],
+   [
+    13,
+    60,
+    18
+   ],
+   [
+    14,
+    51,
+    167
+   ],
+   [
+    15,
+    60,
+    18
+   ],
+   [
+    16,
+    60,
+    18
+   ],
+   [
+    17,
+    60,
+    17
+   ],
+   [
+    18,
+    58,
+    50
+   ],
+   [
+    19,
+    59,
+    33
+   ],
+   [
+    20,
+    60,
+    18
+   ],
+   [
+    21,
+    60,
+    17
+   ],
+   [
+    22,
+    60,
+    18
+   ],
+   [
+    23,
+    60,
+    18
+   ],
+   [
+    24,
+    56,
+    67
+   ],
+   [
+    25,
+    60,
+    18
+   ],
+   [
+    26,
+    60,
+    17
+   ],
+   [
+    27,
+    49,
+    167
+   ],
+   [
+    28,
+    60,
+    18
+   ],
+   [
+    29,
+    60,
+    18
+   ],
+   [
+    30,
+    60,
+    18
+   ],
+   [
+    31,
+    60,
+    17
+   ],
+   [
+    32,
+    60,
+    18
+   ]
+  ],
+  "fn": {
+   "applyRenderRes": {
+    "n": 1517,
+    "ms": 3,
+    "max": 0.2
+   },
+   "stageStep": {
+    "n": 1515,
+    "ms": 7,
+    "max": 3.2
+   },
+   "flushSolid": {
+    "n": 1515,
+    "ms": 74,
+    "max": 4.5
+   },
+   "pickAt": {
+    "n": 134,
+    "ms": 142,
+    "max": 68.2
+   },
+   "targetOf": {
+    "n": 124,
+    "ms": 0,
+    "max": 0.1
+   },
+   "solidStep": {
+    "n": 115,
+    "ms": 61,
+    "max": 3.9
+   },
+   "scNote": {
+    "n": 415,
+    "ms": 40,
+    "max": 17.2
+   },
+   "holdRegion": {
+    "n": 49,
+    "ms": 0,
+    "max": 0
+   },
+   "stageFinishNear": {
+    "n": 68,
+    "ms": 0,
+    "max": 0
+   },
+   "finishAnimsOn": {
+    "n": 130,
+    "ms": 0,
+    "max": 0.1
+   },
+   "rebuildCellPost": {
+    "n": 71,
+    "ms": 11,
+    "max": 5.6
+   },
+   "rebuildCell": {
+    "n": 64,
+    "ms": 166,
+    "max": 46
+   },
+   "pmRestoreSync": {
+    "n": 20,
+    "ms": 223,
+    "max": 40.2
+   },
+   "markSolidRegion": {
+    "n": 12,
+    "ms": 0,
+    "max": 0.1
+   },
+   "refresh": {
+    "n": 6,
+    "ms": 248,
+    "max": 146.7
+   },
+   "sfx.play": {
+    "n": 4,
+    "ms": 2,
+    "max": 2
+   },
+   "startAnim": {
+    "n": 49,
+    "ms": 4,
+    "max": 2.6
+   },
+   "applyTarget": {
+    "n": 2,
+    "ms": 68,
+    "max": 66.2
+   },
+   "paintAt": {
+    "n": 2,
+    "ms": 69,
+    "max": 66.6
+   },
+   "rebuildConnections": {
+    "n": 6,
+    "ms": 1,
+    "max": 0.3
+   },
+   "stageTake": {
+    "n": 7,
+    "ms": 0,
+    "max": 0.1
+   },
+   "rebuildRegion": {
+    "n": 11,
+    "ms": 23,
+    "max": 6.5
+   },
+   "releaseRegion": {
+    "n": 49,
+    "ms": 7,
+    "max": 3.7
+   },
+   "rebuildMega": {
+    "n": 2,
+    "ms": 63,
+    "max": 51.4
+   },
+   "spawnMegaAt": {
+    "n": 2,
+    "ms": 210,
+    "max": 154.8
+   }
+  },
+  "slowCalls": [
+   [
+    42022,
+    "pmRestoreSync",
+    40
+   ],
+   [
+    42020,
+    "rebuildCell",
+    46
+   ],
+   [
+    42003,
+    "refresh",
+    63
+   ],
+   [
+    42003,
+    "applyTarget",
+    66
+   ],
+   [
+    42002,
+    "paintAt",
+    67
+   ],
+   [
+    47167,
+    "rebuildCell",
+    18
+   ],
+   [
+    47191,
+    "pmRestoreSync",
+    20
+   ],
+   [
+    47190,
+    "rebuildCell",
+    22
+   ],
+   [
+    47223,
+    "pmRestoreSync",
+    22
+   ],
+   [
+    47222,
+    "rebuildCell",
+    25
+   ],
+   [
+    47246,
+    "rebuildMega",
+    51
+   ],
+   [
+    47158,
+    "refresh",
+    147
+   ],
+   [
+    47151,
+    "spawnMegaAt",
+    155
+   ],
+   [
+    50552,
+    "pmRestoreSync",
+    17
+   ],
+   [
+    50552,
+    "scNote",
+    17
+   ],
+   [
+    50572,
+    "refresh",
+    34
+   ],
+   [
+    50551,
+    "spawnMegaAt",
+    56
+   ],
+   [
+    57124,
+    "pmRestoreSync",
+    20
+   ],
+   [
+    57124,
+    "pickAt",
+    20
+   ],
+   [
+    57148,
+    "pmRestoreSync",
+    34
+   ],
+   [
+    57148,
+    "pickAt",
+    68
+   ]
+  ],
+  "parts": [
+   {
+    "t": 47154,
+    "gap": 166.9,
+    "up": 7431,
+    "links": 1,
+    "dels": 23,
+    "laps": [
+     [
+      "color + shadow redraw",
+      18.4
+     ],
+     [
+      "scene upkeep",
+      1
+     ],
+     [
+      "  upkeep: merges",
+      0.4
+     ],
+     [
+      "people",
+      0.3
+     ],
+     [
+      "  upkeep: matrices",
+      0.3
+     ],
+     [
+      "  build animations",
+      0.2
+     ],
+     [
+      "megastructures, animations",
+      0.2
+     ],
+     [
+      "  people: the loop over everyone",
+      0.2
+     ]
+    ]
+   },
+   {
+    "t": 42004,
+    "gap": 66.9,
+    "up": 426,
+    "links": 1,
+    "dels": 0,
+    "laps": [
+     [
+      "color + shadow redraw",
+      9.9
+     ],
+     [
+      "scene upkeep",
+      0.8
+     ],
+     [
+      "people",
+      0.4
+     ],
+     [
+      "  upkeep: edit sync",
+      0.3
+     ],
+     [
+      "  people: the loop over everyone",
+      0.2
+     ],
+     [
+      "  upkeep: tiers",
+      0.2
+     ],
+     [
+      "  upkeep: matrices",
+      0.2
+     ],
+     [
+      "time of day, interface",
+      0.1
+     ]
+    ]
+   },
+   {
+    "t": 57138,
+    "gap": 66.6,
+    "up": 0,
+    "links": 0,
+    "dels": 0,
+    "laps": [
+     [
+      "color",
+      1.5
+     ],
+     [
+      "  megastructure: logistics",
+      0.3
+     ],
+     [
+      "megastructures, animations",
+      0.3
+     ],
+     [
+      "people",
+      0.3
+     ],
+     [
+      "  upkeep: matrices",
+      0.2
+     ],
+     [
+      "scene upkeep",
+      0.2
+     ],
+     [
+      "time of day, interface",
+      0.1
+     ],
+     [
+      "vehicles, highways, metros",
+      0.1
+     ]
+    ]
+   },
+   {
+    "t": 50555,
+    "gap": 50.1,
+    "up": 2065,
+    "links": 0,
+    "dels": 23,
+    "laps": [
+     [
+      "color + shadow redraw",
+      4.4
+     ],
+     [
+      "scene upkeep",
+      0.9
+     ],
+     [
+      "  upkeep: merges",
+      0.3
+     ],
+     [
+      "people",
+      0.2
+     ],
+     [
+      "  upkeep: edit sync",
+      0.2
+     ],
+     [
+      "  upkeep: matrices",
+      0.2
+     ],
+     [
+      "time of day, interface",
+      0.1
+     ],
+     [
+      "  build animations",
+      0.1
+     ]
+    ]
+   }
+  ],
+  "partsTotal": {
+   "time of day, interface": 0.4,
+   "vehicles, highways, metros": 0.3,
+   "  vehicle shadows": 0,
+   "  build animations": 0.3,
+   "  megastructure: police": 0.1,
+   "  megastructure: forcefield": 0,
+   "megastructures, animations": 0.7,
+   "  people: decisions": 0.1,
+   "  people: removing the gone": 0.1,
+   "  people: bots, lurkers, clubs": 0.1,
+   "  people: bumps": 0,
+   "  people: stall scan": 0,
+   "  people: lifts": 0,
+   "  people: the loop over everyone": 0.6,
+   "people": 1.2,
+   "steam, rain, camera": 0.2,
+   "  upkeep: later": 0,
+   "  upkeep: staged builds": 0,
+   "  upkeep: loading": 0,
+   "  upkeep: plot arrays": 0,
+   "  upkeep: tiers": 0.4,
+   "  upkeep: edit sync": 0.7,
+   "  upkeep: merges": 0.8,
+   "  upkeep: never-seen": 0.1,
+   "  upkeep: matrices": 0.9,
+   "scene upkeep": 2.9,
+   "  view: far order": 0,
+   "  view: side arc": 0,
+   "  view: culling": 0,
+   "  view: shadows": 0.1,
+   "color + shadow redraw": 32.7,
+   "pass setup": 0.3,
+   "night lights": 0.1,
+   "clouds": 0,
+   "soft effects (half resolution)": 0.2,
+   "composite": 0.1,
+   "bloom and grade": 0,
+   "to screen": 0.2,
+   "  megastructure: logistics": 0.3,
+   "  megastructure: lidar": 0,
+   "color": 1.5
+  }
+ }
+}

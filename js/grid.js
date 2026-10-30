@@ -11,6 +11,8 @@
 //  - the Acoustic Panel (grid_panel.js), opened by that button or by double-clicking the building, with every control;
 //  - the programs (a program is a set of layers: the neuro-phrase feed, the sedation bed, the auto-governor);
 //  - the volume (Settings, Sound), the hold while the Overseer's desk is up, and what the player last set.
+// On a touch screen the player stays a pill (the pattern's name and hold/play); a tap on it opens the shared bottom sheet
+// (tsheet.js) with the trace, the cycles a minute, the controls at a thumb's size, the Acoustic Panel and the music volume.
 // The old object `music` is kept (volume, hold, update) so the rest of the game talks to the Grid the way it did the radio.
 const MUSIC_VOL_KEY = 'neonIsland.musicVolume', GRID_KEY = 'neonIsland.gridSettings2';   // (2: the defaults changed, so settings saved before them start over)
 const GRID_FADE_IN = 8, GRID_FADE_QUICK = .6, GRID_FADE_OUT = 1.5;   // seconds
@@ -211,8 +213,53 @@ const music = (() => {
   // ---------- the player in the corner ----------
   const ui = (() => {
     const deck = $q('gridDeck');
-    if (!deck) return { show(){}, paused(){}, program(){}, text(){} };
+    if (!deck) return { show(){}, paused(){}, program(){}, text(){}, draw(){}, sheetOn: () => false, drawSheet(){} };
     const playBtn = $q('gdPlay'), prog$ = $q('gdProg'), chord$ = $q('gdChord'), clock$ = $q('gdClock'), curve = $q('gdCurve'), barsCv = $q('gdBars');
+    // ---------- the sheet, on a touch screen ----------
+    const TS = typeof TSHEET !== 'undefined' && TSHEET.on ? TSHEET : null;
+    let sh = null, sCurve = null, sBars = null, sPlay = null, sProg = null, sBpm = null, sChord = null, sVol = null, sVolOut = null;
+    const volIn = $q('musicVol');
+    const showVol = () => { if (!sVol) return; sVol.value = String(volume); sVolOut.textContent = Math.round(volume*100) + '%'; };
+    function makeSheet(){
+      sh = document.createElement('div'); sh.className = 'gd-sheet'; sh.setAttribute('role', 'group'); sh.setAttribute('aria-label', 'Psycho-Acoustic Grid');
+      sh.innerHTML = '<div class="gs-top"><b class="gs-prog"></b><span class="gs-bpm"><b></b><small>cycles/min</small></span></div><div class="gs-chord"></div>' +
+        '<canvas class="gs-cv gs-curve" width="300" height="56"></canvas><canvas class="gs-cv gs-bars" width="300" height="30"></canvas>' +
+        '<div class="gs-ctl"><button class="gs-prev" type="button" aria-label="Previous carrier pattern"></button><button class="gs-play" type="button"></button>' +
+        '<button class="gs-next" type="button" aria-label="Next carrier pattern"></button><button class="gs-panel" type="button">Acoustic panel</button></div>' +
+        '<label class="gs-vol"><span>Music</span><input type="range" min="0" max="1" step="0.05" aria-label="Music volume"><output></output></label>';
+      sCurve = sh.querySelector('.gs-curve'); sBars = sh.querySelector('.gs-bars'); sPlay = sh.querySelector('.gs-play');
+      sProg = sh.querySelector('.gs-prog'); sBpm = sh.querySelector('.gs-bpm b'); sChord = sh.querySelector('.gs-chord');
+      sVol = sh.querySelector('input'); sVolOut = sh.querySelector('output');
+      // the same glyphs as the corner player's buttons
+      sh.querySelector('.gs-prev').innerHTML = $q('gdPrev').innerHTML; sPlay.innerHTML = playBtn.innerHTML; sh.querySelector('.gs-next').innerHTML = $q('gdNext').innerHTML;
+      sh.querySelector('.gs-prev').addEventListener('click', () => back());
+      sh.querySelector('.gs-next').addEventListener('click', () => skip());
+      sPlay.addEventListener('click', () => togglePause());
+      sh.querySelector('.gs-panel').addEventListener('click', () => { TS.close(sh); PANEL.show(); });   // (the panel is full-screen work: the sheet goes first)
+      // the volume is the one in Settings: moving either moves both
+      sVol.addEventListener('input', () => { if (volIn){ volIn.value = sVol.value; volIn.dispatchEvent(new Event('input', { bubbles: true })); } else setVolume(+sVol.value); showVol(); });
+      if (volIn) volIn.addEventListener('input', showVol);
+    }
+    function sizeSheet(){ for (const c of [sCurve, sBars]){ const w = Math.max(120, Math.floor(c.clientWidth)); if (c.width !== w) c.width = w; } }   // (one canvas pixel to a CSS pixel, as the corner player draws)
+    function openSheet(){
+      if (!sh) makeSheet();
+      if (TS.isOpen(sh)){ TS.close(sh); return; }
+      TS.open(sh, { key: 'music', title: 'Psycho-Acoustic Grid', detent: 'fit', detents: ['fit'] });
+      sizeSheet(); showVol(); syncSheet();
+    }
+    function syncSheet(){
+      if (!sh) return;
+      sProg.textContent = prog$.textContent; sProg.title = prog$.title || '';
+      sBpm.textContent = clock$.textContent; sChord.textContent = chord$.textContent;
+      const p = playBtn.classList.contains('paused'); sPlay.classList.toggle('paused', p); sPlay.setAttribute('aria-label', playBtn.getAttribute('aria-label') || (p ? 'Resume broadcast' : 'Hold broadcast'));
+    }
+    if (TS){
+      // a tap on the pill (anywhere but its play button) opens the sheet; this runs before touch.js's own tap, which would unfold the corner player
+      deck.addEventListener('click', e => { if (!TS || e.target.closest('button')) return; e.stopPropagation(); deck.classList.add('tmin'); openSheet(); }, true);
+      addEventListener('resize', () => { if (sh && TS.isOpen(sh)) sizeSheet(); });
+      // the log ticker sits beside the pill, from wherever the pill ends
+      if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => { const r = deck.getBoundingClientRect(); document.documentElement.style.setProperty('--gdeck-r', (r.width ? Math.ceil(r.right) : 0) + 'px'); }).observe(deck);
+    }
     $q('gdPrev').addEventListener('click', () => back());
     $q('gdNext').addEventListener('click', () => skip());
     PNL.el.querySelector('#g-progressionSelect').addEventListener('change', () => ui.pattern());
@@ -223,17 +270,19 @@ const music = (() => {
     function place(){ requestAnimationFrame(() => { const r = deck.getBoundingClientRect(); if (r.height) document.documentElement.style.setProperty('--gdeck-b', Math.ceil(r.bottom) + 'px'); }); }
     addEventListener('resize', place);
     return {
-      show(v){ deck.classList.toggle('live', v); deck.setAttribute('aria-hidden', v ? 'false' : 'true'); deck.inert = !v; document.documentElement.classList.toggle('gdeck-on', v); place(); },
+      show(v){ if (!v && sh && TS) TS.close(sh); deck.classList.toggle('live', v); deck.setAttribute('aria-hidden', v ? 'false' : 'true'); deck.inert = !v; document.documentElement.classList.toggle('gdeck-on', v); place(); },
       paused(p){ const eb = $q('g-engageSwitch'), el = $q('g-engageLed'); if (eb){ eb.classList.toggle('on', p); eb.lastChild.textContent = p ? 'Resume' : 'Hold'; } if (el) el.classList.toggle('on-emerald', !p);
-        playBtn.classList.toggle('paused', p); playBtn.setAttribute('aria-label', p ? 'Resume broadcast' : 'Hold broadcast'); playBtn.title = p ? 'Resume' : 'Hold'; deck.classList.toggle('held', p); },
-      pattern(){ const ps = progSel(), o = ps && ps.options[ps.selectedIndex]; if (!o) return; const full = o.textContent.trim(); prog$.textContent = full.split('//').pop().trim(); prog$.title = full; },
+        playBtn.classList.toggle('paused', p); playBtn.setAttribute('aria-label', p ? 'Resume broadcast' : 'Hold broadcast'); playBtn.title = p ? 'Resume' : 'Hold'; deck.classList.toggle('held', p); syncSheet(); },
+      pattern(){ const ps = progSel(), o = ps && ps.options[ps.selectedIndex]; if (!o) return; const full = o.textContent.trim(); prog$.textContent = full.split('//').pop().trim(); prog$.title = full; syncSheet(); },
       program(){ const p = GRID_PROGRAMS[prog]; const pp = $q('gpProg'); if (pp) pp.textContent = p.name.toUpperCase(); PANEL.syncPrograms(); },
       text(){
         const c = E.chord, name = c ? c.name : '', mood = E.mood || '', bpm = E.bpm;
         const s = name + '|' + bpm; if (s === lastTxt) return; lastTxt = s;
-        chord$.textContent = name ? 'Carrier ' + name : ''; clock$.textContent = String(bpm);
+        chord$.textContent = name ? 'Carrier ' + name : ''; clock$.textContent = String(bpm); syncSheet();
       },
       draw(t, dt){ if (!deck.classList.contains('live')) return; drawSignal(curve, barsCv, 'deck', PAL_DECK, t, dt); },
+      sheetOn: () => !!(sh && TS && TS.isOpen(sh)),
+      drawSheet(t, dt){ if (deck.classList.contains('live')) drawSignal(sCurve, sBars, 'deck', PAL_DECK, t, dt); },
     };
   })();
 
@@ -345,9 +394,12 @@ const music = (() => {
     if (!on && !PANEL.open) return;
     if (accD < 1/30) return;   // 30 frames a second is plenty for a trace
     const d = accD; accD = 0; rt = (now - t0)/1000;
+    // (on a touch screen, the player folded to its pill shows no trace or bars: they aren't drawn then, only the sheet's when it's up.
+    //  With neither up and the panel shut, the music isn't even read for them)
+    const folded = typeof TOUCH !== 'undefined' && TOUCH.on && deckFolded(), sheet = folded && ui.sheetOn();
+    if (folded && !sheet && !PANEL.open){ textT -= d; if (textT <= 0){ textT = .25; ui.text(); } return; }
     readBands(d);
-    // (on a touch screen, the player folded to its pill shows no trace or bars: they aren't drawn then)
-    if (!(typeof TOUCH !== 'undefined' && TOUCH.on && deckFolded())) ui.draw(rt, d);
+    if (!folded) ui.draw(rt, d); else if (sheet) ui.drawSheet(rt, d);
     PANEL.draw(rt, d); if (PANEL.open && typeof GRIDVIZ !== 'undefined') GRIDVIZ.draw(rt, d, bands, on && !paused ? level : 0);
     textT -= d; if (textT <= 0){ textT = .25; ui.text(); }
   }

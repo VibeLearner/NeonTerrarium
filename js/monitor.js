@@ -10,6 +10,8 @@ const MON = (() => {
   const el = $m('monitor'), cv = $m('monFeed'), g = cv.getContext('2d');
   g.imageSmoothingEnabled = false;
   const view = document.getElementById('view');
+  // a touch screen: the monitor opens as the shared bottom sheet (tsheet.js), and folds to a follow chip; null on a desktop
+  const TS = typeof TSHEET !== 'undefined' && TSHEET.on ? TSHEET : null;
   const clockText = t => { const d = Math.floor(t/1440) + 1, m = Math.floor(t % 1440); return 'D' + d + ' ' + String(Math.floor(m/60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
 
   /* ---------- picking someone ---------- */
@@ -64,6 +66,8 @@ const MON = (() => {
   M.pick = (cx, cy, exact) => {   // (exact: a click, worth waiting for the card; hovering takes the depth a frame or two late)
     if (typeof pplList === 'undefined' || !M.ready()) return null;
     const r = viewRect(), VP = comp.uniforms.VP.value, tall = (16/PX)*PPL_S/zoom*r.height/2, wide = tall*.75;
+    // a finger gets at least 44 px round each person, however far out the view is (the nearest one wins where they overlap)
+    const hw = TS ? Math.max(wide/2 + 4, 22) : 0, hh = TS ? Math.max(tall/2 + 4.5, 22) : 0;
     const cands = [];
     for (const p of pplList){
       if (!p._ec || !(p._ea > .5) || p.x === undefined) continue;
@@ -71,7 +75,8 @@ const MON = (() => {
       if (_v.x < -1.1 || _v.x > 1.1 || _v.y < -1.1 || _v.y > 1.1) continue;
       const fx = r.left + (_v.x*.5 + .5)*r.width, fy = r.top + (1 - (_v.y*.5 + .5))*r.height;
       const dx = cx - fx, dy = cy - fy;
-      if (Math.abs(dx) > wide/2 + 4 || dy < -tall - 4 || dy > 5) continue;
+      if (TS){ if (Math.abs(dx) > hw || Math.abs(dy + tall/2) > hh) continue; }
+      else if (Math.abs(dx) > wide/2 + 4 || dy < -tall - 4 || dy > 5) continue;
       cands.push([dx*dx + (dy + tall/2)**2, p, _v.z*.5 + .5]);
     }
     if (!cands.length) return null;
@@ -115,16 +120,68 @@ const MON = (() => {
   };
 
   /* ---------- open, close, follow ---------- */
+  let openSeq = 0;
   M.open = id => {
     if (!M.ready()) return;
-    if (M.id !== id) FC.init = false;   // (a new subject: the feed's camera starts from the view's angle)
-    M.id = id; M.rev = -1; M.lastDoor = null; el.hidden = false; document.body.classList.add('watching');
+    if (M.id !== id){ FC.init = false; rwOpen.clear(); }   // (a new subject: the feed's camera starts from the view's angle)
+    M.id = id; M.rev = -1; M.lastDoor = null; el.hidden = false; openSeq++;
+    if (!TS) document.body.classList.add('watching');   // (the room the log and the pins make for it, top right; on touch it's at the bottom)
     if (window.STORY) STORY.setWatch(id);
+    if (TS) sheetUp();
     render(true); drawPins(true);
   };
-  M.close = () => { M.id = null; sel.hidden = true; el.hidden = true; document.body.classList.remove('watching'); MON_FOCUS.on = false; if (window.STORY) STORY.setWatch(null); };
+  const closeNow = () => { M.id = null; sel.hidden = true; el.hidden = true; document.body.classList.remove('watching'); MON_FOCUS.on = false; if (window.STORY) STORY.setWatch(null); if (chip) chip.hidden = true; };
+  M.close = () => { closeNow(); if (TS) TS.close(el); };
   M.refresh = () => { if (M.id) render(false); };
   M.userPan = () => {};   // (the main view is the player's own: the feed has its own camera)
+
+  /* ---------- on a touch screen: the monitor is the bottom sheet ----------
+     Peek: the feed, full width, with the name and Pin over it. Half: the Log and Notebook tabs as well. A tap on the city
+     (not on someone) folds it to a slim follow chip (their picture and name, and a ✕) above the dock, so the whole city shows
+     while the cam keeps them; a tap on the chip brings the sheet back. If the log or the music sheet opens over it, the
+     monitor waits as its chip and comes back after. */
+  let chip = null, chipCv = null, chipG = null, wrap = null, noise = null;
+  const rwOpen = new Set();   // (the "rewritten" marks tapped open, on touch)
+  const feedVisible = () => !TS || TS.isOpen(el);
+  const topH = () => el.querySelector('header').offsetHeight + (wrap ? wrap.offsetHeight : cv.offsetHeight) + $m('monTrace').offsetHeight;
+  function sheetUp(){
+    if (TS.isOpen(el)) return;
+    TS.open(el, { key: 'monitor', title: '', detent: 'peek', detents: ['peek', 'half', 'full'], closeBtn: false, scroll: false, parkOnReplace: true,
+      peek: () => topH() + 6, half: () => topH() + $m('monTabs').offsetHeight + 210,   // (half: about four log rows under the tabs)
+      onClose: () => { if (M.id) closeNow(); },
+      onCover: c => { if (chip) chip.hidden = c || !M.id; } });
+    if (chip) chip.hidden = true;
+  }
+  function park(){ if (!M.id || !TS.isOpen(el)) return; TS.park(el); chipName(); chipPic(); chip.hidden = false; }
+  const chipName = () => { if (chip) chip.querySelector('b').textContent = $m('monName').textContent; };
+  // the chip's picture: the middle of the newest feed frame, a square of it
+  function chipPic(){ if (!chipG || !off || !FC.shown) return; chipG.drawImage(off, (RW - RH)/2, 0, RH, RH, 0, 0, chipCv.width, chipCv.height); chipG.fillStyle = 'rgba(20,60,70,.18)'; chipG.fillRect(0, 0, chipCv.width, chipCv.height); }
+  if (TS){
+    chip = document.createElement('div'); chip.id = 'monChip'; chip.className = 'mon-chip'; chip.hidden = true;
+    chip.innerHTML = '<button class="mc-open" type="button" aria-label="Open the monitor"><canvas width="36" height="36" aria-hidden="true"></canvas><b></b></button><button class="x" type="button" aria-label="Stop following">✕</button>';
+    document.body.appendChild(chip);
+    chipCv = chip.querySelector('canvas'); chipG = chipCv.getContext('2d'); chipG.imageSmoothingEnabled = false;
+    chip.querySelector('.mc-open').addEventListener('click', () => { if (M.id) sheetUp(); });
+    chip.querySelector('.x').addEventListener('click', () => M.close());
+    // the feed in a frame of its own, with the static over it as a baked tile that moves (nothing drawn for it): see M.blit
+    wrap = document.createElement('div'); wrap.className = 'mon-feedwrap'; cv.before(wrap); wrap.appendChild(cv);
+    noise = document.createElement('div'); noise.className = 'mon-noise'; noise.hidden = true; noise.setAttribute('aria-hidden', 'true'); wrap.appendChild(noise);
+    { const t = document.createElement('canvas'); t.width = cv.width; t.height = cv.height; const tg = t.getContext('2d'); let sd = 7;
+      const r = () => (sd = (sd*16807) % 2147483647)/2147483647;
+      tg.fillStyle = 'rgba(200,220,230,.10)'; for (let k = 0; k < 260; k++) tg.fillRect(Math.floor(r()*t.width), Math.floor(r()*t.height), 2, 1);   // (the desktop's static, baked once)
+      noise.style.setProperty('--nz', 'url(' + t.toDataURL() + ')'); }
+    // a tap on the city that doesn't pick anyone folds the sheet to the chip (input.js opens the monitor on a person after this runs)
+    if (typeof canvas !== 'undefined'){
+      let dn = null;
+      canvas.addEventListener('pointerdown', e => { if (e.pointerType === 'mouse') return; if (dn){ dn.multi = true; return; } dn = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), multi: false }; });
+      const up = e => { if (!dn || e.pointerId !== dn.id) return; const d = dn; dn = null;
+        if (d.multi || e.type === 'pointercancel' || performance.now() - d.t > 500 || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 10) return;
+        const seq = openSeq; setTimeout(() => { if (seq === openSeq) park(); }, 0); };
+      canvas.addEventListener('pointerup', up); canvas.addEventListener('pointercancel', up);
+    }
+    // the "rewritten" mark: a tap shows what was first logged (a desktop hovers it for the same words)
+    $m('monBody').addEventListener('click', e => { const i = e.target.closest('.ml i[data-k]'); if (!i) return; const k = i.dataset.k; if (rwOpen.has(k)) rwOpen.delete(k); else rwOpen.add(k); render(false); });
+  }
 
   /* ---------- pins: people kept a click away (a star by the name; chips by the monitor; a chip glows while its person is in a story moment) ---------- */
   const PIN_KEY = 'neonIsland.pins', PIN_MAX = 6;
@@ -238,26 +295,46 @@ const MON = (() => {
     for (let y = 0; y < RH; y++){ const src = (RH - 1 - y)*RW*4; d.set(pix.subarray(src, src + RW*4), y*RW*4); }   // (the target's rows are bottom up)
     og.putImageData(img, 0, 0); FC.ready = false; FC.shown = true;
   }
-  let noiseSeed = 1, lastT = 0;
+  let noiseSeed = 1, lastT = 0, base = null, bg = null, baseKey = '';
+  function look(c, W, H){ c.fillStyle = 'rgba(20,60,70,.18)'; c.fillRect(0, 0, W, H); c.fillStyle = 'rgba(0,0,0,.22)'; for (let y = 0; y < H; y += 3) c.fillRect(0, y, W, 1); }
+  function vignette(c, W, H){ const vg = c.createRadialGradient(W/2, H/2, H*.3, W/2, H/2, W*.62); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.55)'); c.fillStyle = vg; c.fillRect(0, 0, W, H); }
   const rnd = () => (noiseSeed = (noiseSeed*16807) % 2147483647)/2147483647;
   M.blit = () => {
     if (!M.id){ MON_FOCUS.on = false; return; }
     const p = people.get(M.id), W = cv.width, H = cv.height, now = performance.now(), dt = Math.min(.1, (now - (lastT || now))/1000); lastT = now;
     const at = subjectAt();
     if (at){ MON_FOCUS.on = true; MON_FOCUS.x = at.x; MON_FOCUS.z = at.z; aim(at, dt); } else MON_FOCUS.on = false;
-    pickUp(); if (FC.ready) toCanvas();
-    if (at && ++FC.frame % EVERY === 0){ try { drawFeed(at); } catch (e){ if (!M.feedErr){ M.feedErr = true; console.warn('monitor feed:', e); } } }
-    g.fillStyle = '#05080f'; g.fillRect(0, 0, W, H);
-    let shown = false;
-    if (at && FC.shown){ g.drawImage(off, 0, 0, W, H); shown = true; }
-    // the look of a camera feed: a cold tint, scanlines, a vignette, static when there's nothing to see
-    g.fillStyle = 'rgba(20,60,70,.18)'; g.fillRect(0, 0, W, H);
-    g.fillStyle = 'rgba(0,0,0,.22)'; for (let y = 0; y < H; y += 3) g.fillRect(0, y, W, 1);
-    if (!shown || (at && at.inside)){
+    pickUp(); let fresh = false; if (FC.ready){ toCanvas(); fresh = true; }
+    const vis = feedVisible();
+    // (folded to its chip on a touch screen: the cam keeps them at a quarter of the rate, for the chip's picture)
+    if (at && ++FC.frame % (vis ? EVERY : EVERY*4) === 0){ try { drawFeed(at); } catch (e){ if (!M.feedErr){ M.feedErr = true; console.warn('monitor feed:', e); } } }
+    if (fresh && chip && !chip.hidden) chipPic();
+    if (!vis){ if (window.STORY && (STORY.rev !== M.rev || now - M.drawnAt > 1500)) render(false); return; }   // (nothing of the panel on screen)
+    const shown = !!(at && FC.shown), noisy = !shown || !!(at && at.inside);
+    // the look of a camera feed: a cold tint, scanlines, a vignette, static when there's nothing to see.
+    // The still part changes only with a new picture from the feed's camera (every third frame or so), so it's put together once
+    // per picture in a canvas of its own and copied whole each frame under the moving bits: the same pixels, a third of the work.
+    // With static on a desktop it's drawn as before (the static goes under the vignette); a touch screen moves a baked tile of it instead.
+    if (noisy && !TS){
+      g.fillStyle = '#05080f'; g.fillRect(0, 0, W, H);
+      if (shown) g.drawImage(off, 0, 0, W, H);
+      look(g, W, H);
       noiseSeed = (Math.floor(now/80) % 9973) + 1;
       g.fillStyle = 'rgba(200,220,230,.10)'; for (let k = 0; k < 260; k++) g.fillRect(Math.floor(rnd()*W), Math.floor(rnd()*H), 2, 1);
+      vignette(g, W, H);
+    } else {
+      const key = W + 'x' + H + (shown ? 's' : '');
+      if (!base || fresh || key !== baseKey){
+        if (!base){ base = document.createElement('canvas'); bg = base.getContext('2d'); }
+        if (base.width !== W || base.height !== H){ base.width = W; base.height = H; }
+        bg.imageSmoothingEnabled = false;
+        bg.fillStyle = '#05080f'; bg.fillRect(0, 0, W, H);
+        if (shown) bg.drawImage(off, 0, 0, W, H);
+        look(bg, W, H); vignette(bg, W, H); baseKey = key;
+      }
+      g.drawImage(base, 0, 0);
     }
-    const vg = g.createRadialGradient(W/2, H/2, H*.3, W/2, H/2, W*.62); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.55)'); g.fillStyle = vg; g.fillRect(0, 0, W, H);
+    if (noise && noise.hidden !== !noisy) noise.hidden = !noisy;
     g.font = '10px "Silkscreen", monospace'; g.textBaseline = 'top';
     g.fillStyle = Math.floor(now/600) % 2 ? '#ff4f6a' : 'rgba(255,79,106,.25)'; g.fillRect(8, 9, 6, 6);
     g.fillStyle = '#e3d6bd'; g.fillText('REC', 18, 7);
@@ -286,15 +363,17 @@ const MON = (() => {
     const k = STORY.known(M.id) || {};
     $m('monName').textContent = k.first ? (k.first + (k.last ? ' ' + k.last : '')).toUpperCase() : 'SUBJECT';
     $m('monSub').textContent = k.first ? (k.firstVia && k.firstVia.verified ? 'name verified' : 'name unconfirmed') : 'unknown';
+    if (chip) chipName();
     const body = $m('monBody'), atBottom = body.scrollTop + body.clientHeight >= body.scrollHeight - 8;
     const top = M.tab !== 'log' && force;   // (the notebook opens at its top)
     if (M.tab === 'log'){
       const L = STORY.log(M.id);
       if (!STORY.on) body.innerHTML = '<p class="mon-empty">' + (STORY.failed ? 'The story data did not load: ' + esc(STORY.failed) : 'Loading the city\'s stories...') + '</p>';
       else if (!L.length) body.innerHTML = '<p class="mon-empty">Nothing logged yet.</p>';
-      else body.innerHTML = L.map(e => { const t = STORY.render(e), re = e.first && e.first !== t;
-        return '<div class="ml ' + (e.kind || '') + '"><time>' + clockText(e.t) + '</time><span>' + esc(t) + (re ? ' <i title="' + esc('first logged as: ' + e.first) + '">rewritten</i>' : '') + '</span></div>'; }).join('');
-      fitLog(body);
+      else body.innerHTML = L.map(e => { const t = STORY.render(e), re = e.first && e.first !== t, rk = re && TS ? e.t + '|' + e.first : null;
+        return '<div class="ml ' + (e.kind || '') + '"><time>' + clockText(e.t) + '</time><span>' + esc(t) + (re ? ' <i title="' + esc('first logged as: ' + e.first) + '"' + (rk ? ' data-k="' + esc(rk) + '" role="button"' : '') + '>rewritten</i>' : '') +
+          (rk && rwOpen.has(rk) ? '<small class="ml-orig">first logged as: ' + esc(e.first) + '</small>' : '') + '</span></div>'; }).join('');
+      if (!TS) fitLog(body); else body.style.maxHeight = '';   // (on touch the sheet's height sets how much shows)
       if (atBottom || force) body.scrollTop = body.scrollHeight;
       return;
     }

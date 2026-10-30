@@ -282,7 +282,7 @@ function pointerMove(e){
       if (act.mode === 'pinch'){ pinch0 = d; zoom0 = zoomT; act.ang = pang(); act.mid = m; }
       if (act.mode !== 'tilt') return; act.mid = m; tEmit('tilt'); }
     if (act.touch && act.mode === 'tilt'){ const m = pmid(); pitchT = clamp(pitchT + (m.y - act.mid.y)*.006, PITCH_MIN, PITCH_MAX); act.mid = m; return; }
-    zoomT = clamp(zoom0*pinch0/pdist(), 5*ZK, 60*ZK);   // (the limits on the short side: ZK, sky.js) if (act.touch && Math.abs(zoomT - zoom0) > .05*zoom0) tEmit('zoom');
+    zoomT = clamp(zoom0*pinch0/pdist(), 5*ZK, 60*ZK); if (act.touch && Math.abs(zoomT - zoom0) > .05*zoom0) tEmit('zoom');   // (the limits on the short side: ZK, sky.js)
     if (act.touch){ const a = pang(), m = pmid(); let da = a - act.ang; if (da > PI) da -= 2*PI; if (da < -PI) da += 2*PI; yawT += da; act.ang = a; touchPan(m.x - act.mid.x, m.y - act.mid.y); act.mid = m; }   // (twist turns, the pair together pans)
     else { const mx = pmidX(); yawT -= (mx - pinchX)*.008; pinchX = mx; } } return; }
   if (act.kind === 'rotate'){ yawT -= dx*.008; tilt(); return; }

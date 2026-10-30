@@ -63,12 +63,12 @@ const MON = (() => {
     dAt.x = cx; dAt.y = cy; dAt.f = f; dAt.d = d; return d;
   }
   M.ready = () => typeof megasOfKind === 'function' && megasOfKind('police').length > 0;   // (people can be watched once the city has a police station)
-  // zoomed out past this (the zoom on the short side, zoomS: 16 is where a phone starts) people are specks: a tap or click there means
-  // the city, never a person, so nobody is picked or outlined
-  const PICK_ZOOM = 24;
+  // on a touch screen, zoomed out past this (the zoom on the short side, zoomS: 16 is where a phone starts) people are specks: a tap there
+  // means the city, never a person, so nobody is picked. (With a mouse there's no limit: the pointer is precise and the brackets show who first)
+  const PICK_ZOOM_TOUCH = 20;
   M.pick = (cx, cy, exact) => {   // (exact: a click, worth waiting for the card; hovering takes the depth a frame or two late)
     if (typeof pplList === 'undefined' || !M.ready()) return null;
-    if (typeof zoomS === 'function' && zoomS() > PICK_ZOOM) return null;
+    if (TS && typeof zoomS === 'function' && zoomS() > PICK_ZOOM_TOUCH) return null;
     const r = viewRect(), VP = comp.uniforms.VP.value, tall = (16/PX)*PPL_S/zoom*r.height/2, wide = tall*.75;
     // a finger gets at least 44 px round each person, however far out the view is (the nearest one wins where they overlap)
     const hw = TS ? Math.max(wide/2 + 4, 22) : 0, hh = TS ? Math.max(tall/2 + 4.5, 22) : 0;

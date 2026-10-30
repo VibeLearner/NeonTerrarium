@@ -248,30 +248,43 @@ const TUI = (() => {
   if (location.hash.includes('dev')) addEventListener('touchstart', e => { if (e.touches.length === 3 && typeof PH !== 'undefined') PH.toggle(); }, { passive: true });
   /* ---------- text that doesn't fit scrolls (owner, Oct 30) ---------- */
   // Any one-line text the interface cuts short (it ends in "…": text-overflow ellipsis, or a no-wrap line with its overflow hidden) slides
-  // slowly along to show the rest, pauses, and slides back. The music player's title is the main one. Found once and again when the page changes
-  // (never by reading every element's style each frame); checked for fitting every 1.5 s; moved with text-indent, so no element's words are touched
+  // slowly along to show the rest, pauses, and slides back. The music player's title is the main one. The words go in an inner span that is
+  // moved with transform only: the box keeps its width and the page never re-lays itself out for it (owner, Oct 30: the first version moved
+  // text-indent, which changed the box's width as it went). Found in small idle slices, again when new elements arrive; checked every 2 s
   (() => {
-    const cand = new Set(); let scanT = 0;
+    const cand = new Set(); let scanT = 0, lastScan = 0;
     const cut = e => { const cs = getComputedStyle(e); return (cs.textOverflow === 'ellipsis' || (cs.whiteSpace === 'nowrap' && cs.overflowX === 'hidden')) && cs.display !== 'inline'; };
-    function scan(){ scanT = 0; cand.clear();
-      for (const e of document.body.querySelectorAll('*')){ if (e.closest('canvas,svg,script,style,iframe,.title')) continue; let txt = false; for (const n of e.childNodes) if (n.nodeType === 3 && n.nodeValue.trim()){ txt = true; break; } if (txt && cut(e)) cand.add(e); } }
-    // (again when new elements arrive, not when a number or a line of text changes; at most every 4 s)
-    let lastScan = 0;
-    new MutationObserver(ms => { if (scanT) return; if (!ms.some(m => [...m.addedNodes].some(n => n.nodeType === 1))) return;
-      scanT = setTimeout(() => { lastScan = performance.now(); scan(); }, Math.max(1200, 4000 - (performance.now() - lastScan))); }).observe(document.body, { childList: true, subtree: true });
-    setTimeout(scan, 2000);
+    const idle = f => (self.requestIdleCallback ? requestIdleCallback(f, { timeout: 3000 }) : setTimeout(() => f({ timeRemaining: () => 8 }), 200));
+    function scan(){ scanT = 0; lastScan = performance.now();
+      const all = [...document.body.querySelectorAll('*')]; let k = 0;
+      const step = dl => { const k0 = k; while (k < all.length && (k - k0 < 60 || dl.timeRemaining() > 2)){ const e = all[k++];   // (60 at least: a busy page may never be idle)
+
+          if (e.classList.contains('tmq-in') || e.closest('canvas,svg,script,style,iframe,.title')) continue;
+          let txt = false; for (const n of e.childNodes) if (n.nodeType === 3 && n.nodeValue.trim()){ txt = true; break; }
+          if (txt && cut(e)) cand.add(e); }
+        if (k < all.length) idle(step); };
+      idle(step); }
+    new MutationObserver(ms => { if (scanT) return; if (!ms.some(m => [...m.addedNodes].some(n => n.nodeType === 1 && !n.classList.contains('tmq-in')))) return;
+      scanT = setTimeout(scan, Math.max(1500, 6000 - (performance.now() - lastScan))); }).observe(document.body, { childList: true, subtree: true });
+    setTimeout(scan, 4000);
+    const inner = e => e.firstChild && e.firstChild === e.lastChild && e.firstChild.nodeType === 1 && e.firstChild.classList.contains('tmq-in') ? e.firstChild : null;
+    function wrap(e){ const sp = document.createElement('span'); sp.className = 'tmq-in'; while (e.firstChild) sp.appendChild(e.firstChild); e.appendChild(sp); return sp; }
+    function unwrap(e){ const sp = inner(e); if (sp){ while (sp.firstChild) e.insertBefore(sp.firstChild, sp); sp.remove(); } e.classList.remove('tmq'); }
     setInterval(() => {
+      if (document.hidden) return;
       for (const e of cand){
         if (!e.isConnected){ cand.delete(e); continue; }
-        const vis = e.offsetParent !== null || getComputedStyle(e).position === 'fixed';
-        const was = e.classList.contains('tmq'); let over = 0;
-        if (vis && e.clientWidth > 0){ const cs = getComputedStyle(e), rg = document.createRange(); rg.selectNodeContents(e);   // (the words' own width: the slide's text-indent doesn't change it)
-          const k = e.getBoundingClientRect().width/(e.offsetWidth || 1) || 1;   // (a scaled panel: back to the element's own pixels)
-          over = rg.getBoundingClientRect().width/k - (e.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)); }
-        if (over > 2){ const px = Math.round(over + 6); if (!was || e.style.getPropertyValue('--mq') !== -px + 'px'){ e.style.setProperty('--mq', -px + 'px'); e.style.setProperty('--mqt', Math.max(6, 4 + px/22).toFixed(1) + 's'); e.classList.add('tmq'); } }
-        else if (was){ e.classList.remove('tmq'); e.style.removeProperty('--mq'); e.style.removeProperty('--mqt'); }
+        let sp = inner(e); if (!sp && e.classList.contains('tmq')) e.classList.remove('tmq');   // (the game rewrote its words: measured again)
+        if (!e.offsetWidth){ continue; }
+        const cs = getComputedStyle(e), room = e.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+        let w; if (sp) w = sp.offsetWidth; else { const rg = document.createRange(); rg.selectNodeContents(e); w = rg.getBoundingClientRect().width*(e.offsetWidth/(e.getBoundingClientRect().width || 1)); }
+        const over = w - room;
+        if (over > 2){ if (!sp) sp = wrap(e); const px = Math.round(over + 6);
+          if (e.style.getPropertyValue('--mq') !== -px + 'px'){ e.style.setProperty('--mq', -px + 'px'); e.style.setProperty('--mqt', Math.max(6, 4 + px/22).toFixed(1) + 's'); }
+          e.classList.add('tmq'); }
+        else if (sp || e.classList.contains('tmq')) unwrap(e);
       }
-    }, 1500);
+    }, 2000);
   })();
 
   return U;

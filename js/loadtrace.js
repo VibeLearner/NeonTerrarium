@@ -53,7 +53,38 @@
   function finish(){
     done = true; store();
     g(async () => { const d = navigator.userAgentData; if (d && d.getHighEntropyValues){ const h = await d.getHighEntropyValues(['model', 'platformVersion']); R.device.model = h.model; R.device.os = h.platformVersion; } });
-    if (TEST) setTimeout(card, 800);
+    if (TEST) setTimeout(smooth, 300);
+  }
+
+  // ?loadtest, after the load: how smooth the first moments of play are. Every frame's time from the loading screen opening until 30 s after the
+  // title screen is left (2 minutes at most), and for each frame slower than 50 ms what was going on: the load's tail (the cool-down, merges,
+  // people), the Scan pod page, the title. Where the browser says which script took the time (Chrome's long-animation-frame records), that too
+  const LONG = 50;
+  function smooth(){
+    const S = R.smooth = { frames: 0, over50: 0, over100: 0, worst: 0, long: [], scripts: {}, perSec: [] };
+    const pill = document.createElement('div');
+    pill.style.cssText = 'position:fixed;left:50%;top:calc(env(safe-area-inset-top) + 8px);transform:translateX(-50%);z-index:99999;background:rgba(6,9,20,.92);color:#38e8e0;border:1px solid #38e8e0;padding:6px 10px;font:12px "JetBrains Mono",monospace;pointer-events:none';
+    document.body.appendChild(pill);
+    let obs = null;
+    try { obs = new PerformanceObserver(list => { for (const e of list.getEntries()){ if (e.duration < LONG) continue;
+        for (const sc of (e.scripts || []).slice().sort((a, b) => b.duration - a.duration).slice(0, 3)){
+          const k = (sc.sourceURL || '').replace(location.origin, '').replace(/\?.*/, '') + ' ' + (sc.sourceFunctionName || sc.invoker || '?');
+          const q = S.scripts[k] || (S.scripts[k] = { n: 0, ms: 0, max: 0 }); q.n++; q.ms += Math.round(sc.duration); q.max = Math.max(q.max, Math.round(sc.duration)); } } });
+      obs.observe({ type: 'long-animation-frame', buffered: false }); } catch (e) { obs = null; }
+    const t0 = now(); let last = performance.now(), leftAt = null, sec = { t: 0, n: 0, worst: 0 };
+    (function frame(ts){
+      const dt = ts - last; last = ts; S.frames++;
+      const inTitle = !!g(() => TITLE.on); if (!inTitle && leftAt === null){ leftAt = ts; M.played = Math.round(ts); }
+      if (dt > LONG){ S.over50++; if (dt > 100) S.over100++; S.worst = Math.max(S.worst, Math.round(dt));
+        if (S.long.length < 120) S.long.push({ t: Math.round(ts), ms: Math.round(dt), title: inTitle, cool: g(() => LOADP.cool) || 0, loading: !!g(() => LOADP.on),
+          merging: g(() => solidDirty.size + (SOLID_JOB ? 1 : 0)) || 0, stageQ: g(() => STAGE_Q.length + STAGE_READY.length) || 0, people: !g(() => pplReady),
+          scan: !!g(() => FURN.frame), scanWarm: g(() => FURN.warmMs) != null, cache: g(() => SC.mode) || null, scrolling: document.querySelectorAll('.tmq').length }); }
+      const s0 = Math.floor((ts - t0)/1000); if (s0 !== sec.t){ if (sec.n) S.perSec.push([sec.t, sec.n, Math.round(sec.worst)]); sec = { t: s0, n: 0, worst: 0 }; } sec.n++; sec.worst = Math.max(sec.worst, dt);
+      const end = (leftAt !== null && ts - leftAt > 30000) || ts - t0 > 120000;
+      pill.textContent = leftAt === null ? 'LOAD TEST · recording smoothness · tap Continue and play normally' : 'LOAD TEST · recording smoothness · play normally · ' + Math.max(0, Math.ceil(30 - (ts - leftAt)/1000)) + ' s';
+      if (!end){ requestAnimationFrame(frame); return; }
+      if (obs) obs.disconnect(); pill.remove(); store(); card();
+    })(performance.now());
   }
   const iv = setInterval(() => { if (M.open != null && !saved){ store(); clearInterval(iv); } }, 500);
 
@@ -68,6 +99,7 @@
       LABEL.filter(([k]) => M[k] != null).map(([k, l]) => l + ': <b>' + s(M[k]) + '</b>').join('<br>') +
       '<br><br>Downloaded ' + (F.n || 0) + ' files, ' + ((F.kb || 0)/1024).toFixed(1) + ' MB over the network' + (F.fromPhone ? ', ' + F.fromPhone + ' from the phone' : '') +
       '<br>Network: ' + (R.device.connection.type || '?') + ', ' + (R.device.connection.down || '?') + ' Mbps' +
+      (R.smooth ? '<br><br>Smoothness: ' + R.smooth.frames + ' frames, ' + R.smooth.over50 + ' slower than 50 ms, ' + R.smooth.over100 + ' slower than 100 ms, worst ' + R.smooth.worst + ' ms' : '') +
       '<br><br><button type="button" data-a="send" style="padding:10px 16px;margin-right:8px">Send</button><button type="button" data-a="close" style="padding:10px 16px">Close</button><div data-a="st" style="margin-top:8px"></div>';
     document.body.appendChild(el);
     el.addEventListener('click', async e => {

@@ -554,18 +554,9 @@ const FURN = (() => {
   // A session that never shows the title loads the page on the first Furnish click instead.
   (function whenTitle(){
     const ok = () => !F.frame && !F.open && typeof TITLE !== 'undefined' && TITLE.on;
-    // (touch: not behind the title, where the shutter would wait for it; once the city is open, after 10 s, the first time the view has been still for 4 s.
-    //  warmHold below still pauses it whenever the view moves. A Scan tap before then loads the page there and then, as it always could)
-    if (typeof TOUCH !== 'undefined' && TOUCH.on){
-      let openAt = 0, p = null, stillAt = 0;
-      const tick = () => { if (F.frame || F.open) return; const t = performance.now();
-        if (typeof TITLE !== 'undefined' && TITLE.on){ openAt = 0; setTimeout(tick, 500); return; }
-        if (!openAt) openAt = t;
-        let v = null; try { v = [yaw, zoom, PITCH, camT.x, camT.z]; } catch (e) {}
-        if (!v || !p || v.some((x, i) => Math.abs(x - p[i]) > 1e-3)) stillAt = t; p = v;
-        if (t - openAt > 10000 && t - stillAt > 4000 && !document.hidden) preload(); else setTimeout(tick, 500); };
-      setTimeout(tick, 0); return;
-    }
+    // (touch: never in the background. Loading it (a second 3D engine, its library, every shader) on a phone's one thread made the game hitch
+    //  whenever it ran, owner Oct 30; a phone loads it on the first Scan tap instead, which waits a moment then)
+    if (typeof TOUCH !== 'undefined' && TOUCH.on) return;
     const tick = () => { if (F.frame || F.open) return; if (ok()) preload(); else setTimeout(tick, 250); };
     setTimeout(tick, 0);
   })();

@@ -253,10 +253,10 @@ const TITLE = (() => {
   const furnReady = () => { try { return typeof FURN === 'undefined' || !FURN.warmed || FURN.warmed(); } catch (e) { return true; } };
   // (a city with nothing built yet has nobody to wait for: a new one, or one just started)
   const builtNone = () => { try { for (const c of cells.values()) if (c.sections.length || c.mega) return false; return true; } catch (e) { return false; } };
-  // (touch: the screen doesn't wait out the cool-down after the last plot, nor more than 3 s for the merges, nor for the Scan pod page: phones load slower, and
-  //  all three carry on behind the open city. A phone loads the Scan pod page later, while the player is still, see furnish.js)
+  // (touch: the screen doesn't wait for the Scan pod page; a phone loads it on the first Scan tap, see furnish.js. It does wait for the merges and the
+  //  cool-down, as on a computer: letting them run behind the open city made the first seconds of play hitch, owner Oct 30)
   const TOUCH_T = typeof TOUCH !== 'undefined' && TOUCH.on;
-  const cityReady = () => { try { return (typeof LOADP === 'undefined' || (!LOADP.on && (TOUCH_T || !(LOADP.cool > 0)))) && (typeof pplReady === 'undefined' || pplReady || builtNone()); } catch (e) { return true; } };
+  const cityReady = () => { try { return (typeof LOADP === 'undefined' || (!LOADP.on && !(LOADP.cool > 0))) && (typeof pplReady === 'undefined' || pplReady || builtNone()); } catch (e) { return true; } };
   // Loaded: the plots are all in, the people out, and the blocks merged (or ten seconds since the rest, merges can go on a while). The shutter used to give up after 15 s and open
   // on a city still building (owner Oct 26: it opened before the game had loaded); now it waits as long as the load is getting somewhere, and only gives up when nothing has
   // moved on for 20 s
@@ -270,7 +270,7 @@ const TITLE = (() => {
     if (!cityReady()){ loadedAt = null; return false; }
     if (loadedAt === null) loadedAt = now;
     let merging = false; try { merging = !!(solidDirty.size || SOLID_JOB); } catch (e) {}
-    return (!merging && now - loadedAt > 500) || now - loadedAt > (TOUCH_T ? 3000 : 10000);
+    return (!merging && now - loadedAt > 500) || now - loadedAt > 10000;
   }
   let shutR = null, shutCam = null, shutScene = null;
   function drawShutter(now){

@@ -3012,7 +3012,7 @@ function pickSlab(b, o, ox, oy, oz, ix, iy, iz, tMax){
 // (a plot's things out over the street, above the pavement, are looked through: a walkway, a pod's lift tower, a scaffold
 // leg, a sign hung out over the road. They belong to that plot but stand in front of, or beside, another building, and
 // clicking them used to build on the plot they belong to, behind what the pointer was on.)
-const PICK_OUT = SIDE/2 + .35;
+const PICK_OUT = SIDE/2 + .35, _sbx = new THREE.Box3();
 let PICK_ATT = Infinity;   // (the nearest of those the ray passed through, this pick)
 function pickTris(o, tMin, tMax, foot){
   const R = ray.ray, ox = R.origin.x, oy = R.origin.y, oz = R.origin.z, dx = R.direction.x, dy = R.direction.y, dz = R.direction.z;
@@ -3023,7 +3023,10 @@ function pickTris(o, tMin, tMax, foot){
     // a plot: the lag that came on a while after building, Oct 25 trace). A hover now asks the worker for them and goes by the
     // geometry's box meanwhile; a click still waits for the real triangles.
     if (PICK_SOFT && m === ATLAS && o.data.pm && o.data.pm.out){ try { pmEnsure(o, 'full'); } catch (e) {}
-      if (g.boundingBox && R.intersectBox(g.boundingBox, _hit)){ const t = _hit.distanceTo(R.origin); if (t > tMin && t < bt){ const bb = g.boundingBox, e = 1e-3;
+      // (a plot goes by its building's own column, not the box of all it draws: that reaches out over the street with signs and walkways, and a
+      //  tap on the plot in front landed on this one, owner Oct 30: placing felt inconsistent)
+      let sb = g.boundingBox; if (foot && foot.sections && foot.sections.length){ _sbx.min.set(foot.x - SIDE/2, foot.lift ? foot.lift.y - .15 : CURB, foot.z - SIDE/2); _sbx.max.set(foot.x + SIDE/2, foot.height, foot.z + SIDE/2); sb = _sbx; }
+      if (sb && R.intersectBox(sb, _hit)){ const t = _hit.distanceTo(R.origin); if (t > tMin && t < bt){ const bb = sb, e = 1e-3;
         const nx = Math.abs(_hit.x - bb.min.x) < e ? -1 : Math.abs(_hit.x - bb.max.x) < e ? 1 : 0, nz = !nx && Math.abs(_hit.z - bb.min.z) < e ? -1 : !nx && Math.abs(_hit.z - bb.max.z) < e ? 1 : 0;
         bt = t; best = { t, nx, ny: nx || nz ? 0 : 1, nz }; } }
       continue; }

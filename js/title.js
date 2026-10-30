@@ -442,7 +442,7 @@ const TITLE = (() => {
     if (boot){ const ready = () => (RTMODE ? RT && RT.loaded : imRoom.complete && imRoom.naturalWidth) && shutR, t0 = performance.now();
       (function wait(){ if (ready() || performance.now() - t0 > 9000){ shownAt = performance.now(); setTimeout(() => document.documentElement.classList.remove('title-boot'), 120); } else setTimeout(wait, 100); })(); }
     startLive().then(() => { if (live){ live.time(); if (view) live.view(view); } });
-    layout(); aimCity(); try { camT.copy(camGoal); } catch (e) {} try { applyRenderRes(zoom); } catch (e) {} last = 0; raf = requestAnimationFrame(loop); fillNote();
+    layout(); aimCity(); try { camT.copy(camGoal); } catch (e) {} try { applyRenderRes(zoomS()); } catch (e) {} last = 0; raf = requestAnimationFrame(loop); fillNote();
     setTimeout(() => { const c = menu.querySelector('[data-act="continue"]'); if (c) c.focus({ preventScroll: true }); }, 60);
   };
   T.hide = (instant) => {
@@ -450,7 +450,7 @@ const TITLE = (() => {
     closePanel(); setDeck(false);
     if (instant || reduced){ finish(); return; }
     root.classList.add('leaving'); T.leaving = true; leaveAt = performance.now(); crossed = false;
-    try { applyRenderRes(zoom); } catch (e) {}   // (the city at its full size again: it's about to fill the screen)
+    try { applyRenderRes(zoomS()); } catch (e) {}   // (the city at its full size again: it's about to fill the screen)
     const a = A && view && A[view];
     if (!a){ finish(); return; }
     // how far the stage must grow round the window's middle for the round window to cover the whole screen
@@ -490,7 +490,7 @@ const TITLE = (() => {
     const vw_ = document.getElementById('view'); if (vw_) vw_.style.transform = 'scaleX(' + (1 + (CITY_WIDEN - 1)*(1 - e)).toFixed(4) + ')';
     try { const w = Math.exp(-Math.pow((e - ec)/.1, 2)); WARP.k.value = w > .01 ? w : 0; WARP.c.value.set(flightC[0], flightC[1]); } catch (_) {}
     // past the glass: carry on a little into the city and let it settle in the middle of the screen (the game's own easing)
-    if (!crossed && e > ec){ crossed = true; try { if (CITY) camGoal.set(CITY.x, TARGET_Y, CITY.z); zoomT = 52; } catch (_) {} }
+    if (!crossed && e > ec){ crossed = true; try { if (CITY) camGoal.set(CITY.x, TARGET_Y, CITY.z); zoomT = typeof TOUCH !== 'undefined' && TOUCH.on ? touchZoomFit()*ZK : 52; } catch (_) {} }   // (touch: in close enough to see the buildings, the city filling the short side, claude/portrait-world-scale.md)
     if (t >= 1){ finish(); settle(); }
   }
   // Over the city: the camera eases from the title's high look down to the game's own: its usual tilt (PITCH0) and the nearest of its

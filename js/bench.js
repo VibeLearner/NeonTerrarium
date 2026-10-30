@@ -161,7 +161,7 @@
 
   /* ---------- the camera ---------- */
   let BASE = null;
-  function setCam(c){ camGoal.set(c.x, camGoal.y, c.z); camT.copy(camGoal); zoom = zoomT = c.zoom; yaw = yawT = c.yaw; }
+  function setCam(c){ camGoal.set(c.x, camGoal.y, c.z); camT.copy(camGoal); zoom = zoomT = c.zoom*ZK; yaw = yawT = c.yaw; }
   const noon = () => { S.cycle = false; S.hour = 12; S.rain = false; };
   const turn = rate => dt => { yawT += rate*dt; };
   const pan = speed => (dt, t) => { const a = t/1000*.6; camGoal.x = BASE.x + Math.sin(a)*speed; camGoal.z = BASE.z + Math.sin(a*.7)*speed*.6; };
@@ -191,10 +191,10 @@
     await step('fast turn', 5000, turn(1.2));
     setCam(BASE);
     if (!short) await step('pan', 5000, pan(6));
-    setCam(BASE); zoomT = 60; await run(2500);
+    setCam(BASE); zoomT = 60*ZK; await run(2500);
     await step('zoomed out still', short ? 4000 : 6000);
     await step('zoomed out slow turn', short ? 5000 : 6000, turn(.25));
-    zoomT = 5; await run(2000);
+    zoomT = 5*ZK; await run(2000);
     await step('zoomed in close', 4000);
     setCam(BASE); S.hour = 22; S.rain = true; await run(2500);
     await step('night rain', short ? 4000 : 6000);

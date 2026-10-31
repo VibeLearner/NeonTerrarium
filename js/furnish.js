@@ -164,6 +164,20 @@ const FURN = (() => {
     if (!F.hov || !F.hov.rows.length) return;
     F.fl = clamp(F.fl + d, 0, F.hov.rows.length - 1); F.userFloor = true;
     showPick(F.hov, ptrLast ? ptrLast.x : null, ptrLast ? ptrLast.y : null);
+    if (TCH()) focusPod();
+  }
+  // touch: the lit pod is brought to the middle of the view, and the view comes in close enough to see its building clearly if it's further out
+  // (owner, Oct 31), easing there as any move of the view does. The pod's middle is put on the line through the view's middle, the target kept
+  // at its usual height. The note by the finger moves with it, just above the middle; the first time, a prompt says what the next tap does
+  const FOCUS_ZS = 9;   // (the zoom on the short side it comes in to: sky.js zoomS)
+  function focusPod(){
+    if (!TCH() || !F.hov || !F.hov.rows.length || F.hov.out) return;
+    const r = F.hov.rows[F.fl], y = (r.y + r.y1)/2, cp = Math.cos(pitchT), s = (y - TARGET_Y)/Math.max(.2, Math.sin(pitchT));
+    camGoal.set(r.x - Math.sin(yawT)*cp*s, TARGET_Y, r.z - Math.cos(yawT)*cp*s);
+    if (zoomT/ZK > FOCUS_ZS) zoomT = FOCUS_ZS*ZK;
+    const v = canvas.getBoundingClientRect(); ptrLast = { x: v.left + v.width/2, y: v.top + v.height/2 }; showPick(F.hov, ptrLast.x, ptrLast.y);
+    let n = 0; try { n = +(localStorage.getItem('touch:nt.furnTap') || 0); } catch (e) {}
+    if (!n && typeof TUI !== 'undefined'){ TUI.toast('Tap the home again to furnish it', 3000); try { localStorage.setItem('touch:nt.furnTap', '1'); } catch (e) {} }
   }
   // the picked pod in a bold neon outline hugging its block, with a light fill; the rest of the building stays as it is
   function showPick(hv, px, py){
@@ -186,7 +200,7 @@ const FURN = (() => {
     hoverFill.material.color.set(col); hoverFill.position.copy(hover.position); hoverFill.scale.set(ex - .04, h - .04, ez - .04); hoverFill.visible = true;
     const saved = !!getRecipe(r);
     const hh = typeof POD_HH !== 'undefined' ? POD_HH.get(keyOf(r)) : null, nres = hh ? hh.members.length : 0;
-    tip.textContent = label(r) + ' · pod ' + r.pod + ' of ' + r.pods + ' · ' + (nres ? 'occupied · ' + nres + (nres > 1 ? ' residents' : ' resident') : 'vacant') + (saved ? ' · furnished' : '') + (TCH() ? ' · tap again to ' : ' · click to ') + (saved ? 'open' : VERB);
+    tip.textContent = label(r) + ' · pod ' + r.pod + ' of ' + r.pods + ' · ' + (nres ? 'occupied · ' + nres + (nres > 1 ? ' residents' : ' resident') : 'vacant') + (saved ? ' · furnished' : '') + (TCH() ? ' · tap again to ' + (saved ? 'open' : 'furnish') : ' · click to ' + (saved ? 'open' : VERB));
     placeTip(px, py);
   }
   function placeTip(px, py){
@@ -226,12 +240,14 @@ const FURN = (() => {
     const click = !act.moved && (act.kind === 'sky' || act.kind === 'touch'), right = !act.moved && act.kind === 'right';
     act.moved = true;   // (input.js only tidies up)
     if (right) setPick(false);
-    else if (click && e.pointerType === 'touch'){   // (touch: a tap lights a floor, a second tap on the same floor furnishes it)
+    else if (click && e.pointerType === 'touch'){   // (touch: a tap lights a pod and brings it to the middle, close; a second tap on the same pod furnishes it)
       const pc = F.hov && F.hov.c, pf = F.fl; ptrLast = { x: e.clientX, y: e.clientY }; hoverAt(e.clientX, e.clientY);
-      if (pc && F.hov && F.hov.c === pc && F.fl === pf) confirm(); }
+      if (pc && F.hov && F.hov.c === pc && F.fl === pf) confirm(); else focusPod(); }
     else if (click) confirm();
   };
   canvas.addEventListener('pointerup', endP, { capture: true });
+  // (a finger lifting is a leave too, and input.js clears the outline on a leave: while picking, the lit pod stays lit)
+  canvas.addEventListener('pointerleave', e => { if (F.pick && e.pointerType === 'touch') e.stopImmediatePropagation(); }, { capture: true });
   canvas.addEventListener('wheel', e => { if (!F.pick || !F.hov || !F.hov.rows.length) return; e.preventDefault(); e.stopImmediatePropagation(); stepFloor(e.deltaY < 0 ? 1 : -1); }, { capture: true, passive: false });
   addEventListener('keydown', e => {
     if (F.open){ e.preventDefault(); e.stopImmediatePropagation(); if (e.key === 'Escape' && !ov.classList.contains('live')) close(); return; }   // (the apartment has the keys; Esc before it shows cancels)   // (the apartment has the keys: none reach the city under it)

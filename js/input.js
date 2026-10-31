@@ -249,7 +249,7 @@ canvas.addEventListener('pointerdown', e => {
       clearTimeout(tapPend.timer); const p = tapPend; tapPend = null;
       act = { kind: 'dtap', x: p.x, y: p.y, sy: e.clientY, started: false }; return; }
     tapFlush(); }
-  if (ptrs.size === 2){ if (act && act.timer) clearTimeout(act.timer); if (act && (act.kind === 'dtap' || act.kind === 'fresh2') && HL) hlStop(); if (typeof TUI !== 'undefined') TUI.ring(null); act = { kind: 'pinch', touch: e.pointerType === 'touch', ang: pang(), mid: pmid() }; pinch0 = pdist(); zoom0 = zoomT; pinchX = pmidX(); hover.visible = hoverFill.visible = hoverStrip.visible = false; return; }
+  if (ptrs.size === 2){ if (act && act.timer) clearTimeout(act.timer); if (act && act.draw && typeof TT !== 'undefined') TT.cancel(); if (act && (act.kind === 'dtap' || act.kind === 'fresh2') && HL) hlStop(); if (typeof TUI !== 'undefined') TUI.ring(null); act = { kind: 'pinch', touch: e.pointerType === 'touch', ang: pang(), mid: pmid() }; pinch0 = pdist(); zoom0 = zoomT; pinchX = pmidX(); hover.visible = hoverFill.visible = hoverStrip.visible = false; return; }
   if (delMode && e.button === 0){ act = { kind: 'del', x: e.clientX, y: e.clientY, moved: false, from: groundCellAt(e.clientX, e.clientY) }; return; }   // delete mode: drag selects
   if ((e.button === 0 || e.pointerType === 'touch') && !hwMode && !mtMode && !megaPick){   // someone in the street under the pointer: a click opens the monitor on them (monitor.js)
     // (the quick test here; the exact one, which waits for the graphics card, only once it's a click: a press that starts turning the view never waits for it)
@@ -260,7 +260,10 @@ canvas.addEventListener('pointerdown', e => {
     // (a ring fills under the finger while it's held, so a removal is seen coming and can be cancelled by lifting; what was removed can be put back from
     //  the Restore chip for a few seconds: touchui.js)
     if (typeof TUI !== 'undefined' && !megaPick) TUI.ring(e.clientX, e.clientY, 550);
+    // (highway or metro mode: a press on a line's open end, or on the outline aimed, draws track when it drags instead of moving the city: transit-touch.js)
+    if ((hwMode || mtMode) && typeof TT !== 'undefined') act.draw = TT.downAt(e.clientX, e.clientY);
     act.timer = setTimeout(() => { if (act && act.kind === 'touch' && !act.moved){ if (typeof TUI !== 'undefined') TUI.ring(null);
+      if ((hwMode || mtMode) && typeof TT !== 'undefined') TT.clear();
       if (hwMode) hwRightClick(act.x, act.y); else if (mtMode) mtRightClick(act.x, act.y); else if (megaPick) selectMega(null);
       else { const pk = pickAt(act.x, act.y), snap = typeof TUI !== 'undefined' ? TUI.snapCell(pk) : null; removeAt(pk); if (snap) TUI.offerRestore(snap); if (typeof TUI !== 'undefined') TUI.buzz(30); tEmit('remove'); }
       act.kind = 'none'; } }, 550);
@@ -328,6 +331,11 @@ function pointerMove(e){
     if (act.started && HL) hlMove(act.x, e.clientY);
     return;
   }
+  if (act.kind === 'touch' && act.draw){   // drawing track from a line's end (transit-touch.js)
+    if (!act.moved && Math.hypot(e.clientX - act.x, e.clientY - act.y) > 10){ act.moved = true; clearTimeout(act.timer); if (typeof TUI !== 'undefined') TUI.ring(null); TT.drawStart(act.draw); }
+    if (act.moved) TT.drawMove(e.clientX, e.clientY);
+    return;
+  }
   if (act.kind === 'touch'){
     // (a finger rolls a little as it taps: 14 px before it's a drag, owner Oct 31)
     if (!act.moved && Math.hypot(e.clientX - act.x, e.clientY - act.y) > (e.pointerType === 'touch' ? 14 : 10)){ act.moved = true; clearTimeout(act.timer); if (typeof TUI !== 'undefined') TUI.ring(null); tEmit('pan'); hover.visible = hoverFill.visible = hoverStrip.visible = false; if (megaPick) showMegaGhost(null); touchPan(e.clientX - act.x, e.clientY - act.y); return; }
@@ -362,11 +370,14 @@ function endPtr0(e){
       else if (!unitAt(act.x, act.y)) tapBuild(act.x, act.y);   // (one floor; where one floor can't go, an ordinary tap)
     }
     if (act.kind === 'fresh2' && !(typeof LOADP !== 'undefined' && LOADP.on)){ if (act.started){ if (HL){ hlBuild(); tEmit('resize'); } } else freshTrim(act.f); }
+    if (act.kind === 'touch' && act.moved && act.draw && typeof TT !== 'undefined') TT.drawEnd();
     if (act.kind === 'touch' && !act.moved && tapWaits()){ clearTimeout(act.timer); if (typeof TUI !== 'undefined') TUI.ring(null); if (!(typeof LOADP !== 'undefined' && LOADP.on)) freshBuild(e.clientX, e.clientY); }
     else if (act.kind === 'touch' && !act.moved){ clearTimeout(act.timer); if (typeof TUI !== 'undefined') TUI.ring(null);
       // (a finger in highway or metro mode: the next piece is picked by where it would appear, in the air at the line's height: hwPickTouch, mtPickTouch)
       const tt = typeof TOUCH !== 'undefined' && TOUCH.on;
-      if (hwMode) hwClick(e.clientX, e.clientY, tt); else if (mtMode) mtClick(e.clientX, e.clientY, tt); else if (megaPick) placeMegaHere(e.clientX, e.clientY);
+      // (and with a finger, aim then place, and a stretch drawn waits for a tap: transit-touch.js)
+      if ((hwMode || mtMode) && tt && typeof TT !== 'undefined' && TT.tap(e.clientX, e.clientY)){ /* (handled there) */ }
+      else if (hwMode) hwClick(e.clientX, e.clientY, tt); else if (mtMode) mtClick(e.clientX, e.clientY, tt); else if (megaPick) placeMegaHere(e.clientX, e.clientY);
       else { const pk = !S.zone && typeof TUI !== 'undefined' ? pickAt(e.clientX, e.clientY) : null;   // (no zone picked: a tap on a megastructure shows its button, or its card)
         if (pk && pk.c && pk.c.mega && megas.has(pk.c.mega)) TUI.megaTap(megas.get(pk.c.mega), e.clientX, e.clientY); else { act.done = new Set(); paintAt(e.clientX, e.clientY); } } }
   }
@@ -379,7 +390,7 @@ canvas.addEventListener('pointerup', endPtr); canvas.addEventListener('pointerca
 const dropPtr = id => { if (!ptrs.has(id)) return; ptrs.delete(id); if (!ptrs.size){ if (act && act.timer) clearTimeout(act.timer); dragging = false; act = null; if (typeof TUI !== 'undefined') TUI.ring(null); } };
 canvas.addEventListener('lostpointercapture', e => dropPtr(e.pointerId));
 addEventListener('blur', () => { for (const id of [...ptrs.keys()]) dropPtr(id); if (HL) hlStop(); });
-canvas.addEventListener('pointerleave', () => { MON.hoverAt(null); if (!ptrs.size && !AIM){   // (a finger lifting is a leave too: an aim's outline stays)
+canvas.addEventListener('pointerleave', () => { MON.hoverAt(null); if (!ptrs.size && !AIM && !(typeof TT !== 'undefined' && TT.busy())){   // (a finger lifting is a leave too: an aim's outline stays, a transit one too)
  hover.visible = hoverFill.visible = hoverStrip.visible = false; showMegaGhost(null); hwGhost.g.visible = false; hwHighlight(null); } });
 // (no zooming while the title screen is up: its view of the city is set by the title, owner Oct 30)
 const titleUp = () => typeof TITLE !== 'undefined' && TITLE.on;

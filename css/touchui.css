@@ -187,7 +187,7 @@ html.touch .tpeek .tp-b .tp-scan.off{opacity:.55}
 .ttoast{display:none}
 html.touch .ttoast{display:block;position:fixed;left:50%;top:calc(108px + env(safe-area-inset-top,0px));z-index:160;box-sizing:border-box;width:max-content;
   max-width:min(320px, calc(100vw - 32px - 2*max(env(safe-area-inset-left,0px), env(safe-area-inset-right,0px))));padding:8px 14px;
-  font-family:var(--font-pixel);font-size:11px;line-height:1.5;letter-spacing:.08em;text-align:center;color:#e9fbff;background:rgba(6,14,26,.9);
+  font-family:var(--font-pixel);font-size:11px;line-height:1.5;letter-spacing:.08em;text-align:center;white-space:pre-line;color:#e9fbff;background:rgba(6,14,26,.9);
   border:1px solid rgba(90,232,255,.75);box-shadow:0 0 12px rgba(56,232,224,.3);pointer-events:none;user-select:none;
   opacity:0;visibility:hidden;transform:translate(-50%,-6px);transition:opacity .35s ease,transform .35s ease,visibility 0s linear .35s}
 html.touch .ttoast.ton{opacity:1;visibility:visible;transform:translate(-50%,0);transition:opacity .2s ease,transform .2s ease}

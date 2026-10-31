@@ -64,8 +64,9 @@ const MON = (() => {
   }
   M.ready = () => typeof megasOfKind === 'function' && megasOfKind('police').length > 0;   // (people can be watched once the city has a police station)
   // on a touch screen, zoomed out past this (the zoom on the short side, zoomS: 16 is where a phone starts) people are specks: a tap there
-  // means the city, never a person, so nobody is picked. (With a mouse there's no limit: the pointer is precise and the brackets show who first)
-  const PICK_ZOOM_TOUCH = 20;
+  // means the city, never a person, so nobody is picked. Just past the starting view: further out, taps on people were mostly accidents.
+  // (With a mouse there's no limit: the pointer is precise and the brackets show who first)
+  const PICK_ZOOM_TOUCH = 17;
   M.pick = (cx, cy, exact) => {   // (exact: a click, worth waiting for the card; hovering takes the depth a frame or two late)
     if (typeof pplList === 'undefined' || !M.ready()) return null;
     if (TS && typeof zoomS === 'function' && zoomS() > PICK_ZOOM_TOUCH) return null;

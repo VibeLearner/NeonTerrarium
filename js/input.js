@@ -590,7 +590,7 @@ $('bmenuHead').addEventListener('click', () => { setBmenuOpen($('bmenuList').hid
 // Touch: a note at the top says what arrived and what it's for, in a line (owner, Oct 31); the first one also says a double tap turns it, and the
 // fourth that Transit has arrived
 const UNLOCK_TIP = { radio: 'Tap it, then Panel, to tune the broadcast.', police: 'Tap a resident to begin surveillance. Tap the station, then Desk, to run it.',
-  spire: 'Tap it, then Ledger, to read the city\'s records.', lidar: 'Tap it, then Scan a pod, then a home.', square: 'Its food stalls bring the street to life.',
+  spire: 'Tap it, then Ledger, to read the city\'s records.', lidar: 'Tap it, then Scan, then a home.', square: 'Its food stalls bring the street to life.',
   market: 'Shopkeepers and shoppers fill its floors.', mall: 'Build more luxury and industry to stack its floors.', club: 'Its doors open after dark.',
   bathhouse: 'Residents come to soak.', pagoda: 'A luxury hotel and spa above the city.', greenhouse: 'Growers tend crops round the clock.',
   foundry: 'Its furnaces employ the industrial district.', logistics: 'Dock hands, pickers and forklifts, day and night.', wirenest: 'Operators watch the city\'s traffic.',

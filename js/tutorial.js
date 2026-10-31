@@ -90,11 +90,11 @@ const TUT = (() => {
     clearTimeout(tipT); tipT = setTimeout(() => { tipEl.hidden = true; }, ms);
   }
   const TIPS = [
-    { id: 'tag', find: () => [...document.querySelectorAll('.tholo.ton')].find(e => e.getBoundingClientRect().width), say: 'Tap the button to open its screen' },
+    { id: 'tag', find: () => [...document.querySelectorAll('.tholo.ton:not(.tlabel)')].find(e => e.getBoundingClientRect().width), say: 'Tap the button to open its screen' },
     // (the player is always in the page, see-through until the Psycho-Acoustic Grid is built and playing: 'live', grid.js. Its size alone said it was there from the start)
     // (it points at the building, not the player: "the player" read as the person playing)
     { id: 'music', find: () => { const g = document.getElementById('gridDeck'); return g && !g.hidden && g.classList.contains('live') && g.getBoundingClientRect().width ? document.getElementById('view') : null; }, say: 'The Grid is broadcasting. Tap the Grid building to open its panel.' },
-    { id: 'scan', find: () => { const b = document.getElementById('furnBtn'); return b && !b.hidden && typeof megasOfKind === 'function' && megasOfKind('lidar').length ? document.getElementById('view') : null; }, say: 'Tap the LIDAR Array, then Scan a pod, then a home' },
+    { id: 'scan', find: () => { const b = document.getElementById('furnBtn'); return b && !b.hidden && typeof megasOfKind === 'function' && megasOfKind('lidar').length ? document.getElementById('view') : null; }, say: 'Tap the LIDAR Array, then Scan, then a home' },
     { id: 'people', find: () => typeof megasOfKind === 'function' && megasOfKind('police').length ? document.getElementById('view') : null, say: 'Tap someone in the street to watch them' },
   ];
   setInterval(() => {

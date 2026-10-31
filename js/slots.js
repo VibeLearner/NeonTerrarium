@@ -44,7 +44,8 @@ const SLOTS = (() => {
     try { day = STORY.day() + 1; } catch (e) {}
     try { for (const p of people.values()) if (!p.visitor && !p.gone) residents++; } catch (e) {}
     try { plots = cells.size; } catch (e) {}
-    return { day, residents, plots };
+    const mode = typeof ECON !== 'undefined' && ECON.on ? 'economy' : 'sandbox';
+    return { day, residents, plots, mode };
   }
   // a small picture of the city, read from the frame the game has just drawn (the next one, so it's whole)
   function grabThumb(){
@@ -95,9 +96,10 @@ const SLOTS = (() => {
     swapIn(rec);
     return true;
   };
-  SL.create = async name => {
+  SL.create = async (name, mode) => {
     await checkpoint();
-    const rec = { id: newId(), name: (name || '').trim().slice(0, 40) || 'New city', created: Date.now(), updated: Date.now(), meta: { day: 1, residents: 0, plots: 0 }, data: {} };
+    const rec = { id: newId(), name: (name || '').trim().slice(0, 40) || 'New city', created: Date.now(), updated: Date.now(), meta: { day: 1, residents: 0, plots: 0, mode: mode === 'economy' ? 'economy' : 'sandbox' }, data: {} };
+    if (mode === 'economy' && typeof ECON !== 'undefined') rec.data['neonIsland.economy'] = JSON.stringify(ECON.freshState());   // (an Economy city: economy.js; Sandbox has no such key)
     await putRec(rec);
     swapIn(rec);
   };

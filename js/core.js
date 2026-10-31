@@ -219,7 +219,7 @@ const _nm = new THREE.Matrix3();
 // Dark streets: a few plots have almost no light. While one is generated, DARK is set: most of its lamps, windows,
 // neon and trim are swapped for unlit look-alikes (picked by position, so the same ones stay off), and whatever
 // still glows flickers badly. KEEP_LIGHT protects a light from going out (the street lamp: it flickers instead).
-let DARK = false, KEEP_LIGHT = false;
+let DARK = false, KEEP_LIGHT = false;   // (DARK: true for a dark street; in economy mode it can also be a height, see put)
 let LUX = null, NO_GREEN = false;   // NO_GREEN: while a bare plot (no greenery) is generated, see world.js   // while a luxury section is generated: { mats: Map(neon -> its gold/ivory/... stand-in), glows: { kind: kind } }
 const DARK_SUB = { window: toon(0x22303f), bulb: toon(0x3d3226), neon: toon(0x2a2230), trim: toon(0x2c3438) };
 const posHash = (x, y, z) => hash('lit', Math.round(x*20), Math.round(y*20), Math.round(z*20)) % 100;
@@ -248,9 +248,9 @@ let curFine = null;
 function put(geo, mat, m, lean){
   if (PUT_KEEPOUT && keptOut(geo, m)) return;
   if (LUX){ let sub = LUX.mats.get(mat); if (!sub && LUX.auto && mat.userData && mat.userData.glow) sub = LUX.auto(mat); if (sub){ mat = sub; if (LUX.halo) LUX.halo(sub, m); } }
-  if (DARK && !KEEP_LIGHT && mat.userData && DARK_SUB[mat.userData.glow] && posHash(m.elements[12], m.elements[13], m.elements[14]) < 82) mat = DARK_SUB[mat.userData.glow];
+  if (DARK && !KEEP_LIGHT && mat.userData && DARK_SUB[mat.userData.glow] && (DARK === true ? posHash(m.elements[12], m.elements[13], m.elements[14]) < 82 : m.elements[13] > DARK)) mat = DARK_SUB[mat.userData.glow];   // (a number: economy mode, every light above that height is off: the floors nobody lives on yet, economy.js)
   let b = buckets.get(mat); if (!b){ b = { p: [], n: [], d: [], f: mat.userData && mat.userData.glow ? [] : null, o: mat.userData && mat.userData.glow ? [] : null }; buckets.set(mat, b); }
-  const fid = b.f ? (DARK && mat.userData.glow !== 'blink' ? heavyFlickerId() : flickerId(mat.userData.glow)) : 0;
+  const fid = b.f ? (DARK === true && mat.userData.glow !== 'blink' ? heavyFlickerId() : flickerId(mat.userData.glow)) : 0;
   const did = b.f && !FINE_LIGHT ? 0 : detailId(geo, m), ord = b.f ? litOrder(m.elements[12], m.elements[13], m.elements[14]) : 0;   // lights are never dropped: they carry the look from far away
   if (FINE_LIGHT && did > 0 && curFine && geo === U.box){
     const e = m.elements; let a = 0, al = 0; for (let q = 0; q < 3; q++){ const l = Math.hypot(e[q*4], e[q*4 + 1], e[q*4 + 2]); if (l > al){ al = l; a = q; } }

@@ -983,6 +983,7 @@ function* stackRunGen(c, secs, y, tag, first){
     if (lot.aloft && sec.zone === 'mid' && ![signShop, tiledShop, glassTower].includes(builder)) builder = pickWeighted([[signShop, 3], [tiledShop, 2], [glassTower, 1]]);   // on a pod's deck: a building that keeps to it
     if (lot.aloft && sec.zone === 'high' && ![slabTower, roundTower, twistTower, gardenTower, domeTower, shellTower].includes(builder)) builder = pickWeighted([[slabTower, 3], [roundTower, 2], [twistTower, 1], [gardenTower, 1], [domeTower, 1], [shellTower, 1]]);   // (a tower that keeps to the platform)
     if (lot.aloft && sec.zone === 'ind' && ![hall, partsWarehouse].includes(builder)) builder = pickWeighted([[hall, 3], [partsWarehouse, 2]]);   // (a works that keeps to the deck)
+    if (sec.corp && sec.zone === 'ind' && !sec.mf) builder = pickWeighted(upper ? [[brutalTower, 2], [stackedWorks, 1]] : [[brutalTower, 2], [decoWorks, 1.5], [stackedWorks, 1]]);   // (economy mode's corps: the office blocks of the industrial set, economy.js)
     if (sec.mf){ lot.mf = sec.mf; if (sec.zone === 'low') builder = buildTenement; else if (sec.zone === 'mid') builder = signShop; else if (sec.zone === 'ind') builder = hall; else if (sec.zone === 'high') builder = slabTower; }   // built into a gap: a tenement (or shop) short enough to fit
     // most commercial buildings stand on a ring of market stalls opening onto the street (the stall streets, decks
     // and plazas are stalls already, so they stand on the ground)
@@ -1709,7 +1710,8 @@ function steamVent(c){
 }
 
 // About one building in seventy stands on a dark street: almost no light, and what's left flickers (see DARK in core.js)
-const isDarkPlot = c => !!c.sections.length && !c.mega && hash('dark', c.i, c.j) % 70 === 0;
+// (economy mode, economy.js: a building with no power has its lights off, and one not yet full has the floors above its residents unlit)
+const isDarkPlot = c => { if (typeof ECON !== 'undefined' && ECON.on){ const d = ECON.dark(c); if (d !== null) return d; } return !!c.sections.length && !c.mega && hash('dark', c.i, c.j) % 70 === 0; };
 /* ---------- rebuilding ---------- */
 // Pieces are batched in regions of REG x REG grid cells; an edit only re-batches the regions it touched.
 const REG = 5, regions = new Map(), dirtyRegions = new Set();

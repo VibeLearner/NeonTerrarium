@@ -347,6 +347,6 @@ const WIRELOG = (() => {
     reset: () => { try { localStorage.removeItem(KEY); } catch (e) {} location.reload(); },
     state: () => W,
   };
-  return { tick, dev, state: () => W };
+  return { tick, dev, state: () => W, say: (ch, x) => { if (started) add(ch, x); } };   // (say: a line from elsewhere, economy.js)
 })();
 window.WIRELOG = WIRELOG;

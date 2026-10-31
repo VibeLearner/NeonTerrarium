@@ -587,11 +587,27 @@ function renderBmenu(){
 }
 $('bmenuHead').addEventListener('click', () => { setBmenuOpen($('bmenuList').hidden); $('bmenuHead').classList.remove('fresh'); });
 // a kind arriving for the first time: open the menu and make the header pulse so it gets noticed
-function onMegaUnlock(){
+// Touch: a note at the top says what arrived and what it's for, in a line (owner, Oct 31); the first one also says a double tap turns it, and the
+// fourth that Transit has arrived
+const UNLOCK_TIP = { radio: 'Tap it, then Panel, to tune the broadcast.', police: 'Tap a resident to begin surveillance. Tap the station, then Desk, to run it.',
+  spire: 'Tap it, then Ledger, to read the city\'s records.', lidar: 'Tap it, then Scan a pod, then a home.', square: 'Its food stalls bring the street to life.',
+  market: 'Shopkeepers and shoppers fill its floors.', mall: 'Build more luxury and industry to stack its floors.', club: 'Its doors open after dark.',
+  bathhouse: 'Residents come to soak.', pagoda: 'A luxury hotel and spa above the city.', greenhouse: 'Growers tend crops round the clock.',
+  foundry: 'Its furnaces employ the industrial district.', logistics: 'Dock hands, pickers and forklifts, day and night.', wirenest: 'Operators watch the city\'s traffic.',
+  emitter: 'The Spire\'s power core.' };
+function unlockNote(kind){
+  if (typeof TOUCH === 'undefined' || !TOUCH.on || typeof TUI === 'undefined' || !TUI.toast || !MEGA_TYPES[kind]) return;
+  const first = megaUnlockedKinds.size === 1;
+  let txt = MEGA_TYPES[kind].name.toUpperCase() + ' UNLOCKED' + (UNLOCK_TIP[kind] ? '\n' + UNLOCK_TIP[kind] : '') + (first ? '\nDouble tap a megastructure to turn it.' : '');
+  TUI.toast(txt, 6500);
+  if (megaUnlockedKinds.size === 4) setTimeout(() => TUI.toast('TRANSIT UNLOCKED\nTap Transit to build sky highways and the metro.', 5000), 6800);
+}
+function onMegaUnlock(kind){
   renderBmenu(); if (!document.getElementById('bmenuList')) return;
   const tch = typeof TOUCH !== 'undefined' && TOUCH.on;   // (touch: the button pulses, the list doesn't open: on a phone it covered a third of the city and took the next tap)
   if (!tch) setBmenuOpen(true); $('bmenuHead').classList.add('fresh');
   if (megaUnlockedKinds.size === 4){ if (!tch) setTmenuOpen(true); $('tmenuHead').classList.add('fresh'); }   // the fourth: sky highways arrive
+  try { unlockNote(kind); } catch (e) {}
 }
 // Transport (under Buildings): arrives with the fourth megastructure, or at once in a city that already has highways
 const hwUnlocked = () => megaUnlockedKinds.size >= 4 || highways.length > 0 || metros.length > 0;

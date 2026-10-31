@@ -406,6 +406,12 @@ const ECON = (() => {
     const keep = st.corp; st.corp = best.z === 'K'; try { addSection(best.c, zone, {}); } finally { st.corp = keep; }
   }
 
+  // Always night in Economy, so the lights coming on are the show (owner, Oct 31). Only the picture: the clock, the people's days and the stories
+  // run on as usual; the sky, sun, glows and window lights are worked out as if it were this hour.
+  const NIGHT_HOUR = 23;
+  wrap('phaseName', function (){ return 'Night'; });   // (the label under the clock agrees with the sky)
+  wrap('applyTime', function (orig){ if (typeof S === 'undefined') return orig(); const h = S.hour; S.hour = NIGHT_HOUR; try { return orig(); } finally { S.hour = h; } });
+
   // on load: the table filled before the city is drawn, so each building is made with its lights as they were (not lit, then darkened)
   wrap('load', function (orig){ const ok = orig(); if (ok) try { step(1e-9, false); } catch (e) { console.warn('econ load', e); } return ok; });
 

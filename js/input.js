@@ -192,7 +192,7 @@ function touchAimAt(x, y){
 function aimClear(){ if (!AIM) return; AIM = null; hover.visible = hoverFill.visible = hoverStrip.visible = false; if (typeof TUI !== 'undefined' && TUI.aimTip) TUI.aimTip(null); }
 setInterval(() => { if (AIM && (performance.now() - AIM.at > 8000 || AIM.cam !== camSig() || !S.zone)) aimClear(); }, 200);
 function freshBuild(x, y){
-  { const pk = typeof TUI !== 'undefined' ? pickAt(x, y) : null; if (pk && pk.c && pk.c.mega && megas.has(pk.c.mega) && TUI.megaTap(megas.get(pk.c.mega))) return; }
+  { const pk = typeof TUI !== 'undefined' ? pickAt(x, y) : null; if (pk && pk.c && pk.c.mega && megas.has(pk.c.mega) && TUI.megaTap(megas.get(pk.c.mega), x, y)) return; }
   if (S.zone && !hwMode && !mtMode && !megaPick && !delMode){
     const a = touchAimAt(x, y); if (!a){ aimClear(); return; }
     if (plotPx() < AIM_PX){
@@ -336,12 +336,19 @@ function pointerMove(e){
   }
   if (act.kind === 'paint'){ paintAt(e.clientX, e.clientY); showHover(targetOf(pickAt(e.clientX, e.clientY))); }
 }
+// (a finger's tap that was nearly someone in the street, by a megastructure: the megastructure's button or card, or its turn on a double tap, as any other
+//  tap on it gives (touchui.js). It used to build there, or do nothing, so a tap on a megastructure sometimes didn't answer)
+function touchMegaTap(e){
+  if (e.pointerType !== 'touch' || typeof TOUCH === 'undefined' || !TOUCH.on || typeof TUI === 'undefined' || hwMode || mtMode || megaPick || delMode) return false;
+  const pk = pickAt(e.clientX, e.clientY);
+  return !!(pk && pk.c && pk.c.mega && megas.has(pk.c.mega) && TUI.megaTap(megas.get(pk.c.mega), e.clientX, e.clientY));
+}
 // (the finger is let go whatever happens in endPtr0: an error in what a tap does (building, a wall, a pick) used to skip the last lines, leaving it in ptrs)
 const endPtr = e => { const _t0 = performance.now(); try { endPtr0(e); } finally { ptrs.delete(e.pointerId); if (!ptrs.size){ dragging = false; act = null; } PH.outside('pointer up', performance.now() - _t0); } };
 function endPtr0(e){
   if (act && typeof LOADP !== 'undefined' && LOADP.on) act.moved = true;   // (a city is still being loaded from its recipes: a click edits nothing yet)
   if (act && ptrs.has(e.pointerId)){
-    if (act.kind === 'npc' && !act.moved){ const who = MON.pick(e.clientX, e.clientY, true); if (who) MON.open(who); else { act.done = new Set(); paintAt(e.clientX, e.clientY); } }   // (the exact test now; nobody there after all: a click on the city)
+    if (act.kind === 'npc' && !act.moved){ const who = MON.pick(e.clientX, e.clientY, true); if (who) MON.open(who); else if (!touchMegaTap(e)){ act.done = new Set(); paintAt(e.clientX, e.clientY); } }   // (the exact test now; nobody there after all: a click on the city)
     if (act.kind === 'del' && !act.moved){   // a click: inside the selection deletes it, anywhere else clears it
       const c = groundCellAt(e.clientX, e.clientY);
       if (delSel && c && c.i >= delSel.i0 && c.i <= delSel.i1 && c.j >= delSel.j0 && c.j <= delSel.j1) removeArea(delSel);
@@ -361,7 +368,7 @@ function endPtr0(e){
       const tt = typeof TOUCH !== 'undefined' && TOUCH.on;
       if (hwMode) hwClick(e.clientX, e.clientY, tt); else if (mtMode) mtClick(e.clientX, e.clientY, tt); else if (megaPick) placeMegaHere(e.clientX, e.clientY);
       else { const pk = !S.zone && typeof TUI !== 'undefined' ? pickAt(e.clientX, e.clientY) : null;   // (no zone picked: a tap on a megastructure shows its button, or its card)
-        if (pk && pk.c && pk.c.mega && megas.has(pk.c.mega)) TUI.megaTap(megas.get(pk.c.mega)); else { act.done = new Set(); paintAt(e.clientX, e.clientY); } } }
+        if (pk && pk.c && pk.c.mega && megas.has(pk.c.mega)) TUI.megaTap(megas.get(pk.c.mega), e.clientX, e.clientY); else { act.done = new Set(); paintAt(e.clientX, e.clientY); } } }
   }
   ptrs.delete(e.pointerId);
   if (!ptrs.size){ dragging = false; act = null; }

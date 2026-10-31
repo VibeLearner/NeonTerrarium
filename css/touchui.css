@@ -182,3 +182,21 @@ html.tland .zonebar > .hwbar{left:50%;right:auto;transform:translateX(-50%);widt
 @media (max-width:370px){html.touch .zonebar > .hwbar small{display:none}html.touch .zonebar > .hwbar{gap:4px;padding:6px 8px}}
 /* the LIDAR Array's card: Scan a pod (touchui.js) */
 html.touch .tpeek .tp-b .tp-scan.off{opacity:.55}
+
+/* ---------- a short prompt near the top (touchui.js TUI.toast): centered, below the clock and the music, over the city, never in the way of a tap ---------- */
+.ttoast{display:none}
+html.touch .ttoast{display:block;position:fixed;left:50%;top:calc(108px + env(safe-area-inset-top,0px));z-index:160;box-sizing:border-box;width:max-content;
+  max-width:min(320px, calc(100vw - 32px - 2*max(env(safe-area-inset-left,0px), env(safe-area-inset-right,0px))));padding:8px 14px;
+  font-family:var(--font-pixel);font-size:11px;line-height:1.5;letter-spacing:.08em;text-align:center;color:#e9fbff;background:rgba(6,14,26,.9);
+  border:1px solid rgba(90,232,255,.75);box-shadow:0 0 12px rgba(56,232,224,.3);pointer-events:none;user-select:none;
+  opacity:0;visibility:hidden;transform:translate(-50%,-6px);transition:opacity .35s ease,transform .35s ease,visibility 0s linear .35s}
+html.touch .ttoast.ton{opacity:1;visibility:visible;transform:translate(-50%,0);transition:opacity .2s ease,transform .2s ease}
+
+/* ---------- every prompt and tutorial reads centered on touch (owner, Oct 31): the operator's notes, the tips, the aim note, the card's words, the hint
+   line and the explanation plates. Only the alignment changes; where they sit stays as it was ---------- */
+html.touch .ttut .tt-txt,html.touch .ttut .tt-note small,html.touch .ttut .tt-note b{text-align:center}
+html.touch .ttut .tt-txt{justify-items:center}
+html.touch .ttip:not([hidden]),html.touch .taim:not([hidden]),html.touch .tplate:not([hidden]),html.touch .tiltchip{text-align:center}
+html.touch .tpeek .tp-l{text-align:center}
+html.touch .tpeek .tp-h b{flex:1;text-align:center;padding-left:44px}   /* (the width of the close button on the other side, so the name sits in the middle) */
+html.touch #modeHint,html.touch .zonebar > #modeHint{text-align:center}

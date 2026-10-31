@@ -17,6 +17,9 @@ const ECON = (() => {
   // The model counts floors; the game builds in sections (a stacked piece of building, usually two to four floors, each of its own design). Here a
   // level is a section, worth about three of the model's floors, so everything per floor is three times as much per level and the Sector Grade caps
   // are in levels (E and D 1, C 2, B 3, A 4: the model's 2/3, 3, 6, 8 and 12 floors). Building a level is what "click a roof to stack" already does.
+  // Pace (owner, Oct 31: a clicker, not an idle game): the model's hour passes in one real minute, so every rate per hour reads per minute,
+  // a level fills in a second or two, a core charges in seconds to a couple of minutes, and nothing builds up while the game is closed.
+  const K = 60;   // model hours per real hour
   const P = {
     pwr: { R: 3, C: 6, L: 9, I: 12, K: 9 }, stationPwr: 6, hwPwr: 8,
     coreCap: 80, coreCost: 250, coreCostGrowth: 1.35, coreBuildMin: 20, coreBuildGrowth: 1.45, coreBuildMaxH: 2,
@@ -33,9 +36,8 @@ const ECON = (() => {
     caps: [1, 1, 2, 3, 4], capIndustry: 2,
     prodMid: .95, prodFar: .8,
     accessMid: .8, accessFar: .3, accessMetro: .95, jobNear: 3, jobMid: 7, shopR: 3, stationR: 2, corpR: 3, factoryR: 2,
-    fill: 40, fillCheap: 20,   // (per hour, toward the target: a new level fills in a few minutes; the week's pace is set by power, Scrip and play time, not by this)
+    fill: 40, fillCheap: 20,   // (per model hour, toward the target: at the clicker pace a new level lights in a second or two)
     baseline: .6, baselineH: 24, stipend: 15,
-    offlineCapH: 8,
     startMoney: 800,
     metroTile: 25, metroStop: 150, hwTile: 120, hwFinish: 1500,
   };
@@ -59,12 +61,12 @@ const ECON = (() => {
   };
   const TIERS = [
     { name: 'Unlisted', pop: 0, inc: 0 },
-    { name: 'Registered', pop: 100, inc: 0, opens: 'Wire Nest, Town square, core upgrades and the stabilizer' },
-    { name: 'Zoned', pop: 350, inc: 600, opens: 'Metro, Police station, Market Plaza, Foundry' },
-    { name: 'Chartered', pop: 800, inc: 2200, opens: 'Luxury, Corps, Bath House, Neon Dome, LIDAR Array' },
-    { name: 'Incorporated', pop: 1400, inc: 5500, opens: 'Sky highways, Sky mall, Logistics Hub, Hydroponic Farm' },
-    { name: 'Sovereign', pop: 2200, inc: 12000, opens: 'Data Spire, Cloud Pagoda' },
-    { name: 'The coast', pop: 3200, inc: 20000, size: 100, opens: 'The coast, through the Data Spire' },
+    { name: 'Registered', pop: 100, inc: 0, opens: 'Wire Nest, Town square, core upgrades, stabilizer' },
+    { name: 'Zoned', pop: 300, inc: 500, opens: 'Metro, Police station, Market Plaza, Foundry' },
+    { name: 'Chartered', pop: 650, inc: 1800, opens: 'Luxury, Corps, Bath House, Neon Dome, LIDAR Array' },
+    { name: 'Incorporated', pop: 1100, inc: 4500, opens: 'Sky highways, Sky mall, Logistics Hub, Hydroponic Farm' },
+    { name: 'Sovereign', pop: 1700, inc: 9500, opens: 'Data Spire, Cloud Pagoda' },
+    { name: 'The coast', pop: 2500, inc: 16000, size: 80, opens: 'The coast, through the Data Spire' },
   ];
   const GRADES = ['E', 'D', 'C', 'B', 'A'];
   const ZNAME = { R: 'Residential', C: 'Commercial', L: 'Luxury', I: 'Industrial', K: 'Corps' };
@@ -99,7 +101,7 @@ const ECON = (() => {
   function coreCapOf(m){ const s = coreState(m); let c = P.coreCap; for (let k = 0; k < s.up; k++) c += P.coreCap*P.coreUpGain*Math.pow(P.coreUpDecay, k); return c; }
   const coreUpCost = m => Math.round(P.coreUpCost*Math.pow(P.coreUpCostGrowth, coreState(m).up));
   function nextCoreCost(){ const n = megaList('emitter').length; return Math.round(P.coreCost*Math.pow(P.coreCostGrowth, Math.max(0, n - 1))); }
-  function nextCoreBuildMs(){ const n = megaList('emitter').length; return Math.min(P.coreBuildMaxH*3600e3, P.coreBuildMin*60e3*Math.pow(P.coreBuildGrowth, Math.max(0, n - 1))); }
+  function nextCoreBuildMs(){ const n = megaList('emitter').length; return Math.min(P.coreBuildMaxH*3600e3, P.coreBuildMin*60e3*Math.pow(P.coreBuildGrowth, Math.max(0, n - 1)))/K; }
   const megaReach = (m) => { const d = MEGA[m.kind]; return (d.reach || 0) + (d.upReach ? d.upReach*(st.ups[m.kind] || 0) : 0); };
   const megaUpCost = kind => Math.round(MEGA[kind].upCost*Math.pow(MEGA[kind].upGrowth, st.ups[kind] || 0));
   const countZone = z => { let n = 0; for (const c of cells.values()) if (isBld(c) && zoneOf(c) === z) n++; return n; };
@@ -134,12 +136,20 @@ const ECON = (() => {
     const near = (c, arr, r) => { for (const o of arr) if (o !== c && cheb(c, o) <= r) return true; return false; };
     const minD = (c, arr) => { let d = Infinity; for (const o of arr){ const q = cheb(c, o); if (q < d) d = q; } return d; };
     const inReach = (c, k) => { for (const m of reachers[k]) if (megaD(c.i, c.j, m) <= megaReach(m)) return true; return false; };
+    // Who can reach what: a building joins the city when it stands within two plots of another that does, starting from the megastructures,
+    // or within reach of a metro stop. One on its own in the middle of nowhere stays empty.
+    const reach = new Set(), occupied = new Map();
+    for (const c of list) occupied.set(keyOf(c), c);
+    const queue = [];
+    if (typeof megas !== 'undefined') for (const m of megas.values()) for (const b0 of m.cells || []) if (b0) queue.push([b0.i, b0.j]);
+    for (const t of stops) for (let a = -P.stationR; a <= P.stationR; a++) for (let q = -P.stationR; q <= P.stationR; q++){ const k = (t.i + a) + ',' + (t.j + q); if (occupied.has(k) && !reach.has(k)){ reach.add(k); queue.push([t.i + a, t.j + q]); } }
+    while (queue.length){ const [i, j] = queue.pop(); for (let a = -2; a <= 2; a++) for (let q = -2; q <= 2; q++){ const k = (i + a) + ',' + (j + q); if (occupied.has(k) && !reach.has(k)){ reach.add(k); queue.push([i + a, j + q]); } } }
     const rows = [];
     let order = 0;
     for (const c of list){
       const z = zoneOf(c), k = keyOf(c); if (!z) continue;
       let coreD = Infinity; for (const m of cores){ const d = megaD(c.i, c.j, m); if (d < coreD) coreD = d; }
-      const b = { c, z, k, floors: floorsOf(c), coreD, order: order++ };
+      const b = { c, z, k, floors: floorsOf(c), coreD, order: order++, isolated: !reach.has(k) };
       b.band = coreD <= P.coreNear ? 'near' : coreD <= P.coreMid ? 'mid' : 'far';
       b.station = stops.some(t => Math.max(Math.abs(t.i - c.i), Math.abs(t.j - c.j)) <= P.stationR);
       b.track = !b.station && typeof mtAt === 'function' && mtAt(c.i, c.j).length > 0;
@@ -181,13 +191,14 @@ const ECON = (() => {
       else if (b.z === 'I') target = b.eff*pv.staffR;
       else if (b.z === 'K') target = b.eff*pv.staffL;
       else if (b.z === 'C') target = b.eff*Math.max(0, Math.min(1, pv.sales/capPrev));
+      if (b.isolated) target = 0;
       const cheap = b.lv < P.lvCheap;
       let occ = st.occ[b.k] || 0;
       let r = target >= occ ? P.fill + (cheap ? P.fillCheap : 0) : 6; if (b.z !== 'R' && b.z !== 'L') r = 20;
       occ += (target - occ)*Math.min(1, r*dtH); if (occ > b.floors) occ = b.floors;
       st.occ[b.k] = Math.round(occ*1000)/1000; b.occ = occ;
       const lit = Math.floor(occ + .5), best = st.best[b.k] || 0;   // (a level lights once it's about half full: homes short of work still light, they just earn less)
-      if (lit > best){ bonus += (lit - best)*P.bonus[b.z]*(b.z === 'R' && cheap ? P.cheapBonus : 1); st.best[b.k] = lit; if (live) E.emit('light', { c: b.c, lit }); }
+      if (lit > best){ const pay = (lit - best)*P.bonus[b.z]*(b.z === 'R' && cheap ? P.cheapBonus : 1); bonus += pay; st.best[b.k] = lit; if (live) E.emit('light', { c: b.c, lit, pay }); }
       b.lit = lit;
     }
     // jobs
@@ -272,9 +283,10 @@ const ECON = (() => {
   E.dark = c => { const d = darkCalc(c); c._econDark = d; return d; };
   function darkCalc(c){
     if (!isBld(c)) return null;
-    const b = B.get(keyOf(c)); if (!b) return null;
+    const b = B.get(keyOf(c)); if (!b) return CURB + .05;   // (just placed: dark until someone moves in, never a flash of light first)
     if (!b.powered) return true;
-    if (b.lit >= b.floors || c.lift || c.below) return b.band === 'far' ? -2 : b.band === 'mid' ? -1 : null;   // (lit: the lights flicker more the further it stands from a core, core.js)
+    if (c.lift || c.below) return b.lit > 0 ? (b.band === 'far' ? -2 : b.band === 'mid' ? -1 : null) : CURB + .05;
+    if (b.lit >= b.floors) return b.band === 'far' ? -2 : b.band === 'mid' ? -1 : null;   // (lit: the lights flicker more the further it stands from a core, core.js)
     return (b.lit <= 0 ? CURB : (c.sectionTops && c.sectionTops[b.lit - 1]) || CURB + b.lit*3*FH) + .05;   // (the top of the last lived-in level)
   }
   function darkSync(){
@@ -297,6 +309,9 @@ const ECON = (() => {
   E.emit = (n, d) => { (listeners[n] || []).forEach(f => { try { f(d); } catch (e) {} }); };
   E.onEv = (n, f) => (listeners[n] || (listeners[n] = [])).push(f);
 
+  // a level lighting for the first time: that building is redrawn at once (after this tick's numbers are in), ahead of the rest
+  E.onEv('light', d => { const i = darkQ.indexOf(d.c); if (i >= 0) darkQ.splice(i, 1); darkQ.unshift(d.c); setTimeout(darkFlush, 0); });
+
   /* ---------- tiers ---------- */
   const TIER_KINDS = {}; for (const k in MEGA) (TIER_KINDS[MEGA[k].tier] = TIER_KINDS[MEGA[k].tier] || []).push(k);
   function onTier(t, live){
@@ -313,7 +328,7 @@ const ECON = (() => {
   /* ---------- the rules on every build: money, zones, height ---------- */
   function say(msg){ const h = document.getElementById('modeHint'); if (h) h.textContent = msg; if (TOUCHY) note(msg, 3200); else flash(msg); }
   const zoneNow = zone => ZK[zone] === 'I' && st.corp && st.tier >= 3 ? 'K' : ZK[zone];
-  function zoneLocked(z){ if ((z === 'L' || z === 'K') && st.tier < 3){ say((z === 'L' ? 'Luxury' : 'Corps') + ' opens at Chartered (' + fmt(TIERS[3].pop) + ' residents, ' + fmt(TIERS[3].inc) + ' Scrip/h)'); return true; } return false; }
+  function zoneLocked(z){ if ((z === 'L' || z === 'K') && st.tier < 3){ say((z === 'L' ? 'Luxury' : 'Corps') + ' opens at Chartered (' + fmt(TIERS[3].pop) + ' residents, ' + fmt(TIERS[3].inc) + ' Scrip/min)'); return true; } return false; }
   function afford(cost){ if (st.money >= cost) return true; say('Not enough Scrip · ' + fmt(cost) + ' needed, ' + fmt(st.money) + ' held'); return false; }
   function charge(cost){ st.money -= cost; E.emit('spend', cost); hudSoon(); }
   // a new building on a plot that had none
@@ -334,20 +349,20 @@ const ECON = (() => {
   wrap('addPlatform', function (orig, i, j, zone){
     if (!zone) return orig(i, j, zone);
     const g = gateNew(zone); if (!g) return null;
-    const c = orig(i, j, zone); if (c){ charge(g.cost); markCorp(c, g); if (g.z === 'K') refresh([c]); E.emit('build', { c, z: g.z, fresh: true }); }
+    const c = orig(i, j, zone); if (c){ charge(g.cost); markCorp(c, g); if (g.z === 'K') refresh([c]); E.emit('build', { c, z: g.z, fresh: true, cost: g.cost }); }
     return c;
   });
   wrap('addSection', function (orig, c, zone, opt = {}){
     const fresh = !c.sections.length, g = fresh ? gateNew(zone) : gateUp(c, zone, opt); if (!g) return;
     const n0 = c.sections.length, f0 = floorsOf(c), r = orig(c, zone, opt);
-    if (c.sections.length > n0){ charge(g.cost); markCorp(c, g); E.emit('build', { c, z: g.z, fresh, f0 }); }
+    if (c.sections.length > n0){ charge(g.cost); markCorp(c, g); E.emit('build', { c, z: g.z, fresh, f0, cost: g.cost }); }
     return r;
   });
   for (const nm of ['addLift', 'addFloatPod', 'addPodDown', 'addBelowUp']) wrap(nm, function (orig, c, a, b, d){
     const zone = nm === 'addLift' || nm === 'addFloatPod' ? b : a;
     const fresh = !c.sections.length && !(c.below && c.below.length), g = fresh ? gateNew(zone) : gateUp(c, zone, null); if (!g) return null;
     const n0 = c.sections.length + (c.below ? c.below.length : 0), r = orig(c, a, b, d);
-    if (c.sections.length + (c.below ? c.below.length : 0) > n0){ charge(g.cost); markCorp(c, g); E.emit('build', { c, z: g.z, fresh }); }
+    if (c.sections.length + (c.below ? c.below.length : 0) > n0){ charge(g.cost); markCorp(c, g); E.emit('build', { c, z: g.z, fresh, cost: g.cost }); }
     return r;
   });
   // megastructures: one of each (Emitter Cores as many as you like), at their tier, for Scrip
@@ -428,23 +443,15 @@ const ECON = (() => {
       onTier(0, false);
       st.last = now();
     } else onTier(st.tier, false);
-    // time away: up to 8 hours count
-    const away = Math.min(P.offlineCapH*3600e3, Math.max(0, now() - (st.last || now())));
-    if (away > 60e3){
-      const m0 = st.money, p0 = (step(1/3600, false), R.pop); let left = away/3600e3;
-      while (left > 0){ const d = Math.min(left, 2/60); step(d, false); left -= d; }
-      const dm = st.money - m0, dp = R.pop - p0;
-      setTimeout(() => note('While you were away (' + fmtDur(away) + ') · +' + fmt(dm) + ' Scrip' + (dp > 1 ? ' · +' + fmt(dp) + ' residents' : ''), 7000), 2500);
-    }
+    // (time away doesn't count: progress comes from playing)
     lastT = now(); save();
   }
-  const fmtDur = ms => ms >= 3600e3 ? (ms/3600e3).toFixed(1) + ' h' : Math.round(ms/60e3) + ' min';
+  const fmtDur = ms => ms >= 3600e3 ? (ms/3600e3).toFixed(1) + ' h' : ms >= 60e3 ? Math.round(ms/60e3) + ' min' : Math.max(1, Math.round(ms/1000)) + ' s';
   function tick(){
     if (typeof cells === 'undefined') return;
     if (!booted){ if (cells.size < 1) return; boot(); }
-    const t = now(); let dt = (t - lastT)/1000; lastT = t;
-    if (dt > 30){ dt = Math.min(dt, P.offlineCapH*3600); let left = dt/3600; while (left > 0){ const d = Math.min(left, 2/60); step(d, false); left -= d; } }
-    else step(Math.max(0, dt)/3600, true);
+    const t = now(); let dt = Math.min(2, Math.max(0, (t - lastT)/1000)); lastT = t;   // (a hidden tab or a long gap: no catching up)
+    step(dt*K/3600, true);
     darkSync(); autoTick(); hud();
     if ((saveT += dt) > 10){ saveT = 0; save(); }
     if (typeof WIRELOG !== 'undefined' && WIRELOG.say && built('wirenest')) demandLine();
@@ -457,65 +464,81 @@ const ECON = (() => {
     const up = Object.keys(d).filter(k => d[k] > 0), lo = Object.keys(d).filter(k => d[k] < 0);
     if (up.length) WIRELOG.say('CITY', names[up[Math.random()*up.length | 0]] + ' demand · elevated');
     else if (lo.length) WIRELOG.say('CITY', names[lo[0]] + ' demand · low');
-    else WIRELOG.say('CITY', 'Zone demand · nominal · ' + fmt(R.rev) + ' Scrip/h');
+    else WIRELOG.say('CITY', 'Zone demand · nominal · ' + fmt(R.rev) + ' Scrip/min');
   }
 
   /* ---------- the interface ---------- */
   const css = `
-  .econ-hud { --e-bg: rgba(12,10,20,.9); --e-line: rgba(255,179,71,.38); --e-hair: rgba(255,255,255,.1); --e-txt: #efe6d6; --e-dim: #8f879e; --e-acc: #ffb347; --e-good: #5affa8; --e-bad: #ff5a6e;
-    position: fixed; z-index: 4; top: calc(10px + env(safe-area-inset-top,0px)); left: 50%; transform: translateX(-50%); display: flex; align-items: stretch; gap: 0;
-    font: 11px/1.25 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--e-txt); background: var(--e-bg); border: 1px solid var(--e-line); letter-spacing: .02em; max-width: calc(100vw - 24px); }
-  .econ-hud .eh { padding: 5px 10px; display: flex; flex-direction: column; justify-content: center; gap: 1px; border-right: 1px solid var(--e-hair); min-width: 0; white-space: nowrap; }
+  .econ-hud { --e-bg: rgba(12,10,20,.92); --e-line: rgba(255,179,71,.38); --e-hair: rgba(255,255,255,.1); --e-txt: #efe6d6; --e-dim: #9a92aa; --e-acc: #ffb347; --e-good: #5affa8; --e-bad: #ff5a6e;
+    position: fixed; z-index: 4; top: calc(10px + env(safe-area-inset-top,0px)); left: 50%; transform: translateX(-50%); display: flex; align-items: stretch;
+    font: 12px/1.25 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--e-txt); background: var(--e-bg); border: 1px solid var(--e-line); max-width: calc(100vw - 24px); }
+  .econ-hud .eh { padding: 6px 12px; display: flex; flex-direction: column; justify-content: center; gap: 2px; border-right: 1px solid var(--e-hair); min-width: 0; white-space: nowrap; }
   .econ-hud .eh:last-child { border-right: 0; }
   .econ-hud [hidden] { display: none !important; }
-  .econ-hud small { color: var(--e-dim); font-size: 8.5px; letter-spacing: .16em; text-transform: uppercase; }
+  .econ-hud small { color: var(--e-dim); font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; }
   .econ-hud b { font-weight: 500; font-variant-numeric: tabular-nums; }
-  .econ-hud .scrip b { color: var(--e-acc); font-size: 13px; } .econ-hud .rate { color: var(--e-good); font-size: 10px; } .econ-hud .rate.neg { color: var(--e-bad); }
-  .econ-hud .bar { height: 3px; background: var(--e-hair); width: 100%; min-width: 64px; } .econ-hud .bar i { display: block; height: 100%; background: var(--e-acc); }
+  .econ-hud .scrip b { color: var(--e-acc); font-size: 16px; } .econ-hud .rate { color: var(--e-good); font-size: 11px; } .econ-hud .rate.neg { color: var(--e-bad); }
+  .econ-hud .scrip b.bump { animation: ehBump .35s ease-out; } @keyframes ehBump { 0% { transform: scale(1.25); color: #fff; } 100% { transform: none; } }
+  .econ-hud .bar { height: 4px; background: var(--e-hair); width: 100%; min-width: 70px; } .econ-hud .bar i { display: block; height: 100%; background: var(--e-acc); transition: width .4s; }
   .econ-hud .pw.over b { color: var(--e-bad); } .econ-hud .pw .bar i { background: #38e8e0; } .econ-hud .pw.over .bar i { background: var(--e-bad); }
-  .econ-hud .dm { display: flex; gap: 6px; } .econ-hud .dm span { color: var(--e-dim); } .econ-hud .dm span.up { color: var(--e-good); } .econ-hud .dm span.dn { color: var(--e-bad); }
-  .econ-hud button { all: unset; cursor: pointer; padding: 0 12px; color: var(--e-acc); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; }
+  .econ-hud .dm { display: flex; gap: 7px; } .econ-hud .dm span { color: var(--e-dim); } .econ-hud .dm span.up { color: var(--e-good); } .econ-hud .dm span.dn { color: var(--e-bad); }
+  .econ-hud button { all: unset; cursor: pointer; padding: 0 14px; color: var(--e-acc); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; }
   .econ-hud button:hover, .econ-hud button:focus-visible { color: #fff; background: rgba(255,179,71,.12); }
-  .econ-corp { position: fixed; z-index: 4; top: calc(62px + env(safe-area-inset-top,0px)); left: 50%; transform: translateX(-50%); display: flex; font: 10px/1 'JetBrains Mono', monospace; border: 1px solid rgba(232,224,58,.5); background: rgba(12,10,20,.9); }
-  .econ-corp[hidden] { display: none; } .econ-corp button { all: unset; cursor: pointer; padding: 7px 12px; color: #a9a2b6; letter-spacing: .12em; text-transform: uppercase; }
+  .econ-corp { position: fixed; z-index: 4; top: calc(70px + env(safe-area-inset-top,0px)); left: 50%; transform: translateX(-50%); display: flex; font: 12px/1 'JetBrains Mono', monospace; border: 1px solid rgba(232,224,58,.5); background: rgba(12,10,20,.92); }
+  .econ-corp[hidden] { display: none; } .econ-corp button { all: unset; cursor: pointer; padding: 9px 14px; color: #a9a2b6; letter-spacing: .12em; text-transform: uppercase; }
   .econ-corp button[aria-pressed="true"] { color: #12101a; background: #e8e03a; }
-  .econ-flash { position: fixed; z-index: 6; left: 50%; top: calc(64px + env(safe-area-inset-top,0px)); transform: translateX(-50%); font: 11px/1.4 'JetBrains Mono', monospace; color: #efe6d6; background: rgba(12,10,20,.94); border: 1px solid rgba(255,90,110,.5); padding: 6px 12px; pointer-events: none; max-width: calc(100vw - 32px); text-align: center; }
+  .econ-flash { position: fixed; z-index: 6; left: 50%; top: calc(74px + env(safe-area-inset-top,0px)); transform: translateX(-50%); font: 13px/1.45 'JetBrains Mono', monospace; color: #efe6d6; background: rgba(12,10,20,.95); border: 1px solid rgba(255,90,110,.55); padding: 8px 14px; pointer-events: none; max-width: calc(100vw - 32px); text-align: center; }
   .econ-flash[hidden] { display: none; }
-  .econ-note { position: fixed; z-index: 7; left: 50%; bottom: calc(132px + env(safe-area-inset-bottom,0px)); transform: translateX(-50%); width: min(440px, calc(100vw - 32px)); font: 12px/1.45 'JetBrains Mono', monospace; color: #efe6d6; background: rgba(12,10,20,.95); border: 1px solid rgba(255,179,71,.45); border-left: 3px solid #ffb347; padding: 10px 14px; white-space: pre-line; }
-  .econ-note[hidden] { display: none; } .econ-note .t { color: #ffb347; font-size: 9px; letter-spacing: .2em; text-transform: uppercase; display: block; margin-bottom: 4px; }
-  .econ-note .row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; } .econ-note button { all: unset; cursor: pointer; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: #8f879e; padding: 6px 8px; }
+  .econ-note { position: fixed; z-index: 7; left: 50%; bottom: calc(132px + env(safe-area-inset-bottom,0px)); transform: translateX(-50%); width: min(480px, calc(100vw - 32px)); box-sizing: border-box;
+    font: 15px/1.45 'JetBrains Mono', monospace; color: #efe6d6; background: rgba(12,10,20,.96); border: 1px solid rgba(255,179,71,.45); border-left: 4px solid #ffb347; padding: 12px 16px; white-space: pre-line; }
+  .econ-note[hidden] { display: none; } .econ-note .t { color: #ffb347; font-size: 10.5px; letter-spacing: .2em; text-transform: uppercase; display: block; margin-bottom: 6px; }
+  .econ-note .say { font-size: 17px; line-height: 1.35; color: #fff; display: block; }
+  .econ-note .sub { display: block; margin-top: 6px; color: #b9b0c8; font-size: 13px; }
+  .econ-note .prog { display: flex; gap: 6px; margin-top: 10px; } .econ-note .prog i { width: 22px; height: 6px; background: rgba(255,255,255,.12); } .econ-note .prog i.on { background: #ffb347; }
+  .econ-note .row { display: flex; gap: 8px; justify-content: flex-end; align-items: center; margin-top: 10px; } .econ-note button { all: unset; cursor: pointer; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: #9a92aa; padding: 8px 10px; }
   .econ-note button.go { color: #12101a; background: #ffb347; } .econ-note button:focus-visible { outline: 1px solid #ffb347; }
-  .econ-tip { position: fixed; z-index: 61; pointer-events: none; font: 10.5px/1.4 'JetBrains Mono', monospace; color: #efe6d6; background: rgba(12,10,20,.92); border: 1px solid rgba(255,179,71,.35); padding: 5px 8px; transform: translate(16px, 10px); white-space: pre; display: none; }
+  .econ-note.done-flash { animation: enDone .5s ease-out; } @keyframes enDone { 0% { border-color: #5affa8; box-shadow: 0 0 0 6px rgba(90,255,168,.25); } 100% { box-shadow: none; } }
+  .econ-pulse { animation: ePulse 1.1s ease-in-out infinite !important; position: relative; z-index: 5; }
+  @keyframes ePulse { 0%, 100% { box-shadow: 0 0 0 2px rgba(255,179,71,.9), 0 0 0 6px rgba(255,179,71,.0); } 50% { box-shadow: 0 0 0 2px rgba(255,179,71,.9), 0 0 18px 6px rgba(255,179,71,.55); } }
+  .econ-tip { position: fixed; z-index: 61; pointer-events: none; font: 13px/1.5 'JetBrains Mono', monospace; color: #efe6d6; background: rgba(12,10,20,.95); border: 1px solid rgba(255,179,71,.4); padding: 8px 11px; transform: translate(18px, 12px); white-space: pre; display: none; }
+  .econ-tip .h { color: #ffb347; } .econ-tip .bad { color: #ff8a98; } .econ-tip .ok { color: #5affa8; }
+  .econ-float { position: fixed; z-index: 5; pointer-events: none; font: 600 15px/1 'JetBrains Mono', monospace; color: #ffb347; text-shadow: 0 0 8px rgba(255,179,71,.7), 0 1px 0 #000; transform: translate(-50%, -50%); animation: eFloat 1.3s ease-out forwards; white-space: nowrap; }
+  .econ-float.cost { color: #ff8a98; font-size: 12px; text-shadow: 0 1px 0 #000; } .econ-float.warn { color: #ff8a98; font-size: 12px; }
+  @keyframes eFloat { 0% { opacity: 0; transform: translate(-50%, -30%) scale(.7); } 15% { opacity: 1; transform: translate(-50%, -60%) scale(1.15); } 100% { opacity: 0; transform: translate(-50%, -260%) scale(1); } }
   .econ-office { box-sizing: border-box; position: fixed; z-index: 30; top: 0; right: 0; bottom: 0; width: min(420px, 100vw); overflow-y: auto; background: rgba(12,10,20,.97); border-left: 1px solid rgba(255,179,71,.35); color: #efe6d6;
-    font: 12px/1.5 'JetBrains Mono', ui-monospace, monospace; padding: calc(14px + env(safe-area-inset-top,0px)) max(16px, env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) 16px; }
+    font: 14px/1.5 'JetBrains Mono', ui-monospace, monospace; padding: calc(12px + env(safe-area-inset-top,0px)) max(18px, env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) 18px; }
   .econ-office[hidden] { display: none; }
-  .econ-office header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-  .econ-office h2 { margin: 0; font-size: 12px; letter-spacing: .24em; text-transform: uppercase; color: #ffb347; font-weight: 500; }
-  .econ-office h3 { margin: 18px 0 6px; font-size: 9.5px; letter-spacing: .2em; text-transform: uppercase; color: #8f879e; font-weight: 500; border-top: 1px solid rgba(255,255,255,.08); padding-top: 12px; }
-  .econ-office .x { all: unset; cursor: pointer; width: 44px; height: 44px; display: grid; place-items: center; color: #8f879e; font-size: 16px; } .econ-office .x:hover { color: #fff; }
-  .econ-office table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; } .econ-office td { padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,.05); vertical-align: top; } .econ-office td:last-child { text-align: right; white-space: nowrap; padding-left: 8px; }
-  .econ-office .tier.done td { color: #8f879e; } .econ-office .tier.cur td { color: #ffb347; } .econ-office .tier small { display: block; color: #8f879e; font-size: 10px; }
-  .econ-office .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,.05); } .econ-office .row small { display: block; color: #8f879e; font-size: 10px; }
-  .econ-office .btn { all: unset; cursor: pointer; padding: 6px 10px; border: 1px solid rgba(255,179,71,.5); color: #ffb347; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; white-space: nowrap; }
+  .econ-office header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .econ-office h2 { margin: 0; font-size: 13px; letter-spacing: .24em; text-transform: uppercase; color: #ffb347; font-weight: 500; }
+  .econ-office .x { all: unset; cursor: pointer; width: 44px; height: 44px; display: grid; place-items: center; color: #9a92aa; font-size: 18px; } .econ-office .x:hover { color: #fff; }
+  .econ-office .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.08); }
+  .econ-office .stats div { background: #12101c; padding: 10px; } .econ-office .stats small { display: block; color: #9a92aa; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; } .econ-office .stats b { font-size: 18px; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .econ-office .next { margin-top: 14px; border: 1px solid rgba(255,179,71,.4); padding: 12px; } .econ-office .next .nm { color: #ffb347; font-size: 16px; } .econ-office .next p { margin: 4px 0 10px; color: #b9b0c8; font-size: 13px; }
+  .econ-office .meter { margin-top: 8px; font-size: 13px; } .econ-office .meter div { display: flex; justify-content: space-between; } .econ-office .meter .bar { height: 6px; background: rgba(255,255,255,.1); margin-top: 3px; } .econ-office .meter .bar i { display: block; height: 100%; background: #ffb347; }
+  .econ-office details { border-top: 1px solid rgba(255,255,255,.08); margin-top: 14px; } .econ-office summary { cursor: pointer; padding: 12px 0 6px; font-size: 12px; letter-spacing: .18em; text-transform: uppercase; color: #9a92aa; list-style: none; display: flex; justify-content: space-between; }
+  .econ-office summary::after { content: '+'; } .econ-office details[open] summary::after { content: '–'; } .econ-office summary:hover { color: #fff; }
+  .econ-office .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.05); } .econ-office .row small { display: block; color: #9a92aa; font-size: 12px; }
+  .econ-office .btn { all: unset; cursor: pointer; padding: 8px 12px; border: 1px solid rgba(255,179,71,.5); color: #ffb347; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; white-space: nowrap; }
   .econ-office .btn:hover, .econ-office .btn:focus-visible { background: rgba(255,179,71,.14); color: #fff; } .econ-office .btn[disabled] { opacity: .4; cursor: default; }
-  .econ-office p { margin: 4px 0; color: #b9b0c8; }
+  .econ-office p { margin: 6px 0; color: #b9b0c8; font-size: 13px; } .econ-office table { width: 100%; border-collapse: collapse; font-size: 13px; } .econ-office td { padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,.05); } .econ-office td:last-child { text-align: right; }
+  .econ-office .done td { color: #7d768c; } .econ-office .cur td { color: #ffb347; }
   .econ-mini { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: rgba(6,5,10,.72); }
   .econ-mini[hidden] { display: none; }
-  .econ-mini .box { background: #0d0a16; border: 1px solid rgba(56,232,224,.5); padding: 14px; font: 11px/1.4 'JetBrains Mono', monospace; color: #efe6d6; width: min(340px, calc(100vw - 32px)); }
+  .econ-mini .box { background: #0d0a16; border: 1px solid rgba(56,232,224,.5); padding: 14px; font: 13px/1.4 'JetBrains Mono', monospace; color: #efe6d6; width: min(340px, calc(100vw - 32px)); }
   .econ-mini canvas { display: block; width: 100%; aspect-ratio: 1/1.1; background: #07060c; touch-action: none; cursor: pointer; }
-  .econ-mini .top { display: flex; justify-content: space-between; margin-bottom: 8px; color: #38e8e0; letter-spacing: .14em; text-transform: uppercase; font-size: 10px; }
-  .econ-mini .foot { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; color: #8f879e; }
-  .econ-mini button { all: unset; cursor: pointer; color: #38e8e0; letter-spacing: .14em; text-transform: uppercase; font-size: 10px; padding: 8px; }
-  html.touch .econ-hud { top: calc(54px + env(safe-area-inset-top,0px)); left: max(12px, env(safe-area-inset-left,0px)); transform: none; font-size: 10px; }
-  html.touch .econ-corp { top: calc(108px + env(safe-area-inset-top,0px)); left: max(12px, env(safe-area-inset-left,0px)); transform: none; }
-  html.touch .econ-note { font-size: 11px; padding: 8px 12px; bottom: calc(150px + env(safe-area-inset-bottom,0px)); }
-  html.touch .econ-flash { top: calc(112px + env(safe-area-inset-top,0px)); } html.touch .econ-hud .eh { padding: 4px 7px; } html.touch .econ-hud .hide-t { display: none; }
+  .econ-mini .top { display: flex; justify-content: space-between; margin-bottom: 8px; color: #38e8e0; letter-spacing: .14em; text-transform: uppercase; font-size: 11px; }
+  .econ-mini .foot { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; color: #9a92aa; }
+  .econ-mini button { all: unset; cursor: pointer; color: #38e8e0; letter-spacing: .14em; text-transform: uppercase; font-size: 11px; padding: 8px; }
+  html.touch .econ-hud { top: calc(54px + env(safe-area-inset-top,0px)); left: max(12px, env(safe-area-inset-left,0px)); transform: none; font-size: 11px; } html.touch .econ-hud .eh { padding: 5px 9px; } html.touch .econ-hud .hide-t { display: none; }
+  html.touch .econ-corp { top: calc(112px + env(safe-area-inset-top,0px)); left: max(12px, env(safe-area-inset-left,0px)); transform: none; }
+  html.touch .econ-note { font-size: 14px; padding: 11px 14px; bottom: calc(150px + env(safe-area-inset-bottom,0px)); } html.touch .econ-note .say { font-size: 16px; }
+  html.touch .econ-flash { top: calc(116px + env(safe-area-inset-top,0px)); }
   @media (max-width: 560px) { .econ-hud .hide-s { display: none; } }
   `;
   const styleEl = document.createElement('style'); styleEl.textContent = css; document.head.appendChild(styleEl);
   const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
   const hudEl = el('div', 'econ-hud'); hudEl.setAttribute('role', 'status'); hudEl.setAttribute('aria-label', 'City economy');
-  hudEl.innerHTML = `<div class="eh scrip"><small>Scrip</small><b id="ehM">0</b><span class="rate" id="ehR">+0/h</span></div>
+  hudEl.innerHTML = `<div class="eh scrip"><small>Scrip</small><b id="ehM">0</b><span class="rate" id="ehR">+0/min</span></div>
     <div class="eh"><small>Residents</small><b id="ehP">0</b></div>
     <div class="eh pw hide-t" id="ehPw"><small>Power</small><b id="ehPwV">0/0</b><div class="bar"><i id="ehPwB"></i></div></div>
     <div class="eh hide-s"><small id="ehTn">Next</small><b id="ehTv">0/100</b><div class="bar"><i id="ehTb"></i></div></div>
@@ -527,68 +550,110 @@ const ECON = (() => {
   corpEl.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; st.corp = b.dataset.c === '1'; corpSync(); save(); });
   const corpSync = () => { corpEl.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.c === '1') === !!st.corp))); corpEl.hidden = !(typeof S !== 'undefined' && S.zone === 'ind' && st.tier >= 3); };
   const flashEl = el('div', 'econ-flash'); flashEl.hidden = true; document.body.appendChild(flashEl);
-  let flashT = 0; function flash(msg){ flashEl.textContent = msg; flashEl.hidden = false; clearTimeout(flashT); flashT = setTimeout(() => flashEl.hidden = true, 2600); }
+  let flashT = 0; function flash(msg){ flashEl.textContent = msg; flashEl.hidden = false; clearTimeout(flashT); flashT = setTimeout(() => flashEl.hidden = true, 2800); }
   const noteEl = el('div', 'econ-note'); noteEl.hidden = true; noteEl.setAttribute('role', 'status'); document.body.appendChild(noteEl);
   let noteT = 0, noteTut = false;
-  function note(msg, ms = 5000){ if (noteTut) return flash(msg.split('\n')[0]); noteEl.innerHTML = ''; noteEl.append(el('span', 't', 'City office'), document.createTextNode(msg)); noteEl.hidden = false; clearTimeout(noteT); noteT = setTimeout(() => { if (!noteTut) noteEl.hidden = true; }, ms); }
+  function note(msg, ms = 5000){ if (noteTut) return flash(msg.split('\n')[0]); noteEl.innerHTML = ''; noteEl.append(el('span', 't', 'City office'), el('span', 'sub', '')); noteEl.lastChild.textContent = msg; noteEl.hidden = false; clearTimeout(noteT); noteT = setTimeout(() => { if (!noteTut) noteEl.hidden = true; }, ms); }
   E.note = note;
+
+  /* ---------- the light-up: a pulse round the level that just lit, and the Scrip it paid rising off it ---------- */
+  const _v = new THREE.Vector3();
+  function screenOf(x, y, z){ try { _v.set(x, y, z).project(cam); if (_v.z > 1) return null; const r = viewRect(); return [r.left + (_v.x*.5 + .5)*r.width, r.top + (1 - (_v.y*.5 + .5))*r.height]; } catch (e) { return null; } }
+  function floatText(x, y, z, text, cls = ''){ const p = screenOf(x, y, z); if (!p) return; const f = el('div', 'econ-float ' + cls); f.textContent = text; f.style.left = p[0] + 'px'; f.style.top = p[1] + 'px'; document.body.appendChild(f); setTimeout(() => f.remove(), 1400); }
+  const ZCOL = { R: 0x38e8e0, C: 0xffb347, L: 0xff4fa3, I: 0xe8e03a, K: 0xe8e03a };
+  const pulseGeo = new THREE.BoxGeometry(1, 1, 1), pulseEdge = new THREE.EdgesGeometry(pulseGeo), pulses = [];
+  function pulseLevel(c, lit, z){
+    if (typeof scene === 'undefined' || pulses.length > 8) return;
+    const tops = c.sectionTops || [], y1 = (!c.lift && tops[lit - 1]) || c.height || CURB + 2, y0 = (!c.lift && lit > 1 && tops[lit - 2]) || (c.lift ? c.lift.y : CURB);
+    const h = Math.max(.6, y1 - y0), w = (typeof SIDE !== 'undefined' ? SIDE : 3) + .15, col = ZCOL[z] || 0xffffff;
+    const fill = new THREE.Mesh(pulseGeo, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: .5, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending }));
+    const edge = new THREE.LineSegments(pulseEdge, new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: 1, depthTest: false }));
+    for (const o of [fill, edge]){ o.layers.set(1); o.renderOrder = 997; o.position.set(c.x, y0 + h/2, c.z); o.scale.set(w, h, w); scene.add(o); }
+    pulses.push({ fill, edge, t0: performance.now(), w, h });
+    if (pulses.length === 1) requestAnimationFrame(pulseTick);
+  }
+  function pulseTick(t){
+    for (let i = pulses.length - 1; i >= 0; i--){ const p = pulses[i], k = Math.min(1, (t - p.t0)/900), e = 1 - Math.pow(1 - k, 3), g = 1 + .35*e;
+      p.fill.scale.set(p.w*g, p.h*(1 + .2*e), p.w*g); p.edge.scale.copy(p.fill.scale); p.fill.material.opacity = .5*(1 - k); p.edge.material.opacity = 1 - k;
+      if (k >= 1){ for (const o of [p.fill, p.edge]){ scene.remove(o); o.material.dispose(); } pulses.splice(i, 1); } }
+    if (pulses.length) requestAnimationFrame(pulseTick);
+  }
+  let lastBump = 0;
+  E.onEv('light', d => {
+    const b = B.get(keyOf(d.c)), z = b ? b.z : 'R', c = d.c, y = (!c.lift && c.sectionTops && c.sectionTops[d.lit - 1]) || c.height || CURB + 2;
+    pulseLevel(c, d.lit, z);
+    floatText(c.x, y + .6, c.z, '+' + fmt(d.pay) + ' Scrip');
+    try { if (typeof sfx !== 'undefined' && performance.now() - lastBump > 250) sfx.play('place'); } catch (e) {}
+    const m = document.getElementById('ehM'); if (m && performance.now() - lastBump > 200){ lastBump = performance.now(); m.classList.remove('bump'); void m.offsetWidth; m.classList.add('bump'); }
+  });
+  E.onEv('build', d => { if (!d || !d.c) return; const c = d.c; setTimeout(() => { floatText(c.x, (c.height || CURB) + .4, c.z, '−' + fmt(d.cost) + ' Scrip', 'cost');
+    const b = B.get(keyOf(c)); if (b && b.isolated) { floatText(c.x, (c.height || CURB) + 1.4, c.z, 'Isolated', 'warn'); say('Isolated · nobody can reach it · build within two plots of the city'); } }, 60); });
+
   let hudQ = false; const hudSoon = () => { if (hudQ) return; hudQ = true; requestAnimationFrame(() => { hudQ = false; hud(); }); };
+  const perMin = v => fmt(v) + '/min';
   function hud(){
     const $ = id => document.getElementById(id);
-    $('ehM').textContent = fmt(st.money); const r = $('ehR'); r.textContent = (R.rev >= 0 ? '+' : '') + fmt(R.rev) + '/h'; r.classList.toggle('neg', R.rev < 0);
+    $('ehM').textContent = fmt(st.money); const r = $('ehR'); r.textContent = (R.rev >= 0 ? '+' : '') + perMin(R.rev); r.classList.toggle('neg', R.rev < 0);
     $('ehP').textContent = fmt(R.pop);
     const over = R.demandAll > R.supply; $('ehPw').classList.toggle('over', over); $('ehPwV').textContent = fmt(Math.min(R.used, R.supply)) + '/' + fmt(R.supply) + (R.constructing && R.constructing.length ? ' +' : '');
     $('ehPwB').style.width = (R.supply ? Math.min(100, 100*R.demandAll/R.supply) : 100) + '%';
     const nt = TIERS[Math.min(st.tier + 1, TIERS.length - 1)], doneAll = st.tier >= TIERS.length - 1;
     $('ehTn').textContent = doneAll ? TIERS[st.tier].name : 'Next · ' + nt.name;
-    $('ehTv').textContent = doneAll ? 'complete' : fmt(R.pop) + '/' + fmt(nt.pop) + (nt.inc ? ' · ' + fmt(R.rev) + '/' + fmt(nt.inc) : '');
+    $('ehTv').textContent = doneAll ? 'complete' : fmt(R.pop) + '/' + fmt(nt.pop) + ' residents';
     const k = doneAll ? 1 : Math.min(1, R.pop/nt.pop, nt.inc ? R.rev/nt.inc : 1); $('ehTb').style.width = (k*100) + '%';
     const dm = $('ehDm'); dm.hidden = !built('wirenest');
     if (!dm.hidden){ const d = R.demandZ; $('ehDmV').innerHTML = ['R', 'C', 'I', 'L'].filter(z => z !== 'L' || st.tier >= 3).map(z => `<span class="${d[z] > 0 ? 'up' : d[z] < 0 ? 'dn' : ''}" title="${ZNAME[z]} demand">${z}${d[z] > 0 ? '▲' : d[z] < 0 ? '▼' : '·'}</span>`).join(''); }
     corpSync();
-    if (!officeEl.hidden && (offT = (offT + 1) % 3) === 0) renderOffice();
+    if (!officeEl.hidden && (offT = (offT + 1) % 2) === 0) renderOffice();
   }
   let offT = 0;
   document.getElementById('ehO').addEventListener('click', () => toggleOffice());
 
-  /* ---------- the City office ---------- */
+  /* ---------- the City office: the next goal first, the rest folded away ---------- */
   const officeEl = el('aside', 'econ-office'); officeEl.hidden = true; officeEl.setAttribute('role', 'dialog'); officeEl.setAttribute('aria-label', 'City office'); document.body.appendChild(officeEl);
   function toggleOffice(open = officeEl.hidden){ officeEl.hidden = !open; if (open){ renderOffice(); E.emit('office'); const x = officeEl.querySelector('.x'); if (x) x.focus({ preventScroll: true }); } }
   E.office = toggleOffice;
   addEventListener('keydown', e => { if (e.key === 'Escape' && !officeEl.hidden){ toggleOffice(false); e.stopPropagation(); } }, true);
+  const openSec = { power: true };
+  officeEl.addEventListener('toggle', e => { const d = e.target; if (d.dataset && d.dataset.sec) openSec[d.dataset.sec] = d.open; }, true);
+  const sec = (key, title, body) => `<details data-sec="${key}" ${openSec[key] ? 'open' : ''}><summary>${title}</summary>${body}</details>`;
   function renderOffice(){
-    const keepScroll = officeEl.scrollTop;
-    const rows = [];
-    rows.push(`<header><h2>City office</h2><button class="x" type="button" aria-label="Close the City office">✕</button></header>`);
-    rows.push(`<p>Classified <b style="color:#ffb347">${TIERS[st.tier].name}</b> · ${fmt(st.money)} Scrip · ${fmt(R.rev)} Scrip/h · ${fmt(R.pop)} residents · ${Math.round(R.emp*100)}% employed</p>`);
-    rows.push(`<h3>Classification</h3><table>` + TIERS.slice(1).map((t, q) => { const n = q + 1, cls = n <= st.tier ? 'done' : n === st.tier + 1 ? 'cur' : '';
-      return `<tr class="tier ${cls}"><td>${n <= st.tier ? '✓ ' : ''}${t.name}<small>${t.opens}</small></td><td>${fmt(t.pop)} res${t.inc ? '<br>' + fmt(t.inc) + '/h' : ''}${t.size ? '<br>' + t.size + ' lit bldgs' : ''}</td></tr>`; }).join('') + `</table>`);
+    const keepScroll = officeEl.scrollTop, out = [];
+    out.push(`<header><h2>City office</h2><button class="x" type="button" aria-label="Close the City office">✕</button></header>`);
+    out.push(`<div class="stats"><div><small>Scrip</small><b>${fmt(st.money)}</b></div><div><small>Per min</small><b>${fmt(R.rev)}</b></div><div><small>Residents</small><b>${fmt(R.pop)}</b></div></div>`);
+    if (st.tier < TIERS.length - 1){ const t = TIERS[st.tier + 1];
+      const m = (lab, a, b) => `<div class="meter"><div><span>${lab}</span><span>${fmt(Math.min(a, b))} / ${fmt(b)}</span></div><div class="bar"><i style="width:${Math.min(100, 100*a/b)}%"></i></div></div>`;
+      out.push(`<div class="next"><small style="color:#9a92aa;letter-spacing:.14em;text-transform:uppercase;font-size:10px">Next classification</small><div class="nm">${t.name}</div><p>Unlocks ${t.opens}</p>${m('Residents', R.pop, t.pop)}${t.inc ? m('Scrip per min', R.rev, t.inc) : ''}${t.size ? m('Lit buildings', R.size, t.size) : ''}</div>`);
+    } else out.push(`<div class="next"><div class="nm">Every classification reached</div><p>The coast is open through the Data Spire.</p></div>`);
     // power
     const cores = megaList('emitter');
-    rows.push(`<h3>Power · ${fmt(R.used)} of ${fmt(R.supply)} in use${R.demandAll > R.supply ? ' · ' + fmt(R.demandAll - R.supply) + ' short' : ''}</h3>`);
-    rows.push(`<p>Buildings nearest a core get power first. Within ${P.coreNear} plots the air is poor (Sector Grade drops); past ${P.coreMid} the lights flicker and output falls; past ${P.coreReach} there's no power at all.</p>`);
+    let pw = `<p>${fmt(R.used)} of ${fmt(R.supply)} in use${R.demandAll > R.supply ? ' · <span style="color:#ff8a98">' + fmt(R.demandAll - R.supply) + ' short</span>' : ''}. Closest buildings get power first; nothing past ${P.coreReach} plots.</p>`;
     cores.forEach((m, q) => { const s = coreState(m), ready = s.readyAt <= now();
-      rows.push(`<div class="row"><div>Emitter Core ${q + 1}<small>${ready ? fmt(coreCapOf(m)) + ' power · upgrades ' + s.up : 'Charging · ' + fmtDur(s.readyAt - now()) + ' left'}</small></div>` +
-        (ready ? `<button class="btn" data-up="${m.id}" ${st.tier < 1 ? 'disabled title="Opens at Registered"' : ''}>Upgrade · ${fmt(coreUpCost(m))}</button>` : `<button class="btn" data-mini="${m.id}" ${st.tier < 1 ? 'disabled title="Opens at Registered"' : ''}>Stabilize</button>`) + `</div>`); });
-    rows.push(`<p>Next core: ${fmt(nextCoreCost())} Scrip, ${fmtDur(nextCoreBuildMs())} to charge. Place it from Buildings.</p>`);
+      pw += `<div class="row"><div>Emitter Core ${q + 1}<small>${ready ? fmt(coreCapOf(m)) + ' power' : 'Charging · ' + fmtDur(s.readyAt - now())}</small></div>` +
+        (ready ? `<button class="btn" data-up="${m.id}" ${st.tier < 1 ? 'disabled title="Opens at Registered"' : ''}>Upgrade · ${fmt(coreUpCost(m))}</button>` : `<button class="btn" data-mini="${m.id}" ${st.tier < 1 ? 'disabled title="Opens at Registered"' : ''}>Stabilize</button>`) + `</div>`; });
+    pw += `<p>Another core: ${fmt(nextCoreCost())} Scrip from Buildings.</p>`;
+    out.push(sec('power', 'Power', pw));
     // megastructures
-    rows.push(`<h3>Megastructures</h3>`);
+    let mg = '';
     for (const kind of Object.keys(MEGA)){ if (kind === 'emitter' || !MEGA_TYPES[kind]) continue; const d = MEGA[kind], has = built(kind), open = d.tier <= st.tier;
+      if (!open && !has) continue;
       let act = '';
       if (has && d.upCost) act = `<button class="btn" data-upm="${kind}" ${kind === 'radio' && st.tier < 1 ? 'disabled' : ''}>Reach +${d.upReach} · ${fmt(megaUpCost(kind))}</button>`;
-      else if (has && kind === 'mall'){ const m = megaList('mall')[0]; act = m && m.levels < 3 ? `<span>Level ${m.levels} · stack from the roof</span>` : '<span>Level 3</span>'; }
-      else if (has) act = '<span>Built</span>';
-      else act = open ? `<span>${fmt(d.cost)} Scrip</span>` : `<span style="color:#8f879e">${TIERS[d.tier].name}</span>`;
-      rows.push(`<div class="row"><div>${MEGA_TYPES[kind].name}<small>${d.what}${d.reach ? ' · reach ' + megaReachKind(kind) + ' plots' : ''}</small></div>${act}</div>`); }
-    if (built('spire')) rows.push(`<div class="row"><div>Overseer auto-upgrades<small>The cheapest full building gets its next level while you can afford it</small></div><button class="btn" data-auto="1" aria-pressed="${!!st.auto}">${st.auto ? 'On' : 'Off'}</button></div>`);
-    // money
-    rows.push(`<h3>Income per hour</h3><table>` + Object.entries(R.breakdown || {}).filter(([, v]) => Math.abs(v) >= .5).map(([k, v]) => `<tr><td>${k}</td><td>${v < 0 ? '−' : ''}${fmt(Math.abs(v))}</td></tr>`).join('') + `</table>`);
-    rows.push(`<h3>How it works</h3><p>Every building costs Scrip and pays a burst the first time each of its levels lights up. Click or tap a building's roof to stack a level. Sector Grade (E to A) sets how many levels a plot may hold: cores and factories lower it; shops, stations, corps and the Police station raise it. Hover or tap a building to see why it's struggling.</p>`);
-    rows.push(`<div class="row"><div>Tutorial</div><button class="btn" data-tut="1">Replay</button></div>`);
-    officeEl.innerHTML = rows.join('');
+      else if (has && kind === 'mall'){ const m = megaList('mall')[0]; act = m && m.levels < 3 ? `<span>Level ${m.levels}</span>` : '<span>Level 3</span>'; }
+      else if (has) act = '<span style="color:#5affa8">Built</span>';
+      else act = `<span>${fmt(d.cost)}</span>`;
+      mg += `<div class="row"><div>${MEGA_TYPES[kind].name}<small>${d.what}</small></div>${act}</div>`; }
+    if (built('spire')) mg += `<div class="row"><div>Overseer auto-upgrades<small>Grows your fullest buildings for you</small></div><button class="btn" data-auto="1" aria-pressed="${!!st.auto}">${st.auto ? 'On' : 'Off'}</button></div>`;
+    const locked = Object.keys(MEGA).filter(k => k !== 'emitter' && MEGA[k].tier > st.tier).length;
+    if (locked) mg += `<p>${locked} more unlock as the city is classified.</p>`;
+    out.push(sec('megas', 'Megastructures', mg));
+    out.push(sec('income', 'Income per min', `<table>` + Object.entries(R.breakdown || {}).filter(([, v]) => Math.abs(v) >= .5).map(([k, v]) => `<tr><td>${k}</td><td>${v < 0 ? '−' : ''}${fmt(Math.abs(v))}</td></tr>`).join('') + `</table>`));
+    out.push(sec('ladder', 'All classifications', `<table>` + TIERS.slice(1).map((t, q) => { const n = q + 1, cls = n <= st.tier ? 'done' : n === st.tier + 1 ? 'cur' : '';
+      return `<tr class="${cls}"><td>${n <= st.tier ? '✓ ' : ''}${t.name}</td><td>${fmt(t.pop)} residents</td></tr>`; }).join('') + `</table>`));
+    out.push(sec('help', 'How it works', `<p>Build, and each level pays Scrip the moment people move in and light it. Click a lit roof to stack a level. Sector Grade (E to A) caps the levels: cores and factories lower it, shops, stations and police raise it. Buildings must be within two plots of the rest of the city.</p><div class="row"><div>Tutorial</div><button class="btn" data-tut="1">Replay</button></div>`));
+    officeEl.innerHTML = out.join('');
     officeEl.scrollTop = keepScroll;
   }
-  const megaReachKind = kind => { const m = megaList(kind)[0]; return m ? megaReach(m) : MEGA[kind].reach; };
   officeEl.addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b || b.disabled) return;
     if (b.classList.contains('x')) return toggleOffice(false);
@@ -600,43 +665,45 @@ const ECON = (() => {
   });
 
   /* ---------- what a building is doing: hover (mouse) or tap with no zone picked (touch) ---------- */
+  function whyOf(b){
+    if (b.isolated) return 'Isolated · nobody can reach it';
+    if (b.coreD > P.coreReach) return 'No Emitter Core in reach';
+    if (!b.powered) return 'Out of power · upgrade or add a core';
+    if (b.floors > b.cap) return 'Over its Grade · top levels stay dark';
+    if (b.z === 'R' && b.jobBand === 'far' && !b.station) return 'Too far from work';
+    if ((b.z === 'R' || b.z === 'L') && b.ef < .5) return 'Few jobs nearby';
+    if (b.z === 'L' && b.occ < .5 && b.lv < P.lvLuxMin + 10) return 'Grade too low for luxury';
+    if (b.z === 'R' && b.corpNear && b.lv > P.lvPricey) return 'Priced out by corps';
+    if (b.z === 'C' && b.occ < b.eff*.5) return 'Not enough shoppers nearby';
+    if ((b.z === 'I' || b.z === 'K') && b.occ < b.eff*.6) return 'Short of workers';
+    if (b.band === 'near') return 'Beside a core · poor air';
+    return null;
+  }
   function infoOf(c){
     const b = B.get(keyOf(c)); if (!b) return null;
-    const lines = [`${ZNAME[b.z]} · Grade ${gradeOf(b.lv)} · ${b.lit}/${b.floors} levels lit · cap ${b.cap}`];
-    let why = null;
-    if (b.coreD > P.coreReach) why = 'No Emitter Core in reach';
-    else if (!b.powered) why = 'No power left · upgrade or add a core';
-    else if (b.floors > b.cap) why = 'Over its Grade · top levels stay dark';
-    else if (b.z === 'R' && b.jobBand === 'far' && !b.station) why = 'Too far from work · a metro stop helps';
-    else if ((b.z === 'R' || b.z === 'L') && b.ef < .5) why = 'Few jobs in reach';
-    else if (b.z === 'L' && b.occ < .5 && b.lv < P.lvLuxMin + 10) why = 'Grade too low for luxury';
-    else if (b.z === 'R' && b.corpNear && b.lv > P.lvPricey) why = 'Priced out by corps nearby';
-    else if (b.z === 'C' && b.occ < b.eff*.5) why = 'Not enough spending nearby';
-    else if ((b.z === 'I' || b.z === 'K') && b.occ < b.eff*.6) why = 'Short of workers';
-    else if (b.band === 'far') why = 'Far from a core · output down';
-    else if (b.band === 'near') why = 'Beside a core · poor air';
-    if (why) lines.push(why);
-    if (b.earn > 0) lines.push('+' + fmt(b.earn) + ' Scrip/h in taxes');
-    if (b.floors < b.cap && b.powered) lines.push('Next level: ' + fmt(upgradeCost(b.z, b.floors)) + ' Scrip');
-    return lines.join('\n');
+    const why = whyOf(b);
+    return { head: `${ZNAME[b.z]} · Grade ${gradeOf(b.lv)}`, lines: [`${b.lit} of ${b.floors} level${b.floors > 1 ? 's' : ''} lit · max ${b.cap}`, why ? '! ' + why : '✓ Doing well', b.floors < b.cap && b.powered && !b.isolated ? 'Next level · ' + fmt(upgradeCost(b.z, b.floors)) + ' Scrip' : null].filter(Boolean), bad: !!why };
   }
+  const infoText = i => [i.head, ...i.lines].join('\n');
   const tipEl = el('div', 'econ-tip'); document.body.appendChild(tipEl);
   let tipAt = 0;
   if (!TOUCHY) addEventListener('pointermove', e => {
     if (e.pointerType !== 'mouse') return;
-    const t = performance.now(); if (t - tipAt < 120) return; tipAt = t;
+    const t = performance.now(); if (t - tipAt < 100) return; tipAt = t;
     const cv = document.getElementById('view') || (typeof canvas !== 'undefined' ? canvas : null);
     if (!cv || e.target !== cv || (typeof S !== 'undefined' && S.zone) || (typeof megaPick !== 'undefined' && megaPick) || (typeof hwMode !== 'undefined' && (hwMode || mtMode))){ tipEl.style.display = 'none'; return; }
     let pk = null; try { pk = pickAt(e.clientX, e.clientY); } catch (er) {}
-    const c = pk && pk.c && !pk.c.mega ? pk.c : null, txt = c ? infoOf(c) : null;
-    if (!txt){ tipEl.style.display = 'none'; return; }
-    tipEl.textContent = txt; tipEl.style.left = e.clientX + 'px'; tipEl.style.top = e.clientY + 'px'; tipEl.style.display = 'block';
+    const c = pk && pk.c && !pk.c.mega ? pk.c : null, info = c ? infoOf(c) : null;
+    if (!info){ tipEl.style.display = 'none'; return; }
+    tipEl.innerHTML = ''; const h = el('span', 'h'); h.textContent = info.head; tipEl.append(h);
+    for (const l of info.lines){ const s_ = el('span', l.startsWith('!') ? 'bad' : l.startsWith('✓') ? 'ok' : ''); s_.textContent = '\n' + l; tipEl.append(s_); }
+    tipEl.style.left = e.clientX + 'px'; tipEl.style.top = e.clientY + 'px'; tipEl.style.display = 'block';
   }, { passive: true });
-  E.tapInfo = pk => { const c = pk && pk.c && !pk.c.mega ? pk.c : null; const txt = c ? infoOf(c) : null; if (!txt) return false; note(txt, 4500); return true; };
-  E.menuText = kind => { const d = MEGA[kind]; if (!d) return null; if (kind === 'emitter') return fmt(nextCoreCost()) + ' Scrip · ' + fmtDur(nextCoreBuildMs()) + ' to charge'; if (built(kind)) return kind === 'mall' ? 'Built · stack from its roof' : 'Built'; return fmt(d.cost) + ' Scrip · ' + d.what; };
+  E.tapInfo = pk => { const c = pk && pk.c && !pk.c.mega ? pk.c : null; const i = c ? infoOf(c) : null; if (!i) return false; note(infoText(i), 4500); return true; };
+  E.menuText = kind => { const d = MEGA[kind]; if (!d) return null; if (kind === 'emitter') return fmt(nextCoreCost()) + ' Scrip · charges in ' + fmtDur(nextCoreBuildMs()); if (built(kind)) return kind === 'mall' ? 'Built · stack from its roof' : 'Built'; return fmt(d.cost) + ' Scrip · ' + d.what; };
 
   /* ---------- the stabilizer: an optional mini game that shortens a core's charge ---------- */
-  // Keep the grid frequency in the safe band: the trace sinks, a tap or Space lifts it. Every second inside the band takes 15 seconds off the
+  // Keep the grid frequency in the safe band: the trace sinks, a tap or Space lifts it. Every second inside the band takes two seconds off the
   // charge; the band narrows and the pull grows the longer it runs. A core's charge can be cut by half at most this way.
   const MINI = (() => {
     const box = el('div', 'econ-mini'); box.hidden = true; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', 'Stabilize the core');
@@ -644,12 +711,12 @@ const ECON = (() => {
       <div class="foot"><span id="emSaved">0 s saved</span><button type="button" id="emClose">Done</button></div></div>`;
     document.body.appendChild(box);
     const cv = box.querySelector('#emCv'), g = cv.getContext('2d');
-    let on = false, id = null, y = .5, v = 0, t = 0, inBand = 0, saved = 0, maxCut = 0, raf = 0, last = 0, trail = [];
+    let on = false, id = null, y = .5, v = 0, t = 0, saved = 0, maxCut = 0, raf = 0, last = 0, trail = [];
     function open(coreId){
       const m = megas.get(coreId); if (!m) return; const s = coreState(m); if (s.readyAt <= now()) return;
       id = coreId; s.full = s.full || (s.readyAt - now()); s.cut = s.cut || 0; maxCut = s.full*.5 - s.cut;
-      if (maxCut <= 1000){ note('This core is as stable as it gets · it charges on its own'); return; }
-      on = true; box.hidden = false; y = .5; v = 0; t = 0; inBand = 0; saved = 0; trail = []; last = performance.now(); raf = requestAnimationFrame(loop); E.emit('mini');
+      if (maxCut <= 500){ note('This core is as stable as it gets'); return; }
+      on = true; box.hidden = false; y = .5; v = 0; t = 0; saved = 0; trail = []; last = performance.now(); raf = requestAnimationFrame(loop); E.emit('mini');
     }
     function close(){ on = false; box.hidden = true; cancelAnimationFrame(raf); if (id){ const m = megas.get(id); if (m){ const s = coreState(m); s.cut = (s.cut || 0) + saved*1000; } } save(); renderOffice(); }
     const lift = () => { if (on) v -= .55; };
@@ -662,7 +729,7 @@ const ECON = (() => {
       const grav = .9 + t*.025, band = Math.max(.08, .26 - t*.004), mid = .5 + Math.sin(t*.7)*.12*Math.min(1, t/20);
       v += grav*dt; v *= .985; y += v*dt; if (y < 0){ y = 0; v = 0; } if (y > 1){ y = 1; v = 0; }
       const ok = Math.abs(y - mid) < band/2;
-      if (ok){ inBand += dt; const cut = dt*15; if (saved*1000 + cut*1000 <= maxCut){ saved += cut; E.cutBuild(id, cut*1000); } }
+      if (ok){ const cut = dt*2; if (saved*1000 + cut*1000 <= maxCut){ saved += cut; E.cutBuild(id, cut*1000); } }
       trail.push(y); if (trail.length > 150) trail.shift();
       const W = cv.width, H = cv.height;
       g.fillStyle = '#07060c'; g.fillRect(0, 0, W, H);
@@ -672,47 +739,52 @@ const ECON = (() => {
       g.strokeStyle = ok ? '#5affa8' : '#ff5a6e'; g.lineWidth = 2; g.beginPath(); trail.forEach((q, k) => { const x = W - (trail.length - k)*2; k ? g.lineTo(x, q*H) : g.moveTo(x, q*H); }); g.stroke();
       g.fillStyle = ok ? '#5affa8' : '#ff5a6e'; g.beginPath(); g.arc(W - 2, y*H, 5, 0, Math.PI*2); g.fill();
       document.getElementById('emHz').textContent = (50 + (mid - y)*4).toFixed(2) + ' Hz';
-      document.getElementById('emSaved').textContent = Math.round(saved) + ' s saved' + (saved*1000 >= maxCut - 500 ? ' · limit reached' : '');
+      document.getElementById('emSaved').textContent = saved.toFixed(1) + ' s saved' + (saved*1000 >= maxCut - 300 ? ' · limit reached' : '');
       const m = megas.get(id); if (!m || coreReady(m)) { close(); note('Core online'); }
     }
     return { open };
   })();
 
-  /* ---------- the tutorial: a few notes that wait for the player to do each thing (no dimming, no spotlight) ---------- */
+  /* ---------- the tutorial: one short thing at a time, the button to use glowing, the city answering at once (no dimming, no spotlight) ---------- */
   const TUTE = (() => {
-    const tap = TOUCHY ? 'Tap' : 'Click', tapL = tap.toLowerCase();
-    const beats = [
-      { say: `This is your sector. Everything here runs on Scrip.\nPick Residential and ${tapL} three empty plots near the Emitter Core to build homes.`, done: () => countZone('R') >= 3 },
-      { say: `Residents need work. Pick Industrial and place a factory near the homes.`, done: () => countZone('I') >= 1 },
-      { say: `Wages need somewhere to go. Pick Commercial and place a shop.`, done: () => countZone('C') >= 1 },
-      { say: `Levels light up as people move in, and each pays Scrip the first time it lights. Wait for a few to light.`, done: () => litCount() >= 3, live: () => 'Lit so far: ' + Math.min(3, litCount()) + ' of 3' + (litCount() < 3 ? ' · ' + (TOUCHY ? 'tap' : 'hover') + ' a building to see what it needs' : ''), nextAfter: 60 },
-      { say: `Grow up instead of out: with Residential picked, ${tapL} the roof of a lit home to stack a level. Sector Grade caps how tall it can go: build away from the core's poor air.`, ev: 'build', test: d => d && !d.fresh },
-      { say: `Power comes from the Emitter Core. Build past its reach and the lights stay off. The bar at the top shows what's in use.`, next: true },
-      { say: `Open the City office (top of the screen) to see what each classification unlocks.`, ev: 'office' },
-      { say: `Reach ${fmt(TIERS[1].pop)} residents to be Registered. ${TOUCHY ? 'Tap' : 'Hover'} any building to see what it needs. The city is yours.`, next: true, last: true },
-    ];
+    const tap = TOUCHY ? 'Tap' : 'Click';
+    const zoneBtn = z => () => document.querySelector(TOUCHY ? '.zones' : `.zone[data-zone="${z}"]`);
     const litCount = () => Object.values(st.best).reduce((s, n) => s + n, 0);
-    let k = st.tut.done ? beats.length : (st.tut.step || 0), poll = 0, shownAt = 0, liveEl = null, nextShown = false;
+    const beats = [
+      { say: 'Pick Residential.', sub: 'Homes bring people. People bring Scrip.', target: zoneBtn('low'), done: () => typeof S !== 'undefined' && (S.zone === 'low' || countZone('R') >= 3) },
+      { say: `${tap} 3 plots near the core.`, sub: 'Each home lights up when people move in, and pays you.', count: () => [countZone('R'), 3], done: () => countZone('R') >= 3 },
+      { say: 'Now pick Industrial and place a factory.', sub: 'It gives your residents jobs.', target: zoneBtn('ind'), done: () => countZone('I') >= 1 },
+      { say: 'Pick Commercial and place a shop.', sub: 'Shops earn the most Scrip.', target: zoneBtn('mid'), done: () => countZone('C') >= 1 },
+      { say: `${tap} a lit home's roof to stack a level.`, sub: 'Taller buildings hold more people. Your plot\'s Sector Grade sets the limit.', target: zoneBtn('low'), ev: 'build', test: d => d && !d.fresh },
+      { say: `Next goal: ${TIERS[1].name}.`, sub: `Reach ${fmt(TIERS[1].pop)} residents to unlock new buildings. ${TOUCHY ? 'Tap' : 'Hover'} any building to see what it needs.`, next: true, last: true, target: () => document.getElementById('ehO') },
+    ];
+    let k = st.tut.done ? beats.length : Math.min(st.tut.step || 0, beats.length), lit = null;
+    const unpulse = () => { if (lit){ lit.classList.remove('econ-pulse'); lit = null; } };
     function show(){
+      unpulse();
       if (k >= beats.length){ noteTut = false; noteEl.hidden = true; return; }
       const b = beats[k]; noteTut = true; clearTimeout(noteT);
-      noteEl.innerHTML = ''; noteEl.append(el('span', 't', 'Operator note · ' + (k + 1) + '/' + beats.length), document.createTextNode(b.say));
-      liveEl = b.live ? el('span', 't', '') : null; if (liveEl){ liveEl.style.margin = '8px 0 0'; liveEl.textContent = b.live(); noteEl.append(liveEl); }
-      const row = el('div', 'row'); const skip = el('button', '', 'Skip tutorial'); skip.type = 'button'; skip.onclick = finish; row.append(skip);
-      if (b.next){ const go = el('button', 'go', b.last ? 'Done' : 'Next'); go.type = 'button'; go.onclick = advance; row.append(go); }
-      noteEl.append(row); noteEl.hidden = false; shownAt = Date.now(); nextShown = !!b.next;
+      noteEl.innerHTML = ''; noteEl.className = 'econ-note';
+      const say = el('span', 'say'); say.textContent = b.say; const sub = el('span', 'sub'); sub.textContent = b.sub;
+      const prog = el('div', 'prog'); beats.forEach((_, q) => prog.append(el('i', q <= k ? 'on' : '')));
+      noteEl.append(say, sub); if (b.count){ const n = el('span', 'sub'); n.dataset.count = '1'; noteEl.append(n); }
+      const row = el('div', 'row'); row.style.justifyContent = 'space-between'; row.append(prog);
+      const btns = el('div', ''); const skip = el('button', '', 'Skip'); skip.type = 'button'; skip.onclick = finish; btns.append(skip);
+      if (b.next){ const go = el('button', 'go', b.last ? 'Got it' : 'Next'); go.type = 'button'; go.onclick = advance; btns.append(go); }
+      row.append(btns); noteEl.append(row); noteEl.hidden = false; refresh();
     }
-    // a step that waits on the city: its progress line kept current, and a Next after a while so nobody is stuck on it
-    setInterval(() => { const b = beats[k]; if (!b || noteEl.hidden) return;
-      if (liveEl && b.live) liveEl.textContent = b.live();
-      if (b.nextAfter && !nextShown && Date.now() - shownAt > b.nextAfter*1000){ nextShown = true; const go = el('button', 'go', 'Next'); go.type = 'button'; go.onclick = advance; const row = noteEl.querySelector('.row'); if (row) row.append(go); } }, 1000);
-    function advance(){ k++; st.tut.step = k; if (k >= beats.length) st.tut.done = true; save(); show(); }
+    function refresh(){
+      const b = beats[k]; if (!b || noteEl.hidden) return;
+      const n = noteEl.querySelector('[data-count]'); if (n && b.count){ const [a, m] = b.count(); n.textContent = Math.min(a, m) + ' / ' + m; }
+      const t = b.target && b.target(); if (t !== lit){ unpulse(); if (t){ t.classList.add('econ-pulse'); lit = t; } }
+    }
+    function advance(){ k++; st.tut.step = k; if (k >= beats.length) st.tut.done = true; save(); noteEl.classList.add('done-flash'); setTimeout(show, k >= beats.length ? 0 : 260); }
     function finish(){ k = beats.length; st.tut.done = true; st.tut.step = k; save(); show(); }
     for (const ev of ['build', 'office']) E.onEv(ev, d => { const b = beats[k]; if (b && b.ev === ev && (!b.test || b.test(d))) advance(); });
-    setInterval(() => { const b = beats[k]; if (b && b.done && b.done()) advance(); }, 800);
+    setInterval(() => { const b = beats[k]; if (!b) return; if (b.done && b.done()) advance(); else refresh(); }, 400);
     // (on a touch screen the gesture tutorial goes first, tutorial.js: these notes wait until it's done or skipped)
     const gestureDone = () => { if (!TOUCHY) return true; try { const g = JSON.parse(localStorage.getItem('touch:nt.tut') || 'null'); return !!(g && g.done); } catch (e) { return true; } };
-    function start(){ if (k >= beats.length) return; if (!gestureDone()) return setTimeout(start, 2000); setTimeout(show, 1800); }
+    function start(){ if (k >= beats.length) return; if (!gestureDone()) return setTimeout(start, 2000); setTimeout(show, 1200); }
     return { start, replay(){ k = 0; st.tut = { step: 0, done: false }; save(); show(); } };
   })();
   setTimeout(() => TUTE.start(), 0);

@@ -89,7 +89,8 @@ const TITLE = (() => {
     stage.style.translate = (x*S0/2).toFixed(2) + 'px ' + (y*S0/2).toFixed(2) + 'px'; stage.style.rotate = r.toFixed(3) + 'deg'; stage.style.scale = '1.03';
   }
   // the hour: the city's own, in four looks
-  function pickTime(h){ return h >= 5.5 && h < 10 ? 'morning' : h >= 10 && h < 16.5 ? 'day' : h >= 16.5 && h < 19.5 ? 'evening' : 'night'; }
+  const econNight = () => typeof ECON !== 'undefined' && ECON.on;   // (an Economy city is always night: the room is lit for it too, economy.js)
+  function pickTime(h){ if (econNight()) return 'night'; return h >= 5.5 && h < 10 ? 'morning' : h >= 10 && h < 16.5 ? 'day' : h >= 16.5 && h < 19.5 ? 'evening' : 'night'; }
 
   /* ---------- the things that move, drawn live ---------- */
   // The bake leaves out the plants and the lamp (their shadows stay in it). Here the room's own model is built once
@@ -423,7 +424,7 @@ const TITLE = (() => {
   // the city's hour came back from the save while the title was up (story.js restore: it loads a moment after the title shows): the room is lit
   // for that hour instead, the light through the shutter, the sun's pictures and the clouds, and Continue keeps it
   T.setHour = h => {
-    if (!T.on) return; HOUR = h; if (was) was.hour = h;
+    if (!T.on) return; HOUR = econNight() ? 23 : h; if (was) was.hour = h;
     const tod = pickTime(h); if (tod === TOD) return; TOD = tod; preload(tod);
     if (!RTMODE && RAW){ A = {}; for (const v of ['wide', 'tall']) A[v] = RAW[v][TOD] || RAW[v].morning; }
     view = null; try { layout(); } catch (e) {} if (live){ live.time(); if (view) live.view(view); }
@@ -433,7 +434,7 @@ const TITLE = (() => {
     document.documentElement.classList.add('title-on'); root.hidden = false; root.classList.remove('leaving');
     setScene(); RAW = RAW || await anchorsP;
     if (!RAW){ T.hide(true); return; }   // (the pictures couldn't be had: straight into the city)
-    GB = GB || await gbufP; HOUR = was ? was.hour : S.hour; RTMODE = !!GB && (!liveP || !!RT);
+    GB = GB || await gbufP; HOUR = econNight() ? 23 : was ? was.hour : S.hour; RTMODE = !!GB && (!liveP || !!RT);
     A = {}; for (const v of ['wide', 'tall']) A[v] = RTMODE ? GB[v] : (RAW[v][TOD] || RAW[v].morning); view = null;
     OPEN = 0; openFrom = null; shownAt = performance.now();
     stage.style.visibility = 'hidden';

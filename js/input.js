@@ -151,7 +151,10 @@ function tapFlush(){ if (!tapPend) return; const p = tapPend; tapPend = null; cl
 // (Trimming changes the fresh section in place: one rebuild, no removal sweep, no second sound.)
 let FRESH = null;
 const FRESH_MS = 450, FRESH_PX = 40;
-const freshNear = (x, y) => FRESH && performance.now() - FRESH.t < FRESH_MS && Math.hypot(x - FRESH.x, y - FRESH.y) < FRESH_PX && freshOk(FRESH);
+// (and the finger on that building itself: near it was enough before, and a quick tap on the plot next door, half on the new building, trimmed
+//  the new one instead of building there, owner Oct 31)
+const freshNear = (x, y) => { if (!(FRESH && performance.now() - FRESH.t < FRESH_MS && Math.hypot(x - FRESH.x, y - FRESH.y) < FRESH_PX && freshOk(FRESH))) return false;
+  if (Math.hypot(x - FRESH.x, y - FRESH.y) < 12) return true; const pk = pickAt(x, y); return !!(pk && pk.c === FRESH.c && pk.kind === 'bld' && pk.p && Math.abs(pk.p.y - FRESH.c.height) < .05); };   // (its roof: a tap on its side means next door)
 const freshOk = f => cells.get(ckey(f.c.i, f.c.j)) === f.c && f.c.sections[f.c.sections.length - 1] === f.sec && !f.c.lift;
 const tEmit = (name, d) => { try { dispatchEvent(new CustomEvent('nt:' + name, { detail: d })); } catch (e) {} };   // (for the touch tutorial: tutorial.js)
 // Touch placing, as touch builders do it (owner, Oct 30; the conversation's research):
@@ -160,17 +163,31 @@ const tEmit = (name, d) => { try { dispatchEvent(new CustomEvent('nt:' + name, {
 //    (the outline) with a tick, and a second tap on it, or near the first, builds there; a tap elsewhere aims there instead. Closer in, a tap
 //    builds at once as before. The aim goes when the view moves or after 8 s
 const AIM_PX = 36, SNAP_PX = 40;
-let AIM = null;
+let AIM = null, DIRECT = null;
 const plotPx = () => LOT*(canvas.clientHeight || innerHeight)/(2*zoom);
 const camSig = () => camGoal.x.toFixed(3) + ',' + camGoal.z.toFixed(3) + ',' + zoomT.toFixed(3) + ',' + yawT.toFixed(4) + ',' + pitchT.toFixed(4);
 const aimKey = t => !t ? null : t.type === 'empty' || t.type === 'side' ? t.type + ckey(t.i, t.j) : t.type === 'megaUp' ? 'mega:' + t.m.id : t.type + ckey(t.c.i, t.c.j);
 function touchAimAt(x, y){
   const t = targetOf(pickAt(x, y)); if (t) return { t, x, y };
-  let best = null, bd = SNAP_PX*SNAP_PX; const r = viewRect(), v = new THREE.Vector3();
-  for (const c of cells.values()){ if (c.mega || c.wall) continue; v.set(c.x, c.sections.length ? c.height : CURB, c.z).project(cam); if (v.z > 1) continue;
-    const sx = r.left + (v.x*.5 + .5)*r.width, sy = r.top + (1 - (v.y*.5 + .5))*r.height, d = (sx - x)**2 + (sy - y)**2; if (d < bd){ bd = d; best = [sx, sy]; } }
-  if (!best) return null;
-  const t2 = targetOf(pickAt(best[0], best[1])); return t2 ? { t: t2, x: best[0], y: best[1] } : null;
+  // nothing to build where the ray landed (a wall that takes no pod, the pavement round a building, a gap): the plot whose outline on screen is
+  // nearest the finger, within a fingertip (owner, Oct 30: a finger half on a built tile and half on an empty one built nothing). Its outline is
+  // its roof for a building, its paving for an empty plot, and open sky beside the platform grows it there. The target is made for that plot
+  // directly: picking again at its middle went through the same building in front and found nothing again
+  let best = null, bd = SNAP_PX; const r = viewRect(), v = new THREE.Vector3(), q = [];
+  const scr = (wx, wy, wz) => { v.set(wx, wy, wz).project(cam); return v.z > 1 ? null : [r.left + (v.x*.5 + .5)*r.width, r.top + (1 - (v.y*.5 + .5))*r.height]; };
+  const dist = (cx, cz, h, y) => {   // finger to the square's outline on screen (0 inside it)
+    q.length = 0; for (const [a, b] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]){ const s_ = scr(cx + a*h, y, cz + b*h); if (!s_) return Infinity; q.push(s_); }
+    let inside = true, dmin = Infinity;
+    for (let k = 0; k < 4; k++){ const [ax, ay] = q[k], [bx, by] = q[(k + 1) & 3], ex = bx - ax, ey = by - ay, cr = ex*(y_ - ay) - ey*(x_ - ax); if (k === 0) inside = cr; else if (Math.sign(cr) !== Math.sign(inside)) inside = false;
+      const L = ex*ex + ey*ey || 1, u = Math.max(0, Math.min(1, ((x_ - ax)*ex + (y_ - ay)*ey)/L)); dmin = Math.min(dmin, Math.hypot(ax + ex*u - x_, ay + ey*u - y_)); }
+    return inside !== false ? 0 : dmin; };
+  const x_ = x, y_ = y;
+  for (const c of cells.values()){ if (c.mega || c.wall) continue;
+    const built = c.sections.length > 0, d = built ? dist(c.x, c.z, SIDE/2, c.height) : dist(c.x, c.z, LOT/2, CURB);
+    if (d < bd || (d === 0 && best && bd === 0 && !built && best.t.type === 'up')){ bd = d; best = { t: built ? { type: 'up', c } : { type: 'onto', c } }; } }   // (inside two at once: the empty plot, which is what a finger near a building's foot means)
+  if (!best || bd > 0) for (const c of cells.values()){ if (c.mega || c.wall) continue; for (const [a, b] of SIDES4){ const i = c.i + a, j = c.j + b;
+    if (cells.has(ckey(i, j)) || Math.abs(i) > GRID_MAX || Math.abs(j) > GRID_MAX) continue; const d = dist(i*LOT, j*LOT, LOT/2, CURB); if (d < bd){ bd = d; best = { t: { type: 'empty', i, j } }; } } }
+  return best ? { t: best.t, x, y, direct: true } : null;
 }
 function aimClear(){ if (!AIM) return; AIM = null; hover.visible = hoverFill.visible = hoverStrip.visible = false; if (typeof TUI !== 'undefined' && TUI.aimTip) TUI.aimTip(null); }
 setInterval(() => { if (AIM && (performance.now() - AIM.at > 8000 || AIM.cam !== camSig() || !S.zone)) aimClear(); }, 200);
@@ -180,15 +197,16 @@ function freshBuild(x, y){
     const a = touchAimAt(x, y); if (!a){ aimClear(); return; }
     if (plotPx() < AIM_PX){
       const k = aimKey(a.t), same = AIM && AIM.cam === camSig() && (k === AIM.key || Math.hypot(x - AIM.fx, y - AIM.fy) < SNAP_PX);
-      if (!same){ const moved = !!AIM; AIM = { t: a.t, key: k, x: a.x, y: a.y, fx: x, fy: y, at: performance.now(), cam: camSig() }; showHover(a.t);
+      if (!same){ const moved = !!AIM; AIM = { t: a.t, direct: a.direct, key: k, x: a.x, y: a.y, fx: x, fy: y, at: performance.now(), cam: camSig() }; showHover(a.t);
         if (typeof TUI !== 'undefined'){ TUI.buzz(moved ? 4 : 8); if (TUI.aimTip) TUI.aimTip(x, y); } tEmit('aim'); return; }
-      x = AIM.x; y = AIM.y; aimClear();
-    } else { x = a.x; y = a.y; aimClear(); }
+      x = AIM.x; y = AIM.y; DIRECT = AIM.direct ? AIM.t : null; aimClear();
+    } else { x = a.x; y = a.y; DIRECT = a.direct ? a.t : null; aimClear(); }
   }   // (a tap on a megastructure shows its screen's button, never builds)
-  const t = targetOf(pickAt(x, y));
+  const direct = DIRECT; DIRECT = null;
+  const t = direct || targetOf(pickAt(x, y));
   const key = t && t.after === undefined ? (t.type === 'empty' ? ckey(t.i, t.j) : (t.type === 'up' || t.type === 'onto') && t.c && !t.c.mega && !t.c.lift ? ckey(t.c.i, t.c.j) : null) : null;
   const before = key && cells.get(key) ? cells.get(key).sections.length : 0;
-  tapBuild(x, y);
+  if (direct){ const s0 = act; act = { done: new Set() }; try { applyTarget(direct); } finally { act = s0; } } else tapBuild(x, y);
   const c = key && cells.get(key);
   FRESH = c && c.sections.length === before + 1 && !c.lift ? { c, sec: c.sections[c.sections.length - 1], x, y, t: performance.now() } : null;
   if (FRESH){ if (typeof TUI !== 'undefined') TUI.buzz(12); tEmit('build'); }
@@ -311,7 +329,8 @@ function pointerMove(e){
     return;
   }
   if (act.kind === 'touch'){
-    if (!act.moved && Math.hypot(e.clientX - act.x, e.clientY - act.y) > 10){ act.moved = true; clearTimeout(act.timer); if (typeof TUI !== 'undefined') TUI.ring(null); tEmit('pan'); hover.visible = hoverFill.visible = hoverStrip.visible = false; if (megaPick) showMegaGhost(null); touchPan(e.clientX - act.x, e.clientY - act.y); return; }
+    // (a finger rolls a little as it taps: 14 px before it's a drag, owner Oct 31)
+    if (!act.moved && Math.hypot(e.clientX - act.x, e.clientY - act.y) > (e.pointerType === 'touch' ? 14 : 10)){ act.moved = true; clearTimeout(act.timer); if (typeof TUI !== 'undefined') TUI.ring(null); tEmit('pan'); hover.visible = hoverFill.visible = hoverStrip.visible = false; if (megaPick) showMegaGhost(null); touchPan(e.clientX - act.x, e.clientY - act.y); return; }
     if (act.moved) touchPan(dx, dy);
     return;
   }

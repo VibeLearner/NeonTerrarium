@@ -33,7 +33,7 @@ const ECON = (() => {
     caps: [1, 1, 2, 3, 4], capIndustry: 2,
     prodMid: .95, prodFar: .8,
     accessMid: .8, accessFar: .3, accessMetro: .95, jobNear: 3, jobMid: 7, shopR: 3, stationR: 2, corpR: 3, factoryR: 2,
-    fill: 20, fillCheap: 10,   // (per hour, toward the target: a new level fills in a few minutes; the week's pace is set by power, Scrip and play time, not by this)
+    fill: 40, fillCheap: 20,   // (per hour, toward the target: a new level fills in a few minutes; the week's pace is set by power, Scrip and play time, not by this)
     baseline: .6, baselineH: 24, stipend: 15,
     offlineCapH: 8,
     startMoney: 800,
@@ -186,7 +186,7 @@ const ECON = (() => {
       let r = target >= occ ? P.fill + (cheap ? P.fillCheap : 0) : 6; if (b.z !== 'R' && b.z !== 'L') r = 20;
       occ += (target - occ)*Math.min(1, r*dtH); if (occ > b.floors) occ = b.floors;
       st.occ[b.k] = Math.round(occ*1000)/1000; b.occ = occ;
-      const lit = Math.floor(occ + .3), best = st.best[b.k] || 0;   // (a level lights once it's about two thirds full)
+      const lit = Math.floor(occ + .5), best = st.best[b.k] || 0;   // (a level lights once it's about half full: homes short of work still light, they just earn less)
       if (lit > best){ bonus += (lit - best)*P.bonus[b.z]*(b.z === 'R' && cheap ? P.cheapBonus : 1); st.best[b.k] = lit; if (live) E.emit('light', { c: b.c, lit }); }
       b.lit = lit;
     }
@@ -443,7 +443,7 @@ const ECON = (() => {
     if ((saveT += dt) > 10){ saveT = 0; save(); }
     if (typeof WIRELOG !== 'undefined' && WIRELOG.say && built('wirenest')) demandLine();
   }
-  setInterval(tick, 1000);
+  let tickErr = 0; setInterval(() => { try { tick(); } catch (e) { if (tickErr++ < 5) console.error('economy tick', e); } }, 1000);
   let demT = 40;
   function demandLine(){
     if (--demT > 0) return; demT = 45 + (Math.random()*30 | 0);
@@ -679,21 +679,27 @@ const ECON = (() => {
       { say: `This is your sector. Everything here runs on Scrip.\nPick Residential and ${tapL} three empty plots near the Emitter Core to build homes.`, done: () => countZone('R') >= 3 },
       { say: `Residents need work. Pick Industrial and place a factory near the homes.`, done: () => countZone('I') >= 1 },
       { say: `Wages need somewhere to go. Pick Commercial and place a shop.`, done: () => countZone('C') >= 1 },
-      { say: `Levels light up as people move in, and each pays Scrip the first time it lights. Wait for a few to light.`, done: () => Object.values(st.best).reduce((s, n) => s + n, 0) >= 3 },
+      { say: `Levels light up as people move in, and each pays Scrip the first time it lights. Wait for a few to light.`, done: () => litCount() >= 3, live: () => 'Lit so far: ' + Math.min(3, litCount()) + ' of 3' + (litCount() < 3 ? ' · ' + (TOUCHY ? 'tap' : 'hover') + ' a building to see what it needs' : ''), nextAfter: 60 },
       { say: `Grow up instead of out: with Residential picked, ${tapL} the roof of a lit home to stack a level. Sector Grade caps how tall it can go: build away from the core's poor air.`, ev: 'build', test: d => d && !d.fresh },
       { say: `Power comes from the Emitter Core. Build past its reach and the lights stay off. The bar at the top shows what's in use.`, next: true },
       { say: `Open the City office (top of the screen) to see what each classification unlocks.`, ev: 'office' },
       { say: `Reach ${fmt(TIERS[1].pop)} residents to be Registered. ${TOUCHY ? 'Tap' : 'Hover'} any building to see what it needs. The city is yours.`, next: true, last: true },
     ];
-    let k = st.tut.done ? beats.length : (st.tut.step || 0), poll = 0;
+    const litCount = () => Object.values(st.best).reduce((s, n) => s + n, 0);
+    let k = st.tut.done ? beats.length : (st.tut.step || 0), poll = 0, shownAt = 0, liveEl = null, nextShown = false;
     function show(){
       if (k >= beats.length){ noteTut = false; noteEl.hidden = true; return; }
       const b = beats[k]; noteTut = true; clearTimeout(noteT);
       noteEl.innerHTML = ''; noteEl.append(el('span', 't', 'Operator note · ' + (k + 1) + '/' + beats.length), document.createTextNode(b.say));
+      liveEl = b.live ? el('span', 't', '') : null; if (liveEl){ liveEl.style.margin = '8px 0 0'; liveEl.textContent = b.live(); noteEl.append(liveEl); }
       const row = el('div', 'row'); const skip = el('button', '', 'Skip tutorial'); skip.type = 'button'; skip.onclick = finish; row.append(skip);
       if (b.next){ const go = el('button', 'go', b.last ? 'Done' : 'Next'); go.type = 'button'; go.onclick = advance; row.append(go); }
-      noteEl.append(row); noteEl.hidden = false;
+      noteEl.append(row); noteEl.hidden = false; shownAt = Date.now(); nextShown = !!b.next;
     }
+    // a step that waits on the city: its progress line kept current, and a Next after a while so nobody is stuck on it
+    setInterval(() => { const b = beats[k]; if (!b || noteEl.hidden) return;
+      if (liveEl && b.live) liveEl.textContent = b.live();
+      if (b.nextAfter && !nextShown && Date.now() - shownAt > b.nextAfter*1000){ nextShown = true; const go = el('button', 'go', 'Next'); go.type = 'button'; go.onclick = advance; const row = noteEl.querySelector('.row'); if (row) row.append(go); } }, 1000);
     function advance(){ k++; st.tut.step = k; if (k >= beats.length) st.tut.done = true; save(); show(); }
     function finish(){ k = beats.length; st.tut.done = true; st.tut.step = k; save(); show(); }
     for (const ev of ['build', 'office']) E.onEv(ev, d => { const b = beats[k]; if (b && b.ev === ev && (!b.test || b.test(d))) advance(); });

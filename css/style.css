@@ -445,6 +445,15 @@ html.title-on.title-deck #deckToggle{visibility:visible!important;pointer-events
 .tact button{padding:4px 8px;font-size:11px}
 .tact button.danger{border-color:#6a2a3a;color:#ff8aa8}
 .trow{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.tnew{display:grid;gap:6px}
+.tmode{display:grid;grid-template-columns:1fr 1fr;gap:6px;border:0;margin:0;padding:0;min-width:0}
+.tmode legend{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.tmode label{display:block;cursor:pointer;min-width:0}
+.tmode input{position:absolute;opacity:0;width:1px;height:1px}
+.tmode span{display:block;border:1px solid var(--line);padding:6px 8px;color:var(--muted);font-size:11.5px;height:100%;box-sizing:border-box}
+.tmode small{display:block;font-size:10px;color:var(--muted);opacity:.85;margin-top:2px}
+.tmode input:checked + span{border-color:var(--amber);color:var(--ink)}
+.tmode input:focus-visible + span{outline:1px solid var(--amber);outline-offset:1px}
 .t-panel input:not([type=file]){font:inherit;color:var(--ink);background:#0f1829;border:1px solid var(--line);border-radius:3px;padding:6px 8px;flex:1;min-width:120px}
 .tfile{cursor:pointer;border:1px dashed var(--line);padding:6px 10px;color:var(--muted);width:100%;box-sizing:border-box;text-align:center}
 .tfile:hover{border-color:var(--muted);color:var(--ink)}

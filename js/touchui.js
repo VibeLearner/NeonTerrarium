@@ -1,7 +1,9 @@
 // Neon Terrarium: the touch screen's own pieces (claude/mobile-ui-plan.md). Nothing here runs with a mouse and keyboard: the desktop page is untouched.
 //  - the hold ring under a finger about to remove something, and the Restore chip that puts the last removal back (input.js asks for both)
 //  - a tap on a megastructure with a screen of its own (the Acoustic Panel, the Data Spire, the Precinct desk) shows its button over it for 5 s;
-//    the button opens the screen. A tap on any other megastructure opens its card: its name, a line in the log's voice, and TURN
+//    the button opens the screen. A tap on any other megastructure opens its card: its name, a line in the log's voice, and TURN.
+//    A double tap on any megastructure turns it a quarter, straight away (or says there's no room)
+//  - a short prompt near the top of the screen (TUI.toast), for anything that wants a word with the player
 //  - text the interface cuts short scrolls to show the rest
 //  - a TURN chip while a megastructure is being placed, a recenter button once the view has wandered off the city, an exit chip for erase mode
 //  - the Interface tab of Settings (playerui.js makes the tab): text size, Clean signal, reduce motion, haptics, tips, the tutorial, erase mode, full screen
@@ -9,7 +11,7 @@
 //  - small vibrations on a build and a removal (Android; a setting)
 'use strict';
 const TUI = (() => {
-  const U = { buzz(){}, ring(){}, snapCell(){ return null; }, offerRestore(){}, peek(){}, megaTap(){ return false; }, eraseChip(){}, aimTip(){} };
+  const U = { buzz(){}, ring(){}, snapCell(){ return null; }, offerRestore(){}, peek(){}, megaTap(){ return false; }, eraseChip(){}, aimTip(){}, toast(){} };
   if (typeof TOUCH === 'undefined' || !TOUCH.on) return U;
   const $ = id => document.getElementById(id);
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
@@ -101,8 +103,38 @@ const TUI = (() => {
       b.addEventListener('click', () => { if (!megas.has(m.id)) return; t.opened = true; t.until = 0; U.buzz(8); SCREEN[m.kind][1](m); });
       document.body.appendChild(b); tags.set(m.id, t); }
   }
-  U.megaTap = m => {
+  // a double tap on a megastructure turns it a quarter, at once, with no preview (owner, Oct 31). The first tap has already shown its button or its card;
+  // the second, on the same megastructure soon after (input.js's double tap: DT_MS, with the same allowance it gives, and DT_PX), hides it again and turns,
+  // so a double tap never opens its screen. A quarter turn only: if the block it would need isn't free, nothing changes, it flashes red and a prompt says why
+  let lastTap = null;
+  const dtWin = () => (typeof DT_MS !== 'undefined' ? DT_MS : 250) + 150, dtPx = () => typeof DT_PX !== 'undefined' ? DT_PX : 40;
+  function quarterFits(m){   // (the quarter turn turnMega tries first, mega.js: the same block, kept round the same middle)
+    const t = MEGA_TYPES[m.kind]; if (!t || typeof megaBlockOk !== 'function') return false;
+    const rot = ((m.facing || 0) + 1) % 4, [w, h] = t.w === t.h || rot % 2 === 0 ? [t.w, t.h] : [t.h, t.w], own = new Set(m.cells);
+    const x0 = m.i + (m.w - 1)/2 - (w - 1)/2, z0 = m.j + (m.h - 1)/2 - (h - 1)/2;
+    for (const i of new Set([Math.floor(x0), Math.ceil(x0)])) for (const j of new Set([Math.floor(z0), Math.ceil(z0)])) if (megaBlockOk(i, j, w, h, own, m.kind)) return true;
+    return false;
+  }
+  function turnQuarter(m){
+    if (peekM === m) closePeek();
+    const t = tags.get(m.id); if (t){ t.until = 0; t.opened = false; }
+    if (typeof turnMega !== 'function') return;
+    if (!quarterFits(m)){
+      if (typeof showAreaSel === 'function'){ showAreaSel({ i0: m.i, i1: m.i + m.w - 1, j0: m.j, j1: m.j + m.h - 1 }); setTimeout(() => showAreaSel(null), 450); }
+      U.toast('No room to turn'); U.buzz(20); return;
+    }
+    if (turnMega(m)){ U.buzz(12); dispatchEvent(new CustomEvent('nt:megaturn', { detail: m.kind })); } else U.toast('No room to turn');
+  }
+  // (a finger's double tap also comes as a dblclick, and on the desktop a double click on the Grid, a Data Spire or a police station opens its screen
+  //  (grid.js, overseer.js, policedesk.js). From a finger it is the turn above, so the dblclick stops here, before it reaches the city; a mouse's still goes)
+  let lastPtrType = '';
+  addEventListener('pointerdown', e => { lastPtrType = e.pointerType; }, true);
+  addEventListener('dblclick', e => { if (lastPtrType !== 'mouse' && e.target === $('view')){ e.stopImmediatePropagation(); e.preventDefault(); } }, true);
+  U.megaTap = (m, x, y) => {
     if (!m || !megas.has(m.id)) return false;
+    const now = performance.now(), lt = lastTap;
+    if (lt && lt.id === m.id && now - lt.t < dtWin() && (x == null || lt.x == null || Math.hypot(x - lt.x, y - lt.y) < dtPx())){ lastTap = null; turnQuarter(m); return true; }
+    lastTap = { id: m.id, t: now, x, y };
     if (!SCREEN[m.kind]) return U.peek(m);   // (no screen to open: its card, with TURN)
     syncTags(); const t = tags.get(m.id); if (!t) return U.peek(m);
     for (const o of tags.values()) if (o !== t) o.until = 0;   // (one at a time)
@@ -132,6 +164,17 @@ const TUI = (() => {
         if (x !== t.x || y !== t.y){ t.x = x; t.y = y; t.el.style.transform = 'translate(' + x + 'px,' + y + 'px) translate(-50%,-100%)'; } }
     }
   }
+
+  /* ---------- a short prompt: one or two lines, centered near the top, over the city but never in the way of a tap (pointer-events none). It fades in,
+     stays about 2 s and fades out; a new one takes the place of the one showing ---------- */
+  const toastEl = el('div', 'ttoast'); toastEl.setAttribute('role', 'status'); toastEl.setAttribute('aria-live', 'polite'); document.body.appendChild(toastEl);
+  let toastT = 0;
+  U.toast = (text, ms = 2000) => {
+    clearTimeout(toastT);
+    if (!text){ toastEl.classList.remove('ton'); return; }
+    toastEl.textContent = String(text); toastEl.classList.remove('ton'); void toastEl.offsetWidth; toastEl.classList.add('ton');   // (the fade in starts again)
+    toastT = setTimeout(() => toastEl.classList.remove('ton'), Math.max(600, +ms || 2000));
+  };
 
   /* ---------- aiming, zoomed out: "Tap again to place" by the outline, the first few times (input.js freshBuild) ---------- */
   const aimEl = el('div', 'taim', 'Tap again to place'); aimEl.hidden = true; document.body.appendChild(aimEl);

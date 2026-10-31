@@ -16,7 +16,7 @@ const ECON = (() => {
   /* ---------- the numbers (balanced: claude/economy-balance.md) ---------- */
   // The model counts floors; the game builds in sections (a stacked piece of building, usually two to four floors, each of its own design). Here a
   // level is a section, worth about three of the model's floors, so everything per floor is three times as much per level and the Sector Grade caps
-  // are in levels (E and D 1, C 2, B 3, A 4: the model's 2/3, 3, 6, 8 and 12 floors). Building a level is what "click a roof to stack" already does.
+  // are in levels (E 1, D 2, C 2, B 3, A 4: the model's 2/3, 3, 6, 8 and 12 floors). Building a level is what "click a roof to stack" already does.
   // Pace (owner, Oct 31: a clicker, not an idle game): the model's hour passes in one real minute, so every rate per hour reads per minute,
   // a level fills in a second or two, a core charges in seconds to a couple of minutes, and nothing builds up while the game is closed.
   const K = 60;   // model hours per real hour
@@ -33,7 +33,7 @@ const ECON = (() => {
     bonus: { R: 60, C: 75, L: 180, I: 30, K: 90 }, cheapBonus: .7,
     lvBase: 50, lvCore: -25, lvFactory: -15, lvTrack: -10, lvStation: 15, lvShop: 10, lvCorp: 22, lvPolice: 15,
     lvCheap: 35, cheapProd: .7, lvPricey: 65, priceyMin: .3, lvLuxMin: 45, lvLuxFull: 75,
-    caps: [1, 1, 2, 3, 4], capIndustry: 2,
+    caps: [2, 2, 2, 3, 4], capIndustry: 2,   // (E and D 2: any first home can take a second level, so the tutorial stack always works)
     prodMid: .95, prodFar: .8,
     accessMid: .8, accessFar: .3, accessMetro: .95, jobNear: 3, jobMid: 7, shopR: 3, stationR: 2, corpR: 3, factoryR: 2,
     fill: 40, fillCheap: 20,   // (per model hour, toward the target: at the clicker pace a new level lights in a second or two)
@@ -70,13 +70,14 @@ const ECON = (() => {
   ];
   const GRADES = ['E', 'D', 'C', 'B', 'A'];
   const ZNAME = { R: 'Residential', C: 'Commercial', L: 'Luxury', I: 'Industrial', K: 'Corps' };
-  const ZK = { low: 'R', mid: 'C', high: 'L', ind: 'I' };
+  const ZONEK = { low: 'R', mid: 'C', high: 'L', ind: 'I' };
   const TOUCHY = typeof TOUCH !== 'undefined' && TOUCH.on;
 
   /* ---------- state ---------- */
   if (!st || !st.on) return Object.assign(E, { dark: () => null, coastOpen: () => true, tapInfo: () => false, menuText: () => null, transit: () => null, freshState });
   E.on = true;
   document.documentElement.classList.add('econ');
+  { const hs = document.createElement('style'); hs.textContent = 'html.econ #modeHint{display:none!important}'; document.head.appendChild(hs); }
   st = Object.assign(freshState(), st);
   function freshState(){ return { on: true, v: 1, money: P.startMoney, tier: 0, fresh: true, last: Date.now(), peak: 0, best: {}, occ: {}, cores: {}, ups: {}, auto: false, tut: { step: 0, done: false }, stock: 0, corp: false, metroPaid: {}, hwPaid: {} }; }
   const save = () => { st.last = Date.now(); try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} };
@@ -84,7 +85,7 @@ const ECON = (() => {
 
   /* ---------- reading the city ---------- */
   const keyOf = c => c.i + ',' + c.j;
-  const zoneOf = c => { const s = (c.below && c.below.length ? c.below[0] : c.sections[0]); if (!s) return null; const z = ZK[s.zone]; return z === 'I' && (s.corp || c.sections.some(x => x.corp)) ? 'K' : z; };
+  const zoneOf = c => { const s = (c.below && c.below.length ? c.below[0] : c.sections[0]); if (!s) return null; const z = ZONEK[s.zone]; return z === 'I' && (s.corp || c.sections.some(x => x.corp)) ? 'K' : z; };
   const floorsOf = c => c.sections.length + (c.lift && c.below ? c.below.length : 0);   // (levels: see the numbers above)
   const isBld = c => c.sections.length > 0 && !c.mega && !c.wall;
   const megaD = (i, j, m) => Math.max(Math.max(m.i - i, 0, i - (m.i + m.w - 1)), Math.max(m.j - j, 0, j - (m.j + m.h - 1)));
@@ -326,8 +327,8 @@ const ECON = (() => {
   E.coastOpen = () => st.tier >= TIERS.length - 1;
 
   /* ---------- the rules on every build: money, zones, height ---------- */
-  function say(msg){ const h = document.getElementById('modeHint'); if (h) h.textContent = msg; if (TOUCHY) note(msg, 3200); else flash(msg); }
-  const zoneNow = zone => ZK[zone] === 'I' && st.corp && st.tier >= 3 ? 'K' : ZK[zone];
+  function say(msg){ if (TOUCHY) note(msg, 3200); else flash(msg); }   // (the sandbox's instruction line under the city is hidden in Economy)
+  const zoneNow = zone => ZONEK[zone] === 'I' && st.corp && st.tier >= 3 ? 'K' : ZONEK[zone];
   function zoneLocked(z){ if ((z === 'L' || z === 'K') && st.tier < 3){ say((z === 'L' ? 'Luxury' : 'Corps') + ' opens at Chartered (' + fmt(TIERS[3].pop) + ' residents, ' + fmt(TIERS[3].inc) + ' Scrip/min)'); return true; } return false; }
   function afford(cost){ if (st.money >= cost) return true; say('Not enough Scrip · ' + fmt(cost) + ' needed, ' + fmt(st.money) + ' held'); return false; }
   function charge(cost){ st.money -= cost; E.emit('spend', cost); hudSoon(); }
@@ -431,7 +432,7 @@ const ECON = (() => {
   wrap('load', function (orig){ const ok = orig(); if (ok) try { step(1e-9, false); } catch (e) { console.warn('econ load', e); } return ok; });
 
   /* ---------- the clock ---------- */
-  let lastT = now(), saveT = 0, booted = false;
+  let lastT = now(), saveT = 0, booted = false, needView = true;
   function boot(){
     booted = true;
     if (st.fresh){
@@ -452,6 +453,7 @@ const ECON = (() => {
     if (!booted){ if (cells.size < 1) return; boot(); }
     const t = now(); let dt = Math.min(2, Math.max(0, (t - lastT)/1000)); lastT = t;   // (a hidden tab or a long gap: no catching up)
     step(dt*K/3600, true);
+    if (needView && !(typeof TITLE !== 'undefined' && TITLE.on)){ needView = false; try { const m = megaList('emitter')[0]; if (m) camGoal.set(m.x, camGoal.y, m.z); zoomT = 12*(typeof ZK !== 'undefined' ? ZK : 1); } catch (e) {} }   // (each time the city opens: in close on the core)
     darkSync(); autoTick(); hud();
     if ((saveT += dt) > 10){ saveT = 0; save(); }
     if (typeof WIRELOG !== 'undefined' && WIRELOG.say && built('wirenest')) demandLine();
@@ -750,12 +752,12 @@ const ECON = (() => {
     const tap = TOUCHY ? 'Tap' : 'Click';
     const zoneBtn = z => () => document.querySelector(TOUCHY ? '.zones' : `.zone[data-zone="${z}"]`);
     const litCount = () => Object.values(st.best).reduce((s, n) => s + n, 0);
+    const homesStacked = () => { for (const b of B.values()) if (b.z === 'R' && b.floors >= 2) return true; return false; };
     const beats = [
-      { say: 'Pick Residential.', sub: 'Homes bring people. People bring Scrip.', target: zoneBtn('low'), done: () => typeof S !== 'undefined' && (S.zone === 'low' || countZone('R') >= 3) },
-      { say: `${tap} 3 plots near the core.`, sub: 'Each home lights up when people move in, and pays you.', count: () => [countZone('R'), 3], done: () => countZone('R') >= 3 },
-      { say: 'Now pick Industrial and place a factory.', sub: 'It gives your residents jobs.', target: zoneBtn('ind'), done: () => countZone('I') >= 1 },
+      { say: `Pick Residential, then ${tap.toLowerCase()} 3 plots near the core.`, sub: 'A plot or two away is best: right beside the core the air is poor.', target: zoneBtn('low'), count: () => [countZone('R'), 3], done: () => countZone('R') >= 3 },
+      { say: 'Pick Industrial and place a factory.', sub: 'It gives your residents jobs.', target: zoneBtn('ind'), done: () => countZone('I') >= 1 },
       { say: 'Pick Commercial and place a shop.', sub: 'Shops earn the most Scrip.', target: zoneBtn('mid'), done: () => countZone('C') >= 1 },
-      { say: `${tap} a lit home's roof to stack a level.`, sub: 'Taller buildings hold more people. Your plot\'s Sector Grade sets the limit.', target: zoneBtn('low'), ev: 'build', test: d => d && !d.fresh },
+      { say: `Pick Residential and ${tap.toLowerCase()} a lit home's roof to stack a level.`, sub: 'Taller homes hold more people. If it says the Grade is too low, try a home further from the core.', target: zoneBtn('low'), done: homesStacked, nextAfter: 40 },
       { say: `Next goal: ${TIERS[1].name}.`, sub: `Reach ${fmt(TIERS[1].pop)} residents to unlock new buildings. ${TOUCHY ? 'Tap' : 'Hover'} any building to see what it needs.`, next: true, last: true, target: () => document.getElementById('ehO') },
     ];
     let k = st.tut.done ? beats.length : Math.min(st.tut.step || 0, beats.length), lit = null;
@@ -771,10 +773,12 @@ const ECON = (() => {
       const row = el('div', 'row'); row.style.justifyContent = 'space-between'; row.append(prog);
       const btns = el('div', ''); const skip = el('button', '', 'Skip'); skip.type = 'button'; skip.onclick = finish; btns.append(skip);
       if (b.next){ const go = el('button', 'go', b.last ? 'Got it' : 'Next'); go.type = 'button'; go.onclick = advance; btns.append(go); }
-      row.append(btns); noteEl.append(row); noteEl.hidden = false; refresh();
+      row.append(btns); noteEl.append(row); noteEl.hidden = false; shownAt = Date.now(); refresh();
     }
+    let shownAt = 0;
     function refresh(){
       const b = beats[k]; if (!b || noteEl.hidden) return;
+      if (b.nextAfter && Date.now() - shownAt > b.nextAfter*1000 && !noteEl.querySelector('button.go')){ const go = el('button', 'go', 'Next'); go.type = 'button'; go.onclick = advance; const bt = noteEl.querySelector('.row > div:last-child'); if (bt) bt.append(go); }
       const n = noteEl.querySelector('[data-count]'); if (n && b.count){ const [a, m] = b.count(); n.textContent = Math.min(a, m) + ' / ' + m; }
       const t = b.target && b.target(); if (t !== lit){ unpulse(); if (t){ t.classList.add('econ-pulse'); lit = t; } }
     }

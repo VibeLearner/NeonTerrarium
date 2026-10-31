@@ -1640,7 +1640,7 @@ const WALL_HOLO_MIN_Y = 2.4;  // 'tall enough': stacking a section can make a bu
 function rooftopBoard(c, y){
   const top = c.sections[c.sections.length - 1], lot = c._topLot; c._topLot = null;
   airCells.delete(c);
-  if (!top || c.dark) return;
+  if (!top || c.dark === true) return;   // (true: a dark street; economy mode's numbers are lit buildings, economy.js)
   const mid = c.sections.some(s => s.zone === 'mid');
   // A building has the wall hologram or the air-filter one, never both: the plots that get the wall hologram are
   // picked first, and the air-filter tower is picked from the others. Both picks come from the plot alone, so

@@ -266,14 +266,15 @@ const ECON = (() => {
   }
 
   /* ---------- dark floors: unpowered buildings, and the floors nobody lives on yet ---------- */
-  // world.js isDarkPlot asks: true = the whole building's lights off (core.js DARK), a number = every light above that height off, null = as before
+  // world.js isDarkPlot asks: true = the whole building's lights off (core.js DARK), a positive number = every light above that height off,
+  // -1 or -2 = all lit but flickering a little or a lot (mid-way or far from a core), null = as before
   const darkQ = [];
   E.dark = c => { const d = darkCalc(c); c._econDark = d; return d; };
   function darkCalc(c){
     if (!isBld(c)) return null;
     const b = B.get(keyOf(c)); if (!b) return null;
     if (!b.powered) return true;
-    if (b.lit >= b.floors || c.lift || c.below) return null;
+    if (b.lit >= b.floors || c.lift || c.below) return b.band === 'far' ? -2 : b.band === 'mid' ? -1 : null;   // (lit: the lights flicker more the further it stands from a core, core.js)
     return (b.lit <= 0 ? CURB : (c.sectionTops && c.sectionTops[b.lit - 1]) || CURB + b.lit*3*FH) + .05;   // (the top of the last lived-in level)
   }
   function darkSync(){
@@ -479,7 +480,7 @@ const ECON = (() => {
   .econ-note .row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; } .econ-note button { all: unset; cursor: pointer; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: #8f879e; padding: 6px 8px; }
   .econ-note button.go { color: #12101a; background: #ffb347; } .econ-note button:focus-visible { outline: 1px solid #ffb347; }
   .econ-tip { position: fixed; z-index: 61; pointer-events: none; font: 10.5px/1.4 'JetBrains Mono', monospace; color: #efe6d6; background: rgba(12,10,20,.92); border: 1px solid rgba(255,179,71,.35); padding: 5px 8px; transform: translate(16px, 10px); white-space: pre; display: none; }
-  .econ-office { position: fixed; z-index: 30; top: 0; right: 0; bottom: 0; width: min(420px, 100vw); overflow-y: auto; background: rgba(12,10,20,.97); border-left: 1px solid rgba(255,179,71,.35); color: #efe6d6;
+  .econ-office { box-sizing: border-box; position: fixed; z-index: 30; top: 0; right: 0; bottom: 0; width: min(420px, 100vw); overflow-y: auto; background: rgba(12,10,20,.97); border-left: 1px solid rgba(255,179,71,.35); color: #efe6d6;
     font: 12px/1.5 'JetBrains Mono', ui-monospace, monospace; padding: calc(14px + env(safe-area-inset-top,0px)) max(16px, env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) 16px; }
   .econ-office[hidden] { display: none; }
   .econ-office header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
@@ -499,7 +500,10 @@ const ECON = (() => {
   .econ-mini .top { display: flex; justify-content: space-between; margin-bottom: 8px; color: #38e8e0; letter-spacing: .14em; text-transform: uppercase; font-size: 10px; }
   .econ-mini .foot { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; color: #8f879e; }
   .econ-mini button { all: unset; cursor: pointer; color: #38e8e0; letter-spacing: .14em; text-transform: uppercase; font-size: 10px; padding: 8px; }
-  html.touch .econ-hud { top: calc(6px + env(safe-area-inset-top,0px)); font-size: 10px; } html.touch .econ-hud .eh { padding: 4px 7px; } html.touch .econ-hud .hide-t { display: none; }
+  html.touch .econ-hud { top: calc(54px + env(safe-area-inset-top,0px)); left: max(12px, env(safe-area-inset-left,0px)); transform: none; font-size: 10px; }
+  html.touch .econ-corp { top: calc(108px + env(safe-area-inset-top,0px)); left: max(12px, env(safe-area-inset-left,0px)); transform: none; }
+  html.touch .econ-note { font-size: 11px; padding: 8px 12px; bottom: calc(150px + env(safe-area-inset-bottom,0px)); }
+  html.touch .econ-flash { top: calc(112px + env(safe-area-inset-top,0px)); } html.touch .econ-hud .eh { padding: 4px 7px; } html.touch .econ-hud .hide-t { display: none; }
   @media (max-width: 560px) { .econ-hud .hide-s { display: none; } }
   `;
   const styleEl = document.createElement('style'); styleEl.textContent = css; document.head.appendChild(styleEl);
@@ -694,7 +698,10 @@ const ECON = (() => {
     function finish(){ k = beats.length; st.tut.done = true; st.tut.step = k; save(); show(); }
     for (const ev of ['build', 'office']) E.onEv(ev, d => { const b = beats[k]; if (b && b.ev === ev && (!b.test || b.test(d))) advance(); });
     setInterval(() => { const b = beats[k]; if (b && b.done && b.done()) advance(); }, 800);
-    return { start(){ if (k < beats.length) setTimeout(show, 1800); }, replay(){ k = 0; st.tut = { step: 0, done: false }; save(); show(); } };
+    // (on a touch screen the gesture tutorial goes first, tutorial.js: these notes wait until it's done or skipped)
+    const gestureDone = () => { if (!TOUCHY) return true; try { const g = JSON.parse(localStorage.getItem('touch:nt.tut') || 'null'); return !!(g && g.done); } catch (e) { return true; } };
+    function start(){ if (k >= beats.length) return; if (!gestureDone()) return setTimeout(start, 2000); setTimeout(show, 1800); }
+    return { start, replay(){ k = 0; st.tut = { step: 0, done: false }; save(); show(); } };
   })();
   setTimeout(() => TUTE.start(), 0);
 

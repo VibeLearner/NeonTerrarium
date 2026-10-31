@@ -248,9 +248,9 @@ let curFine = null;
 function put(geo, mat, m, lean){
   if (PUT_KEEPOUT && keptOut(geo, m)) return;
   if (LUX){ let sub = LUX.mats.get(mat); if (!sub && LUX.auto && mat.userData && mat.userData.glow) sub = LUX.auto(mat); if (sub){ mat = sub; if (LUX.halo) LUX.halo(sub, m); } }
-  if (DARK && !KEEP_LIGHT && mat.userData && DARK_SUB[mat.userData.glow] && (DARK === true ? posHash(m.elements[12], m.elements[13], m.elements[14]) < 82 : m.elements[13] > DARK)) mat = DARK_SUB[mat.userData.glow];   // (a number: economy mode, every light above that height is off: the floors nobody lives on yet, economy.js)
+  if (DARK && !KEEP_LIGHT && mat.userData && DARK_SUB[mat.userData.glow] && (DARK === true ? posHash(m.elements[12], m.elements[13], m.elements[14]) < 82 : DARK > 0 && m.elements[13] > DARK)) mat = DARK_SUB[mat.userData.glow];   // (a number: economy mode, every light above that height is off: the floors nobody lives on yet, economy.js)
   let b = buckets.get(mat); if (!b){ b = { p: [], n: [], d: [], f: mat.userData && mat.userData.glow ? [] : null, o: mat.userData && mat.userData.glow ? [] : null }; buckets.set(mat, b); }
-  const fid = b.f ? (DARK === true && mat.userData.glow !== 'blink' ? heavyFlickerId() : flickerId(mat.userData.glow)) : 0;
+  const fid = b.f ? (DARK === true && mat.userData.glow !== 'blink' ? heavyFlickerId() : flickerId(mat.userData.glow, DARK === -1 ? 1.6 : DARK === -2 ? 4 : 1)) : 0;   // (economy mode: -1 and -2, a building mid-way and far from its Emitter Core, flickers more)
   const did = b.f && !FINE_LIGHT ? 0 : detailId(geo, m), ord = b.f ? litOrder(m.elements[12], m.elements[13], m.elements[14]) : 0;   // lights are never dropped: they carry the look from far away
   if (FINE_LIGHT && did > 0 && curFine && geo === U.box){
     const e = m.elements; let a = 0, al = 0; for (let q = 0; q < 3; q++){ const l = Math.hypot(e[q*4], e[q*4 + 1], e[q*4 + 2]); if (l > al){ al = l; a = q; } }
@@ -349,7 +349,7 @@ function detailId(geo, m){
 // which lights flicker: some neon, fewer lamps and trims, the odd window (Math.random, so the city's layout
 // randomness is untouched)
 const FLK_ODDS = { neon: .08, bulb: .06, trim: .03, window: .02 };
-function flickerId(kind){ return fxRand() < (FLK_ODDS[kind] || 0) ? 1 + Math.floor(fxRand()*198) : 0; }
+function flickerId(kind, mul = 1){ return fxRand() < (FLK_ODDS[kind] || 0)*mul ? 1 + Math.floor(fxRand()*198) : 0; }
 // ids 200 to 254 flicker hard and often: the failing lights of a dark street
 const heavyFlickerId = () => 200 + Math.floor(fxRand()*55);
 function bucketGeometry(b){

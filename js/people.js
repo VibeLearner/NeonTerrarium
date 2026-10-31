@@ -1484,8 +1484,8 @@ function syncLurkers(){
   for (const c of cells.values()){
     // the dark streets always have one; now and then an ordinary, well-lit street gets one too (rarely out, and
     // quick to give up)
-    const rare = !c.dark && !!c.sections.length && !c.mega && hash('lurk2', c.i, c.j) % 12 === 0;
-    if (!c.dark && !rare) continue;
+    const rare = c.dark !== true && !!c.sections.length && !c.mega && hash('lurk2', c.i, c.j) % 12 === 0;
+    if (c.dark !== true && !rare) continue;   // (economy mode: only a building with no power counts, economy.js)
     const k = ckey(c.i, c.j); keep.add(k);
     const G = cellGrid(c);
     // a corner of the plot's street that's clear (and stays the same every time)

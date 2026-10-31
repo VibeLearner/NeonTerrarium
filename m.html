@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="en" data-nscripts="73">
+<html lang="en" data-nscripts="74">
 <head>
 <meta charset="utf-8">
 <!-- phone page: made from index.html by tools/mobile/build.js; do not edit, edit index.html and run the build -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Neon Terrarium</title>
 <script src="min/js/benchboot.js?v=a86ea20fbc"></script>   <!-- the phone benchmark, only with ?bench in the address (does nothing otherwise) -->
-<script src="min/js/saveguard.js?v=5cb495749e"></script>
+<script src="min/js/saveguard.js?v=6e53c30e3b"></script>
 <script src="min/js/tv.js?v=e874b5e8bc"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,7 +15,7 @@
 <script src="min/js/touch.js?v=9d19c56347"></script>
 <script src="min/js/loadtrace.js?v=9475945617"></script>   <!-- how long this load took, stage by stage -->
 <script src="min/js/tsheet.js?v=64ba9a384b"></script>   <!-- the touch screen's shared bottom sheet (nothing with a mouse) -->
-<link rel="stylesheet" href="css/style.css?v=2026-10-30dk">
+<link rel="stylesheet" href="css/style.css?v=2026-10-31ec">
 <link rel="stylesheet" href="css/player.css?v=2026-10-30u">
 <link rel="stylesheet" href="css/touchui.css?v=2026-10-31mt">
 <link rel="stylesheet" href="css/touch-sheets.css?v=2026-10-30pc">
@@ -48,7 +48,8 @@
   <section class="t-panel" id="tCities" hidden aria-label="Cities">
     <header><h2>Cities</h2><button id="tClose" aria-label="Close">Close</button></header>
     <ul id="tList" class="tlist"></ul>
-    <form id="tNew" class="trow"><input id="tNewName" maxlength="40" placeholder="Name a new city" aria-label="New city name"><button type="submit">New city</button></form>
+    <form id="tNew" class="tnew"><div class="trow"><input id="tNewName" maxlength="40" placeholder="Name a new city" aria-label="New city name"><button type="submit">New city</button></div>
+      <fieldset class="tmode"><legend>Mode</legend><label><input type="radio" name="tMode" value="sandbox" checked><span>Sandbox<small>Build freely</small></span></label><label><input type="radio" name="tMode" value="economy"><span>Economy<small>Earn Scrip, power the city, unlock as it grows</small></span></label></fieldset></form>
     <div class="trow"><label class="tfile">Import a city file<input id="tImport" type="file" accept=".neoncity,application/json"></label></div>
     <form id="tCloud" class="tcloud">
       <h3>Cloud saves</h3>
@@ -307,7 +308,7 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/BufferGeometryUtils.js"></script>
 <!-- ?v= makes browsers fetch fresh copies after an update; change it with every release -->
 <script src="min/js/matreg.js?v=9096582554"></script>
-<script src="min/js/core.js?v=9806163bfe"></script>
+<script src="min/js/core.js?v=4b2621fb69"></script>
 <script src="min/js/spritegen.js?v=0fe190566e"></script>
 <script src="min/js/spritegen_grass.js?v=eb2c20e171"></script>
 <script src="min/js/spritegen_shrubs.js?v=46ac088878"></script>
@@ -329,7 +330,7 @@
 <script src="min/js/peoplegen_roles.js?v=98a61ecd73"></script>
 <script src="min/js/peoplegen_umbrella.js?v=736bb9435a"></script>
 <script src="min/js/peoplegen_held.js?v=72d9fee9b3"></script>
-<script src="min/js/sprites.js?v=9e69631aa9"></script>
+<script src="min/js/sprites.js?v=c58cb097dc"></script>
 <script src="min/js/buildings.js?v=e9169c1e07"></script>
 <script src="min/js/ground.js?v=c301f37fc3"></script>
 <script src="min/js/vehicles.js?v=e171121c37"></script>
@@ -337,10 +338,10 @@
 <script src="min/js/looks.js?v=b04b61d5e6"></script>
 <script src="min/js/lookui.js?v=7321368d7b"></script>
 <script src="min/js/audio.js?v=2863d3f20e"></script>
-<script src="min/js/world.js?v=3c146825e8"></script>
+<script src="min/js/world.js?v=c94a85c8c2"></script>
 <script src="min/js/perimeter.js?v=f5a466bc06"></script>
 <script src="min/js/mega.js?v=4a99422d19"></script>
-<script src="min/js/people.js?v=4b58f3c8f0"></script>
+<script src="min/js/people.js?v=4fc8a4c08b"></script>
 <script src="min/js/highway.js?v=0ccd4b56f7"></script>
 <script src="min/js/metro.js?v=30b55d3654"></script>
 <script src="min/js/story.js?v=0e60961057"></script>
@@ -355,21 +356,22 @@
 <script src="min/js/grid_viz.js?v=ca305e4802"></script>
 <script src="min/js/booth_song.js?v=0d3a3778c0"></script>
 <script src="min/js/booth.js?v=d2b1d0172a"></script>
-<script src="min/js/input.js?v=1f8abf8adf"></script>
+<script src="min/js/input.js?v=6993342636"></script>
 <script src="min/js/transit-touch.js?v=b346eff6ab"></script>   <!-- building transit with a finger (nothing with a mouse) -->
-<script src="min/js/furnish.js?v=c8541adf6f"></script>
+<script src="min/js/furnish.js?v=00c8ee3055"></script>
 <script src="min/js/lidar.js?v=b42022a01e"></script>
 <script src="min/js/perfhud.js?v=2d94e4cd42"></script>
 <script src="min/js/memcensus.js?v=2e92d4f00e"></script>
 <script src="min/js/staticcache.js?v=10d848d77b"></script>
 <script src="min/js/neverseen.js?v=a178dcf466"></script>
+<script src="min/js/economy.js?v=f7fc58b649"></script>
 <script src="min/js/main.js?v=c1b056789f"></script>
 <script src="min/js/cityledger.js?v=c26793c039"></script>
-<script src="min/js/overseer.js?v=261221f003"></script>
+<script src="min/js/overseer.js?v=1ef3b7aa54"></script>
 <script src="min/js/policedesk.js?v=6710cb6119"></script>
-<script src="min/js/wirelog.js?v=50d94c4e26"></script>
-<script src="min/js/slots.js?v=5b5ed015e4"></script>
-<script src="min/js/title.js?v=787cc51afc"></script>
+<script src="min/js/wirelog.js?v=1f52af3e24"></script>
+<script src="min/js/slots.js?v=08594789a3"></script>
+<script src="min/js/title.js?v=3212a64be7"></script>
 <script>document.getElementById('toTitle').addEventListener('click', () => { const tg = document.getElementById('deckToggle'); if (document.getElementById('deck').classList.contains('open')) tg.click(); (TITLE.fromGame || TITLE.show)(); });</script>
 <!-- the player's interface for the public build (settings dialog, city settings, folds): not on #dev -->
 <script src="min/js/playerui.js?v=aa2ce590ef"></script>

@@ -422,7 +422,7 @@ const FURN = (() => {
       const secs = c.sections || [];
       const o = { i: c.i, j: c.j, x: c.x, z: c.z, h: +(c.height || 0).toFixed(2), zone: c.mega ? 'mega' : c.park ? '' : secs.length ? secs[secs.length - 1].zone : '' };
       if (secs.length) o.sections = secs.map(s => ({ zone: s.zone, seed: s.seed })); if (c.sectionTops) o.tops = c.sectionTops.map(v => +v.toFixed(3));
-      if (c.lift) o.lift = Object.assign({}, c.lift); if (c.mega) o.mega = c.mega; if (c.park) o.park = 1; if (c.firstFloors) o.ff = c.firstFloors; try { if (isDarkPlot(c)) o.dark = 1; } catch (e) {}
+      if (c.lift) o.lift = Object.assign({}, c.lift); if (c.mega) o.mega = c.mega; if (c.park) o.park = 1; if (c.firstFloors) o.ff = c.firstFloors; try { if (isDarkPlot(c) === true) o.dark = 1; } catch (e) {}
       cellsOut.push(o);
       const H = homesOf(c); for (const h of H){ const r = Object.assign({}, h); delete r.top; delete r.base; homes.push(r); }
       const bySec = new Map(); for (const h of H){ if (h.kind === 'lift') continue; const L = bySec.get(h.section) || []; L.push(h); bySec.set(h.section, L); }

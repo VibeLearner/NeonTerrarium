@@ -427,8 +427,9 @@ function plant(kind,P,x,y,z,k=1,anchor,fixed=false){
   const scale = new THREE.Matrix4().makeScale(s[0]/PX*k, s[1]/PX*k, 1);
   const toss = chance(.5)?-1:1, shade = rnd(.85,1.05), phase = rnd(0,TAU);
   const flip = (kind.startsWith('sign_') || kind.startsWith('glyph_')) ? 1 : toss;   // lettering must read the right way round
-  if (DARK && flip === 1 && kind.startsWith('sign_')){ _gv.set(x,y,z).applyMatrix4(P); if (posHash(_gv.x, _gv.y, _gv.z) < 70) return; }
-  const ph = DARK && kind.startsWith('sign_') ? phase + 100 : phase;   // a sign on a dark street flickers hard
+  if (DARK === true && flip === 1 && kind.startsWith('sign_')){ _gv.set(x,y,z).applyMatrix4(P); if (posHash(_gv.x, _gv.y, _gv.z) < 70) return; }
+  if (DARK > 0 && kind.startsWith('sign_')){ _gv.set(x,y,z).applyMatrix4(P); if (_gv.y > DARK) return; }   // (economy mode: no signs on the levels nobody lives on yet, core.js put)
+  const ph = DARK === true && kind.startsWith('sign_') ? phase + 100 : phase;   // a sign on a dark street flickers hard
   if (PUT_KEEPOUT){ _gv.set(x,y,z).applyMatrix4(P); if (inKeepOut(_gv.x, _gv.y, _gv.z, .2)){ if (!fixed) rnd(0,PI); return; } }   // (not where a highway pillar meets the roof: see put)
   if (fixed){
     FOL_LIST[kind].push({ m: under(P, T(x,y,z)).multiply(scale), an, flip, shade, phase: ph, fixed:1 });
@@ -610,8 +611,9 @@ const _gv = new THREE.Vector3();
 function glow(P,x,y,z,kind,s=1){
   if (LUX && LUX.haloAll) s *= LUX.haloAll;   // a district whose halos run smaller (the works)
   if (LUX && LUX.glows[kind]){ s *= LUX.haloK || 1; kind = LUX.glows[kind]; }
-  if (DARK && !KEEP_LIGHT && GLOW_FLK[kind]){ _gv.set(x,y,z).applyMatrix4(P); if (posHash(_gv.x, _gv.y, _gv.z) < 80) return; }
-  if (DARK && GLOW_FLK[kind]) s = -s;   // marks a halo that flickers hard (see glowPoints)
+  if (DARK === true && !KEEP_LIGHT && GLOW_FLK[kind]){ _gv.set(x,y,z).applyMatrix4(P); if (posHash(_gv.x, _gv.y, _gv.z) < 80) return; }
+  if (DARK > 0 && !KEEP_LIGHT && GLOW_FLK[kind]){ _gv.set(x,y,z).applyMatrix4(P); if (_gv.y > DARK) return; }   // (economy mode: the halos of the unlit levels go too)
+  if (DARK === true && GLOW_FLK[kind]) s = -s;   // marks a halo that flickers hard (see glowPoints)
   if (!glowList){ if (LIGHT_ONLY[kind]) return; const sp = new THREE.Sprite(GLOW[kind]); sp.position.set(x,y,z).applyMatrix4(P); sp.scale.set(Math.abs(s),Math.abs(s),1); sp.layers.set(1); glowGroup.add(sp); return; }
   _gv.set(x,y,z).applyMatrix4(P); (glowList[kind] || (glowList[kind] = [])).push(_gv.x, _gv.y, _gv.z, s);
 }

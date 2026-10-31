@@ -245,7 +245,7 @@ const OVERSEER = (() => {
 
   /* ---------- the view ---------- */
   function dom(){
-    const d = D, asl = d.pop - d.awake, first = !accessed(), tot = d.zf.low + d.zf.mid + d.zf.high + d.zf.ind || 1;
+    const d = D, asl = d.pop - d.awake, first = !accessed() && !(typeof ECON !== 'undefined' && ECON.on && !ECON.coastOpen()), tot = d.zf.low + d.zf.mid + d.zf.high + d.zf.ind || 1;
     const meter = (f, n = 24) => Array.from({ length: n }, (_, k) => `<i class="${k < Math.round(f*n) ? 'on' : ''}"></i>`).join('');
     const zrow = (lbl, v) => `<div class="bar"><span>${lbl}</span><span class="tr"><i style="width:${(100*v/Math.max(1, Math.max(d.zf.low, d.zf.mid, d.zf.high, d.zf.ind))).toFixed(1)}%"></i></span><span>${fmt(v)}</span></div>`;
     const topMax = Math.max(1, ...d.cr.top.map(t => t.n));
@@ -459,7 +459,9 @@ const OVERSEER = (() => {
     a.animate([{ opacity: 1, transform: 'translate(-50%, -50%)' }, { opacity: 0, transform: 'translate(-50%, -46%) scale(.97)' }], { duration: 260, easing: 'ease-in' }).onfinish = () => a.remove();
     const b = root.querySelector('.close'); if (b) b.focus({ preventScroll: true }); }
   function yes(){
-    if (!O.open || O.busy) return; O.busy = true;
+    if (!O.open || O.busy) return;
+    if (typeof ECON !== 'undefined' && ECON.on && !ECON.coastOpen()){ const say = root && root.querySelector('.say'); if (say) say.textContent = 'Archive sealed · opens at the final classification'; if (ECON.note) ECON.note('The coast opens at the final classification · see the City office'); return; }   // (economy mode, economy.js)
+    O.busy = true;
     try { localStorage.setItem(ACCESS_KEY, String(safe(() => STORY.day() + 1, 1))); } catch (e) {}
     const say = root.querySelector('.say'); if (say) say.innerHTML = 'Accessing<span class="cur"></span>';
     const acc = root.querySelector('.acc'); if (acc) acc.textContent = 'ACCESSING';

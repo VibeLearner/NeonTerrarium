@@ -567,7 +567,7 @@ const TITLE = (() => {
     const list = await SLOTS.list(), box = $t('tList');
     box.innerHTML = list.map(c => {
       const m = c.meta || {}, line = 'Day ' + (m.day || 1) + ' · ' + (m.residents || 0).toLocaleString('en-US') + ' residents';
-      const tags = (c.active ? '<i class="tag on">Playing</i>' : '') + (c.cloud ? '<i class="tag">' + (c.local ? 'Cloud' : 'Cloud only') + '</i>' : '') + (c.cloudNewer ? '<i class="tag warn">Newer in cloud</i>' : '');
+      const tags = (c.active ? '<i class="tag on">Playing</i>' : '') + (c.meta && c.meta.mode === 'economy' ? '<i class="tag">Economy</i>' : '') + (c.cloud ? '<i class="tag">' + (c.local ? 'Cloud' : 'Cloud only') + '</i>' : '') + (c.cloudNewer ? '<i class="tag warn">Newer in cloud</i>' : '');
       return '<li class="tcity' + (c.active ? ' active' : '') + '" data-id="' + esc(c.id) + '">' +
         '<div class="tthumb">' + (c.thumb ? '<img alt="" src="' + c.thumb + '">' : '<span>No picture yet</span>') + '</div>' +
         '<div class="tinfo"><b>' + esc(c.name) + '</b><small>' + line + '</small><small>' + (c.active ? 'Open now' : 'Saved ' + ago(c.updated)) + '</small><div class="ttags">' + tags + '</div></div>' +
@@ -604,7 +604,7 @@ const TITLE = (() => {
       }
     } catch (err) { say(err.message, true); }
   });
-  $t('tNew').addEventListener('submit', async e => { e.preventDefault(); say('Starting a new city…'); try { await SLOTS.create($t('tNewName').value); } catch (err) { say(err.message, true); } });
+  $t('tNew').addEventListener('submit', async e => { e.preventDefault(); say('Starting a new city…'); try { const md = document.querySelector('input[name="tMode"]:checked'); await SLOTS.create($t('tNewName').value, md ? md.value : 'sandbox'); } catch (err) { say(err.message, true); } });
   $t('tImport').addEventListener('change', async e => { const f = e.target.files[0]; e.target.value = ''; if (!f) return; try { const r = await SLOTS.importFile(f); say('Added “' + r.name + '”. Open it from the list.'); render(); } catch (err) { say(err.message, true); } });
   if ($t('tCloud')) $t('tCloud').addEventListener('submit', async e => {
     e.preventDefault(); const v = $t('tUser').value;

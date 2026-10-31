@@ -108,21 +108,26 @@ const TUT = (() => {
   // each beat done anywhere. They wait for the city to say each step was done (a piece added, the height changed, a line finished), pause while the
   // mode is off and carry on when it's back, and keep their shown and done counts in this browser (touch:nt.tutHw, touch:nt.tutMt).
   // Replayed from Settings, Interface (touchui.js), which turns the mode on.
+  // (owner, Oct 31: they teach the touch controls of transit-touch.js: tap to aim, tap again to place; drag from the end to draw, tap to place;
+  //  and on the metro, double tap the first station to turn it)
+  const ttN = k => typeof TT !== 'undefined' ? TT[k] || 0 : 0;
   const hwOpen = () => typeof highways !== 'undefined' ? highways.filter(h => !h.done) : [], tilesOf = a => a.reduce((n, l) => n + l.tiles.length, 0);
   const mtOpen = () => typeof metros !== 'undefined' ? metros.filter(l => !l.done && !l.loop) : [];
   const doneOf = a => a.filter(l => l.done).length;
   // each beat: arm() takes a note of how things stand when it's shown, and returns the test that says it's done
   const MINI = {
     hw: { key: 'touch:nt.tutHw', name: 'SKY HIGHWAY', mode: () => typeof hwMode !== 'undefined' && hwMode, end: 'Hold a piece to cut the road back.', beats: [
-      { id: 'start', say: 'Tap a plot to start a highway', ghost: 'tap', arm: () => { const n = highways.length; return () => highways.length > n || hwOpen().some(h => h === hwActive); } },
+      { id: 'start', say: 'Tap a plot to aim, then tap again to start a highway', ghost: 'tap2', arm: () => { const n = highways.length; return () => highways.length > n || hwOpen().some(h => h === hwActive); } },
       { id: 'height', say: 'Tap \u2212 or + below to set the height', ghost: 'tap', arm: () => { const L = hwLevel; return () => hwLevel !== L; } },
-      { id: 'extend', say: 'Tap just ahead of the end, in the air, to extend it', ghost: 'tap', arm: () => { const n = tilesOf(hwOpen()); return () => tilesOf(hwOpen()) > n; } },
-      { id: 'finish', say: 'Tap the last piece to add the drop-off', ghost: 'tap', arm: () => { const n = doneOf(highways); return () => doneOf(highways) > n; } },
+      { id: 'extend', say: 'Drag from the end to draw the road, then tap it to build', ghost: 'drag', arm: () => { const n = tilesOf(hwOpen()); return () => tilesOf(hwOpen()) > n; } },
+      { id: 'finish', say: 'Tap the last piece twice to add the drop-off', ghost: 'tap2', arm: () => { const n = doneOf(highways); return () => doneOf(highways) > n; } },
     ] },
     mt: { key: 'touch:nt.tutMt', name: 'METRO', mode: () => typeof mtMode !== 'undefined' && mtMode, end: 'Tap a straight piece to add a station. Hold a piece to cut the line back.', beats: [
-      { id: 'start', say: 'Tap a plot to start a line at its first station', ghost: 'tap', arm: () => { const n = metros.length; return () => metros.length > n || mtOpen().some(l => l === mtActive); } },
-      { id: 'extend', say: 'Tap just ahead of the end, in the air, to extend it', ghost: 'tap', arm: () => { const n = tilesOf(metros); return () => tilesOf(metros) > n; } },
-      { id: 'finish', say: 'Tap the last piece to finish it with a station', ghost: 'tap', arm: () => { const n = doneOf(metros); return () => doneOf(metros) > n; } },
+      { id: 'start', say: 'Tap a plot to aim, then tap again to place the first station', ghost: 'tap2', arm: () => { const n = metros.length; return () => metros.length > n || mtOpen().some(l => l === mtActive); } },
+      // (done once it's turned, or once no lone station is left to turn)
+      { id: 'turn', say: 'Double tap the station to turn it', ghost: 'tap2', arm: () => { const n = ttN('turns'); return () => ttN('turns') > n || !metros.some(l => l.tiles.length === 1); } },
+      { id: 'extend', say: 'Drag from the end to draw the track, then tap it to build', ghost: 'drag', arm: () => { const n = tilesOf(metros); return () => tilesOf(metros) > n; } },
+      { id: 'finish', say: 'Tap the last piece twice to finish it with a station', ghost: 'tap2', arm: () => { const n = doneOf(metros); return () => doneOf(metros) > n; } },
     ] },
   };
   for (const m of Object.values(MINI)) m.st = load(m.key, { done: false, beats: {} });

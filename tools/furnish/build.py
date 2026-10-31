@@ -9,7 +9,8 @@ Runs the lab's own `build.py --embed` (Build mode only, boots straight into Buil
 window.PODCITY_NOPACK (the city comes from the game, never from city/*.wasm), furnish/bridge.css + furnish/bridge.js (the Exit to city
 and Save bar and the postMessage side of js/furnish.js) and furnish/touch.css + furnish/touch.js (the phone layout: a bottom tray, a bar
 over the selected piece, pinch and two-finger pan; touch screens only), each with a ?v= from its contents. The phone layout reaches into
-the builder through PodBuilder.touch, a few hooks added to the lab's builder.js here (TOUCH_API). Writes furnish.html next to index.html.
+the builder through PodBuilder.touch, a few hooks added to the lab's builder.js here (TOUCH_API), and a touch screen gets a hold in the head
+that keeps a touch from cutting the loading hologram short (HOLD). Writes furnish.html next to index.html.
 Every step can run again on its own output: --refresh swaps the old tags for new ones instead of adding a second set.
 """
 import hashlib, os, subprocess, sys
@@ -40,6 +41,17 @@ TOUCH_API = (
     "      v.set((lb.min.x+lb.max.x)/2,lb.max.y,(lb.min.z+lb.max.z)/2).applyMatrix4(i.pivot.matrixWorld).project(B.cam);const r=$('bCanvas').getBoundingClientRect();return {x:r.left+(v.x+1)/2*r.width,y:r.top+(1-v.y)/2*r.height}}}})();\n")
 API_AT = 'window.PodBuilder={version:1,'
 
+# On a touch screen the hologram that plays while an apartment comes in is a loading screen: a touch must not cut it short. The lab skips
+# it from a window capture listener of the builder's (added at startup) and one of PodContext's, so this goes in the head, before any of the
+# lab's scripts, and is the first listener there: while furnish/bridge.js says the apartment is still coming in (window.__ntLoading) it
+# stops every pointer, touch and click before the lab's listeners or touch.js see it. Keys are left alone (Esc still goes back to the city).
+HOLD_MARK = '<!-- Neon Terrarium: the touch hold (tools/furnish/build.py) -->'
+HOLD = (HOLD_MARK + '\n<script>(()=>{if(!(window.matchMedia&&matchMedia(\'(pointer: coarse)\').matches))return;'
+        'const hold=e=>{const f=window.__ntLoading;if(f&&f()){if(e.cancelable)e.preventDefault();e.stopImmediatePropagation()}};'
+        "for(const t of ['pointerdown','pointermove','pointerup','pointercancel','touchstart','touchmove','touchend','mousedown','mouseup','click','dblclick','contextmenu','wheel'])"
+        'addEventListener(t,hold,{capture:true,passive:false})})()</script>\n')
+HOLD_AT = '<script>window.PODLAB_EMBED=true;window.PODCITY_NOPACK=true</script>\n'
+
 
 def ver(f):
     return hashlib.sha1(open(os.path.join(REPO, 'furnish', f), 'rb').read()).hexdigest()[:10]
@@ -54,6 +66,15 @@ def game_side(html):
         html = html.replace(a, b)
     if 'window.PODCITY_NOPACK=true' not in html:
         html = html.replace('<script>window.PODLAB_EMBED=true</script>', '<script>window.PODLAB_EMBED=true;window.PODCITY_NOPACK=true</script>', 1)
+    # the touch hold (see HOLD), right after the embed flags in the head; an older one from a previous run goes first
+    i = html.find(HOLD_MARK)
+    if i >= 0:
+        j = html.find('</script>\n', i)
+        html = html[:i] + html[j + len('</script>\n'):]
+    if HOLD_AT in html:
+        html = html.replace(HOLD_AT, HOLD_AT + HOLD, 1)
+    else:
+        print('warning: no embed flags script in the lab build: the touch hold is left out (a touch can cut the hologram short)')
     # the phone layout's hooks into the builder (see TOUCH_API); without them touch.js leaves the page as it is
     if 'touch:TOUCHAPI' not in html:
         if html.count(API_AT) == 1:

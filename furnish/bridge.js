@@ -18,14 +18,19 @@
   const sim = document.createElement('div'); sim.className = 'nt-sim'; sim.hidden = true; sim.setAttribute('role', 'note');
   sim.innerHTML = '<b>LIDAR reconstruction</b><span>Simulated apartment, rebuilt from the scan.</span>';
   // (it sits just under the lab's toolbar at the top, whatever its height; the toast goes under it)
+  // On a touch screen (html.ftouch, furnish/touch.js) the toolbar is folded into Tools on the top row, so both go under that row (and
+  // under the Tools row while it is open), and the note only shows while the apartment comes in: see simWatch.
+  const touch = () => document.documentElement.classList.contains('ftouch');
   function placeSim(){
-    const bb = document.querySelector('.bbar'), r = bb && bb.getBoundingClientRect();
-    const top = r && r.height ? Math.round(r.bottom + 8) : 64; sim.style.top = top + 'px';
+    let top = 64;
+    if (touch()){ let y = 0; for (const el of [bar, document.querySelector('.bstage.ft-tools .bbar')]){ const r = el && el.getBoundingClientRect(); if (r && r.height) y = Math.max(y, r.bottom); } if (y) top = Math.round(y + 8); }
+    else { const bb = document.querySelector('.bbar'), r = bb && bb.getBoundingClientRect(); if (r && r.height) top = Math.round(r.bottom + 8); }
+    sim.style.top = top + 'px';
     toast.style.top = (sim.hidden ? top : top + (sim.offsetHeight || 40) + 6) + 'px';
   }
   addEventListener('resize', () => { if (!sim.hidden) placeSim(); });
   const toast = document.createElement('div'); toast.className = 'nt-toast'; toast.hidden = true; toast.setAttribute('role', 'status');
-  function say(t){ toast.textContent = t; toast.hidden = false; clearTimeout(say.t); say.t = setTimeout(() => { toast.hidden = true; }, 2200); }
+  function say(t){ if (touch()) placeSim(); toast.textContent = t; toast.hidden = false; clearTimeout(say.t); say.t = setTimeout(() => { toast.hidden = true; }, 2200); }
   function mount(){
     const tl = document.querySelector('.btl'); if (tl) tl.insertBefore(bar, tl.firstChild); else document.body.appendChild(bar);
     document.body.appendChild(toast); document.body.appendChild(sim);
@@ -71,8 +76,8 @@
     else if (C && C.setCitySource){   // (an older lab: the whole city once it is all here)
       let res; const pr = new Promise(r => { res = r; }); stream = { live: false, head: m.head, plots: [], em: m.head.em, res }; C.setCitySource(pr); }
     else console.warn('furnish: this lab build has no PodContext.setCitySource; the stand-in city is shown');
-    sim.hidden = !m.sim; sim.classList.remove('in'); if (m.sim){ placeSim(); void sim.offsetWidth; sim.classList.add('in'); for (const ms of [400, 1500, 4000]) setTimeout(() => { if (!sim.hidden) placeSim(); }, ms); }
-    S.home = h; const visit = S.visit; liveWatch(visit); doneWatch(visit);
+    sim.hidden = !m.sim; sim.classList.remove('in', 'gone'); if (m.sim){ placeSim(); void sim.offsetWidth; sim.classList.add('in'); for (const ms of [400, 1500, 4000]) setTimeout(() => { if (!sim.hidden) placeSim(); }, ms); }
+    S.home = h; const visit = S.visit; liveWatch(visit); doneWatch(visit); if (m.sim) simWatch(visit);
     (async () => {
       try {
         if (warming){ try { if (PB().warmStop) await PB().warmStop(); else await warming; } catch (e) {} if (S.visit !== visit) return; sleep(false); }
@@ -108,6 +113,23 @@
         let perf = null; try { perf = PB().perf ? PB().perf() : null; } catch (e) {}
         send({ type: 'furnish:done', lab: { homeMs: S.homeMs, ms: Math.round(performance.now() - S.t0), timeline: st && st.timeline || null, builder: perf } }); return; }
       requestAnimationFrame(look); };
+    requestAnimationFrame(look);
+  }
+  // On a touch screen the apartment coming in is a loading screen: from furnish:begin until the home is in and the hologram has resolved
+  // a touch does nothing (the hold that build.py puts first in the page asks window.__ntLoading, so the lab's own listeners never see the
+  // touch and the hologram is never cut short), and the LIDAR note goes once it is over: it says what the hologram is building, and on a
+  // small screen it stood in front of the apartment after that. A minute at most, so a hologram that never ends can't hold the page.
+  const HOLD_MS = 60000;
+  function loading(){
+    if (!S.opening || S.sent || !S.home || performance.now() - S.t0 > HOLD_MS) return false;
+    const C = PC(), st = $('bStage');
+    return !S.ready || !!(C && C.transitioning) || !!(st && st.classList.contains('trans'));
+  }
+  window.__ntLoading = loading;
+  function simWatch(visit){
+    const look = () => { if (S.visit !== visit || sim.hidden) return;
+      if (!touch() || loading()){ requestAnimationFrame(look); return; }
+      sim.classList.add('gone'); setTimeout(() => { if (S.visit !== visit) return; sim.hidden = true; sim.classList.remove('gone'); placeSim(); }, 450); };
     requestAnimationFrame(look);
   }
   // furnish:warm: while the title screen shows, everything that doesn't need a home is made ready (the library, the worker, the programs)

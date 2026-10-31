@@ -13,18 +13,29 @@ html.ftouch .bstage::after{content:"";position:absolute;left:0;right:0;top:100%;
 html.ftouch .bstage button,html.ftouch .nt-bar button,html.ftouch .ftsheet button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;user-select:none;-webkit-user-select:none}
 html.ftouch .bpanel,html.ftouch header.bar{backdrop-filter:none;-webkit-backdrop-filter:none}
 
-/* top: Exit and Save at the left inside the safe area, the home controls (undo, walls, view, time, work light) in a row under them that scrolls sideways */
-html.ftouch .btl{left:var(--ftL);top:var(--ftT)}
-html.ftouch .nt-bar button{height:44px;padding:0 14px;font-size:12px;letter-spacing:.06em}
+/* top: one row inside the safe area, Exit to city at the left, Save at the right and Tools in the middle (touch.js). Tools opens the home
+   controls (undo, walls, view, time, work light) in a row under it that grows out from the middle, and scrolls sideways when it is too wide */
+html.ftouch .btl{left:var(--ftL);right:var(--ftR);top:var(--ftT);justify-items:stretch;pointer-events:none}
+html.ftouch .nt-bar{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;pointer-events:auto}
+html.ftouch .nt-bar .nt-exit{justify-self:start}
+html.ftouch .nt-bar .nt-save{justify-self:end}
+html.ftouch .nt-bar button{height:44px;padding:0 14px;font-size:12px;letter-spacing:.06em;white-space:nowrap}
+html.ftouch .nt-bar .nt-tools{display:flex;align-items:center;justify-content:center;gap:6px;padding:0 12px;border-color:#5ae8ff;color:#5ae8ff}
+html.ftouch .nt-bar .nt-tools svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+html.ftouch .nt-bar .nt-tools svg:last-child{width:14px;height:14px;transition:transform .2s ease}
+html.ftouch .nt-bar .nt-tools.on{background:rgba(56,232,224,.22);box-shadow:0 0 8px rgba(56,232,224,.5);color:#fff}
+html.ftouch .nt-bar .nt-tools.on svg:last-child{transform:rotate(180deg)}
+@media (max-width:440px){html.ftouch .nt-bar .nt-tools span{display:none}html.ftouch .nt-bar .nt-tools{padding:0 14px}}   /* (a phone held upright: the icons only, so Exit and Save keep their words on one line) */
 html.ftouch .bset,html.ftouch .bhintw,html.ftouch .bexit{display:none!important}
-html.ftouch .bbar{top:calc(var(--ftT) + 50px);left:var(--ftL);right:var(--ftR);transform:none;max-width:none;height:52px;gap:4px;padding:0 4px;overflow-x:auto;overflow-y:hidden;overscroll-behavior:contain;scrollbar-width:none;background:var(--ftPlate);
-  -webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);mask-image:linear-gradient(90deg,#000 88%,transparent)}
+html.ftouch .bbar{top:calc(var(--ftT) + 52px);left:50%;right:auto;width:max-content;max-width:calc(100% - var(--ftL) - var(--ftR));height:52px;gap:4px;padding:0 4px;overflow-x:auto;overflow-y:hidden;overscroll-behavior:contain;scrollbar-width:none;background:var(--ftPlate);
+  transform:translateX(-50%) scaleX(.15);transform-origin:50% 50%;opacity:0;visibility:hidden;pointer-events:none;transition:transform .22s ease,opacity .18s ease,visibility 0s linear .22s}
+html.ftouch .bstage.ft-tools:not(.trans) .bbar{transform:translateX(-50%) scaleX(1);opacity:1;visibility:visible;pointer-events:auto;transition:transform .22s ease,opacity .18s ease,visibility 0s}
+html.ftouch .bbar.ftmore{-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);mask-image:linear-gradient(90deg,#000 88%,transparent)}
 html.ftouch .bbar::-webkit-scrollbar{display:none}
 html.ftouch .bbar .lbl{display:none}
 html.ftouch .bbar .grp,html.ftouch .bbar .sep,html.ftouch .bbar>button{flex:none}
 html.ftouch .bbar button{min-height:44px;min-width:44px;padding:0 10px;font-size:12px}
 html.ftouch .bbar .ico{width:44px;font-size:19px}
-html.ftouch.ftland .bbar{top:var(--ftT);left:calc(var(--ftL) + var(--ftBtlW,250px) + 10px)}
 
 /* the tray, bottom row: the lab's five catalog groups and our Stored and Home, as icon tabs (the group's name shows over its strip) */
 html.ftouch .brail{top:calc(100% + var(--ftStrip));left:var(--ftL);right:var(--ftR);width:auto;height:var(--ftTabs);max-height:none;display:flex;align-items:center;justify-content:space-between;gap:4px;overflow:visible;z-index:6}
@@ -82,9 +93,9 @@ html.ftouch .fthint.fade{opacity:0}
 html.ftouch .fthint.bad{border:1px dashed #ff3df2;color:#ffe0fc}
 html.ftouch .fthint[hidden]{display:none}
 
-/* sheets over the bottom of the room: the inspector (Tint), and Stored and Home */
+/* sheets over the bottom of the room: Stored and Home (the inspector, Tint, is a panel at the side: further down) */
 html.ftouch #bStage:not(.ft-insp) #bInsp{display:none!important}
-html.ftouch .binsp{left:0;right:0;bottom:0;top:auto!important;width:auto;max-height:min(64%,480px)!important;z-index:8;padding:12px var(--ftR) 14px var(--ftL);clip-path:none;border:0;border-top:1px solid var(--pink);background:var(--ftPlate);overscroll-behavior:contain}
+html.ftouch .binsp{z-index:8;background:var(--ftPlate);overscroll-behavior:contain}
 html.ftouch .ftsheet{position:absolute;left:0;right:0;bottom:0;z-index:8;max-height:min(64%,480px);overflow-y:auto;overscroll-behavior:contain;display:grid;gap:16px;align-content:start;padding:8px var(--ftR) 16px var(--ftL);
   font-size:13px;line-height:1.5;background:var(--ftPlate);border-top:1px solid var(--cyan)}
 html.ftouch .ftsheet[hidden]{display:none}
@@ -132,10 +143,32 @@ html.ftouch .ibtns button{min-height:44px;font-size:12px}
 html.ftouch body[data-view="build"] .toast{bottom:calc(var(--ftTray) + 60px);font-size:13px}
 html.ftouch .nt-toast{font-size:13px}
 html.ftouch .nt-sim,html.ftouch .nt-sim b{font-size:12px}
+html.ftouch .nt-sim{max-width:calc(100vw - 32px)}
+html.ftouch .nt-sim.gone{opacity:0;transition:opacity .4s ease}   /* (the LIDAR note leaves once the apartment is in: bridge.js) */
 
 /* a long press on a button says what it does (there is no hover on glass) */
 html.ftouch .ftexp{position:fixed;z-index:40;max-width:min(320px,calc(100vw - 32px));padding:8px 12px;font:13px/1.4 "JetBrains Mono",ui-monospace,monospace;color:#fff;background:var(--ftPlate,rgba(5,5,12,.94));border:1px solid #38E8E0;pointer-events:none}
 html.ftouch .ftexp[hidden]{display:none}
+
+/* Tint: the inspector as a narrow panel at one side of the room (the side away from the piece: .ft-pl puts it at the left), from under the
+   top row down over the tray, so the piece stays in sight while its colors are picked. Turning, copying and deleting are on the bar over the
+   piece, so the panel leaves out the rotation dial and those two buttons */
+html.ftouch{--ftInspW:min(212px,56vw)}
+html.ftouch.ftland{--ftInspW:min(300px,40vw)}
+html.ftouch #bStage.ft-insp #bInsp{left:auto;right:var(--ftR);top:calc(var(--ftT) + 52px)!important;bottom:calc(8px - var(--ftTray) + var(--ftSafeB));width:var(--ftInspW);max-height:none!important;
+  padding:10px 10px 12px;gap:10px;border:1px solid var(--pink);clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);box-shadow:0 0 14px rgba(255,79,163,.18)}
+html.ftouch #bStage.ft-insp.ft-pl #bInsp{left:var(--ftL);right:auto}
+html.ftouch #bInsp .isec:has(#iDial),html.ftouch #bInsp .ibtns [data-a="dup"],html.ftouch #bInsp .ibtns [data-a="del"]{display:none}
+html.ftouch #bInsp .xbtn{top:6px;right:6px}
+html.ftouch #bInsp h3{padding-right:48px;overflow-wrap:anywhere}
+html.ftouch #bInsp .sub{overflow-wrap:anywhere}
+html.ftouch #bInsp .swatches{display:flex;flex-wrap:wrap;gap:6px}
+html.ftouch #bInsp .cpick .pal{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}
+html.ftouch.ftland #bInsp .cpick .pal{grid-template-columns:repeat(auto-fill,minmax(34px,1fr))}
+html.ftouch #bInsp .cpick .pal button{min-width:0;width:auto}
+html.ftouch #bInsp .irow{flex-wrap:wrap}
+html.ftouch #bInsp .ibtns{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+html.ftouch #bInsp .ibtns button{min-width:0;padding:0 6px;white-space:normal;line-height:1.2}
 
 /* the hologram: our parts step aside with the lab's */
 html.ftouch .bstage .ftbar,html.ftouch .bstage .fthint,html.ftouch .bstage .ftsheet,html.ftouch .bstage #ftEmpty{transition:opacity .45s ease}

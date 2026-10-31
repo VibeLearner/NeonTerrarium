@@ -331,7 +331,7 @@ function mtRemoveArea(r){
   return out;
 }
 function mtClearAll(){ for (const l of metros) mtDropView(l); metros = []; mtActive = null; MT_SIG = null; mtReindex(); }
-function mtSave(){ try { localStorage.setItem(MT_SAVE_KEY, JSON.stringify(metros.map(l => ({ id: l.id, done: l.done, loop: !!l.loop, st: l.st, sides: l.sides, t: l.tiles.map(t => [t.i, t.j]) })))); } catch (e) {} }
+function mtSave(){ try { localStorage.setItem(MT_SAVE_KEY, JSON.stringify(metros.map(l => ({ id: l.id, done: l.done, loop: !!l.loop, st: l.st, sides: l.sides, d0: l.tiles.length === 1 && l.dir0 ? l.dir0 : undefined, t: l.tiles.map(t => [t.i, t.j]) })))); } catch (e) {} }   // (d0: the way a lone first station faces, turned with a double tap on a touch screen)
 function mtLoad(){
   mtClearAll();
   try {
@@ -340,6 +340,7 @@ function mtLoad(){
       if (!q || !Array.isArray(q.t) || !q.t.length) continue;
       const tiles = q.t.map(([i, j]) => ({ i: i | 0, j: j | 0 })), n = tiles.length;
       const loop = !!q.loop && n >= 4 && mtAdj(tiles[0], tiles[n - 1]), l = { id: q.id | 0 || mtNext, tiles, loop, done: (!!q.done && n > 1) || loop, st: (Array.isArray(q.st) ? q.st : []).filter(k => k > 0 && k < n - (loop ? 0 : 1)), sides: q.sides && typeof q.sides === 'object' ? q.sides : {} };
+      if (n === 1 && Array.isArray(q.d0) && SIDES4.some(d => d[0] === q.d0[0] && d[1] === q.d0[1])) l.dir0 = [q.d0[0], q.d0[1]];
       metros.push(l); mtNext = Math.max(mtNext, l.id + 1);
     }
   } catch (e) {}
@@ -807,9 +808,11 @@ function mtPickTouch(cx, cy){
   if (pk && pk.kind === 'mtTile' && (pk.l.loop || (pk.k !== 0 && pk.k !== pk.l.tiles.length - 1))) return pk;   // (an end hit is weighed against the plots beside it, below)
   let best = null, bd = HW_TAP_PX*HW_TAP_PX;
   const near = (x, z, out) => { const p = hwScreenAt(x, MT_Y, z); if (!p) return; const d = (p[0] - cx)**2 + (p[1] - cy)**2; if (d < bd){ bd = d; best = out; } };
-  for (const l of metros) if (!l.loop) for (const [e, pv] of [[l.tiles[l.tiles.length - 1], l.tiles[l.tiles.length - 2]], [l.tiles[0], l.tiles[1]]]){   // (the same ends mtPick carries a line on from)
-    if (e === l.tiles[0] && (!pv || (l.done && l !== mtActive))) continue;
-    near(e.i*LOT, e.j*LOT, { kind: 'mtTile', l, k: l.tiles.indexOf(e), d: 0 });
+  // (the same ends mtPick carries a line on from; a lone first station counts once, as its open end: it used to be passed over as both, and only the
+  //  plane under the finger could pick the plots beside it)
+  for (const l of metros) if (!l.loop) for (const [e, pv, first] of [[l.tiles[l.tiles.length - 1], l.tiles[l.tiles.length - 2], false], [l.tiles[0], l.tiles[1], true]]){
+    if (first && (!pv || (l.done && l !== mtActive))) continue;
+    near(e.i*LOT, e.j*LOT, { kind: 'mtTile', l, k: first ? 0 : l.tiles.length - 1, d: 0 });
     for (const [a, b] of SIDES4){
       const i = e.i + a, j = e.j + b; if (pv && pv.i === i && pv.j === j) continue;
       const out = { kind: 'mtGround', i, j, d: 0, near: true };

@@ -857,8 +857,9 @@ function hwHover(cx, cy, touch){ hwLastPt = { x: cx, y: cy, touch }; const t = h
   const el = $('modeHint'), why = hwHintText(t && !t.ok && t.type !== 'none' ? t.why : ''); el.textContent = why; el.hidden = !why; }
 function hwClick(cx, cy, touch){ const t = hwTargetAt(touch ? hwPickTouch(cx, cy) : hwPick(cx, cy)); if (hwApply(t)) hwHover(cx, cy, touch); }   // (touch: a tap, see hwPickTouch)
 function hwRightClick(cx, cy){ const pk = hwPick(cx, cy); if (pk && pk.kind === 'hwTile'){ hwCutAt(pk.h, pk.k); hwHover(cx, cy); } }
-function hwSetLevel(L){ hwLevel = Math.max(HW_MIN_L, Math.min(HW_MAX_L, L)); const el = document.getElementById('hwLevel'); if (el) el.textContent = hwLevel; if (hwLastPt) hwHover(hwLastPt.x, hwLastPt.y, hwLastPt.touch); }
-function hwSetLanesUI(n){ hwSetLanes(n); const el = document.getElementById('hwLanes'); if (el) el.textContent = n + ' lanes'; if (hwLastPt) hwHover(hwLastPt.x, hwLastPt.y, hwLastPt.touch); }
+// (with a finger, the outline aimed is aimed again at the new height or lanes instead: transit-touch.js)
+function hwSetLevel(L){ hwLevel = Math.max(HW_MIN_L, Math.min(HW_MAX_L, L)); const el = document.getElementById('hwLevel'); if (el) el.textContent = hwLevel; if (typeof TT !== 'undefined' && TT.relevel()) return; if (hwLastPt) hwHover(hwLastPt.x, hwLastPt.y, hwLastPt.touch); }
+function hwSetLanesUI(n){ hwSetLanes(n); const el = document.getElementById('hwLanes'); if (el) el.textContent = n + ' lanes'; if (typeof TT !== 'undefined' && TT.relevel()) return; if (hwLastPt) hwHover(hwLastPt.x, hwLastPt.y, hwLastPt.touch); }
 function setHwMode(on, quiet){
   hwMode = on;
   if (on){ if (mtMode) setMtMode(false, true); if (S.zone) selectZone(null); if (delMode) setDelMode(false, true); if (megaPick) selectMega(null, true); hover.visible = hoverFill.visible = hoverStrip.visible = false; showMegaGhost(null); }

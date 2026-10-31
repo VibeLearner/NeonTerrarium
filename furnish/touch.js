@@ -7,8 +7,12 @@
 //    and tap Place on the bar over it. Cyan with a solid outline fits; magenta with a dashed one is blocked, and the line over the
 //    tray says why
 //  - a bar over the selected piece: turn, copy (duplicate), tint, store, delete. Press and hold a floor or a wall to tint it
+//  - Tint opens a narrow panel beside the piece (the view slides the piece clear of it), so its colors change in sight while picking
+//  - the top row: Exit to city at the left, Save at the right and Tools in the middle, which opens the lab's home controls (undo,
+//    walls, view, day or night, the work light) in a row under it, growing out from the middle
 //  - two fingers: pinch to zoom, drag to pan. One finger orbits, selects and moves as in the lab
 //  - a long press on any button says what it does
+//  - while the apartment comes in (the hologram), a touch does nothing: it never cuts the hologram short (the hold in build.py)
 // It drives the lab through PodBuilder (its public calls) and PodBuilder.touch (the hooks build.py adds to the lab's builder.js).
 // A mouse and keyboard see none of it: nothing below runs unless the main pointer is coarse.
 'use strict';
@@ -47,7 +51,8 @@
       .replace(/\bClick\b/g, 'Tap').replace(/\bclick\b/g, 'tap').replace(/^Point at/, 'Tap').replace(/ \(Alt\)/, '')); } catch (e) {}
     const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
     const ICO = { store: 'M4 9h16v11H4zM3 4h18v5H3zM10 13h4', home: 'M4 11l8-7 8 7v9h-5v-6H9v6H4z', turn: 'M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5',
-      dup: 'M8 8h12v12H8zM4 16V4h12', tint: 'M12 3s6 7 6 11a6 6 0 0 1-12 0c0-4 6-11 6-11z', del: 'M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13', ok: 'M5 12l5 5L19 7', x: 'M6 6l12 12M18 6L6 18' };
+      dup: 'M8 8h12v12H8zM4 16V4h12', tint: 'M12 3s6 7 6 11a6 6 0 0 1-12 0c0-4 6-11 6-11z', del: 'M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13', ok: 'M5 12l5 5L19 7', x: 'M6 6l12 12M18 6L6 18',
+      tools: 'M4 7h9M17 7h3M4 17h3M11 17h9M15 5v4M9 15v4', more: 'M7 10l5 5 5-5' };
     const ico = k => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="' + ICO[k] + '"/></svg>';
 
     /* ---------- the tray ---------- */
@@ -59,9 +64,37 @@
     const empty = document.createElement('div'); empty.id = 'ftEmpty'; empty.textContent = 'Pick a tab below: furniture, lights, decor, plants, or floors and walls'; fly.after(empty);
     rail.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return;
       if (b.dataset.ft) sheetOpen(sheetK === b.dataset.ft ? null : b.dataset.ft); else { sheetOpen(null); inspOpen(false); } });
-    // the room is framed in the space over the tray: the stage changed size when ftouch went on (the lab's ResizeObserver refits it)
-    const bw = document.querySelector('.nt-bar');
-    if (bw && 'ResizeObserver' in window) new ResizeObserver(() => root.style.setProperty('--ftBtlW', bw.offsetWidth + 'px')).observe(bw);
+    // (the room is framed in the space over the tray: the stage changed size when ftouch went on, and the lab's ResizeObserver refits it)
+
+    /* ---------- the top row: Exit at the left, Save at the right, Tools in the middle ---------- */
+    // Tools opens the lab's home controls (its toolbar, .bbar) in a row under the top row, growing out from the middle. A second tap
+    // closes it, and so does a pick that is done in one go (walls, day or night, the work light), a tap on the room, a panel opening
+    // or the hologram. Undo, redo and turning the view leave it open, since they are often tapped a few times in a row.
+    const ntBar = document.querySelector('.nt-bar'), bbar = document.querySelector('.bbar');
+    const tools = document.createElement('button'); tools.type = 'button'; tools.className = 'nt-tools'; tools.id = 'ftTools';
+    const TOOLS_T = 'Tools: undo and redo, the walls, turning the view, day or night, the work light';
+    tools.title = TOOLS_T; tools.setAttribute('aria-label', TOOLS_T); tools.setAttribute('aria-expanded', 'false');
+    tools.innerHTML = ico('tools') + '<span>Tools</span>' + ico('more');
+    if (bbar){ if (!bbar.id) bbar.id = 'ftBbar'; tools.setAttribute('aria-controls', bbar.id); }
+    const sv = $('ntSave'); if (sv && sv.parentNode === ntBar) ntBar.insertBefore(tools, sv); else ntBar.appendChild(tools);
+    let toolsOn = false;
+    function toolsOpen(on){
+      on = !!on && !!bbar; if (on === toolsOn) return; toolsOn = on;
+      if (on){   // (it grows out from under the Tools button, which sits a little off the middle when Exit is wider than Save)
+        const tr = tools.getBoundingClientRect(), sr = st.getBoundingClientRect(), w = bbar.offsetWidth, x0 = bbar.offsetLeft - w/2;
+        bbar.style.transformOrigin = Math.round(Math.max(0, Math.min(w, tr.left + tr.width/2 - sr.left - x0))) + 'px 50%';
+      }
+      st.classList.toggle('ft-tools', on); tools.setAttribute('aria-expanded', on); tools.classList.toggle('on', on);
+      if (on){ sheetOpen(null); bbar.scrollLeft = 0; requestAnimationFrame(toolsFit); }
+    }
+    // the row scrolls sideways when it is wider than the screen: then (only) its right end fades to say there is more
+    function toolsFit(){ if (bbar) bbar.classList.toggle('ftmore', bbar.scrollWidth > bbar.clientWidth + 2 && bbar.scrollLeft + bbar.clientWidth < bbar.scrollWidth - 2); }
+    tools.addEventListener('click', () => toolsOpen(!toolsOn));
+    if (bbar){
+      bbar.addEventListener('scroll', toolsFit, { passive: true }); addEventListener('resize', () => { if (toolsOn) toolsFit(); });
+      bbar.addEventListener('click', e => { const b = e.target.closest('button'); if (!b || b.disabled) return;
+        if (b.closest('#bWalls') || b.closest('#bTime') || b.id === 'bWork') setTimeout(() => toolsOpen(false), 120); }, true);   // (a moment, so the pick shows first)
+    }
 
     /* ---------- the sheets: Stored and Home ---------- */
     const sheet = document.createElement('section'); sheet.className = 'ftsheet'; sheet.hidden = true; sheet.setAttribute('aria-label', 'Panel');
@@ -81,7 +114,7 @@
         ['Press and hold a floor or wall', 'Select it to tint its finish'],
         ['Drag the room', 'Orbit'],
         ['Pinch · drag with two fingers', 'Zoom · pan'],
-        ['Top row', 'Undo and redo, the walls, turning the view, day or night, the work light'],
+        ['Tools, top middle', 'Undo and redo, the walls, turning the view, day or night, the work light'],
         ['Press and hold a button', 'What it does'],
       ].map(([a, b]) => '<dt>' + esc(a) + '</dt><dd>' + esc(b) + '</dd>').join('') + '</dl><button type="button" class="wide" id="ftPick">Copy a piece\'s colors</button>';
       homeP.appendChild(ctl);
@@ -93,7 +126,7 @@
       sheetK = k; sheet.hidden = !k;
       tStore.setAttribute('aria-pressed', k === 'store'); tHome.setAttribute('aria-pressed', k === 'home');
       if (!k) return;
-      inspOpen(false);
+      inspOpen(false); toolsOpen(false);
       $('ftSheetT').textContent = k === 'store' ? 'Stored this visit' : 'This home';
       storeP.hidden = k !== 'store'; homeP.hidden = k !== 'home'; homeP.style.display = k === 'home' ? 'grid' : 'none';
       if (k === 'store') renderStore();
@@ -124,14 +157,35 @@
       toast((list.length > 1 ? list.length + ' pieces' : (PB().piece(top.id) || {}).name || 'It') + ' put away in Stored, for this visit');
     }
 
-    /* ---------- the inspector, as a sheet: only when Tint opens it ---------- */
+    /* ---------- the inspector, as a narrow panel beside the piece: only when Tint opens it ---------- */
+    // It goes on the side of the room away from the piece (from under the top row to the bottom of the screen, over the tray), and the
+    // view slides so the piece stands in the middle of the room that is left: each color shows on it as it is picked. Turning, copying
+    // and deleting stay on the bar over the piece, so the panel leaves them out (touch.css) and is only colors, light and variants.
+    let slide = 0;
     function inspOpen(on){
+      const was = st.classList.contains('ft-insp');
       st.classList.toggle('ft-insp', !!on);
-      if (!on) return;
-      sheetOpen(null);
+      if (!on){ cancelAnimationFrame(slide); return; }
+      sheetOpen(null); toolsOpen(false);
+      const a = T.anchor(), r = st.getBoundingClientRect();
+      if (!was) st.classList.toggle('ft-pl', !!(a && a.x > r.left + r.width/2));   // (the panel at the left when the piece is right of the middle)
       const sw = insp.querySelector('#iSw .sw, #iFT');
       if (sw && sw.getAttribute('aria-expanded') !== 'true') sw.click();
-      insp.scrollTop = 0; if (sw) sw.scrollIntoView({ block: 'nearest' });
+      insp.scrollTop = 0;
+      if (a) requestAnimationFrame(() => clearOf(a));
+    }
+    // slide the view (as a two-finger drag would) until the piece's anchor is in the middle of the room beside the panel, over a quarter second
+    function clearOf(a){
+      const r = st.getBoundingClientRect(), p = insp.getBoundingClientRect(); if (!p.width) return;
+      const left = st.classList.contains('ft-pl'), x0 = left ? p.right : r.left, x1 = left ? r.right : p.left;
+      const top = topFree(r), y0 = top + 40, y1 = r.bottom - 40;
+      const dx = (x0 + x1)/2 - a.x, dy = a.y < y0 ? y0 - a.y : a.y > y1 ? y1 - a.y : 0;
+      if (Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
+      const N = 14; let i = 0, sx = 0, sy = 0;
+      cancelAnimationFrame(slide);
+      const step = () => { if (!st.classList.contains('ft-insp')) return; i++; const e = 1 - Math.pow(1 - i/N, 3), nx = dx*e, ny = dy*e;
+        try { T.pan(nx - sx, ny - sy); } catch (er) {} sx = nx; sy = ny; if (i < N) slide = requestAnimationFrame(step); };
+      slide = requestAnimationFrame(step);
     }
 
     /* ---------- the bar over the piece ---------- */
@@ -214,8 +268,9 @@
     function aimMiddle(){ const r = st.getBoundingClientRect(), top = topFree(r); aimTo(r.left + r.width/2, (top + r.bottom)/2); }
     addEventListener('pointerdown', e => {
       if (e.pointerType === 'mouse' || e.target !== cv) return;
-      const s = T.state(); if (!s.on || s.trans) return;   // (during the hologram any touch skips it: the lab's)
+      const s = T.state(); if (!s.on || s.trans) return;   // (during the hologram a touch never gets here: the hold in build.py takes it first)
       if (sheetK) sheetOpen(null);
+      if (toolsOn) toolsOpen(false);
       tp.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (tp.size === 1){
         if (s.mode === 'place'){
@@ -275,13 +330,16 @@
     document.addEventListener('contextmenu', e => { if (e.target.closest && e.target.closest('.bstage button, .nt-bar button')) e.preventDefault(); }, true);
 
     /* ---------- every frame while a home is open: the bar, the hint, the ghost's look ---------- */
-    // the room's free space starts under the top row(s): the bar over a piece never goes up there
-    function topFree(r){ const b = document.querySelector('.bbar'), br = b && b.getBoundingClientRect(); return br && br.height ? br.bottom + 8 : r.top + 8; }
+    // the room's free space starts under the top row (and the Tools row while it is open): the bar over a piece never goes up there
+    function topFree(r){ let y = r.top;
+      for (const el of [ntBar, toolsOn ? bbar : null]){ const br = el && el.getBoundingClientRect(); if (br && br.height) y = Math.max(y, br.bottom); }
+      return y + 8; }
     let lastMode = '', first = true, kindId = null, wallKind = false;
     function tick(){
       requestAnimationFrame(tick);
       let s; try { s = T.state(); } catch (e) { return; }
-      if (!s.on || !s.ready || s.asleep || document.hidden){ if (barK) barKind(''); return; }
+      if (!s.on || !s.ready || s.asleep || document.hidden){ if (barK) barKind(''); if (toolsOn) toolsOpen(false); return; }
+      if (s.trans && toolsOn) toolsOpen(false);
       if (s.home !== homeRef){ homeRef = s.home; stored.length = 0; fromStore = -1; renderStore(); }
       if (first){ first = false; if (fly.hidden && !sheetK){ const g = rail.querySelector('[data-grp]'); if (g) g.click(); } }   // (the tray opens on Furniture)
       if (s.mode === 'place' && lastMode !== 'place') aimMiddle();

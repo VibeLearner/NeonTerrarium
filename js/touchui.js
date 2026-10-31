@@ -1,7 +1,7 @@
 // Neon Terrarium: the touch screen's own pieces (claude/mobile-ui-plan.md). Nothing here runs with a mouse and keyboard: the desktop page is untouched.
 //  - the hold ring under a finger about to remove something, and the Restore chip that puts the last removal back (input.js asks for both)
-//  - a tap on a megastructure with a screen of its own (the Acoustic Panel, the Data Spire, the Precinct desk) shows its button over it for 5 s;
-//    the button opens the screen. A tap on any other megastructure opens its card: its name, a line in the log's voice, and TURN.
+//  - a tap on a megastructure shows a holo-tag over it for 5 s: on one with a screen of its own (the Acoustic Panel, the Data Spire, the Precinct desk)
+//    its button, which opens the screen; on the LIDAR Array SCAN, which starts a scan; on any other just its name, a label that does nothing.
 //    A double tap on any megastructure turns it a quarter, straight away (or says there's no room)
 //  - a short prompt near the top of the screen (TUI.toast), for anything that wants a word with the player
 //  - text the interface cuts short scrolls to show the rest
@@ -11,7 +11,7 @@
 //  - small vibrations on a build and a removal (Android; a setting)
 'use strict';
 const TUI = (() => {
-  const U = { buzz(){}, ring(){}, snapCell(){ return null; }, offerRestore(){}, peek(){}, megaTap(){ return false; }, eraseChip(){}, aimTip(){}, toast(){} };
+  const U = { buzz(){}, ring(){}, snapCell(){ return null; }, offerRestore(){}, megaTap(){ return false; }, eraseChip(){}, aimTip(){}, toast(){} };
   if (typeof TOUCH === 'undefined' || !TOUCH.on) return U;
   const $ = id => document.getElementById(id);
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
@@ -66,44 +66,30 @@ const TUI = (() => {
     } catch (e){ console.warn('restore', e); return false; }
   }
 
-  /* ---------- megastructures: the card, the holo-tags ---------- */
+  /* ---------- megastructures: the holo-tags ---------- */
+  // The tag over a tapped megastructure (owner, Oct 31: no card any more). One with a screen gets its button, which opens it; the LIDAR Array gets SCAN,
+  // which starts a scan (furnish.js, its Scan button: on touch it only shows by the dock while a scan is on); any other gets its name, just a label
   const SCREEN = { radio: ['PANEL', () => { const b = $('gdPanel'); if (b) b.click(); }], spire: ['LEDGER', m => OVERSEER.show(m)], police: ['DESK', m => PRECINCT.show(m)] };
-  const LINE = { radio: 'Broadcasting to the district.', spire: 'Ledger online. City records current.', police: 'Desk staffed. Calls logged.', lidar: 'Array sweeping. Pods in range can be scanned.',
-    wirenest: 'Relay up. Traffic logged.', club: 'Doors open after dark.', square: 'Stalls trading.', market: 'Stalls trading.', mall: 'Floors open.', greenhouse: 'Crops cycling.', foundry: 'Furnaces lit.' };
-  const card = el('div', 'tpeek'); card.hidden = true; card.setAttribute('role', 'dialog');
-  card.innerHTML = '<div class="tp-h"><b></b><button class="tp-x" type="button" aria-label="Close">✕</button></div><p class="tp-l"></p><div class="tp-b"><button class="tp-go" type="button">ACCESS</button><button class="tp-turn" type="button">TURN</button><button class="tp-scan" type="button" hidden>SCAN A POD</button></div>';
-  document.body.appendChild(card);
-  let peekM = null;
-  U.peek = m => {
-    if (!m || !megas.has(m.id)) return false;
-    peekM = m; const t = MEGA_TYPES[m.kind] || {}, scr = SCREEN[m.kind];
-    card.querySelector('b').textContent = (t.name || m.kind).toUpperCase();
-    card.querySelector('.tp-l').textContent = (LINE[m.kind] || 'Online.') + ' ' + m.w + ' × ' + m.h + ' plots.';
-    const go = card.querySelector('.tp-go'); go.hidden = !scr; if (scr) go.textContent = 'ACCESS ' + scr[0];
-    // (the LIDAR Array: Scan lives here on touch, not as a button by the dock, owner Oct 30)
-    const fb = $('furnBtn'), sc = card.querySelector('.tp-scan'); sc.hidden = !(m.kind === 'lidar' && fb && !fb.hidden); sc.classList.toggle('off', !!(fb && fb.classList.contains('off')));
-    card.hidden = false; dispatchEvent(new CustomEvent('nt:peek', { detail: m.kind })); return true;
-  };
-  const closePeek = () => { card.hidden = true; peekM = null; };
-  card.querySelector('.tp-x').addEventListener('click', closePeek);
-  card.querySelector('.tp-go').addEventListener('click', () => { const m = peekM, s = m && SCREEN[m.kind]; closePeek(); if (s) s[1](m); });
-  card.querySelector('.tp-scan').addEventListener('click', () => { const fb = $('furnBtn'); closePeek(); if (fb && !fb.classList.contains('on')) fb.click(); U.buzz(8); });
-  card.querySelector('.tp-turn').addEventListener('click', () => { if (peekM && typeof turnMega === 'function'){ if (turnMega(peekM)) U.buzz(12); } });
-  // (a press on the city closes the card)
-  $('view').addEventListener('pointerdown', () => { if (!card.hidden) closePeek(); }, true);
-  // the tags: one per megastructure with a screen, over its middle, moved each frame with transform only. Hidden until the megastructure is tapped
-  // (owner, Oct 30: tapping builds, so the buttons don't hover all the time): a tap shows its button for 5 s, then it fades. Tapping the button opens
-  // the screen straight away; while that screen (or any other) is open no button shows, and once it's closed the button comes back for 5 s and fades
+  const scan = () => { const fb = $('furnBtn'); if (fb && !fb.classList.contains('on') && !fb.classList.contains('off')) fb.click(); };
+  const ACT = { lidar: ['SCAN', scan] };
+  const tagOf = m => SCREEN[m.kind] || ACT[m.kind] || null;
+  // the tags: one per megastructure, over its middle, moved each frame with transform only. Hidden until the megastructure is tapped
+  // (owner, Oct 30: tapping builds, so the buttons don't hover all the time): a tap shows its tag for 5 s, then it fades. Tapping a button opens
+  // the screen straight away; while that screen (or any other) is open no tag shows, and once it's closed the button comes back for 5 s and fades
   const SHOW_MS = 5000, tags = new Map(), _v = new THREE.Vector3();
   function syncTags(){
     for (const [id, t] of tags) if (!megas.has(id)){ t.el.remove(); tags.delete(id); }
-    for (const m of megas.values()){ if (!SCREEN[m.kind] || tags.has(m.id)) continue;
-      const b = el('button', 'tholo'); b.type = 'button'; b.innerHTML = '<i></i><span>' + SCREEN[m.kind][0] + '</span>';
+    for (const m of megas.values()){ if (tags.has(m.id)) continue;
+      const a = tagOf(m), b = el(a ? 'button' : 'div', a ? 'tholo' : 'tholo tlabel'), name = ((MEGA_TYPES[m.kind] || {}).name || m.kind).toUpperCase();
+      b.innerHTML = '<i></i><span></span>'; b.querySelector('span').textContent = a ? a[0] : name;
       const t = { el: b, m, until: 0, opened: false };
-      b.addEventListener('click', () => { if (!megas.has(m.id)) return; t.opened = true; t.until = 0; U.buzz(8); SCREEN[m.kind][1](m); });
+      if (a){ b.type = 'button';
+        b.addEventListener('pointerdown', () => { if (t.until) t.until = Math.max(t.until, performance.now() + 1000); });   // (pressed just as it fades: it waits for the finger to lift)
+        b.addEventListener('click', () => { if (!megas.has(m.id)) return; if (SCREEN[m.kind]) t.opened = true; t.until = 0; U.buzz(8); a[1](m); }); }
+      else b.setAttribute('aria-label', name);   // (a label: a tap on it does nothing, and never reaches the city under it)
       document.body.appendChild(b); tags.set(m.id, t); }
   }
-  // a double tap on a megastructure turns it a quarter, at once, with no preview (owner, Oct 31). The first tap has already shown its button or its card;
+  // a double tap on a megastructure turns it a quarter, at once, with no preview (owner, Oct 31). The first tap has already shown its tag;
   // the second, on the same megastructure soon after (input.js's double tap: DT_MS, with the same allowance it gives, and DT_PX), hides it again and turns,
   // so a double tap never opens its screen. A quarter turn only: if the block it would need isn't free, nothing changes, it flashes red and a prompt says why
   let lastTap = null;
@@ -116,7 +102,6 @@ const TUI = (() => {
     return false;
   }
   function turnQuarter(m){
-    if (peekM === m) closePeek();
     const t = tags.get(m.id); if (t){ t.until = 0; t.opened = false; }
     if (typeof turnMega !== 'function') return;
     if (!quarterFits(m)){
@@ -135,8 +120,7 @@ const TUI = (() => {
     const now = performance.now(), lt = lastTap;
     if (lt && lt.id === m.id && now - lt.t < dtWin() && (x == null || lt.x == null || Math.hypot(x - lt.x, y - lt.y) < dtPx())){ lastTap = null; turnQuarter(m); return true; }
     lastTap = { id: m.id, t: now, x, y };
-    if (!SCREEN[m.kind]) return U.peek(m);   // (no screen to open: its card, with TURN)
-    syncTags(); const t = tags.get(m.id); if (!t) return U.peek(m);
+    syncTags(); const t = tags.get(m.id); if (!t) return false;
     for (const o of tags.values()) if (o !== t) o.until = 0;   // (one at a time)
     t.until = performance.now() + SHOW_MS; U.buzz(6); dispatchEvent(new CustomEvent('nt:peek', { detail: m.kind })); return true;
   };
@@ -150,7 +134,7 @@ const TUI = (() => {
     if (!any) return;
     gpEl = gpEl || document.getElementById('gridPanel'); tsEl = tsEl || document.getElementById('tsheet');
     const busy = root.classList.contains('gp-open') || (typeof OVERSEER !== 'undefined' && OVERSEER.hold) || (typeof PRECINCT !== 'undefined' && PRECINCT.hold) || (typeof FURN !== 'undefined' && FURN.hold) || (typeof TITLE !== 'undefined' && TITLE.on) ||
-      !!(gpEl && gpEl.classList.contains('open')) || !!(tsEl && !tsEl.hidden) || !card.hidden;
+      !!(gpEl && gpEl.classList.contains('open')) || !!(tsEl && !tsEl.hidden) || (typeof FURN !== 'undefined' && (FURN.pick || FURN.open));
     // a screen opened from a button has closed: the button again, for 5 s
     if (wasBusy && !busy) for (const t of tags.values()) if (t.opened){ t.opened = false; t.until = now + SHOW_MS; }
     wasBusy = busy;
@@ -160,7 +144,8 @@ const TUI = (() => {
       if (want){ const m = t.m; let top = m.top || 6; _v.set((m.i + (m.w - 1)/2)*LOT, top + 1.5, (m.j + (m.h - 1)/2)*LOT).project(cam); }
       const on = want && _v.z < 1 && Math.abs(_v.x) < 1.6 && Math.abs(_v.y) < 1.6;   // (a tall one's top off the screen: its button held at the edge, below)
       if (t.on !== on){ t.on = on; t.el.classList.toggle('ton', on); }
-      if (on){ const sa = 54, x = Math.round(Math.max(r.left + 50, Math.min(r.right - 50, r.left + (_v.x*.5 + .5)*r.width))), y = Math.round(Math.max(r.top + sa + 40, Math.min(r.bottom - 160, r.top + (1 - (_v.y*.5 + .5))*r.height)));
+      if (on && !t.hw) t.hw = Math.ceil(t.el.offsetWidth/2) + 8;   // (half its width, so a long name stays on the screen)
+      if (on){ const sa = 54, hw = Math.max(50, t.hw || 0), x = Math.round(Math.max(r.left + hw, Math.min(r.right - hw, r.left + (_v.x*.5 + .5)*r.width))), y = Math.round(Math.max(r.top + sa + 40, Math.min(r.bottom - 160, r.top + (1 - (_v.y*.5 + .5))*r.height)));
         if (x !== t.x || y !== t.y){ t.x = x; t.y = y; t.el.style.transform = 'translate(' + x + 'px,' + y + 'px) translate(-50%,-100%)'; } }
     }
   }

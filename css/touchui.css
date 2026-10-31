@@ -25,21 +25,8 @@ html.touch .tcenter{left:max(10px, env(safe-area-inset-left,0px));bottom:calc(15
 html.touch .terase{left:50%;transform:translateX(-50%);top:calc(52px + env(safe-area-inset-top,0px));border-color:#ff4a5a;color:#ffb3ba}
 html.tland .tturn,html.tland .tcenter{bottom:calc(96px + env(safe-area-inset-bottom,0px))}
 
-/* ---------- a megastructure's card ---------- */
-.tpeek{display:none}
-html.touch .tpeek:not([hidden]){display:block;position:fixed;z-index:7;left:max(8px, env(safe-area-inset-left,0px));right:max(8px, env(safe-area-inset-right,0px));
-  bottom:calc(150px + env(safe-area-inset-bottom,0px));max-width:420px;margin:0 auto;padding:10px 12px 12px;color:var(--ink);background:rgba(6,9,20,.96);border:1px solid var(--cyan);
-  box-shadow:0 0 0 1px rgba(56,232,224,.12),0 10px 30px rgba(0,0,0,.5);clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px)}
-html.tland .tpeek:not([hidden]){bottom:calc(96px + env(safe-area-inset-bottom,0px))}
-html.touch .tpeek .tp-h{display:flex;align-items:center;justify-content:space-between;gap:10px}
-html.touch .tpeek .tp-h b{font-family:var(--font-pixel);font-weight:400;font-size:13px;letter-spacing:.12em;color:var(--cyan)}
-html.touch .tpeek .tp-x{width:44px;height:44px;flex:none;padding:0;font-size:15px;border-radius:0}
-html.touch .tpeek .tp-l{margin:2px 0 10px;font-size:13px;line-height:1.45;color:#c9d6ea}
-html.touch .tpeek .tp-b{display:flex;gap:8px}
-html.touch .tpeek .tp-b button{flex:1;min-height:44px;font-family:var(--font-pixel);font-size:12px;letter-spacing:.1em;border-radius:0;color:var(--cyan);border-color:var(--cyan);background:rgba(56,232,224,.08)}
-html.touch .tpeek .tp-b button[hidden]{display:none}
 
-/* ---------- holo-tags over the megastructures with a screen ---------- */
+/* ---------- holo-tags over the megastructures: a button, or a name that is only a label (touchui.js) ---------- */
 .tholo{display:none}
 html.touch .tholo{display:flex;align-items:center;gap:6px;position:fixed;left:0;top:0;z-index:2;min-height:36px;padding:0 10px;font-family:var(--font-pixel);font-size:11px;letter-spacing:.12em;
   color:#e9fbff;background:rgba(6,14,26,.86);border:1px solid rgba(90,232,255,.75);border-radius:0;box-shadow:0 0 10px rgba(90,232,255,.35);touch-action:manipulation;
@@ -48,6 +35,7 @@ html.touch .tholo{display:flex;align-items:center;gap:6px;position:fixed;left:0;
 html.touch .tholo.ton{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .2s ease}   /* (shown when its megastructure is tapped, fading out after 5 s: touchui.js) */
 html.touch .tholo::before{content:"";position:absolute;inset:-5px -4px}   /* (44 px to a finger) */
 html.touch .tholo::after{content:"";position:absolute;left:50%;bottom:-7px;width:1px;height:7px;background:rgba(90,232,255,.75)}
+html.touch .tholo.tlabel{cursor:default}   /* (a name only: nothing to press) */
 html.touch .tholo i{width:7px;height:7px;background:#5ae8ff;box-shadow:0 0 6px #5ae8ff}
 
 /* ---------- press and hold: the explanation plate ---------- */
@@ -99,9 +87,9 @@ html.nt-calm *,html.nt-calm *::before,html.nt-calm *::after{animation-duration:.
 html.nt-clean #prec::after,html.nt-clean #gridPanel::before,html.nt-clean #spire::before,html.nt-clean #ovsCurtain,html.nt-clean #ovsBars{display:none!important}
 html.nt-clean #view.gp-glitch,html.nt-clean .blink,html.nt-clean .live i{animation:none!important}
 /* text size: the panels, lists and logs grow (zoom keeps their layout; the dock keeps its size) */
-html.nt-text-125 :is(html.pui .pu-pane,#spire,#prec,#gridPanel,.monitor,#wirelog,.hwhelp,.bmenu-list,#modeHint,.tpeek,.tplate,.t-panel,#tsheet){zoom:1.25}
-html.nt-text-150 :is(html.pui .pu-pane,#spire,#prec,#gridPanel,.monitor,#wirelog,.hwhelp,.bmenu-list,#modeHint,.tpeek,.tplate,.t-panel,#tsheet){zoom:1.5}
-html.nt-text-200 :is(html.pui .pu-pane,#spire,#prec,#gridPanel,.monitor,#wirelog,.hwhelp,.bmenu-list,#modeHint,.tpeek,.tplate,.t-panel,#tsheet){zoom:2}
+html.nt-text-125 :is(html.pui .pu-pane,#spire,#prec,#gridPanel,.monitor,#wirelog,.hwhelp,.bmenu-list,#modeHint,.tplate,.t-panel,#tsheet){zoom:1.25}
+html.nt-text-150 :is(html.pui .pu-pane,#spire,#prec,#gridPanel,.monitor,#wirelog,.hwhelp,.bmenu-list,#modeHint,.tplate,.t-panel,#tsheet){zoom:1.5}
+html.nt-text-200 :is(html.pui .pu-pane,#spire,#prec,#gridPanel,.monitor,#wirelog,.hwhelp,.bmenu-list,#modeHint,.tplate,.t-panel,#tsheet){zoom:2}
 
 /* ---------- the touch tutorial (js/tutorial.js): a dim with a hole where to act, a ghost of the gesture, an operator's note ---------- */
 .ttut,.ttip{display:none}
@@ -180,8 +168,6 @@ html.touch .hwbar button{min-width:40px}
 html.touch .hwbar .hwlanes{margin-left:6px}
 html.tland .zonebar > .hwbar{left:50%;right:auto;transform:translateX(-50%);width:max-content}
 @media (max-width:370px){html.touch .zonebar > .hwbar small{display:none}html.touch .zonebar > .hwbar{gap:4px;padding:6px 8px}}
-/* the LIDAR Array's card: Scan a pod (touchui.js) */
-html.touch .tpeek .tp-b .tp-scan.off{opacity:.55}
 
 /* ---------- a short prompt near the top (touchui.js TUI.toast): centered, below the clock and the music, over the city, never in the way of a tap ---------- */
 .ttoast{display:none}
@@ -192,11 +178,10 @@ html.touch .ttoast{display:block;position:fixed;left:50%;top:calc(108px + env(sa
   opacity:0;visibility:hidden;transform:translate(-50%,-6px);transition:opacity .35s ease,transform .35s ease,visibility 0s linear .35s}
 html.touch .ttoast.ton{opacity:1;visibility:visible;transform:translate(-50%,0);transition:opacity .2s ease,transform .2s ease}
 
-/* ---------- every prompt and tutorial reads centered on touch (owner, Oct 31): the operator's notes, the tips, the aim note, the card's words, the hint
-   line and the explanation plates. Only the alignment changes; where they sit stays as it was ---------- */
+/* ---------- every prompt and tutorial reads centered on touch (owner, Oct 31): the operator's notes, the tips, the aim note, the hint line, Scan's
+   note by the finger and the explanation plates. Only the alignment changes; where they sit stays as it was ---------- */
 html.touch .ttut .tt-txt,html.touch .ttut .tt-note small,html.touch .ttut .tt-note b{text-align:center}
 html.touch .ttut .tt-txt{justify-items:center}
-html.touch .ttip:not([hidden]),html.touch .taim:not([hidden]),html.touch .tplate:not([hidden]),html.touch .tiltchip{text-align:center}
-html.touch .tpeek .tp-l{text-align:center}
-html.touch .tpeek .tp-h b{flex:1;text-align:center;padding-left:44px}   /* (the width of the close button on the other side, so the name sits in the middle) */
+html.touch .ttip:not([hidden]),html.touch .taim:not([hidden]),html.touch .furn-tip,html.touch .tplate:not([hidden]),html.touch .tiltchip{text-align:center}
+html.touch .furn-tip{box-sizing:border-box}   /* (its max width then counts its padding, so it and the pod arrows beside it stay on the screen: furnish.js placeTip) */
 html.touch #modeHint,html.touch .zonebar > #modeHint{text-align:center}

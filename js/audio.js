@@ -43,5 +43,12 @@ const sfx = (() => {
     src.connect(g); g.connect(out); src.start();
   }
   function setVolume(v){ volume = v; if (out) out.gain.value = v; try { localStorage.setItem(SFX_VOL_KEY, String(v)); } catch (e) {} }
-  return { play, setVolume, get volume(){ return volume; } };
+  // a short synthesized tone (Economy's light-ups and classifications): a quick upward glide into the note, then a ring-out
+  function tone(freq, { gain = .16, dur = .45, at = 0, glide = .72 } = {}){
+    if (!ctx || volume <= 0 || ctx.state !== 'running') return;
+    const t = ctx.currentTime + at, g = ctx.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(gain, t + .012); g.gain.exponentialRampToValueAtTime(.0008, t + dur); g.connect(out);
+    for (const [mul, type, lv] of [[1, 'triangle', 1], [2, 'sine', .35], [3.01, 'sine', .12]]){ const o = ctx.createOscillator(), og = ctx.createGain(); o.type = type; og.gain.value = lv;
+      o.frequency.setValueAtTime(freq*mul*glide, t); o.frequency.exponentialRampToValueAtTime(freq*mul, t + .06); o.connect(og); og.connect(g); o.start(t); o.stop(t + dur + .05); }
+  }
+  return { play, tone, setVolume, get volume(){ return volume; } };
 })();

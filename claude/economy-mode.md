@@ -40,12 +40,20 @@ Balance source: the Economy Balancer artifact and the project doc `claude/econom
 - Floating numbers (+Scrip, −cost, labels) are 17 to 20 px on a dark pill, raised above the building.
 - Moving in: a level's first half arrives at once (it lights in about a second, with the surge), then the rest trickle in over about 15 s (`P.trickle`). Every 3 residents (2 in luxury) a thin glow runs up one corner of the building and round its top edge, with a small "+3 residents" and a soft tick.
 - Full: when a building has lit every level and holds 95% of what it can where it stands, it pays a bonus (half a level's bonus per level, once per height) and plays the uplink: a holographic scan sweeps down the building and back, it glitches magenta and cyan, data glyphs rise off the roof, and a projector on the roof throws a hologram panel above it (light rays to its corners) that decodes out of noise into "FULL HOUSE" (Packed, Full shift) with the payout counting up. The panel is a real object in the world: it faces the camera when it appears and stays where it is if the view turns. Uplinks queue (up to three, then they shrink to a label). Old saves mark buildings already full quietly.
-- Stabilizer: optional mini game while a core charges. Keep the trace in the band (tap, click or Space). Each second inside takes 2 s off, up to half the charge.
+- No force-field dome over the city in Economy (`fieldPlan` returns nothing). Instead, every 4.5 s a grid of light runs out over the ground from each working core, as far as it reaches: open ground carries it on, a building takes a ring round its foot and stops it, so the pulse flows round buildings rather than through them.
+- Smoke: each working core breathes out smog that hangs thick within 2 plots, thins through the mid band and fades out at the edge of its reach.
+- Power view: click a core (no zone picked) to see its reach and bands on the ground for 9 s (red poor air up to 2 plots, amber 95% output 3 to 5, green 80% output to the edge, grey no power), or press Power in the top bar (or V) to show every core's. A legend explains the colors.
+- Power surges (after the tutorial; the first about 2 min in, then every 3 to 5 min): a core glows yellow, orange, then red, 5 s each, with a label and a warning ring. Click it to open the stabilizer (keep the trace in the band for 4 s; the clock stops while you work); success pays a little Scrip. Ignore it and the core shuts down: its buildings go dark until you click it and crank it back up (click, tap or Space fills a bar that drains). After a restart its reach is 7 plots for 90 s. Charging a new core no longer has a mini game.
+- Objectives panel (top left, always shown): the next classification, an overall bar (the average of its requirements), a bar per requirement (the one holding you back marked), and what it unlocks. The top bar's Next box is hidden.
 - Always night: the sky and lights are drawn as 23:00 (the clock, people and stories run on); the title room is lit for night too.
-- Tutorial and tips sit at the bottom right on desktop (centered above the zone bar on touch and narrow windows).
+- Tutorial notes hover over what they're about (the core, the zone button to use, the home in question, the objectives panel) with a pointer; tips sit at the bottom right on desktop (centered on touch and narrow windows).
 - Tutorial: the goal and core; a home right beside the core; why that's too close (poor air within two plots); deselect and lay 3 empty tiles (everything must connect by ground or it's isolated); a home on the far tile (clean air, but further from work); a factory; a shop; stack a level; next goal. Notes are one action each, the button to use pulsing, a progress strip; no dimming, no spotlight; skippable; replay from the Office. On touch it waits for the gesture tutorial first.
 - Hover (mouse) or tap with no zone picked (touch): a building's Grade, lit levels, cap, why it's struggling, taxes, next level's price.
 - Corps: with Industrial picked from Chartered on, a Factory / Corps switch appears.
+
+## Residential look
+
+Residential is lit like homes: moss-green neon trim (`M.neonMoss`, halo `GLOW.moss`) and umber/tungsten windows (`RES_ROOMS`, buildings.js), in both modes; the zone color is moss (#9BD86A). The little icon signs on residential shopfronts still use the cyan art (only pink, cyan and amber are drawn).
 
 ## Console
 

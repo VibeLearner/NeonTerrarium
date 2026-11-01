@@ -6,7 +6,7 @@
 // each floor belonging to a zone. Every piece is generated from a seed made of its grid position and floor number,
 // so editing one spot never reshuffles anything else.
 const ZONES = {
-  low:  { key:'A', name:'Residential', col:'#38E8E0' },
+  low:  { key:'A', name:'Residential', col:'#9BD86A' },   // (moss green: residential is lit like homes; cyan neon read as commercial)
   mid:  { key:'B', name:'Commercial',  col:'#FFB347' },
   high: { key:'C', name:'Luxury',      col:'#FF4FA3' },
   ind:  { key:'D', name:'Industrial',  col:'#E8E03A' },

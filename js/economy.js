@@ -24,7 +24,8 @@ const ECON = (() => {
     pwr: { R: 3, C: 6, L: 9, I: 12, K: 9 }, stationPwr: 6, hwPwr: 8,
     coreCap: 80, coreCost: 250, coreCostGrowth: 1.35, coreBuildMin: 20, coreBuildGrowth: 1.45, coreBuildMaxH: 2,
     coreUpCost: 250, coreUpCostGrowth: 1.6, coreUpGain: .5, coreUpDecay: .85, coreUpPollCut: .2, coreJobs: 10, coreUpkeep: 10,
-    coreReach: 9, coreNear: 2, coreMid: 5,
+    coreReach: 9, coreNear: 2, coreMid: 5, coreReachLow: 7, lowMs: 90e3,   // (after a restart: 7 plots for 90 s)
+    surgeFirst: 120e3, surgeGap: [180e3, 300e3], surgeStage: 5000,   // (power surges: the first two minutes after the tutorial, then every 3 to 5 min; 5 s per stage, yellow, orange, red)
     ppl: { R: 24, L: 9 }, jobsI: 36, jobsK: 12, unempStay: .4,
     incR: 10, incRU: 2, incL: 60, incLU: 6, tax: .08, spend: .6,
     cCap: 450, cShare: .4, cStation: .3, luxSmall: .4, bigShop: 2,
@@ -100,6 +101,8 @@ const ECON = (() => {
 
   function coreState(m){ let s = st.cores[m.id]; if (!s) s = st.cores[m.id] = { up: 0, readyAt: 0 }; return s; }
   const coreReady = m => coreState(m).readyAt <= now();
+  const coreOnline = m => coreReady(m) && !coreState(m).off;
+  const coreRch = m => coreState(m).lowUntil > now() ? P.coreReachLow : P.coreReach;   // (reach: shorter for a while after a restart)
   function coreCapOf(m){ const s = coreState(m); let c = P.coreCap; for (let k = 0; k < s.up; k++) c += P.coreCap*P.coreUpGain*Math.pow(P.coreUpDecay, k); return c; }
   const coreUpCost = m => Math.round(P.coreUpCost*Math.pow(P.coreUpCostGrowth, coreState(m).up));
   function nextCoreCost(){ const n = megaList('emitter').length; return Math.round(P.coreCost*Math.pow(P.coreCostGrowth, Math.max(0, n - 1))); }
@@ -120,7 +123,7 @@ const ECON = (() => {
   const arrived = new Map();   // (residents last announced per building: not saved, so opening a city doesn't replay arrivals)
   function step(dtH, live){
     const T = now();
-    const coresAll = megaList('emitter'), cores = coresAll.filter(coreReady);
+    const coresAll = megaList('emitter'), cores = coresAll.filter(coreOnline);
     let supply = 0; for (const m of cores) supply += coreCapOf(m);
     const avgUp = cores.length ? cores.reduce((s, m) => s + coreState(m).up, 0)/cores.length : 0, pollMul = Math.pow(1 - P.coreUpPollCut, avgUp);
     // what the megastructures, the metro and the highways draw first
@@ -153,8 +156,8 @@ const ECON = (() => {
     let order = 0;
     for (const c of list){
       const z = zoneOf(c), k = keyOf(c); if (!z) continue;
-      let coreD = Infinity; for (const m of cores){ const d = megaD(c.i, c.j, m); if (d < coreD) coreD = d; }
-      const b = { c, z, k, floors: floorsOf(c), coreD, order: order++, isolated: !reach.has(k) };
+      let coreD = Infinity, inRange = false; for (const m of cores){ const d = megaD(c.i, c.j, m); if (d < coreD) coreD = d; if (d <= coreRch(m)) inRange = true; }
+      const b = { c, z, k, floors: floorsOf(c), coreD, inRange, order: order++, isolated: !reach.has(k) };
       b.band = coreD <= P.coreNear ? 'near' : coreD <= P.coreMid ? 'mid' : 'far';
       b.station = stops.some(t => Math.max(Math.abs(t.i - c.i), Math.abs(t.j - c.j)) <= P.stationR);
       b.track = !b.station && typeof mtAt === 'function' && mtAt(c.i, c.j).length > 0;
@@ -182,7 +185,7 @@ const ECON = (() => {
     let demandAll = megaPwr;
     for (const b of rows){
       const need = P.pwr[b.z]*Math.min(b.floors, b.cap); demandAll += need;
-      b.powered = b.coreD <= P.coreReach && used + need <= supply;
+      b.powered = b.inRange && used + need <= supply;
       if (b.powered) used += need;
       b.eff = b.powered ? Math.min(b.floors, b.cap) : 0;
     }
@@ -410,6 +413,7 @@ const ECON = (() => {
     const cost = Math.round(MEGA.mall.cost*Math.pow(MEGA.mall.levelGrowth, m.levels)); if (!afford(cost)) return;
     const l0 = m.levels, r = orig(m); if (m.levels > l0) charge(cost); return r;
   });
+  wrap('fieldPlan', function (){ return []; });   // (no force-field dome over the city in Economy: the cores show their reach on the ground instead)
   wrap('maybeSpawnMegas', function (){ /* in Economy nothing arrives on its own: the tiers unlock, the player builds */ });
   // transit: the metro opens at Zoned, the sky highways at Incorporated; track and stops are bought plot by plot
   E.transit = which => which === 'hw' ? st.tier >= 4 : st.tier >= 2;
@@ -477,7 +481,7 @@ const ECON = (() => {
     const t = now(); let dt = Math.min(2, Math.max(0, (t - lastT)/1000)); lastT = t;   // (a hidden tab or a long gap: no catching up)
     step(dt*K/3600, true);
     if (needView && !(typeof TITLE !== 'undefined' && TITLE.on)){ needView = false; try { const m = megaList('emitter')[0]; if (m) camGoal.set(m.x, camGoal.y, m.z); zoomT = 12*(typeof ZK !== 'undefined' ? ZK : 1); } catch (e) {} }   // (each time the city opens: in close on the core)
-    darkSync(); autoTick(); hud(); hintTick();
+    darkSync(); autoTick(); hud(); hintTick(); try { powerTick(dt*1000); } catch (e) { console.warn('surge', e); }
     if ((saveT += dt) > 10){ saveT = 0; save(); }
     if (typeof WIRELOG !== 'undefined' && WIRELOG.say && built('wirenest')) demandLine();
   }
@@ -556,8 +560,38 @@ const ECON = (() => {
   .econ-mini canvas { display: block; width: 100%; aspect-ratio: 1/1.1; background: #07060c; touch-action: none; cursor: pointer; }
   .econ-mini .top { display: flex; justify-content: space-between; margin-bottom: 8px; color: #38e8e0; letter-spacing: .14em; text-transform: uppercase; font-size: 11px; }
   .econ-mini .foot { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; color: #9a92aa; }
+  .econ-hud .nx { display: none; }   /* (the objectives panel, top left, shows this now) */
+  .econ-obj { position: fixed; z-index: 4; left: max(16px, env(safe-area-inset-left,0px)); top: calc(40px + env(safe-area-inset-top,0px)); width: 236px; box-sizing: border-box;
+    font: 12px/1.3 'JetBrains Mono', monospace; color: #efe6d6; background: rgba(12,10,20,.9); border: 1px solid rgba(255,179,71,.38); padding: 9px 11px 10px; }
+  .econ-obj .h { display: flex; justify-content: space-between; align-items: baseline; } .econ-obj .h small { color: #9a92aa; font-size: 9.5px; letter-spacing: .16em; text-transform: uppercase; }
+  .econ-obj .h b { color: #ffb347; font-size: 15px; font-weight: 600; } .econ-obj .h span { color: #ffb347; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .econ-obj .ov { height: 9px; background: rgba(255,255,255,.1); margin: 6px 0 8px; position: relative; overflow: hidden; } .econ-obj .ov i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #ff9a2a, #ffb347); transition: width .4s; }
+  .econ-obj .ov i::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.45), transparent); animation: eoSheen 2.4s linear infinite; } @keyframes eoSheen { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+  .econ-obj .r { margin-top: 5px; } .econ-obj .r div { display: flex; justify-content: space-between; color: #b9b0c8; font-size: 11.5px; } .econ-obj .r div b { color: #efe6d6; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .econ-obj .r .bar { height: 4px; background: rgba(255,255,255,.1); margin-top: 3px; } .econ-obj .r .bar i { display: block; height: 100%; background: #9a92aa; transition: width .4s; }
+  .econ-obj .r.ok div b { color: #5affa8; } .econ-obj .r.ok .bar i { background: #5affa8; } .econ-obj .r.lim .bar i { background: #ffb347; } .econ-obj .r.lim div span::before { content: '▸ '; color: #ffb347; }
+  .econ-obj .u { margin-top: 8px; color: #9a92aa; font-size: 11px; } .econ-obj .u em { color: #c9fffb; font-style: normal; }
+  html.touch .econ-obj { top: calc(112px + env(safe-area-inset-top,0px)); left: max(12px, env(safe-area-inset-left,0px)); width: 200px; padding: 7px 9px; } html.touch .econ-corp { top: calc(250px + env(safe-area-inset-top,0px)); }
+  .econ-legend { position: fixed; z-index: 5; left: 50%; transform: translateX(-50%); top: calc(74px + env(safe-area-inset-top,0px)); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; max-width: calc(100vw - 32px);
+    font: 12px/1.3 'JetBrains Mono', monospace; color: #efe6d6; background: rgba(12,10,20,.94); border: 1px solid rgba(122,184,255,.5); padding: 8px 12px; }
+  .econ-legend[hidden] { display: none; } .econ-legend b { color: #7ab8ff; letter-spacing: .14em; text-transform: uppercase; font-size: 11px; font-weight: 500; }
+  .econ-legend span { display: flex; align-items: center; gap: 6px; } .econ-legend i { width: 12px; height: 12px; display: inline-block; } .econ-legend small { color: #9a92aa; margin-left: 2px; } .econ-legend em { color: #ffb347; font-style: normal; }
+  .econ-legend button { all: unset; cursor: pointer; color: #9a92aa; padding: 2px 6px; } .econ-legend button:hover { color: #fff; }
+  .econ-hud button[aria-pressed="true"] { color: #12101a; background: #7ab8ff; }
+  html.touch .econ-legend { top: auto; bottom: calc(150px + env(safe-area-inset-bottom,0px)); }
+  .econ-mini .how { margin: 0 0 8px; color: #b9b0c8; font-size: 12px; line-height: 1.45; }
+  .econ-mini .meter { height: 8px; background: rgba(255,255,255,.1); margin-top: 8px; } .econ-mini .meter i { display: block; height: 100%; width: 0; background: #5affa8; transition: width .1s; } .econ-mini .meter.big { height: 14px; }
+  .econ-mini .crankbtn { all: unset; cursor: pointer; display: grid; place-items: center; gap: 4px; margin: 10px auto; width: 150px; height: 150px; border-radius: 50%; border: 2px solid #7ab8ff; color: #cfe6ff; background: radial-gradient(#13203a, #07060c); box-shadow: 0 0 22px rgba(122,184,255,.35); user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+  .econ-mini .crankbtn span { font-size: 54px; line-height: 1; display: block; } .econ-mini .crankbtn b { font-size: 12px; letter-spacing: .3em; text-transform: uppercase; } .econ-mini .crankbtn:active { transform: scale(.96); }
+  .econ-mark { position: fixed; z-index: 6; transform: translate(-50%, -100%); cursor: pointer; font: 600 13px/1.3 'JetBrains Mono', monospace; color: #fff; background: rgba(10,8,18,.92); border: 2px solid var(--sc, #ff3a3a); padding: 6px 10px 8px; text-align: center; white-space: nowrap; box-shadow: 0 0 16px var(--sc, #ff3a3a); }
+  .econ-mark b { display: block; font-size: 14px; letter-spacing: .14em; text-transform: uppercase; color: var(--sc, #ff3a3a); } .econ-mark span { font-size: 11.5px; color: #d8d0e4; }
+  .econ-mark i { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--sc); }
+  .econ-mark.s2 { animation: emBlink .5s steps(2) infinite; } @keyframes emBlink { 50% { box-shadow: 0 0 2px var(--sc); } }
+  .econ-mark.off { --sc: #8a8396; border-color: #ff5a6e; box-shadow: 0 0 14px rgba(255,90,110,.5); } .econ-mark.off b { color: #ff8a98; }
   .econ-mini button { all: unset; cursor: pointer; color: #38e8e0; letter-spacing: .14em; text-transform: uppercase; font-size: 11px; padding: 8px; }
   .zone.econ-cant { opacity: .5; } .zone[data-econ-cost] { position: relative; } .zone[data-econ-cost]::after { content: attr(data-econ-cost); position: absolute; right: 4px; top: 3px; font: 9.5px/1 'JetBrains Mono', monospace; color: #ffb347; opacity: .85; pointer-events: none; }
+  .econ-note.anch { width: min(360px, calc(100vw - 24px)); } .econ-note.anch::after { content: ''; position: absolute; left: var(--ax, 50%); top: 100%; margin-left: -9px; border: 9px solid transparent; border-top-color: #ffb347; }
+  .econ-note.anch.below::after { top: auto; bottom: 100%; border-top-color: transparent; border-bottom-color: #ffb347; }
   .econ-note.tip { border-left-color: #38e8e0; } .econ-note.tip .t { color: #38e8e0; }
   .econ-class { position: fixed; z-index: 8; left: 50%; top: 22%; transform: translate(-50%, 0); text-align: center; pointer-events: none; font-family: 'JetBrains Mono', monospace; color: #fff; width: min(560px, calc(100vw - 32px)); }
   .econ-class .k { font-size: 12px; letter-spacing: .4em; text-transform: uppercase; color: #ffb347; animation: ecIn .5s ease-out both; }
@@ -581,10 +615,23 @@ const ECON = (() => {
   hudEl.innerHTML = `<div class="eh scrip"><small>Scrip</small><b id="ehM">0</b><span class="rate" id="ehR">+0/min</span></div>
     <div class="eh"><small>Residents</small><b id="ehP">0</b></div>
     <div class="eh pw hide-t" id="ehPw"><small>Power</small><b id="ehPwV">0/0</b><div class="bar"><i id="ehPwB"></i></div></div>
-    <div class="eh hide-s"><small id="ehTn">Next</small><b id="ehTv">0/100</b><div class="bar"><i id="ehTb"></i></div></div>
+    <div class="eh hide-s nx"><small id="ehTn">Next</small><b id="ehTv">0/100</b><div class="bar"><i id="ehTb"></i></div></div>
     <div class="eh hide-s" id="ehDm" hidden><small>Demand</small><div class="dm" id="ehDmV"></div></div>
+    <button type="button" id="ehV" aria-pressed="false" title="Power view: every core's reach and bands (V)">Power</button>
     <button type="button" id="ehO" aria-haspopup="dialog">Office</button>`;
   document.body.appendChild(hudEl);
+  const objEl = el('div', 'econ-obj'); objEl.setAttribute('role', 'status'); objEl.setAttribute('aria-label', 'Next classification'); document.body.appendChild(objEl);
+  let objKey = '';
+  function objectives(){
+    const done = st.tier >= TIERS.length - 1, nt = TIERS[Math.min(st.tier + 1, TIERS.length - 1)];
+    if (done){ const k = 'done'; if (objKey !== k){ objKey = k; objEl.innerHTML = `<div class="h"><small>Sector</small><b>${TIERS[st.tier].name}</b></div><div class="u">Every classification reached. The coast is open.</div>`; } return; }
+    const req = [['Residents', R.pop, nt.pop], ['Scrip per min', Math.max(0, R.rev), nt.inc]]; if (nt.size) req.push(['Lit buildings', R.size, nt.size]);
+    const fr = req.filter(r => r[2]).map(r => Math.min(1, r[1]/r[2])), overall = fr.reduce((a, b) => a + b, 0)/fr.length, lim = Math.min(...fr);
+    const rows = req.filter(r => r[2]).map((r, k) => { const f = fr[k]; return `<div class="r ${f >= 1 ? 'ok' : f === lim ? 'lim' : ''}"><div><span>${r[0]}</span><b>${fmt(Math.min(r[1], r[2]))} / ${fmt(r[2])}</b></div><div class="bar"><i style="width:${100*f}%"></i></div></div>`; }).join('');
+    const opens = (nt.opens || '').split(',').slice(0, 3).map(x => x.trim()).filter(Boolean).join(', ');
+    const html = `<div class="h"><small>Next · ${nt.name}</small><span>${Math.floor(overall*100)}%</span></div><div class="ov"><i style="width:${100*overall}%"></i></div>${rows}${opens ? `<div class="u">Unlocks <em>${opens}</em></div>` : ''}`;
+    if (html !== objKey){ objKey = html; objEl.innerHTML = html; }
+  }
   const corpEl = el('div', 'econ-corp', `<button type="button" data-c="0">Factory</button><button type="button" data-c="1">Corps</button>`); corpEl.hidden = true; corpEl.setAttribute('role', 'group'); corpEl.setAttribute('aria-label', 'Industrial kind');
   document.body.appendChild(corpEl);
   corpEl.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; st.corp = b.dataset.c === '1'; corpSync(); save(); });
@@ -600,7 +647,7 @@ const ECON = (() => {
   const anyB = f => { for (const b of B.values()) if (f(b)) return true; return false; };
   const HINTS = {
     isolated: { say: 'Isolated: no ground joins that building to the city, so nobody can get there.', sub: 'Connect it with ground to the core or another building (or build within two plots of one).', on: () => anyB(b => b.isolated) },
-    reach: { say: 'Out of the Emitter Core\'s reach.', sub: 'A core powers buildings within 9 plots. Past that the lights stay off: build another Emitter Core nearer (Buildings menu).', on: () => anyB(b => !b.isolated && b.coreD > P.coreReach) },
+    reach: { say: 'Out of the Emitter Core\'s reach.', sub: 'A core powers buildings within 9 plots. Past that the lights stay off: build another Emitter Core nearer (Buildings menu).', on: () => anyB(b => !b.isolated && !b.inRange && !megaList('emitter').some(m => coreState(m).off)) },
     power: { say: 'Power is maxed out.', sub: 'New levels stay dark until there is more power. Build another Emitter Core, or upgrade one in the Office.', on: () => R.demandAll > R.supply },
     grade: { say: 'Sector Grade caps how tall buildings grow.', sub: 'Shops, metro stops and police raise it; cores and factories lower it. A plot further from the core usually grows taller.', on: () => true },
     jobs: { say: 'Homes need work nearby.', sub: 'Factories and shops give jobs. Without them people move in slowly and fewer levels light.', on: () => anyB(b => (b.z === 'R' || b.z === 'L') && !b.isolated && b.powered && (b.ef < .5 || (b.jobBand === 'far' && !b.station))), wait: 25 },
@@ -659,7 +706,7 @@ const ECON = (() => {
   const _v = new THREE.Vector3();
   function screenOf(x, y, z){ try { _v.set(x, y, z).project(cam); if (_v.z > 1) return null; const r = viewRect(); return [r.left + (_v.x*.5 + .5)*r.width, r.top + (1 - (_v.y*.5 + .5))*r.height]; } catch (e) { return null; } }
   function floatText(x, y, z, text, cls = ''){ const p = screenOf(x, y, z); if (!p) return; const f = el('div', 'econ-float ' + cls); f.textContent = text; f.style.left = p[0] + 'px'; f.style.top = (p[1] - 34) + 'px'; document.body.appendChild(f); setTimeout(() => f.remove(), 1700); }
-  const ZCOL = { R: 0x38e8e0, C: 0xffb347, L: 0xff4fa3, I: 0xe8e03a, K: 0xe8e03a };
+  const ZCOL = { R: 0x9bd86a, C: 0xffb347, L: 0xff4fa3, I: 0xe8e03a, K: 0xe8e03a };
   const pulseGeo = new THREE.BoxGeometry(1, 1, 1), pulseEdge = new THREE.EdgesGeometry(pulseGeo), pulses = [];
   function pulseLevel(c, lit, z, whole, colOver){
     if (typeof scene === 'undefined' || pulses.length > (whole ? 70 : 8)) return;
@@ -935,6 +982,7 @@ const ECON = (() => {
     for (const zb of document.querySelectorAll('.zone[data-zone]')){ const z = zoneNow(zb.dataset.zone); if (!z || !P.cost[z]) continue;
       const locked = (z === 'L' || z === 'K') && st.tier < 3, cost = placeCost(z), can = !locked && st.money >= cost;
       zb.classList.toggle('econ-cant', !locked && !can); zb.dataset.econCost = locked ? 'Chartered' : fmt(cost); }
+    objectives();
     const dm = $('ehDm'); dm.hidden = !built('wirenest');
     if (!dm.hidden){ const d = R.demandZ; $('ehDmV').innerHTML = ['R', 'C', 'I', 'L'].filter(z => z !== 'L' || st.tier >= 3).map(z => `<span class="${d[z] > 0 ? 'up' : d[z] < 0 ? 'dn' : ''}" title="${ZNAME[z]} demand">${z}${d[z] > 0 ? '▲' : d[z] < 0 ? '▼' : '·'}</span>`).join(''); }
     corpSync();
@@ -942,6 +990,7 @@ const ECON = (() => {
   }
   let offT = 0;
   document.getElementById('ehO').addEventListener('click', () => toggleOffice());
+  document.getElementById('ehV').addEventListener('click', () => VIEW.toggle());
 
   /* ---------- the City office: the next goal first, the rest folded away ---------- */
   const officeEl = el('aside', 'econ-office'); officeEl.hidden = true; officeEl.setAttribute('role', 'dialog'); officeEl.setAttribute('aria-label', 'City office'); document.body.appendChild(officeEl);
@@ -963,8 +1012,9 @@ const ECON = (() => {
     const cores = megaList('emitter');
     let pw = `<p>${fmt(R.used)} of ${fmt(R.supply)} in use${R.demandAll > R.supply ? ' · <span style="color:#ff8a98">' + fmt(R.demandAll - R.supply) + ' short</span>' : ''}. Closest buildings get power first; nothing past ${P.coreReach} plots.</p>`;
     cores.forEach((m, q) => { const s = coreState(m), ready = s.readyAt <= now();
-      pw += `<div class="row"><div>Emitter Core ${q + 1}<small>${ready ? fmt(coreCapOf(m)) + ' power' : 'Charging · ' + fmtDur(s.readyAt - now())}</small></div>` +
-        (ready ? `<button class="btn" data-up="${m.id}" ${st.tier < 1 ? 'disabled title="Opens at Registered"' : ''}>Upgrade · ${fmt(coreUpCost(m))}</button>` : `<button class="btn" data-mini="${m.id}" ${st.tier < 1 ? 'disabled title="Opens at Registered"' : ''}>Stabilize</button>`) + `</div>`; });
+      const stat = !ready ? 'Charging · ' + fmtDur(s.readyAt - now()) : s.off ? '<span style="color:#ff8a98">Offline</span>' : s.surge ? '<span style="color:#ffb347">Power surge</span>' : fmt(coreCapOf(m)) + ' power' + (s.lowUntil > now() ? ' · reach ' + P.coreReachLow + ' for ' + fmtDur(s.lowUntil - now()) : '');
+      pw += `<div class="row"><div>Emitter Core ${q + 1}<small>${stat}</small></div>` +
+        (s.off ? `<button class="btn" data-restart="${m.id}">Restart</button>` : s.surge ? `<button class="btn" data-mini="${m.id}">Stabilize</button>` : ready ? `<button class="btn" data-up="${m.id}" ${st.tier < 1 ? 'disabled title="Opens at Registered"' : ''}>Upgrade · ${fmt(coreUpCost(m))}</button>` : '') + `</div>`; });
     pw += `<p>Another core: ${fmt(nextCoreCost())} Scrip from Buildings.</p>`;
     out.push(sec('power', 'Power', pw));
     // megastructures
@@ -993,7 +1043,8 @@ const ECON = (() => {
     if (b.classList.contains('x')) return toggleOffice(false);
     if (b.dataset.up) return E.upCore(b.dataset.up);
     if (b.dataset.upm) return E.upMega(b.dataset.upm);
-    if (b.dataset.mini) return MINI.open(b.dataset.mini);
+    if (b.dataset.mini){ toggleOffice(false); return MINI.open(b.dataset.mini); }
+    if (b.dataset.restart){ toggleOffice(false); return RESTART.open(b.dataset.restart); }
     if (b.dataset.auto){ st.auto = !st.auto; save(); return renderOffice(); }
     if (b.dataset.tut){ toggleOffice(false); return TUTE.replay(); }
   });
@@ -1001,7 +1052,7 @@ const ECON = (() => {
   /* ---------- what a building is doing: hover (mouse) or tap with no zone picked (touch) ---------- */
   function whyOf(b){
     if (b.isolated) return 'Isolated · nobody can reach it';
-    if (b.coreD > P.coreReach) return 'No Emitter Core in reach';
+    if (!b.inRange) return megaList('emitter').some(m => coreState(m).off) ? 'Core offline or out of reach' : 'No Emitter Core in reach';
     if (!b.powered) return 'Out of power · upgrade or add a core';
     if (b.floors > b.cap) return 'Over its Grade · top levels stay dark';
     if (b.z === 'R' && b.jobBand === 'far' && !b.station) return 'Too far from work';
@@ -1039,20 +1090,179 @@ const ECON = (() => {
   /* ---------- the stabilizer: an optional mini game that shortens a core's charge ---------- */
   // Keep the grid frequency in the safe band: the trace sinks, a tap or Space lifts it. Every second inside the band takes two seconds off the
   // charge; the band narrows and the pull grows the longer it runs. A core's charge can be cut by half at most this way.
+  /* ---------- the power view: click a core (or Power in the top bar, or V) to see how far it reaches and its bands, color-coded on the ground:
+     poor air close in, 95% output in the middle, 80% out to the edge of its reach ---------- */
+  const BAND = [{ to: () => P.coreNear, col: '#ff5a3c', name: 'Poor air', what: 'Grade −25' }, { to: () => P.coreMid, col: '#ffbf3a', name: 'Mid', what: '95% output' }, { to: m => coreRch(m), col: '#8fe36a', name: 'Far', what: '80% output' }];
+  const VIEW = (() => {
+    const tileMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: .34, depthTest: false, depthWrite: false });
+    const tiles = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), tileMat, 1600); tiles.count = 0; tiles.frustumCulled = false; tiles.layers.set(1); tiles.renderOrder = 995;
+    tiles.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(1600*3), 3);
+    const lines = new THREE.Group(); lines.renderOrder = 996;
+    if (typeof scene !== 'undefined'){ scene.add(tiles); scene.add(lines); }
+    const leg = el('div', 'econ-legend'); leg.hidden = true; document.body.appendChild(leg);
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI/2, 0, 0)), pp = new THREE.Vector3(), ss = new THREE.Vector3(), cc = new THREE.Color();
+    let mode = null, until = 0, single = null;   // mode: 'one' (a core clicked) or 'all' (the toggle)
+    function square(m, r, col){ const x0 = (m.i - r - .5)*LOT, x1 = (m.i + m.w - 1 + r + .5)*LOT, z0 = (m.j - r - .5)*LOT, z1 = (m.j + m.h - 1 + r + .5)*LOT, y = CURB + .14;
+      const g = new THREE.BufferGeometry().setFromPoints([[x0, z0], [x1, z0], [x1, z1], [x0, z1]].map(([x, z]) => new THREE.Vector3(x, y, z)));
+      const ln = new THREE.LineLoop(g, new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: .95, depthTest: false })); ln.layers.set(1); ln.renderOrder = 996; ln.frustumCulled = false; lines.add(ln); }
+    function draw(){
+      for (const o of [...lines.children]){ lines.remove(o); o.geometry.dispose(); o.material.dispose(); }
+      const cores = mode === 'one' ? (single && megas.has(single.id) ? [single] : []) : megaList('emitter');
+      if (!mode || !cores.length){ tiles.visible = false; leg.hidden = true; return; }
+      let n = 0;
+      for (const c of cells.values()){ if (n >= 1600) break; if (c.mega) continue;
+        let best = Infinity, bm = null; for (const m of cores){ const d = megaD(c.i, c.j, m); if (d < best){ best = d; bm = m; } }
+        if (!bm) continue; const out = best > coreRch(bm), live = coreOnline(bm); if (best > coreRch(bm) + 2) continue;
+        const band = out ? null : best <= P.coreNear ? BAND[0] : best <= P.coreMid ? BAND[1] : BAND[2];
+        cc.set(band ? band.col : '#4a4458'); if (!live) cc.multiplyScalar(.35);
+        pp.set(c.i*LOT, CURB + .08, c.j*LOT); ss.set(LOT*.94, LOT*.94, 1); m4.compose(pp, q, ss); tiles.setMatrixAt(n, m4); tiles.setColorAt(n, cc); n++; }
+      tiles.count = n; tiles.instanceMatrix.needsUpdate = true; tiles.instanceColor.needsUpdate = true; tiles.visible = true;
+      for (const m of cores){ square(m, P.coreNear, BAND[0].col); square(m, P.coreMid, BAND[1].col); square(m, coreRch(m), BAND[2].col); }
+      const one = cores.length === 1 ? cores[0] : null, so = one ? coreState(one) : null;
+      leg.innerHTML = `<b>${mode === 'one' ? 'Emitter Core' : 'Power view'}</b>` + BAND.map((b, k) => `<span><i style="background:${b.col}"></i>${b.name} · ${b.what}<small>${k === 0 ? 'up to ' + P.coreNear : k === 1 ? (P.coreNear + 1) + '–' + P.coreMid : (P.coreMid + 1) + '–' + (one ? coreRch(one) : P.coreReach)} plots</small></span>`).join('') +
+        `<span><i style="background:#4a4458"></i>No power<small>past ${one ? coreRch(one) : P.coreReach} plots</small></span>` + (so && so.lowUntil > now() ? `<em>Reach cut to ${P.coreReachLow} for ${fmtDur(so.lowUntil - now())} after the restart</em>` : '') + (so && so.off ? '<em>Offline: click it to restart</em>' : '') +
+        `<button type="button" aria-label="Close the power view">✕</button>`;
+      leg.hidden = false;
+    }
+    leg.addEventListener('click', e => { if (e.target.closest('button')) hide(); });
+    function show(m){ mode = 'one'; single = m; until = Date.now() + 9000; draw(); }
+    function toggle(){ if (mode === 'all') hide(); else { mode = 'all'; single = null; until = 0; draw(); } syncBtn(); }
+    function hide(){ mode = null; single = null; draw(); syncBtn(); }
+    const syncBtn = () => { const b = document.getElementById('ehV'); if (b) b.setAttribute('aria-pressed', String(mode === 'all')); };
+    setInterval(() => { if (!mode) return; if (mode === 'one' && Date.now() > until) return hide(); draw(); }, 1000);
+    addEventListener('keydown', e => { if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return; if ((e.key === 'v' || e.key === 'V') && !e.metaKey && !e.ctrlKey && !e.altKey){ toggle(); } if (e.key === 'Escape' && mode) hide(); });
+    return { show, toggle, hide, get on(){ return mode; } };
+  })();
+
+  /* ---------- smoke: each working core breathes out smog that hangs thick close in and thins out band by band to the edge of its reach ---------- */
+  const SMOKE = (() => {
+    const tex = (() => { const cv = document.createElement('canvas'); cv.width = cv.height = 64; const g = cv.getContext('2d');
+      for (let k = 0; k < 9; k++){ const x = 18 + Math.random()*28, y = 18 + Math.random()*28, r = 10 + Math.random()*16, gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, 'rgba(255,255,255,.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); }
+      return new THREE.CanvasTexture(cv); })();
+    const pool = [], live = [], MAX = 180;
+    for (let k = 0; k < MAX; k++){ const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, color: 0x4c4656, transparent: true, opacity: 0, depthWrite: false, fog: false, toneMapped: false })); sp.visible = false; sp.renderOrder = 5; if (typeof scene !== 'undefined') scene.add(sp); pool.push(sp); }
+    let last = performance.now(), acc = 0;
+    (function run(){ requestAnimationFrame(run); const t = performance.now(), dt = Math.min(.1, (t - last)/1000); last = t; if (document.hidden) return;
+      const cores = typeof megas !== 'undefined' ? megaList('emitter').filter(coreOnline) : [];
+      acc += dt*3.5*cores.length;
+      while (acc >= 1 && pool.length){ acc -= 1; const m = cores[(Math.random()*cores.length) | 0], sp = pool.pop(), a = Math.random()*Math.PI*2, r0 = (m.w/2)*LOT*.6;
+        sp.position.set(m.x + Math.cos(a)*r0, CURB + .6 + Math.random()*1.2, m.z + Math.sin(a)*r0); sp.visible = true;
+        live.push({ sp, m, vx: Math.cos(a), vz: Math.sin(a), sp0: (coreRch(m) + 1)*LOT/(11 + Math.random()*6), t0: t, rise: .05 + Math.random()*.12, s0: 2.2 + Math.random()*1.6 }); }
+      if (acc > 3) acc = 3;
+      for (let i = live.length - 1; i >= 0; i--){ const p = live[i], sp = p.sp, age = (t - p.t0)/1000;
+        sp.position.x += p.vx*p.sp0*dt; sp.position.z += p.vz*p.sp0*dt; sp.position.y += p.rise*dt;
+        const dPl = Math.max(0, Math.max(Math.abs(sp.position.x - p.m.x), Math.abs(sp.position.z - p.m.z))/LOT - p.m.w/2 + .5), rch = coreRch(p.m);
+        const dens = dPl <= P.coreNear ? .2 : dPl <= P.coreMid ? .2 - .12*(dPl - P.coreNear)/(P.coreMid - P.coreNear) : dPl <= rch ? .08 - .065*(dPl - P.coreMid)/(rch - P.coreMid) : .015 - (dPl - rch)*.015;
+        sp.material.opacity = Math.max(0, Math.min(1, age/.8)*dens); sp.scale.setScalar(p.s0*(1 + age*.35));
+        if (dens <= 0 || !coreOnline(p.m)){ sp.visible = false; sp.material.opacity = 0; pool.push(sp); live.splice(i, 1); } } })();
+    return {};
+  })();
+
+  /* ---------- the core's pulse: every few seconds a grid of light runs out over the ground from each working core, flowing round the
+     buildings (a ring round each one as it passes) instead of through them, as far as the core reaches ---------- */
+  const PULSE = (() => {
+    const mk = ring => { const cv = document.createElement('canvas'); cv.width = cv.height = 64; const g = cv.getContext('2d'); g.strokeStyle = '#fff';
+      if (ring){ g.lineWidth = 5; g.strokeRect(4, 4, 56, 56); g.lineWidth = 1; g.globalAlpha = .6; g.strokeRect(10, 10, 44, 44); }
+      else { g.lineWidth = 2; g.strokeRect(1, 1, 62, 62); g.globalAlpha = .45; g.lineWidth = 1; for (const k of [16, 32, 48]){ g.beginPath(); g.moveTo(k, 0); g.lineTo(k, 64); g.moveTo(0, k); g.lineTo(64, k); g.stroke(); } }
+      const t = new THREE.CanvasTexture(cv); return t; };
+    const mat = tex => new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending });
+    const N = 1400, mkMesh = tex => { const im = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), mat(tex), N); im.count = 0; im.frustumCulled = false; im.layers.set(1); im.renderOrder = 994;
+      im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(N*3), 3); if (typeof scene !== 'undefined') scene.add(im); return im; };
+    const grid = mkMesh(mk(false)), rings = mkMesh(mk(true));
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI/2, 0, 0)), pp = new THREE.Vector3(), ss = new THREE.Vector3(), cc = new THREE.Color(), base = new THREE.Color(0x7ab8ff);
+    let G = [], Rg = [], t0 = 0, maxD = 0, running = false;
+    // a walk over the ground from every working core: open ground carries the pulse on, a building takes it (a ring round its foot) and stops it, so it flows round
+    function plan(){
+      const cores = megaList('emitter').filter(coreOnline); G = []; Rg = []; maxD = 0; if (!cores.length) return false;
+      const dist = new Map(), Q = [], occ = c => isBld(c) || !!c.wall;
+      for (const m of cores) for (const b0 of m.cells || []) if (b0){ const k = b0.i + ',' + b0.j; dist.set(k, 0); Q.push([b0.i, b0.j, m]); }
+      for (let h = 0; h < Q.length; h++){ const [i, j, m] = Q[h], d0 = dist.get(i + ',' + j);
+        for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]){ const ni = i + a, nj = j + b, k = ni + ',' + nj; if (dist.has(k)) continue; const c = cells.get(k); if (!c || c.mega) continue;
+          if (megaD(ni, nj, m) > coreRch(m)) continue; dist.set(k, d0 + 1); maxD = Math.max(maxD, d0 + 1);
+          if (occ(c)) Rg.push({ c, d: d0 + 1 }); else { G.push({ c, d: d0 + 1 }); Q.push([ni, nj, m]); } } }
+      const place = (im, arr, sz) => { arr.length = Math.min(arr.length, N); arr.forEach((o, k) => { pp.set(o.c.i*LOT, CURB + .06, o.c.j*LOT); ss.set(sz, sz, 1); m4.compose(pp, q, ss); im.setMatrixAt(k, m4); }); im.count = arr.length; im.instanceMatrix.needsUpdate = true; };
+      place(grid, G, LOT); place(rings, Rg, LOT*.99); return true;
+    }
+    const SPEED = 7, WIDTH = 1.1;
+    function tick(){
+      requestAnimationFrame(tick); if (!running) return;
+      const front = (performance.now() - t0)/1000*SPEED;
+      const paint = (im, arr, gain) => { for (let k = 0; k < arr.length; k++){ const x = (front - arr[k].d)/WIDTH, a = x > -1 && x < 2.5 ? Math.exp(-x*x)*(1 - arr[k].d/(maxD + 2))*gain : 0; cc.copy(base).multiplyScalar(a); im.setColorAt(k, cc); } im.instanceColor.needsUpdate = true; };
+      paint(grid, G, .9); paint(rings, Rg, 1.4);
+      if (front > maxD + 3){ running = false; grid.visible = rings.visible = false; }
+    }
+    requestAnimationFrame(tick);
+    setInterval(() => { if (running || document.hidden || !booted) return; if (plan()){ t0 = performance.now(); running = true; grid.visible = rings.visible = true; } }, 4500);
+    return {};
+  })();
+
+  /* ---------- power surges: now and then a core surges, yellow, orange, red. Stabilize it in time (the trace mini game) or it shuts down;
+     a dead core comes back by cranking it (click fast to fill the bar), and for a while after its reach is shorter ---------- */
+  const SURGE_COL = ['#ffe14a', '#ff9a2a', '#ff3a3a'];
+  const surgeStage = s => s.surge ? Math.min(2, Math.floor((now() - s.surge.t0)/P.surgeStage)) : -1;
+  E.coreLook = m => { if (!m) return null; const s = coreState(m); if (s.off) return { off: true }; if (s.surge) return { col: SURGE_COL[surgeStage(s)] }; return null; };
+  let surgeLbl = null;
+  function powerTick(dms){
+    const t = now(), cores = megaList('emitter');
+    for (const m of cores){ const s = coreState(m);
+      if (s.surge){ if (MINI.openFor === m.id) s.surge.t0 += dms;   // (the clock stops while you're working on it)
+        else if (t - s.surge.t0 >= 3*P.surgeStage) shutdown(m); } }
+    if (!st.tut.done || st.tier < 0) return;
+    if (!st.nextSurge) st.nextSurge = t + P.surgeFirst;
+    if (t >= st.nextSurge && !cores.some(m => coreState(m).surge)){
+      const ok = cores.filter(m => coreOnline(m)); st.nextSurge = t + P.surgeGap[0] + Math.random()*(P.surgeGap[1] - P.surgeGap[0]);
+      if (ok.length){ const m = ok[(Math.random()*ok.length) | 0]; coreState(m).surge = { t0: t }; save();
+        say('Power surge! Click the Emitter Core to stabilize it'); try { if (typeof sfx !== 'undefined' && sfx.tone) [0, .18, .36].forEach(a => sfx.tone(880, { gain: .1, at: a, dur: .12, glide: 1 })); } catch (e) {} } }
+    surgeMarks();
+  }
+  function shutdown(m){ const s = coreState(m); s.surge = null; s.off = true; save(); say('Emitter Core offline · click it and crank it back up'); hudSoon();
+    try { if (typeof sfx !== 'undefined' && sfx.tone){ sfx.tone(220, { gain: .16, dur: .9, glide: 1.6 }); sfx.tone(110, { gain: .14, dur: 1.2, glide: 1.5 }); } } catch (e) {} }
+  // the label over a surging or dead core: what's wrong and what to do, with the time left
+  const marks = new Map();
+  function surgeMarks(){
+    for (const m of megaList('emitter')){ const s = coreState(m); let lb = marks.get(m.id);
+      const want = s.surge || s.off;
+      if (!want){ if (lb){ lb.remove(); marks.delete(m.id); } continue; }
+      if (!lb){ lb = el('div', 'econ-mark'); document.body.appendChild(lb); marks.set(m.id, lb); lb.addEventListener('click', () => coreClick(m)); }
+      if (s.off){ lb.className = 'econ-mark off'; lb.innerHTML = '<b>Offline</b><span>Click to restart</span>'; }
+      else { const k = surgeStage(s), left = Math.max(0, 3*P.surgeStage - (now() - s.surge.t0)); lb.className = 'econ-mark s' + k; lb.style.setProperty('--sc', SURGE_COL[k]);
+        lb.innerHTML = `<b>Power surge</b><span>Click to stabilize · ${Math.ceil(left/1000)} s</span><i style="width:${100*left/(3*P.surgeStage)}%"></i>`; }
+    }
+    for (const [id, lb] of marks) if (!megas.has(id)){ lb.remove(); marks.delete(id); }
+  }
+  // the glow over a surging core: a big light that swells and flickers in the stage's color, and a warning ring on the ground round it
+  const flares = new Map();
+  function flareFor(m){ let f = flares.get(m.id); if (f) return f;
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, transparent: true, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending })); sp.layers.set(1); sp.renderOrder = 998;
+    const ring = new THREE.Mesh(new THREE.RingGeometry(.9, 1, 64), new THREE.MeshBasicMaterial({ transparent: true, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide })); ring.rotation.x = -Math.PI/2; ring.layers.set(1); ring.renderOrder = 997;
+    for (const o of [sp, ring]){ o.frustumCulled = false; if (typeof scene !== 'undefined') scene.add(o); }
+    f = { sp, ring }; flares.set(m.id, f); return f; }
+  (function flareLoop(){ requestAnimationFrame(flareLoop); const t = performance.now()/1000;
+    for (const [id, f] of flares){ const m = megas.get(id), s = m && coreState(m);
+      if (!s || !s.surge){ for (const o of [f.sp, f.ring]){ scene.remove(o); o.geometry && o.geometry.dispose(); o.material.dispose(); } flares.delete(id); continue; }
+      const k = surgeStage(s), col = SURGE_COL[k], fl = .75 + .25*Math.sin(t*(10 + k*8))*Math.sin(t*3.3), y = (m.roofH || CURB + 6)*.6;
+      f.sp.material.color.set(col); f.sp.position.set(m.x, y, m.z); f.sp.scale.setScalar(m.w*LOT*(1.1 + .25*k)*fl); f.sp.material.opacity = .65 + .35*fl;
+      const rp = (t*(.8 + k*.5)) % 1; f.ring.material.color.set(col); f.ring.position.set(m.x, CURB + .12, m.z); f.ring.scale.setScalar(m.w*LOT*(.6 + rp*1.6)); f.ring.material.opacity = (1 - rp)*.9; }
+    if (typeof megas !== 'undefined') for (const m of megaList('emitter')) if (coreState(m).surge && !flares.has(m.id)) flareFor(m); })();
+  (function markLoop(){ requestAnimationFrame(markLoop); if (!marks.size) return;
+    for (const [id, lb] of marks){ const m = megas.get(id); if (!m) continue; const p = screenOf(m.x, (m.roofH || CURB + 6) + 1.5, m.z); if (!p){ lb.style.display = 'none'; continue; } lb.style.display = ''; lb.style.left = p[0] + 'px'; lb.style.top = p[1] + 'px'; } })();
+  // clicking a megastructure with no zone picked (input.js): a core shows its reach, or opens the fix it needs
+  function coreClick(m){ const s = coreState(m); if (s.off) return RESTART.open(m.id); if (s.surge) return MINI.open(m.id); VIEW.show(m); return true; }
+  E.megaClick = m => { if (!m || m.kind !== 'emitter') return false; coreClick(m); return true; };
+
   const MINI = (() => {
     const box = el('div', 'econ-mini'); box.hidden = true; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', 'Stabilize the core');
-    box.innerHTML = `<div class="box"><div class="top"><span>Core stabilizer</span><span id="emHz">50.00 Hz</span></div><canvas id="emCv" width="300" height="330" aria-label="Frequency trace: tap or press Space to lift it"></canvas>
-      <div class="foot"><span id="emSaved">0 s saved</span><button type="button" id="emClose">Done</button></div></div>`;
+    box.innerHTML = `<div class="box"><div class="top"><span>Surge stabilizer</span><span id="emHz">50.00 Hz</span></div><p class="how">Keep the trace inside the band: click, tap or press Space to lift it.</p><canvas id="emCv" width="300" height="300" aria-label="Frequency trace: tap or press Space to lift it"></canvas>
+      <div class="meter"><i id="emStab"></i></div><div class="foot"><span id="emSaved">Stability 0%</span><button type="button" id="emClose">Leave it</button></div></div>`;
     document.body.appendChild(box);
     const cv = box.querySelector('#emCv'), g = cv.getContext('2d');
-    let on = false, id = null, y = .5, v = 0, t = 0, saved = 0, maxCut = 0, raf = 0, last = 0, trail = [];
+    let on = false, id = null, y = .5, v = 0, t = 0, stab = 0, raf = 0, last = 0, trail = [];
+    const NEED = 4;   // seconds inside the band
     function open(coreId){
-      const m = megas.get(coreId); if (!m) return; const s = coreState(m); if (s.readyAt <= now()) return;
-      id = coreId; s.full = s.full || (s.readyAt - now()); s.cut = s.cut || 0; maxCut = s.full*.5 - s.cut;
-      if (maxCut <= 500){ note('This core is as stable as it gets'); return; }
-      on = true; box.hidden = false; y = .5; v = 0; t = 0; saved = 0; trail = []; last = performance.now(); raf = requestAnimationFrame(loop); E.emit('mini');
+      const m = megas.get(coreId); if (!m || !coreState(m).surge) return;
+      id = coreId; api.openFor = id; on = true; box.hidden = false; y = .5; v = 0; t = 0; stab = 0; trail = []; last = performance.now(); raf = requestAnimationFrame(loop); E.emit('mini');
     }
-    function close(){ on = false; box.hidden = true; cancelAnimationFrame(raf); if (id){ const m = megas.get(id); if (m){ const s = coreState(m); s.cut = (s.cut || 0) + saved*1000; } } save(); renderOffice(); }
+    function close(){ on = false; box.hidden = true; cancelAnimationFrame(raf); api.openFor = null; save(); }
     const lift = () => { if (on) v -= .55; };
     cv.addEventListener('pointerdown', e => { e.preventDefault(); lift(); });
     addEventListener('keydown', e => { if (!on) return; if (e.code === 'Space'){ e.preventDefault(); e.stopPropagation(); lift(); } if (e.key === 'Escape'){ e.stopPropagation(); close(); } }, true);
@@ -1060,22 +1270,51 @@ const ECON = (() => {
     function loop(ts){
       if (!on) return; raf = requestAnimationFrame(loop);
       const dt = Math.min(.05, (ts - last)/1000); last = ts; t += dt;
-      const grav = .9 + t*.025, band = Math.max(.08, .26 - t*.004), mid = .5 + Math.sin(t*.7)*.12*Math.min(1, t/20);
+      const grav = .9 + t*.03, band = Math.max(.1, .26 - t*.006), mid = .5 + Math.sin(t*.9)*.14*Math.min(1, t/6);
       v += grav*dt; v *= .985; y += v*dt; if (y < 0){ y = 0; v = 0; } if (y > 1){ y = 1; v = 0; }
       const ok = Math.abs(y - mid) < band/2;
-      if (ok){ const cut = dt*2; if (saved*1000 + cut*1000 <= maxCut){ saved += cut; E.cutBuild(id, cut*1000); } }
+      stab = Math.max(0, Math.min(NEED, stab + (ok ? dt : -dt*.35)));
       trail.push(y); if (trail.length > 150) trail.shift();
       const W = cv.width, H = cv.height;
       g.fillStyle = '#07060c'; g.fillRect(0, 0, W, H);
-      g.fillStyle = 'rgba(56,232,224,.12)'; g.fillRect(0, (mid - band/2)*H, W, band*H);
-      g.strokeStyle = 'rgba(56,232,224,.5)'; g.strokeRect(.5, (mid - band/2)*H + .5, W - 1, band*H - 1);
+      g.fillStyle = 'rgba(122,184,255,.12)'; g.fillRect(0, (mid - band/2)*H, W, band*H);
+      g.strokeStyle = 'rgba(122,184,255,.6)'; g.strokeRect(.5, (mid - band/2)*H + .5, W - 1, band*H - 1);
       g.strokeStyle = 'rgba(255,255,255,.06)'; for (let q = 1; q < 6; q++){ g.beginPath(); g.moveTo(0, q*H/6); g.lineTo(W, q*H/6); g.stroke(); }
       g.strokeStyle = ok ? '#5affa8' : '#ff5a6e'; g.lineWidth = 2; g.beginPath(); trail.forEach((q, k) => { const x = W - (trail.length - k)*2; k ? g.lineTo(x, q*H) : g.moveTo(x, q*H); }); g.stroke();
       g.fillStyle = ok ? '#5affa8' : '#ff5a6e'; g.beginPath(); g.arc(W - 2, y*H, 5, 0, Math.PI*2); g.fill();
       document.getElementById('emHz').textContent = (50 + (mid - y)*4).toFixed(2) + ' Hz';
-      document.getElementById('emSaved').textContent = saved.toFixed(1) + ' s saved' + (saved*1000 >= maxCut - 300 ? ' · limit reached' : '');
-      const m = megas.get(id); if (!m || coreReady(m)) { close(); note('Core online'); }
+      document.getElementById('emSaved').textContent = 'Stability ' + Math.round(100*stab/NEED) + '%';
+      document.getElementById('emStab').style.width = (100*stab/NEED) + '%';
+      const m = megas.get(id); if (!m || !coreState(m).surge){ close(); return; }
+      if (stab >= NEED){ const s = coreState(m); s.surge = null; const pay = 40 + 30*st.tier; st.money += pay; close(); hudSoon(); surgeMarks();
+        say('Core stabilized · +' + fmt(pay) + ' Scrip'); floatText(m.x, (m.roofH || CURB + 6) + 1, m.z, '+' + fmt(pay) + ' Scrip');
+        try { if (typeof sfx !== 'undefined' && sfx.tone) [0, 4, 7, 12].forEach((n, q) => sfx.tone(523*Math.pow(2, n/12), { gain: .1, at: q*.06, dur: .4 })); } catch (e) {}
+        pulseLevel({ x: m.x, z: m.z, sectionTops: [], height: m.roofH || CURB + 6 }, 1, 'R', true, new THREE.Color(0x7ab8ff)); }
     }
+    const api = { open, openFor: null };
+    return api;
+  })();
+
+  // a dead core: crank it. Every click, tap or Space press fills the bar; it drains on its own, so it takes a quick burst
+  const RESTART = (() => {
+    const box = el('div', 'econ-mini'); box.hidden = true; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', 'Restart the core');
+    box.innerHTML = `<div class="box crank"><div class="top"><span>Restart the core</span><span id="erPct">0%</span></div><p class="how">Click as fast as you can (or tap, or hammer Space) to spin it back up before the charge drains.</p>
+      <button type="button" class="crankbtn" id="erBtn"><span id="erRot">⟳</span><b>Crank</b></button><div class="meter big"><i id="erBar"></i></div><div class="foot"><span>Back on at 100% · reach ${P.coreReachLow} plots for ${Math.round(P.lowMs/1000)} s</span><button type="button" id="erClose">Later</button></div></div>`;
+    document.body.appendChild(box);
+    let on = false, id = null, k = 0, raf = 0, last = 0, rot = 0;
+    const hit = () => { if (!on) return; k = Math.min(1, k + .065); rot += 40; if (k >= 1) return done(); try { if (typeof sfx !== 'undefined' && sfx.tone) sfx.tone(300 + k*700, { gain: .05, dur: .06, glide: .8 }); } catch (e) {} };
+    box.querySelector('#erBtn').addEventListener('pointerdown', e => { e.preventDefault(); hit(); });
+    addEventListener('keydown', e => { if (!on) return; if (e.code === 'Space' || e.key === 'Enter'){ e.preventDefault(); e.stopPropagation(); if (!e.repeat) hit(); } if (e.key === 'Escape'){ e.stopPropagation(); close(); } }, true);
+    box.querySelector('#erClose').addEventListener('click', () => close());
+    function open(coreId){ const m = megas.get(coreId); if (!m || !coreState(m).off) return; id = coreId; on = true; k = 0; box.hidden = false; last = performance.now(); raf = requestAnimationFrame(loop); }
+    function close(){ on = false; box.hidden = true; cancelAnimationFrame(raf); }
+    function loop(ts){ if (!on) return; raf = requestAnimationFrame(loop); const dt = Math.min(.05, (ts - last)/1000); last = ts;
+      k = Math.max(0, k - dt*.16); rot += dt*k*900;
+      document.getElementById('erBar').style.width = (k*100) + '%'; document.getElementById('erPct').textContent = Math.round(k*100) + '%'; document.getElementById('erRot').style.transform = `rotate(${rot}deg)`;
+    }
+    function done(){ const m = megas.get(id); close(); if (!m) return; const s = coreState(m); s.off = false; s.lowUntil = now() + P.lowMs; save(); surgeMarks(); hudSoon();
+      say(`Core back online · reach ${P.coreReachLow} plots for ${Math.round(P.lowMs/1000)} s`); try { if (typeof sfx !== 'undefined' && sfx.tone) [0, 7, 12, 19].forEach((n, q) => sfx.tone(262*Math.pow(2, n/12), { gain: .1, at: q*.07, dur: .5 })); } catch (e) {}
+      VIEW.show(m); }
     return { open };
   })();
 
@@ -1088,21 +1327,24 @@ const ECON = (() => {
     const emptyN = () => { let n = 0; for (const c of cells.values()) if (!c.mega && !c.sections.length && !(c.below && c.below.length) && !c.lift && !c.wall) n++; return n; };
     const homes = () => [...B.values()].filter(b => b.z === 'R');
     const farHome = () => homes().some(b => b.band !== 'near' && !b.isolated);
+    const coreAt = () => { const m = megaList('emitter')[0]; return m ? { w: [m.x, (m.roofH || CURB + 6) + 1, m.z] } : null; };
+    const homeAt = f => () => { const b = homes().find(f || (() => true)); return b ? { w: [b.c.x, ((b.c.sectionTops && b.c.sectionTops[b.c.sectionTops.length - 1]) || b.c.height || CURB + 3) + .6, b.c.z] } : null; };
+    const elAt = f => () => { const e = f(); return e ? { el: e } : null; };
     const beats = [
-      { say: 'Goal: grow this sector into a city.', sub: `Climb six classifications to ${TIERS[TIERS.length - 1].name}, each unlocking new buildings. The glowing tower is your Emitter Core: it powers every building within 9 plots.`, next: true },
-      { say: `Pick Residential and ${tap.toLowerCase()} the ground right next to the core.`, sub: 'People move in, the lights come on, and every lit level pays Scrip.', target: zoneBtn('low'), done: () => countZone('R') >= 1 },
-      { say: () => homes().some(b => b.band === 'near') ? 'Too close to the core.' : 'Homes right beside the core get poor air.', sub: 'Within two plots of a core the air is poor, so homes there have a low Sector Grade and can\'t grow tall. Three plots out the air is clean.', next: true },
-      { say: TOUCHY ? `Tap Residential again to deselect it, then tap the ground beside your city to lay 3 empty tiles in a row, away from the core.` : `Deselect Residential (click it again or press Esc), then click the ground beside your city to lay 3 empty tiles in a row, away from the core.`, sub: 'Empty tiles extend the ground. Everything must connect to the city by ground, or it\'s isolated and nobody can move in.', target: () => document.querySelector('.zone.on') || null, enter: emptyN, count: b => [Math.max(0, emptyN() - b._base), 3], done: b => emptyN() - b._base >= 3 },
-      { say: `Now pick Residential and build a home on the far tile, 3 plots from the core.`, sub: 'Out there the air is clean and homes grow taller. But it\'s further from work, so keep jobs close.', target: zoneBtn('low'), done: farHome },
-      { say: 'Pick Industrial and place a factory near your homes.', sub: 'It gives them jobs. Homes far from work fill slowly.', target: zoneBtn('ind'), done: () => countZone('I') >= 1 },
-      { say: 'Pick Commercial and place a shop.', sub: 'Shops earn the most Scrip.', target: zoneBtn('mid'), done: () => countZone('C') >= 1 },
-      { say: `Pick Residential and ${tap.toLowerCase()} a lit home's roof to stack a level.`, sub: 'Taller homes hold more people. Fill one completely for a jackpot.', target: zoneBtn('low'), done: homesStacked, nextAfter: 40 },
-      { say: `Next goal: ${TIERS[1].name}.`, sub: `Reach ${fmt(TIERS[1].pop)} residents. ${TOUCHY ? 'Tap' : 'Hover'} any building to see what it needs.`, next: true, last: true, target: () => document.getElementById('ehO') },
+      { say: 'Goal: grow this sector into a city.', sub: `Climb six classifications to ${TIERS[TIERS.length - 1].name}, each unlocking new buildings. This glowing tower is your Emitter Core: it powers every building within 9 plots.`, next: true, at: coreAt },
+      { say: `Pick Residential and ${tap.toLowerCase()} the ground right next to the core.`, sub: 'People move in, the lights come on, and every lit level pays Scrip.', target: zoneBtn('low'), at: elAt(zoneBtn('low')), done: () => countZone('R') >= 1 },
+      { say: () => homes().some(b => b.band === 'near') ? 'Too close to the core.' : 'Homes right beside the core get poor air.', sub: 'Within two plots of a core the air is poor, so homes there have a low Sector Grade and can\'t grow tall. Three plots out the air is clean.', next: true, at: homeAt(b => b.band === 'near') },
+      { say: 'Now lay some empty ground.', sub: TOUCHY ? 'Tap Residential again so no zone is picked, then tap beside your city to place 3 empty tiles leading away from the core. Everything must connect by ground, or it\'s isolated and nobody can move in.' : 'Click Residential again (or press Esc) so no zone is picked, then click beside your city to place 3 empty tiles leading away from the core. Everything must connect by ground, or it\'s isolated and nobody can move in.', target: () => document.querySelector('.zone.on') || null, at: elAt(zoneBtn('low')), enter: emptyN, count: b => [Math.max(0, emptyN() - b._base), 3], done: b => emptyN() - b._base >= 3 },
+      { say: `Now pick Residential and build a home on the far tile, 3 plots from the core.`, sub: 'Out there the air is clean and homes grow taller. But it\'s further from work, so keep jobs close.', target: zoneBtn('low'), at: elAt(zoneBtn('low')), done: farHome },
+      { say: 'Pick Industrial and place a factory near your homes.', sub: 'It gives them jobs. Homes far from work fill slowly.', target: zoneBtn('ind'), at: elAt(zoneBtn('ind')), done: () => countZone('I') >= 1 },
+      { say: 'Pick Commercial and place a shop.', sub: 'Shops earn the most Scrip.', target: zoneBtn('mid'), at: elAt(zoneBtn('mid')), done: () => countZone('C') >= 1 },
+      { say: `Pick Residential and ${tap.toLowerCase()} a lit home's roof to stack a level.`, sub: 'Taller homes hold more people. Fill one completely for a Full House.', target: zoneBtn('low'), at: homeAt(b => b.lit > 0 && b.band !== 'near'), done: homesStacked, nextAfter: 40 },
+      { say: `Next goal: ${TIERS[1].name}.`, sub: `This panel tracks it: fill every bar to reach the next city size. ${TOUCHY ? 'Tap' : 'Hover'} any building to see what it needs.`, next: true, last: true, target: () => document.querySelector('.econ-obj'), at: elAt(() => document.querySelector('.econ-obj')) },
     ];
     let k = st.tut.done ? beats.length : Math.min(st.tut.step || 0, beats.length), lit = null;
     const unpulse = () => { if (lit){ lit.classList.remove('econ-pulse'); lit = null; } };
     function show(){
-      unpulse();
+      unpulse(); { const s_ = noteEl.style; s_.left = s_.top = s_.right = s_.bottom = s_.transform = ''; noteEl.classList.remove('anch', 'below'); }
       if (k >= beats.length){ noteTut = false; noteEl.hidden = true; return; }
       const b = beats[k]; noteTut = true; clearTimeout(noteT);
       noteEl.innerHTML = ''; noteEl.className = 'econ-note';
@@ -1115,6 +1357,19 @@ const ECON = (() => {
       row.append(btns); noteEl.append(row); noteEl.hidden = false; shownAt = Date.now(); refresh();
     }
     let shownAt = 0;
+    // the note hovers over what it's talking about: above a button, or over a spot in the city (it follows the camera); otherwise its corner
+    function place(){
+      const b = beats[k]; const a = !noteEl.hidden && noteTut && b && b.at ? b.at() : null;
+      let x = null, y = null, below = false;
+      if (a && a.el){ const r = a.el.getBoundingClientRect(); if (r.width){ x = r.left + r.width/2; y = r.top - 14; if (r.top < innerHeight*.35){ y = r.bottom + 14; below = true; } } }
+      else if (a && a.w){ const p = screenOf(a.w[0], a.w[1], a.w[2]); if (p && p[1] > 60 && p[1] < innerHeight - 40){ x = p[0]; y = p[1] - 14; } }
+      const st_ = noteEl.style;
+      if (x === null){ if (noteEl.classList.contains('anch')){ noteEl.classList.remove('anch', 'below'); st_.left = st_.top = st_.right = st_.bottom = st_.transform = ''; st_.removeProperty('--ax'); } return; }
+      const w = noteEl.offsetWidth || 340, cx = Math.min(innerWidth - w/2 - 12, Math.max(w/2 + 12, x));
+      noteEl.classList.add('anch'); noteEl.classList.toggle('below', below);
+      st_.left = cx + 'px'; st_.top = y + 'px'; st_.right = 'auto'; st_.bottom = 'auto'; st_.transform = below ? 'translate(-50%, 0)' : 'translate(-50%, -100%)'; st_.setProperty('--ax', (x - cx + w/2) + 'px');
+    }
+    (function placeLoop(){ requestAnimationFrame(placeLoop); if (noteTut) place(); })();
     function refresh(){
       const b = beats[k]; if (!b || noteEl.hidden) return;
       if (b.nextAfter && Date.now() - shownAt > b.nextAfter*1000 && !noteEl.querySelector('button.go')){ const go = el('button', 'go', 'Next'); go.type = 'button'; go.onclick = advance; const bt = noteEl.querySelector('.row > div:last-child'); if (bt) bt.append(go); }

@@ -2400,10 +2400,17 @@ function emitterFx(m){
   const heart = new THREE.Sprite(GLOW.arc.clone()); heart.position.set(0, d.g0 + d.gh*.5, 0); heart.scale.set(1.6, 1.6, 1); heart.layers.set(1); root.add(heart);
   const aura = new THREE.Sprite(GLOW.platinum.clone()); aura.position.copy(heart.position); aura.scale.set(3.4, 3.4, 1); aura.layers.set(1); root.add(aura);
   const inv = new THREE.Matrix4().fromArray(d.m).invert(), halos = d.nodes.map(p => { const sp = new THREE.Sprite(GLOW.blue.clone()); sp.position.fromArray(p).applyMatrix4(inv); sp.scale.set(.9, .9, 1); sp.layers.set(1); root.add(sp); return sp; });
+  const col0 = [heart.material.color.clone(), aura.material.color.clone(), GLOW.blue.color.clone()];   // (their own colors, to go back to after a surge)
   return {
     update(dt, t){
-      const fl = .7 + .3*Math.sin(t*23.0)*Math.sin(t*7.1), pulse = fieldPulse(t);
-      heart.material.opacity = .7 + .3*fl; heart.scale.setScalar(1.3 + .4*fl); aura.material.opacity = .25 + .35*pulse;
+      // Economy: a core that surges glows yellow, orange, red and shudders; one that's shut down goes dark (economy.js)
+      const look = typeof ECON !== 'undefined' && ECON.on && ECON.coreLook ? ECON.coreLook(m) : null;
+      pl.visible = pl2.visible = !(look && look.off);
+      if (look && look.off){ heart.material.opacity = 0; aura.material.opacity = 0; halos.forEach(h => { h.material.opacity = .08; }); return; }
+      if (look && look.col){ if (!m._ecTint) m._ecTint = new THREE.Color(); m._ecTint.set(look.col); heart.material.color.copy(m._ecTint); aura.material.color.copy(m._ecTint); halos.forEach(h => h.material.color.copy(m._ecTint)); }
+      else if (m._ecTint){ heart.material.color.copy(col0[0]); aura.material.color.copy(col0[1]); halos.forEach(h => h.material.color.copy(col0[2])); m._ecTint = null; }
+      const surge = look && look.col ? 1 : 0, fl = .7 + .3*Math.sin(t*(23.0 + surge*30))*Math.sin(t*7.1), pulse = surge ? .5 + .5*Math.sin(t*12) : fieldPulse(t);
+      heart.material.opacity = .7 + .3*fl; heart.scale.setScalar((1.3 + .4*fl)*(1 + surge*.6)); aura.material.opacity = .25 + .35*pulse + surge*.3; aura.scale.setScalar(3.4*(1 + surge*.8*pulse));
       halos.forEach((h, k) => { h.material.opacity = .35 + .65*pulse*(.8 + .2*Math.sin(t*3 + k)); });
     },
     dispose(){ scene.remove(root); geo.dispose(); geo2.dispose(); heart.material.dispose(); aura.material.dispose(); for (const h of halos) h.material.dispose(); }

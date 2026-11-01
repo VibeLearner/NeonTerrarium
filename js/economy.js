@@ -572,8 +572,8 @@ const ECON = (() => {
   .econ-note[hidden] { display: none; } .econ-note .t { color: #ffb347; font-size: 10.5px; letter-spacing: .2em; text-transform: uppercase; display: block; margin-bottom: 6px; }
   .econ-note .say { font-size: 17px; line-height: 1.35; color: #fff; display: block; }
   .econ-note .sub { display: block; margin-top: 6px; color: #b9b0c8; font-size: 13px; }
-  .econ-note .prog { display: flex; gap: 6px; margin-top: 10px; } .econ-note .prog i { width: 22px; height: 6px; background: rgba(255,255,255,.12); } .econ-note .prog i.on { background: #ffb347; }
-  .econ-note .row { display: flex; gap: 8px; justify-content: flex-end; align-items: center; margin-top: 10px; } .econ-note button { all: unset; cursor: pointer; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: #9a92aa; padding: 8px 10px; }
+  .econ-note .prog { display: flex; gap: 4px; margin-top: 10px; flex: 1 1 auto; min-width: 0; max-width: 220px; } .econ-note .prog i { flex: 1 1 0; min-width: 6px; max-width: 22px; height: 6px; background: rgba(255,255,255,.12); }   /* (the pips shrink to fit however many steps there are) */ .econ-note .prog i.on { background: #ffb347; }
+  .econ-note .row { display: flex; gap: 8px; justify-content: flex-end; align-items: center; margin-top: 10px; flex-wrap: wrap; } .econ-note .row > div:last-child { display: flex; gap: 4px; flex: none; margin-left: auto; } .econ-note button { all: unset; cursor: pointer; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: #9a92aa; padding: 8px 10px; }
   .econ-note button.go { color: #12101a; background: #ffb347; } .econ-note button:focus-visible { outline: 1px solid #ffb347; }
   .econ-note.done-flash { animation: enDone .5s ease-out; } @keyframes enDone { 0% { border-color: #5affa8; box-shadow: 0 0 0 6px rgba(90,255,168,.25); } 100% { box-shadow: none; } }
   .econ-pulse { animation: ePulse 1.1s ease-in-out infinite !important; position: relative; z-index: 5; }
@@ -1485,7 +1485,8 @@ const ECON = (() => {
       if (x === null){ if (noteEl.classList.contains('anch')){ noteEl.classList.remove('anch', 'below'); st_.left = st_.top = st_.right = st_.bottom = st_.transform = ''; st_.removeProperty('--ax'); } return; }
       const w = noteEl.offsetWidth || 340, cx = Math.min(innerWidth - w/2 - 12, Math.max(w/2 + 12, x));
       noteEl.classList.add('anch'); noteEl.classList.toggle('below', below);
-      st_.left = cx + 'px'; st_.top = y + 'px'; st_.right = 'auto'; st_.bottom = 'auto'; st_.transform = below ? 'translate(-50%, 0)' : 'translate(-50%, -100%)'; st_.setProperty('--ax', (x - cx + w/2) + 'px');
+      const L_ = Math.round(cx) + 'px', T_ = Math.round(y) + 'px'; if (st_.left === L_ && st_.top === T_) return;
+      st_.left = L_; st_.top = T_; st_.right = 'auto'; st_.bottom = 'auto'; st_.transform = below ? 'translate(-50%, 0)' : 'translate(-50%, -100%)'; st_.setProperty('--ax', (x - cx + w/2) + 'px');
     }
     (function placeLoop(){ requestAnimationFrame(placeLoop); if (noteTut) place(); })();
     function refresh(){

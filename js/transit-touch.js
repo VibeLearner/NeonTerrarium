@@ -143,7 +143,8 @@ const TT = (() => {
       let m = -1, bd = NEAR_PX; DR.tiles.forEach((q, k) => { const d = near(q.i*LOT, lineY(q), q.j*LOT); if (d < bd){ bd = d; m = k; } });
       if (m >= 0) return { cont: m };
     }
-    if (AIM && AIM.hw === hw && AIM.cam === camSig() && AIM.t && Math.hypot(x - AIM.fx, y - AIM.fy) < SAME_PX){   // (16 px, not 40: plots are about 38 px apart at the starting zoom, and a tap on the next plot placed the aimed one) const t = AIM.t;
+    // (SAME_PX: 16 px, not 40: plots are about 38 px apart at the starting zoom, and a tap on the next plot placed the aimed one)
+    if (AIM && AIM.hw === hw && AIM.cam === camSig() && AIM.t && Math.hypot(x - AIM.fx, y - AIM.fy) < SAME_PX){ const t = AIM.t;
       if (hw && (t.type === 'extend' || t.type === 'finish')) return { kind: 'hw', h: t.h };
       if (hw && t.type === 'start' && t.ok) return { kind: 'hwNew', i: t.i, j: t.j, L: t.L };
       if (!hw && (t.type === 'extend' || t.type === 'finish' || t.type === 'reopen')) return mtLastOf(t.l);

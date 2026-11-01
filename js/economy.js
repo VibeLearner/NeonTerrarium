@@ -514,7 +514,7 @@ const ECON = (() => {
   .econ-corp button[aria-pressed="true"] { color: #12101a; background: #e8e03a; }
   .econ-flash { position: fixed; z-index: 6; left: 50%; top: calc(74px + env(safe-area-inset-top,0px)); transform: translateX(-50%); font: 13px/1.45 'JetBrains Mono', monospace; color: #efe6d6; background: rgba(12,10,20,.95); border: 1px solid rgba(255,90,110,.55); padding: 8px 14px; pointer-events: none; max-width: calc(100vw - 32px); text-align: center; }
   .econ-flash[hidden] { display: none; }
-  .econ-note { position: fixed; z-index: 7; left: 50%; bottom: calc(132px + env(safe-area-inset-bottom,0px)); transform: translateX(-50%); width: min(480px, calc(100vw - 32px)); box-sizing: border-box;
+  .econ-note { position: fixed; z-index: 7; right: max(16px, env(safe-area-inset-right,0px)); bottom: calc(150px + env(safe-area-inset-bottom,0px)); width: min(400px, calc(100vw - 32px)); box-sizing: border-box;
     font: 15px/1.45 'JetBrains Mono', monospace; color: #efe6d6; background: rgba(12,10,20,.96); border: 1px solid rgba(255,179,71,.45); border-left: 4px solid #ffb347; padding: 12px 16px; white-space: pre-line; }
   .econ-note[hidden] { display: none; } .econ-note .t { color: #ffb347; font-size: 10.5px; letter-spacing: .2em; text-transform: uppercase; display: block; margin-bottom: 6px; }
   .econ-note .say { font-size: 17px; line-height: 1.35; color: #fff; display: block; }
@@ -531,20 +531,6 @@ const ECON = (() => {
   .econ-float.cost { color: #ff8a98; font-size: 17px; text-shadow: 0 1px 0 #000; } .econ-float.big { color: #fff; font-size: 16px; letter-spacing: .14em; text-transform: uppercase; text-shadow: 0 0 10px rgba(56,232,224,.9), 0 1px 0 #000; } .econ-float.warn { color: #ff8a98; font-size: 17px; } .econ-float.boost { color: #5ae8ff; font-size: 16px; text-shadow: 0 0 8px rgba(90,232,255,.8), 0 1px 0 #000; }
   @keyframes eFloat { 0% { opacity: 0; transform: translate(-50%, -30%) scale(.7); } 12% { opacity: 1; transform: translate(-50%, -70%) scale(1.15); } 70% { opacity: 1; transform: translate(-50%, -170%) scale(1); } 100% { opacity: 0; transform: translate(-50%, -230%) scale(1); } }
   .econ-float.arrive { font-size: 13px; color: #c9fffb; text-shadow: 0 1px 0 #000; padding: 3px 7px; animation-duration: 1.3s; }
-  .econ-holo { --hc: #38e8e0; position: fixed; z-index: 7; pointer-events: none; transform: translate(-50%, -100%) skewX(-6deg); text-align: center; font-family: 'JetBrains Mono', monospace; color: #fff; padding: 8px 16px 9px; min-width: 190px;
-    background: linear-gradient(rgba(10,8,18,.55), rgba(10,8,18,.8)), repeating-linear-gradient(0deg, rgba(255,255,255,.06) 0 1px, transparent 1px 3px); border: 1px solid var(--hc); border-left-width: 4px; clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
-    box-shadow: 0 0 22px var(--hc); animation: ehoIn .45s steps(6) both, ehoFlick 2.8s linear; }
-  .econ-holo small { display: block; font-size: 10.5px; letter-spacing: .32em; text-transform: uppercase; color: var(--hc); }
-  .econ-holo b { position: relative; display: block; font-size: 22px; letter-spacing: .14em; margin: 3px 0 2px; text-shadow: -2px 0 #ff2bd6, 2px 0 #2bf3ff; white-space: pre; }
-  .econ-holo b::after { content: attr(data-t); position: absolute; inset: 0; color: var(--hc); clip-path: inset(40% 0 45% 0); transform: translateX(4px); animation: ehoSlice .9s steps(1) infinite; }
-  .econ-holo span { display: block; font-size: 17px; font-weight: 700; color: #ffb347; text-shadow: 0 0 10px rgba(255,179,71,.7); }
-  .econ-holo.lock b { text-shadow: 0 0 12px var(--hc), 0 0 2px #fff; } .econ-holo.lock b::after { display: none; } .econ-holo.lock { animation: ehoLock .4s ease-out; }
-  .econ-holo.out { animation: ehoOut .5s steps(5) forwards; }
-  @keyframes ehoIn { from { opacity: 0; transform: translate(-50%, -100%) skewX(-6deg) scaleY(.05); } to { opacity: 1; transform: translate(-50%, -100%) skewX(-6deg); } }
-  @keyframes ehoFlick { 0%, 100% { opacity: 1; } 31% { opacity: 1; } 32% { opacity: .35; } 33% { opacity: 1; } 71% { opacity: 1; } 72% { opacity: .5; } 73% { opacity: 1; } }
-  @keyframes ehoSlice { 0% { clip-path: inset(40% 0 45% 0); transform: translateX(4px); } 33% { clip-path: inset(10% 0 70% 0); transform: translateX(-5px); } 66% { clip-path: inset(70% 0 8% 0); transform: translateX(3px); } }
-  @keyframes ehoLock { 0% { box-shadow: 0 0 50px var(--hc); filter: brightness(1.6); } 100% { box-shadow: 0 0 22px var(--hc); filter: none; } }
-  @keyframes ehoOut { to { opacity: 0; transform: translate(-50%, -100%) skewX(-6deg) scaleY(.05); } }
   .econ-reach { position: fixed; z-index: 6; pointer-events: none; transform: translate(-50%, -100%); font: 600 14px/1.35 'JetBrains Mono', monospace; color: #efe6d6; background: rgba(10,8,18,.9); border: 1px solid currentColor; padding: 7px 11px; text-align: center; white-space: nowrap; }
   .econ-reach b { display: block; font-size: 17px; } .econ-reach[hidden] { display: none; }
   .econ-office { box-sizing: border-box; position: fixed; z-index: 30; top: 0; right: 0; bottom: 0; width: min(420px, 100vw); overflow-y: auto; background: rgba(12,10,20,.97); border-left: 1px solid rgba(255,179,71,.35); color: #efe6d6;
@@ -584,7 +570,8 @@ const ECON = (() => {
   @keyframes ecOut { to { opacity: 0; transform: translate(-50%, -14px); } }
   html.touch .econ-hud { top: calc(54px + env(safe-area-inset-top,0px)); left: max(12px, env(safe-area-inset-left,0px)); transform: none; font-size: 11px; } html.touch .econ-hud .eh { padding: 5px 9px; } html.touch .econ-hud .hide-t { display: none; }
   html.touch .econ-corp { top: calc(112px + env(safe-area-inset-top,0px)); left: max(12px, env(safe-area-inset-left,0px)); transform: none; }
-  html.touch .econ-note { font-size: 14px; padding: 11px 14px; bottom: calc(150px + env(safe-area-inset-bottom,0px)); } html.touch .econ-note .say { font-size: 16px; }
+  html.touch .econ-note { font-size: 14px; padding: 11px 14px; right: auto; left: 50%; transform: translateX(-50%); bottom: calc(150px + env(safe-area-inset-bottom,0px)); }
+  @media (max-width: 900px) { html:not(.touch) .econ-note { right: auto; left: 50%; transform: translateX(-50%); } } html.touch .econ-note .say { font-size: 16px; }
   html.touch .econ-flash { top: calc(116px + env(safe-area-inset-top,0px)); }
   @media (max-width: 560px) { .econ-hud .hide-s { display: none; } }
   `;
@@ -791,61 +778,77 @@ const ECON = (() => {
     g.font = 'bold 44px "JetBrains Mono", monospace'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.shadowColor = '#fff'; g.shadowBlur = 10; g.fillStyle = '#fff'; g.fillText(ch, 32, 34); out.push(new THREE.CanvasTexture(cv)); } return out; })();
   let jackQ = [], jackOn = false;
   E.onEv('full', d => { if (jackQ.length >= 3){ floatText(d.c.x, (d.c.height || CURB + 2) + .4, d.c.z, FULLNAME[d.z] + ' +' + fmt(d.pay), 'big'); return; } jackQ.push(d); if (!jackOn) nextJack(); });
-  function nextJack(){ const d = jackQ.shift(); if (!d){ jackOn = false; return; } jackOn = true; try { jackpot(d); } catch (e) { console.warn('uplink', e); } setTimeout(nextJack, 2800); }
+  function nextJack(){ const d = jackQ.shift(); if (!d){ jackOn = false; return; } jackOn = true; try { jackpot(d); } catch (e) { console.warn('uplink', e); } setTimeout(nextJack, 3000); }
+  // the hologram's face, drawn on a canvas each frame while it decodes
+  function holoDraw(g, W, H, col, name, pay, k, flick){
+    g.clearRect(0, 0, W, H);
+    const cut = 26; g.beginPath(); g.moveTo(0, 0); g.lineTo(W - cut, 0); g.lineTo(W, cut); g.lineTo(W, H); g.lineTo(cut, H); g.lineTo(0, H - cut); g.closePath();
+    const bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, `rgba(${col.r*255|0},${col.g*255|0},${col.b*255|0},.20)`); bg.addColorStop(1, 'rgba(8,6,16,.55)'); g.fillStyle = bg; g.fill();
+    g.save(); g.clip(); g.fillStyle = 'rgba(255,255,255,.07)'; for (let y = 0; y < H; y += 4) g.fillRect(0, y, W, 1);
+    if (flick){ const y = Math.random()*H; g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(0, y, W, 6 + Math.random()*10); } g.restore();
+    const hex = '#' + col.getHexString(); g.strokeStyle = hex; g.lineWidth = 4; g.shadowColor = hex; g.shadowBlur = 16; g.stroke(); g.shadowBlur = 0;
+    g.fillStyle = hex; g.fillRect(0, 0, 10, H - cut);
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = '600 22px "JetBrains Mono", monospace'; g.fillStyle = hex; g.fillText('OCCUPANCY 100%', W/2, 40);
+    g.font = '700 58px "JetBrains Mono", monospace';
+    const off = k < 1 ? 4 + Math.random()*3 : 0; if (off){ g.fillStyle = 'rgba(255,43,214,.85)'; g.fillText(name, W/2 - off, 110); g.fillStyle = 'rgba(43,243,255,.85)'; g.fillText(name, W/2 + off, 110); }
+    g.shadowColor = hex; g.shadowBlur = k >= 1 ? 22 : 8; g.fillStyle = '#fff'; g.fillText(name, W/2, 110); g.shadowBlur = 0;
+    if (pay !== null){ g.font = '700 40px "JetBrains Mono", monospace'; g.shadowColor = '#ffb347'; g.shadowBlur = 14; g.fillStyle = '#ffb347'; g.fillText(pay, W/2, 182); g.shadowBlur = 0; }
+  }
   function jackpot(d){
     const c = d.c, top = (c.sectionTops && c.sectionTops[c.sectionTops.length - 1]) || c.height || CURB + 3, y0 = c.lift ? c.lift.y : CURB, H = Math.max(1, top - y0);
     const zc = new THREE.Color(ZCOL[d.z] || 0x38e8e0), MAG = new THREE.Color(0xff2bd6), CYA = new THREE.Color(0x2bf3ff), w = (typeof SIDE !== 'undefined' ? SIDE : 3) + .2;
-    // glitch: the whole building flickers magenta / cyan, off-beat, then settles in its own color
     [0, 70, 190, 240, 380, 520].forEach((t, q) => setTimeout(() => pulseLevel(c, Math.max(1, d.floors), d.z, true, q % 2 ? MAG : CYA), t));
     setTimeout(() => pulseLevel(c, Math.max(1, d.floors), d.z, true, zc), 1500);
     const snd = typeof sfx !== 'undefined' && sfx.tone ? sfx.tone : () => {};
     try { for (let q = 0; q < 7; q++) snd(900 + Math.random()*1600, { gain: .03, at: q*.045, dur: .05, glide: .6 + Math.random()*.6 }); } catch (e) {}
-    if (typeof scene !== 'undefined'){
-      const g = new THREE.Group(); g.position.set(c.x, 0, c.z); scene.add(g);
-      const add = o => { o.traverse(q => { q.layers.set(1); q.renderOrder = 998; q.frustumCulled = false; }); g.add(o); return o; };
-      const addMat = (col, op = 1) => new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: op, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
-      // the scan: a bright square ring and a thin sheet, sweeping down the building and back up
-      const ringG = new THREE.EdgesGeometry(new THREE.BoxGeometry(w, .06, w)), ring = add(new THREE.LineSegments(ringG, new THREE.LineBasicMaterial({ color: CYA, transparent: true, depthTest: false })));
-      const sheet = add(new THREE.Mesh(new THREE.PlaneGeometry(w, w), addMat(CYA, .35))); sheet.rotation.x = -Math.PI/2;
-      // the uplink: a beam off the roof into the sky, a white core in a colored sheath
-      const beamG = new THREE.CylinderGeometry(.5, .5, 1, 16, 1, true); beamG.translate(0, .5, 0);
-      const coreG = new THREE.CylinderGeometry(.14, .14, 1, 8, 1, true); coreG.translate(0, .5, 0);
-      const beam = add(new THREE.Mesh(beamG, addMat(zc, 0))), coreB = add(new THREE.Mesh(coreG, addMat(0xffffff, 0)));
-      beam.position.y = coreB.position.y = top; const BEAM = 40;
-      const flare = add(new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: zc, transparent: true, opacity: 0, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending }))); flare.position.y = top + .3;
-      // the data: glyphs rising off the roof, flickering, each a little column of its own
-      const bits = [];
-      for (let q = 0; q < 46; q++){ const sp = add(new THREE.Sprite(new THREE.SpriteMaterial({ map: glyphTex[q % glyphTex.length], color: q % 4 ? zc : (q % 8 ? MAG : 0xffffff), transparent: true, opacity: 0, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending })));
-        const a = Math.random()*Math.PI*2, r = Math.random()*w*.9; sp.position.set(Math.cos(a)*r, top + Math.random()*.5, Math.sin(a)*r); sp.scale.setScalar(.45 + Math.random()*.25);
-        bits.push({ sp, v: 3 + Math.random()*5, t0: 350 + Math.random()*1100, k: q }); }
-      const t0 = performance.now();
-      (function run(){ const el_ = performance.now() - t0;
-        // scan: down in 450 ms, back up by 900, gone by 1100
-        const sk = Math.min(1, el_/900), sy = sk < .5 ? top - H*(sk*2) : y0 + H*((sk - .5)*2), so = el_ < 900 ? 1 : Math.max(0, 1 - (el_ - 900)/200);
-        ring.position.y = sheet.position.y = sy; ring.material.opacity = so; sheet.material.opacity = .35*so; ring.material.color.copy(Math.floor(el_/60) % 2 ? CYA : MAG);
-        // beam: shoots up at 500 ms, holds, thins out by 2.6 s
-        const bk = Math.max(0, Math.min(1, (el_ - 500)/250)), bf = el_ < 2000 ? 1 : Math.max(0, 1 - (el_ - 2000)/600), fl = .8 + Math.random()*.2;
-        beam.scale.set(1 + .4*(1 - bk), BEAM*bk, 1 + .4*(1 - bk)); coreB.scale.set(1, BEAM*bk, 1); beam.material.opacity = .4*bk*bf*fl; coreB.material.opacity = .95*bk*bf;
-        beam.scale.x = beam.scale.z = bf*(1 + .4*(1 - bk)) + .01; flare.material.opacity = bk*bf; flare.scale.setScalar(w*(1.4 + .6*Math.sin(el_/50)));
-        for (const b_ of bits){ const t = el_ - b_.t0; if (t < 0) continue; b_.sp.position.y += b_.v*.016; b_.sp.material.opacity = Math.max(0, Math.min(1, t/120) - t/1500)*(Math.random() < .12 ? .2 : 1);
-          if (Math.random() < .04) b_.sp.material.map = glyphTex[(Math.random()*glyphTex.length) | 0]; }
-        if (el_ < 2700) return requestAnimationFrame(run);
-        scene.remove(g); g.traverse(o => { if (o.material) o.material.dispose(); }); for (const gg of [ringG, beamG, coreG, sheet.geometry]) gg.dispose(); })();
-      setTimeout(() => { try { snd(110, { gain: .16, dur: .9, glide: .5 }); snd(220, { gain: .1, dur: 1.1, glide: .5 }); [0, 7, 12, 19].forEach((n, q) => snd(659*Math.pow(2, n/12), { gain: .08, at: .05 + q*.06, dur: q === 3 ? 1.3 : .5, glide: .9 })); } catch (e) {} }, 500);
-    }
-    // the hologram tag: decodes out of noise, scanlines, a glitch slice now and then
-    const p = screenOf(c.x, top + 1.2, c.z), tag = el('div', 'econ-holo'); tag.style.setProperty('--hc', '#' + zc.getHexString());
-    const vw = innerWidth, tx = p ? Math.min(vw - 130, Math.max(130, p[0])) : vw/2, ty = p ? Math.min(innerHeight - 160, Math.max(170, p[1] - 30)) : innerHeight*.35;   // (kept on screen)
-    tag.style.left = tx + 'px'; tag.style.top = ty + 'px';
-    tag.innerHTML = `<small>Occupancy 100%</small><b data-t=""></b><span>+0 Scrip</span>`; document.body.appendChild(tag);
-    const nameEl = tag.querySelector('b'), payEl = tag.querySelector('span'), want = FULLNAME[d.z].toUpperCase(), t1 = performance.now();
-    (function decode(){ const e = performance.now() - t1, k = Math.min(1, Math.max(0, (e - 250)/700)), n = Math.floor(k*want.length);
-      let out = want.slice(0, n); for (let q = n; q < want.length; q++) out += want[q] === ' ' ? ' ' : NOISE[(Math.random()*NOISE.length) | 0];
-      nameEl.textContent = out; nameEl.dataset.t = out;
-      if (e > 950){ const pk = Math.min(1, (e - 950)/600); payEl.textContent = '+' + fmt(Math.round(d.pay*pk)) + ' Scrip'; if (pk >= 1 && !tag.classList.contains('lock')) tag.classList.add('lock'); }
-      if (e < 1600) requestAnimationFrame(decode); })();
-    setTimeout(() => tag.classList.add('out'), 2500); setTimeout(() => tag.remove(), 3000);
+    setTimeout(() => { try { snd(110, { gain: .16, dur: .9, glide: .5 }); snd(220, { gain: .1, dur: 1.1, glide: .5 }); [0, 7, 12, 19].forEach((n, q) => snd(659*Math.pow(2, n/12), { gain: .08, at: .05 + q*.06, dur: q === 3 ? 1.3 : .5, glide: .9 })); } catch (e) {} }, 500);
     const m = document.getElementById('ehM'); if (m){ m.classList.remove('bump'); void m.offsetWidth; m.classList.add('bump'); }
+    if (typeof scene === 'undefined') return;
+    const g = new THREE.Group(); scene.add(g);
+    const add = (o, parent = g) => { o.traverse(q => { q.layers.set(1); q.renderOrder = 998; q.frustumCulled = false; }); parent.add(o); return o; };
+    const addMat = (col, op = 1) => new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: op, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+    // the scan, down the building and back
+    const ringG = new THREE.EdgesGeometry(new THREE.BoxGeometry(w, .06, w)), ring = add(new THREE.LineSegments(ringG, new THREE.LineBasicMaterial({ color: CYA, transparent: true, depthTest: false })));
+    const sheet = add(new THREE.Mesh(new THREE.PlaneGeometry(w, w), addMat(CYA, .35))); sheet.rotation.x = -Math.PI/2;
+    ring.position.set(c.x, top, c.z); sheet.position.set(c.x, top, c.z);
+    // the projector on the roof
+    const emit = new THREE.Vector3(c.x, top + .15, c.z);
+    const lens = add(new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: zc, transparent: true, opacity: 0, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending }))); lens.position.copy(emit);
+    // the hologram: a panel over the roof, turned to face the camera as it is now, then left where it is (turn the view and it stays put)
+    const HW = 6.8, HH = HW*256/512, cv = document.createElement('canvas'); cv.width = 512; cv.height = 256; const gc = cv.getContext('2d'), tex = new THREE.CanvasTexture(cv);
+    const panel = add(new THREE.Mesh(new THREE.PlaneGeometry(HW, HH), new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, depthTest: false, depthWrite: false, side: THREE.DoubleSide })));
+    panel.renderOrder = 999; panel.quaternion.copy(cam.quaternion);
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(panel.quaternion), upv = new THREE.Vector3(0, 1, 0).applyQuaternion(panel.quaternion);
+    const centre = new THREE.Vector3(c.x, top + 2.4 + HH/2, c.z); panel.position.copy(centre);
+    // the projection: four rays from the lens to the panel's corners, and faint sheets between them
+    const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b_]) => centre.clone().addScaledVector(right, a*HW/2).addScaledVector(upv, b_*HH/2));
+    const rayPos = []; for (const k_ of corners) rayPos.push(emit.x, emit.y, emit.z, k_.x, k_.y, k_.z);
+    const rayG = new THREE.BufferGeometry(); rayG.setAttribute('position', new THREE.Float32BufferAttribute(rayPos, 3));
+    const rays = add(new THREE.LineSegments(rayG, new THREE.LineBasicMaterial({ color: zc, transparent: true, opacity: 0, depthTest: false })));
+    const conePos = []; for (let q = 0; q < 4; q++){ const a_ = corners[q], b2 = corners[(q + 1) % 4]; conePos.push(emit.x, emit.y, emit.z, a_.x, a_.y, a_.z, b2.x, b2.y, b2.z); }
+    const coneG = new THREE.BufferGeometry(); coneG.setAttribute('position', new THREE.Float32BufferAttribute(conePos, 3));
+    const cone = add(new THREE.Mesh(coneG, addMat(zc, 0)));
+    // data rising off the roof
+    const bits = [];
+    for (let q = 0; q < 40; q++){ const sp = add(new THREE.Sprite(new THREE.SpriteMaterial({ map: glyphTex[q % glyphTex.length], color: q % 4 ? zc : (q % 8 ? MAG : 0xffffff), transparent: true, opacity: 0, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending })));
+      const a = Math.random()*Math.PI*2, r = Math.random()*w*.9; sp.position.set(c.x + Math.cos(a)*r, top + Math.random()*.5, c.z + Math.sin(a)*r); sp.scale.setScalar(.4 + Math.random()*.25);
+      bits.push({ sp, v: 2.5 + Math.random()*4, t0: 300 + Math.random()*1200 }); }
+    const name = FULLNAME[d.z].toUpperCase(), t0 = performance.now(), LIFE = 4200;
+    (function run(){ const el_ = performance.now() - t0;
+      const sk = Math.min(1, el_/900), sy = sk < .5 ? top - H*(sk*2) : y0 + H*((sk - .5)*2), so = el_ < 900 ? 1 : Math.max(0, 1 - (el_ - 900)/200);
+      ring.position.y = sheet.position.y = sy; ring.material.opacity = so; sheet.material.opacity = .35*so; ring.material.color.copy(Math.floor(el_/60) % 2 ? CYA : MAG);
+      // the projector warms up at 350 ms; the panel unfolds from a line, flickering, by 700 ms; it all folds back up in the last 400 ms
+      const on = Math.max(0, Math.min(1, (el_ - 350)/350)), off = el_ > LIFE - 400 ? Math.max(0, (LIFE - el_)/400) : 1, live = on*off, fl = Math.random() < .06 ? .45 : 1;
+      lens.material.opacity = live; lens.scale.setScalar(1 + .3*Math.sin(el_/40));
+      panel.scale.set(1, Math.max(.02, on < 1 ? on*on : off), 1); panel.material.opacity = live*fl;
+      rays.material.opacity = .8*live*fl; cone.material.opacity = .07*live;
+      if (on > 0){ const k = Math.min(1, Math.max(0, (el_ - 600)/800)), n = Math.floor(k*name.length); let txt = name.slice(0, n); for (let q = n; q < name.length; q++) txt += name[q] === ' ' ? ' ' : NOISE[(Math.random()*NOISE.length) | 0];
+        const pk = Math.min(1, Math.max(0, (el_ - 1400)/600)); holoDraw(gc, 512, 256, zc, txt, el_ > 1400 ? '+' + fmt(Math.round(d.pay*pk)) + ' Scrip' : null, k, Math.random() < .08); tex.needsUpdate = true; }
+      for (const b_ of bits){ const t = el_ - b_.t0; if (t < 0) continue; b_.sp.position.y += b_.v*.016; b_.sp.material.opacity = Math.max(0, Math.min(1, t/120) - t/1500)*(Math.random() < .12 ? .2 : 1);
+        if (Math.random() < .04) b_.sp.material.map = glyphTex[(Math.random()*glyphTex.length) | 0]; }
+      if (el_ < LIFE) return requestAnimationFrame(run);
+      scene.remove(g); g.traverse(o => { if (o.material){ if (o.material.map && o.material.map === tex) tex.dispose(); o.material.dispose(); } }); for (const gg of [ringG, sheet.geometry, panel.geometry, rayG, coneG]) gg.dispose(); })();
   }
 
   /* ---------- reach: while placing a megastructure with a reach, the area it covers and what it would touch; once placed, the boost runs out to each one ---------- */
@@ -1089,7 +1092,7 @@ const ECON = (() => {
       { say: 'Goal: grow this sector into a city.', sub: `Climb six classifications to ${TIERS[TIERS.length - 1].name}, each unlocking new buildings. The glowing tower is your Emitter Core: it powers every building within 9 plots.`, next: true },
       { say: `Pick Residential and ${tap.toLowerCase()} the ground right next to the core.`, sub: 'People move in, the lights come on, and every lit level pays Scrip.', target: zoneBtn('low'), done: () => countZone('R') >= 1 },
       { say: () => homes().some(b => b.band === 'near') ? 'Too close to the core.' : 'Homes right beside the core get poor air.', sub: 'Within two plots of a core the air is poor, so homes there have a low Sector Grade and can\'t grow tall. Three plots out the air is clean.', next: true },
-      { say: `${tap} Residential again to put it down, then ${tap.toLowerCase()} the ground beside your city to lay 3 empty tiles in a row, away from the core.`, sub: 'Empty tiles extend the ground. Everything must connect to the city by ground, or it\'s isolated and nobody can move in.', target: () => document.querySelector('.zone.on') || null, enter: emptyN, count: b => [Math.max(0, emptyN() - b._base), 3], done: b => emptyN() - b._base >= 3 },
+      { say: TOUCHY ? `Tap Residential again to deselect it, then tap the ground beside your city to lay 3 empty tiles in a row, away from the core.` : `Deselect Residential (click it again or press Esc), then click the ground beside your city to lay 3 empty tiles in a row, away from the core.`, sub: 'Empty tiles extend the ground. Everything must connect to the city by ground, or it\'s isolated and nobody can move in.', target: () => document.querySelector('.zone.on') || null, enter: emptyN, count: b => [Math.max(0, emptyN() - b._base), 3], done: b => emptyN() - b._base >= 3 },
       { say: `Now pick Residential and build a home on the far tile, 3 plots from the core.`, sub: 'Out there the air is clean and homes grow taller. But it\'s further from work, so keep jobs close.', target: zoneBtn('low'), done: farHome },
       { say: 'Pick Industrial and place a factory near your homes.', sub: 'It gives them jobs. Homes far from work fill slowly.', target: zoneBtn('ind'), done: () => countZone('I') >= 1 },
       { say: 'Pick Commercial and place a shop.', sub: 'Shops earn the most Scrip.', target: zoneBtn('mid'), done: () => countZone('C') >= 1 },

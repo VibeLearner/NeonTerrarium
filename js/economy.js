@@ -43,8 +43,8 @@ const ECON = (() => {
   };
   // the megastructures: the tier each unlocks at, what it costs, the power it draws, the jobs it gives (per level for the Sky mall), and its reach in plots
   const MEGA = {
-    radio:      { tier: 0, cost: 0,     pwr: 4,  jobs: 6,  reach: 7, upReach: 2, upCost: 500, upGrowth: 1.6, what: 'Productivity +15% in reach' },
-    emitter:    { tier: 0, cost: 250,   pwr: 0,  jobs: 10, what: 'Power for everything in reach' },
+    radio:      { tier: 0, cost: 300,   pwr: 4,  jobs: 6,  reach: 7, upReach: 2, upCost: 500, upGrowth: 1.6, what: 'buildings within 7 plots earn 15% more' },
+    emitter:    { tier: 0, cost: 250,   pwr: 0,  jobs: 10, what: 'powers every building within 9 plots' },
     wirenest:   { tier: 1, cost: 600,   pwr: 4,  jobs: 6,  what: 'Demand readout in the log, data income' },
     square:     { tier: 1, cost: 400,   pwr: 4,  jobs: 6,  reach: 5, what: 'Residents in reach spend 15% more' },
     police:     { tier: 2, cost: 1500,  pwr: 6,  jobs: 8,  reach: 7, upReach: 2, upCost: 1000, upGrowth: 1.6, what: 'Sector Grade +15 in reach' },
@@ -137,14 +137,16 @@ const ECON = (() => {
     const near = (c, arr, r) => { for (const o of arr) if (o !== c && cheb(c, o) <= r) return true; return false; };
     const minD = (c, arr) => { let d = Infinity; for (const o of arr){ const q = cheb(c, o); if (q < d) d = q; } return d; };
     const inReach = (c, k) => { for (const m of reachers[k]) if (megaD(c.i, c.j, m) <= megaReach(m)) return true; return false; };
-    // Who can reach what: a building joins the city when it stands within two plots of another that does, starting from the megastructures,
-    // or within reach of a metro stop. One on its own in the middle of nowhere stays empty.
+    // Who can reach what: reach spreads from the megastructures (and metro stops) along any connected ground, built on or not,
+    // and hops up to two plots between buildings. A building on land of its own, cut off from all of that, stays empty.
     const reach = new Set(), occupied = new Map();
     for (const c of list) occupied.set(keyOf(c), c);
-    const queue = [];
-    if (typeof megas !== 'undefined') for (const m of megas.values()) for (const b0 of m.cells || []) if (b0) queue.push([b0.i, b0.j]);
-    for (const t of stops) for (let a = -P.stationR; a <= P.stationR; a++) for (let q = -P.stationR; q <= P.stationR; q++){ const k = (t.i + a) + ',' + (t.j + q); if (occupied.has(k) && !reach.has(k)){ reach.add(k); queue.push([t.i + a, t.j + q]); } }
-    while (queue.length){ const [i, j] = queue.pop(); for (let a = -2; a <= 2; a++) for (let q = -2; q <= 2; q++){ const k = (i + a) + ',' + (j + q); if (occupied.has(k) && !reach.has(k)){ reach.add(k); queue.push([i + a, j + q]); } } }
+    const queue = [], seed = (i, j) => { const k = i + ',' + j; if (!reach.has(k) && cells.has(k)){ reach.add(k); queue.push([i, j]); } };
+    if (typeof megas !== 'undefined') for (const m of megas.values()) for (const b0 of m.cells || []) if (b0){ reach.add(b0.i + ',' + b0.j); queue.push([b0.i, b0.j]); }
+    for (const t of stops) for (let a = -P.stationR; a <= P.stationR; a++) for (let q = -P.stationR; q <= P.stationR; q++) seed(t.i + a, t.j + q);
+    while (queue.length){ const [i, j] = queue.pop(), hop = occupied.has(i + ',' + j) ? 2 : 1;
+      for (let a = -hop; a <= hop; a++) for (let q = -hop; q <= hop; q++){ const k = (i + a) + ',' + (j + q); if (reach.has(k)) continue;
+        if (Math.max(Math.abs(a), Math.abs(q)) === 1 || occupied.has(k)) seed(i + a, j + q); } }
     const rows = [];
     let order = 0;
     for (const c of list){
@@ -439,7 +441,7 @@ const ECON = (() => {
       // a new sector: the tutorial starts with an Emitter Core and the Psycho-Acoustic Grid standing
       st.fresh = false; st.money = P.startMoney;
       const c0 = cells.get('0,0') || [...cells.values()][0];
-      for (const kind of ['emitter', 'radio']) try { const blk = findMegaBlock(kind, c0); if (blk){ const m = spawnMegaAt(kind, blk); if (m && kind === 'emitter') coreState(m).readyAt = 0; } } catch (e) { console.warn('econ starter', e); }
+      for (const kind of ['emitter']) try { const blk = findMegaBlock(kind, c0); if (blk){ const m = spawnMegaAt(kind, blk); if (m && kind === 'emitter') coreState(m).readyAt = 0; } } catch (e) { console.warn('econ starter', e); }
       try { save(); if (typeof window.save === 'function') window.save(); } catch (e) {}
       onTier(0, false);
       st.last = now();
@@ -568,7 +570,7 @@ const ECON = (() => {
     if (typeof scene === 'undefined' || pulses.length > 8) return;
     const tops = c.sectionTops || [], y1 = (!c.lift && tops[lit - 1]) || c.height || CURB + 2, y0 = (!c.lift && lit > 1 && tops[lit - 2]) || (c.lift ? c.lift.y : CURB);
     const h = Math.max(.6, y1 - y0), w = (typeof SIDE !== 'undefined' ? SIDE : 3) + .15, col = ZCOL[z] || 0xffffff;
-    const fill = new THREE.Mesh(pulseGeo, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: .5, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending }));
+    const fill = new THREE.Mesh(pulseGeo, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: .8, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending }));
     const edge = new THREE.LineSegments(pulseEdge, new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: 1, depthTest: false }));
     for (const o of [fill, edge]){ o.layers.set(1); o.renderOrder = 997; o.position.set(c.x, y0 + h/2, c.z); o.scale.set(w, h, w); scene.add(o); }
     pulses.push({ fill, edge, t0: performance.now(), w, h });
@@ -576,20 +578,70 @@ const ECON = (() => {
   }
   function pulseTick(t){
     for (let i = pulses.length - 1; i >= 0; i--){ const p = pulses[i], k = Math.min(1, (t - p.t0)/900), e = 1 - Math.pow(1 - k, 3), g = 1 + .35*e;
-      p.fill.scale.set(p.w*g, p.h*(1 + .2*e), p.w*g); p.edge.scale.copy(p.fill.scale); p.fill.material.opacity = .5*(1 - k); p.edge.material.opacity = 1 - k;
+      p.fill.scale.set(p.w*g, p.h*(1 + .2*e), p.w*g); p.edge.scale.copy(p.fill.scale); p.fill.material.opacity = .8*(1 - k); p.edge.material.opacity = 1 - k;
       if (k >= 1){ for (const o of [p.fill, p.edge]){ scene.remove(o); o.material.dispose(); } pulses.splice(i, 1); } }
     if (pulses.length) requestAnimationFrame(pulseTick);
+  }
+  /* the surge: three strands of current spiral up from the street round the building to the level that lit, then that level flashes */
+  const glowTex = (() => { const cv = document.createElement('canvas'); cv.width = cv.height = 64; const g = cv.getContext('2d'), r = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(.25, 'rgba(255,255,255,.8)'); r.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = r; g.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(cv); })();
+  const surges = [];
+  function surge(c, lit, z, done){
+    if (typeof scene === 'undefined' || surges.length > 5){ done(); return; }
+    const tops = c.sectionTops || [], y1 = (!c.lift && tops[lit - 1]) || c.height || CURB + 2, y0 = c.lift ? c.lift.y : CURB;
+    const h = Math.max(1, y1 - y0), w = (typeof SIDE !== 'undefined' ? SIDE : 3), R = w*.74, turns = Math.max(2, h/1.6), col = ZCOL[z] || 0xffffff;
+    const root = new THREE.Group(); root.position.set(c.x, y0, c.z);
+    const SEG = Math.round(40*turns), RAD = 5, strands = [];
+    for (let s = 0; s < 3; s++){
+      const ph = s*Math.PI*2/3, pts = [];
+      for (let q = 0; q <= SEG; q++){ const u = q/SEG, a = ph + u*turns*Math.PI*2, j = q && q < SEG ? (Math.random() - .5)*.22 : 0;
+        pts.push(new THREE.Vector3(Math.cos(a)*(R + j), u*h + (Math.random() - .5)*.1, Math.sin(a)*(R + j))); }
+      const curve = new THREE.CatmullRomCurve3(pts);
+      const outer = new THREE.Mesh(new THREE.TubeGeometry(curve, SEG, .085, RAD, false), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: .95, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending }));
+      const inner = new THREE.Mesh(new THREE.TubeGeometry(curve, SEG, .035, RAD, false), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1, depthTest: false, depthWrite: false }));
+      const head = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: col, transparent: true, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending }));
+      head.scale.set(1.1, 1.1, 1);
+      for (const o of [outer, inner, head]){ o.layers.set(1); o.renderOrder = 998; o.frustumCulled = false; root.add(o); }
+      strands.push({ outer, inner, head, curve });
+    }
+    const base = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: col, transparent: true, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending }));
+    base.position.set(0, .1, 0); base.scale.set(w*2.2, w*2.2, 1); base.layers.set(1); base.renderOrder = 998; root.add(base);
+    const top = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: col, transparent: true, opacity: 0, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending }));
+    top.position.set(0, h, 0); top.layers.set(1); top.renderOrder = 999; root.add(top);
+    scene.add(root);
+    surges.push({ root, strands, base, top, t0: performance.now(), per: SEG*RAD*6, SEG, h, w, done, fired: false });
+    if (surges.length === 1) requestAnimationFrame(surgeTick);
+  }
+  const CLIMB = 750, FADE = 450;
+  function surgeTick(){ const t = performance.now();
+    for (let i = surges.length - 1; i >= 0; i--){ const s = surges[i], el2 = Math.max(0, t - s.t0);
+      const k = Math.min(1, el2/CLIMB), head = k < 1 ? k*k*(3 - 2*k)*.85 + k*.15 : 1, tail = Math.max(0, head - .38), fk = Math.max(0, (el2 - CLIMB)/FADE);
+      const crackle = .75 + Math.random()*.25;
+      for (const st2 of s.strands){
+        const a = Math.floor(tail*s.SEG), b = Math.max(a + 1, Math.ceil(head*s.SEG)), rng = RADS => [a*RADS*6, (b - a)*RADS*6];
+        const [o0, n0] = rng(5); st2.outer.geometry.setDrawRange(o0, n0); st2.inner.geometry.setDrawRange(o0, n0);
+        st2.outer.material.opacity = .95*crackle*(1 - fk); st2.inner.material.opacity = (1 - fk);
+        const p = st2.curve.getPointAt(Math.min(1, Math.max(0, head))); st2.head.position.copy(p); st2.head.material.opacity = (1 - fk)*crackle;
+      }
+      s.base.material.opacity = Math.max(0, 1 - el2/500); s.base.scale.setScalar(s.w*(2.2 + el2/400));
+      if (k >= 1){
+        if (!s.fired){ s.fired = true; try { s.done(); } catch (e) {} }
+        const e2 = Math.min(1, fk*1.4); s.top.material.opacity = 1 - e2; s.top.scale.setScalar(s.w*(1.5 + 3.5*e2));
+      }
+      if (fk >= 1){ scene.remove(s.root); s.root.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); surges.splice(i, 1); }
+    }
+    if (surges.length) requestAnimationFrame(surgeTick);
   }
   let lastBump = 0;
   E.onEv('light', d => {
     const b = B.get(keyOf(d.c)), z = b ? b.z : 'R', c = d.c, y = (!c.lift && c.sectionTops && c.sectionTops[d.lit - 1]) || c.height || CURB + 2;
-    pulseLevel(c, d.lit, z);
-    floatText(c.x, y + .6, c.z, '+' + fmt(d.pay) + ' Scrip');
+    surge(c, d.lit, z, () => pulseLevel(c, d.lit, z));
+    setTimeout(() => floatText(c.x, y + .6, c.z, '+' + fmt(d.pay) + ' Scrip'), CLIMB);
     try { if (typeof sfx !== 'undefined' && performance.now() - lastBump > 250) sfx.play('place'); } catch (e) {}
     const m = document.getElementById('ehM'); if (m && performance.now() - lastBump > 200){ lastBump = performance.now(); m.classList.remove('bump'); void m.offsetWidth; m.classList.add('bump'); }
   });
   E.onEv('build', d => { if (!d || !d.c) return; const c = d.c; setTimeout(() => { floatText(c.x, (c.height || CURB) + .4, c.z, '−' + fmt(d.cost) + ' Scrip', 'cost');
-    const b = B.get(keyOf(c)); if (b && b.isolated) { floatText(c.x, (c.height || CURB) + 1.4, c.z, 'Isolated', 'warn'); say('Isolated · nobody can reach it · build within two plots of the city'); } }, 60); });
+    const b = B.get(keyOf(c)); if (b && b.isolated) { floatText(c.x, (c.height || CURB) + 1.4, c.z, 'Isolated', 'warn'); say('Isolated · nobody can reach it · connect it to the city with ground'); } }, 60); });
 
   let hudQ = false; const hudSoon = () => { if (hudQ) return; hudQ = true; requestAnimationFrame(() => { hudQ = false; hud(); }); };
   const perMin = v => fmt(v) + '/min';
@@ -652,7 +704,7 @@ const ECON = (() => {
     out.push(sec('income', 'Income per min', `<table>` + Object.entries(R.breakdown || {}).filter(([, v]) => Math.abs(v) >= .5).map(([k, v]) => `<tr><td>${k}</td><td>${v < 0 ? '−' : ''}${fmt(Math.abs(v))}</td></tr>`).join('') + `</table>`));
     out.push(sec('ladder', 'All classifications', `<table>` + TIERS.slice(1).map((t, q) => { const n = q + 1, cls = n <= st.tier ? 'done' : n === st.tier + 1 ? 'cur' : '';
       return `<tr class="${cls}"><td>${n <= st.tier ? '✓ ' : ''}${t.name}</td><td>${fmt(t.pop)} residents</td></tr>`; }).join('') + `</table>`));
-    out.push(sec('help', 'How it works', `<p>Build, and each level pays Scrip the moment people move in and light it. Click a lit roof to stack a level. Sector Grade (E to A) caps the levels: cores and factories lower it, shops, stations and police raise it. Buildings must be within two plots of the rest of the city.</p><div class="row"><div>Tutorial</div><button class="btn" data-tut="1">Replay</button></div>`));
+    out.push(sec('help', 'How it works', `<p><b>Goal:</b> grow the sector through six classifications to The coast. <b>Emitter Core:</b> powers every building within 9 plots; build more cores to grow outward. <b>Megastructures</b> are optional boosts, one of each, each helping what's in its reach.</p><p>Build, and each level pays Scrip the moment people move in and light it. Click a lit roof to stack a level. Sector Grade (E to A) caps the levels: cores and factories lower it, shops, stations and police raise it. Buildings must connect to the city by ground (or sit within two plots of another building).</p><div class="row"><div>Tutorial</div><button class="btn" data-tut="1">Replay</button></div>`));
     officeEl.innerHTML = out.join('');
     officeEl.scrollTop = keepScroll;
   }
@@ -702,7 +754,7 @@ const ECON = (() => {
     tipEl.style.left = e.clientX + 'px'; tipEl.style.top = e.clientY + 'px'; tipEl.style.display = 'block';
   }, { passive: true });
   E.tapInfo = pk => { const c = pk && pk.c && !pk.c.mega ? pk.c : null; const i = c ? infoOf(c) : null; if (!i) return false; note(infoText(i), 4500); return true; };
-  E.menuText = kind => { const d = MEGA[kind]; if (!d) return null; if (kind === 'emitter') return fmt(nextCoreCost()) + ' Scrip · charges in ' + fmtDur(nextCoreBuildMs()); if (built(kind)) return kind === 'mall' ? 'Built · stack from its roof' : 'Built'; return fmt(d.cost) + ' Scrip · ' + d.what; };
+  E.menuText = kind => { const d = MEGA[kind]; if (!d) return null; if (kind === 'emitter') return fmt(nextCoreCost()) + ' Scrip · powers 9 plots around it · charges in ' + fmtDur(nextCoreBuildMs()); if (built(kind)) return kind === 'mall' ? 'Built · stack from its roof' : 'Built'; return fmt(d.cost) + ' Scrip · ' + d.what; };
 
   /* ---------- the stabilizer: an optional mini game that shortens a core's charge ---------- */
   // Keep the grid frequency in the safe band: the trace sinks, a tap or Space lifts it. Every second inside the band takes two seconds off the
@@ -754,11 +806,13 @@ const ECON = (() => {
     const litCount = () => Object.values(st.best).reduce((s, n) => s + n, 0);
     const homesStacked = () => { for (const b of B.values()) if (b.z === 'R' && b.floors >= 2) return true; return false; };
     const beats = [
+      { say: 'Your goal: grow this sector into a city.', sub: `Climb six classifications, from ${TIERS[0].name} to ${TIERS[TIERS.length - 1].name}, by housing people and earning Scrip. Each one unlocks new buildings.`, next: true },
+      { say: 'This tower is your Emitter Core.', sub: 'It powers every building within 9 plots. No power, no lights, no people. Build near it, but not right against it: the air there is poor.', next: true },
       { say: `Pick Residential, then ${tap.toLowerCase()} 3 plots near the core.`, sub: 'A plot or two away is best: right beside the core the air is poor.', target: zoneBtn('low'), count: () => [countZone('R'), 3], done: () => countZone('R') >= 3 },
       { say: 'Pick Industrial and place a factory.', sub: 'It gives your residents jobs.', target: zoneBtn('ind'), done: () => countZone('I') >= 1 },
       { say: 'Pick Commercial and place a shop.', sub: 'Shops earn the most Scrip.', target: zoneBtn('mid'), done: () => countZone('C') >= 1 },
       { say: `Pick Residential and ${tap.toLowerCase()} a lit home's roof to stack a level.`, sub: 'Taller homes hold more people. If it says the Grade is too low, try a home further from the core.', target: zoneBtn('low'), done: homesStacked, nextAfter: 40 },
-      { say: `Next goal: ${TIERS[1].name}.`, sub: `Reach ${fmt(TIERS[1].pop)} residents to unlock new buildings. ${TOUCHY ? 'Tap' : 'Hover'} any building to see what it needs.`, next: true, last: true, target: () => document.getElementById('ehO') },
+      { say: `Next goal: ${TIERS[1].name}.`, sub: `Reach ${fmt(TIERS[1].pop)} residents. Megastructures in the Buildings menu boost what's around them: the Psycho-Acoustic Grid makes nearby buildings earn more. ${TOUCHY ? 'Tap' : 'Hover'} any building to see what it needs.`, next: true, last: true, target: () => document.getElementById('ehO') },
     ];
     let k = st.tut.done ? beats.length : Math.min(st.tut.step || 0, beats.length), lit = null;
     const unpulse = () => { if (lit){ lit.classList.remove('econ-pulse'); lit = null; } };
@@ -795,7 +849,7 @@ const ECON = (() => {
 
   /* ---------- for tests and the console ---------- */
   E.freshState = freshState; E.state = () => st; E.P = P; E.MEGA = MEGA; E.TIERS = TIERS; E.save = save; E.step = step; E.building = k => B.get(k); E.info = infoOf;
-  E.dev = { money(n){ st.money += n; hud(); }, tier(t){ st.tier = Math.max(0, Math.min(TIERS.length - 1, t)); onTier(st.tier, true); hud(); }, run(h){ let left = h; while (left > 0){ const d = Math.min(left, 2/60); step(d, false); left -= d; } darkSync(); hud(); } };
+  E.dev = { money(n){ st.money += n; hud(); }, tier(t){ st.tier = Math.max(0, Math.min(TIERS.length - 1, t)); onTier(st.tier, true); hud(); }, light(c, lit = 1){ E.emit("light", { c, lit, pay: 0 }); }, run(h){ let left = h; while (left > 0){ const d = Math.min(left, 2/60); step(d, false); left -= d; } darkSync(); hud(); } };
   return E;
 })();
 window.ECON = ECON;

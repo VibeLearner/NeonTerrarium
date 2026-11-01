@@ -20,12 +20,12 @@ Balance source: the Economy Balancer artifact and the project doc `claude/econom
 ## How the game maps onto the model
 
 - **A building** is a plot with sections. **A level** is a section (a stacked piece, usually two to four floors). The model counted floors; here every per-floor number is tripled per level and the Sector Grade caps are in levels: E 2, D 2, C 2, B 3, A 4 (factories and corps 2). Stacking a level is the existing "click a roof to stack a section".
-- **Isolation.** A building joins the city when it stands within two plots of another that has, starting from the megastructures, or within reach of a metro stop. An isolated one stays empty and says so.
-- **Light-up.** A level lighting for the first time pulses in its zone's color, pays a floating +Scrip, and that building is redrawn first. A building just placed starts dark (no flash of light).
+- **Isolation.** Reach spreads from the megastructures (and metro stops) along any connected ground, built on or not, and hops up to two plots between buildings. A building cut off from all of that stays empty and says so.
+- **Light-up.** A level lighting for the first time sends a surge up the building (three crackling strands of current spiraling from the street to that level, in its zone's color), then that level flashes, pays a floating +Scrip, and that building is redrawn first. A building just placed starts dark (no flash of light).
 - **One zone per building.** A building only takes more of its own zone (corps only on corps).
 - **Distances** are in plots (Chebyshev), measured to a megastructure's footprint. Emitter Core: within 2 poor air (Grade −25), within 5 mid (95% output, a little more flicker), within 9 far (80%, more flicker), past 9 no power.
 - **Power order**: megastructures, metro stops and finished highways first; then buildings nearest a core first, oldest first.
-- **Megastructures**: one each (Emitter Cores as many as you like; the Sky mall stacks to 3 levels from its roof). Nothing arrives on its own. Reach-based ones (Acoustic Grid, Police station, Town Square, Bath House, LIDAR) work by radius in plots; the Grid and Police station take reach upgrades in the City office.
+- **Megastructures**: one each (Emitter Cores as many as you like; the Sky mall stacks to 3 levels from its roof). A new city starts with one Emitter Core and nothing else; the Psycho-Acoustic Grid is an optional 300 Scrip build from the start. Reach-based ones (Acoustic Grid, Police station, Town Square, Bath House, LIDAR) work by radius in plots; the Grid and Police station take reach upgrades in the City office.
 - **Sky highway** benefits (trade rates) start once one highway is finished; track and stops are paid per plot.
 
 ## Player-facing pieces
@@ -34,7 +34,7 @@ Balance source: the Economy Balancer artifact and the project doc `claude/econom
 - City office: classification ladder, power and cores (upgrade, or Stabilize while charging), megastructures with reach upgrades, Overseer auto-upgrades once the Data Spire stands, income breakdown, tutorial replay.
 - Stabilizer: optional mini game while a core charges. Keep the trace in the band (tap, click or Space). Each second inside takes 2 s off, up to half the charge.
 - Always night: the sky and lights are drawn as 23:00 (the clock, people and stories run on); the title room is lit for night too.
-- Tutorial: six short notes, one action each, the button to use pulsing, a progress strip; no dimming, no spotlight; skippable; replay from the Office. On touch it waits for the gesture tutorial first.
+- Tutorial: opens with the goal (six classifications to The coast) and what the Emitter Core does, then four short notes, one action each, the button to use pulsing, a progress strip; no dimming, no spotlight; skippable; replay from the Office. On touch it waits for the gesture tutorial first.
 - Hover (mouse) or tap with no zone picked (touch): a building's Grade, lit levels, cap, why it's struggling, taxes, next level's price.
 - Corps: with Industrial picked from Chartered on, a Factory / Corps switch appears.
 

@@ -508,9 +508,11 @@ const ECON = (() => {
   @keyframes ePulse { 0%, 100% { box-shadow: 0 0 0 2px rgba(255,179,71,.9), 0 0 0 6px rgba(255,179,71,.0); } 50% { box-shadow: 0 0 0 2px rgba(255,179,71,.9), 0 0 18px 6px rgba(255,179,71,.55); } }
   .econ-tip { position: fixed; z-index: 61; pointer-events: none; font: 13px/1.5 'JetBrains Mono', monospace; color: #efe6d6; background: rgba(12,10,20,.95); border: 1px solid rgba(255,179,71,.4); padding: 8px 11px; transform: translate(18px, 12px); white-space: pre; display: none; }
   .econ-tip .h { color: #ffb347; } .econ-tip .bad { color: #ff8a98; } .econ-tip .ok { color: #5affa8; }
-  .econ-float { position: fixed; z-index: 5; pointer-events: none; font: 600 15px/1 'JetBrains Mono', monospace; color: #ffb347; text-shadow: 0 0 8px rgba(255,179,71,.7), 0 1px 0 #000; transform: translate(-50%, -50%); animation: eFloat 1.3s ease-out forwards; white-space: nowrap; }
-  .econ-float.cost { color: #ff8a98; font-size: 12px; text-shadow: 0 1px 0 #000; } .econ-float.big { color: #fff; font-size: 13px; letter-spacing: .14em; text-transform: uppercase; text-shadow: 0 0 10px rgba(56,232,224,.9), 0 1px 0 #000; } .econ-float.warn { color: #ff8a98; font-size: 12px; }
-  @keyframes eFloat { 0% { opacity: 0; transform: translate(-50%, -30%) scale(.7); } 15% { opacity: 1; transform: translate(-50%, -60%) scale(1.15); } 100% { opacity: 0; transform: translate(-50%, -260%) scale(1); } }
+  .econ-float { position: fixed; z-index: 5; pointer-events: none; font: 700 20px/1 'JetBrains Mono', monospace; color: #ffb347; text-shadow: 0 0 8px rgba(255,179,71,.7), 0 1px 0 #000; background: rgba(10,8,18,.72); padding: 5px 9px 6px; border-radius: 4px; transform: translate(-50%, -50%); animation: eFloat 1.6s ease-out forwards; white-space: nowrap; }
+  .econ-float.cost { color: #ff8a98; font-size: 17px; text-shadow: 0 1px 0 #000; } .econ-float.big { color: #fff; font-size: 16px; letter-spacing: .14em; text-transform: uppercase; text-shadow: 0 0 10px rgba(56,232,224,.9), 0 1px 0 #000; } .econ-float.warn { color: #ff8a98; font-size: 17px; } .econ-float.boost { color: #5ae8ff; font-size: 16px; text-shadow: 0 0 8px rgba(90,232,255,.8), 0 1px 0 #000; }
+  @keyframes eFloat { 0% { opacity: 0; transform: translate(-50%, -30%) scale(.7); } 12% { opacity: 1; transform: translate(-50%, -70%) scale(1.15); } 70% { opacity: 1; transform: translate(-50%, -170%) scale(1); } 100% { opacity: 0; transform: translate(-50%, -230%) scale(1); } }
+  .econ-reach { position: fixed; z-index: 6; pointer-events: none; transform: translate(-50%, -100%); font: 600 14px/1.35 'JetBrains Mono', monospace; color: #efe6d6; background: rgba(10,8,18,.9); border: 1px solid currentColor; padding: 7px 11px; text-align: center; white-space: nowrap; }
+  .econ-reach b { display: block; font-size: 17px; } .econ-reach[hidden] { display: none; }
   .econ-office { box-sizing: border-box; position: fixed; z-index: 30; top: 0; right: 0; bottom: 0; width: min(420px, 100vw); overflow-y: auto; background: rgba(12,10,20,.97); border-left: 1px solid rgba(255,179,71,.35); color: #efe6d6;
     font: 14px/1.5 'JetBrains Mono', ui-monospace, monospace; padding: calc(12px + env(safe-area-inset-top,0px)) max(18px, env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) 18px; }
   .econ-office[hidden] { display: none; }
@@ -635,13 +637,13 @@ const ECON = (() => {
   /* ---------- the light-up: a pulse round the level that just lit, and the Scrip it paid rising off it ---------- */
   const _v = new THREE.Vector3();
   function screenOf(x, y, z){ try { _v.set(x, y, z).project(cam); if (_v.z > 1) return null; const r = viewRect(); return [r.left + (_v.x*.5 + .5)*r.width, r.top + (1 - (_v.y*.5 + .5))*r.height]; } catch (e) { return null; } }
-  function floatText(x, y, z, text, cls = ''){ const p = screenOf(x, y, z); if (!p) return; const f = el('div', 'econ-float ' + cls); f.textContent = text; f.style.left = p[0] + 'px'; f.style.top = p[1] + 'px'; document.body.appendChild(f); setTimeout(() => f.remove(), 1400); }
+  function floatText(x, y, z, text, cls = ''){ const p = screenOf(x, y, z); if (!p) return; const f = el('div', 'econ-float ' + cls); f.textContent = text; f.style.left = p[0] + 'px'; f.style.top = (p[1] - 34) + 'px'; document.body.appendChild(f); setTimeout(() => f.remove(), 1700); }
   const ZCOL = { R: 0x38e8e0, C: 0xffb347, L: 0xff4fa3, I: 0xe8e03a, K: 0xe8e03a };
   const pulseGeo = new THREE.BoxGeometry(1, 1, 1), pulseEdge = new THREE.EdgesGeometry(pulseGeo), pulses = [];
-  function pulseLevel(c, lit, z, whole){
+  function pulseLevel(c, lit, z, whole, colOver){
     if (typeof scene === 'undefined' || pulses.length > (whole ? 70 : 8)) return;
     const tops = c.sectionTops || [], y1 = (!c.lift && tops[lit - 1]) || c.height || CURB + 2, y0 = whole ? (c.lift ? c.lift.y : CURB) : (!c.lift && lit > 1 && tops[lit - 2]) || (c.lift ? c.lift.y : CURB);
-    const h = Math.max(.6, y1 - y0), w = (typeof SIDE !== 'undefined' ? SIDE : 3) + .15, col = ZCOL[z] || 0xffffff;
+    const h = Math.max(.6, y1 - y0), w = (typeof SIDE !== 'undefined' ? SIDE : 3) + .15, col = colOver || ZCOL[z] || 0xffffff;
     const fill = new THREE.Mesh(pulseGeo, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: .8, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending }));
     const edge = new THREE.LineSegments(pulseEdge, new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: 1, depthTest: false }));
     for (const o of [fill, edge]){ o.layers.set(1); o.renderOrder = 997; o.position.set(c.x, y0 + h/2, c.z); o.scale.set(w, h, w); scene.add(o); }
@@ -721,6 +723,72 @@ const ECON = (() => {
   });
   E.onEv('build', d => { if (!d || !d.c) return; const c = d.c; setTimeout(() => { floatText(c.x, (c.height || CURB) + .4, c.z, '−' + fmt(d.cost) + ' Scrip', 'cost');
     const b = B.get(keyOf(c)); if (b && b.isolated) { floatText(c.x, (c.height || CURB) + 1.4, c.z, 'Isolated', 'warn'); if (st.hints.isolated) say('Isolated · nobody can reach it · connect it to the city with ground'); else hint('isolated'); } }, 60); });
+
+  /* ---------- reach: while placing a megastructure with a reach, the area it covers and what it would touch; once placed, the boost runs out to each one ---------- */
+  const REACH_FX = { radio: ['Psycho-Acoustic Grid', b => true, '+15% Scrip'], police: ['Police station', b => true, '+15 Grade'], square: ['Town square', b => b.z === 'R' || b.z === 'L', '+15% spending'],
+    bathhouse: ['Bath House', b => b.z === 'R', 'homes work better'], lidar: ['LIDAR', b => b.z === 'R' || b.z === 'L', '+2% tax'] };
+  const reachFill = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ transparent: true, opacity: .05, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending }));
+  const reachEdge = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints([[-.5, -.5], [.5, -.5], [.5, .5], [-.5, .5]].map(([x, y]) => new THREE.Vector3(x, y, 0))), new THREE.LineBasicMaterial({ transparent: true, opacity: .95, depthTest: false }));
+  // a beam of light over each building it would touch, a tile on each plot it covers, and a low wall of light round the edge
+  const tagMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: .75, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending });
+  const tags = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), tagMat, 160); tags.count = 0; tags.frustumCulled = false;
+  const tileMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: .22, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending });
+  const tiles = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), tileMat, 900); tiles.count = 0; tiles.frustumCulled = false;
+  const wallMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: .32, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+  const wall = new THREE.Group(); for (let q = 0; q < 4; q++) wall.add(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), wallMat));
+  for (const o of [reachFill, reachEdge, tags, tiles, wall]){ if (o === reachFill || o === reachEdge) o.rotation.x = -Math.PI/2; o.traverse(q => { q.layers.set(1); q.renderOrder = 996; q.frustumCulled = false; }); o.visible = false; if (typeof scene !== 'undefined') scene.add(o); }
+  const reachLbl = el('div', 'econ-reach'); reachLbl.hidden = true; document.body.appendChild(reachLbl);
+  const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI/2, 0, 0)), _qi = new THREE.Quaternion(), _p = new THREE.Vector3(), _s = new THREE.Vector3();
+  function reachOf(kind){ const d = MEGA[kind]; return d ? (d.reach || 0) + (d.upReach ? d.upReach*(st.ups[kind] || 0) : 0) : 0; }
+  function touched(kind, blk){ const fx = REACH_FX[kind], r = reachOf(kind), out = []; for (const b of B.values()) if (!b.isolated && fx[1](b) && megaD(b.c.i, b.c.j, blk) <= r) out.push(b); return out; }
+  function reachShow(kind, g){
+    const fx = REACH_FX[kind];
+    if (!fx || !g){ reachFill.visible = reachEdge.visible = tags.visible = tiles.visible = wall.visible = false; reachLbl.hidden = true; return; }
+    const r = reachOf(kind), col = new THREE.Color(MEGA_TYPES[kind].colour || '#5ae8ff');
+    const x = (g.i + (g.w - 1)/2)*LOT, z = (g.j + (g.h - 1)/2)*LOT, sx = (g.w + 2*r)*LOT, sz = (g.h + 2*r)*LOT;
+    reachFill.material.color.copy(col); reachEdge.material.color.copy(col); tagMat.color.copy(col); tileMat.color.copy(col); wallMat.color.copy(col);
+    const WH = 1.1; [[0, -sz/2, sx, 0], [0, sz/2, sx, 0], [-sx/2, 0, sz, Math.PI/2], [sx/2, 0, sz, Math.PI/2]].forEach(([ox, oz, len, ry], q) => { const w_ = wall.children[q]; w_.position.set(x + ox, CURB + WH/2, z + oz); w_.rotation.y = ry; w_.scale.set(len, WH, 1); });
+    let nt = 0; for (let a = g.i - r; a <= g.i + g.w - 1 + r && nt < 900; a++) for (let q = g.j - r; q <= g.j + g.h - 1 + r && nt < 900; q++){ const cc = cells.get(a + ',' + q); if (!cc || (a >= g.i && a < g.i + g.w && q >= g.j && q < g.j + g.h)) continue;
+      _p.set(a*LOT, CURB + .07, q*LOT); _s.set(LOT*.86, LOT*.86, 1); _m4.compose(_p, _q, _s); tiles.setMatrixAt(nt++, _m4); }
+    tiles.count = nt; tiles.instanceMatrix.needsUpdate = true;
+    reachFill.position.set(x, CURB + .06, z); reachFill.scale.set(sx, sz, 1); reachEdge.position.set(x, CURB + .1, z); reachEdge.scale.set(sx, sz, 1);
+    const hit = touched(kind, g); tags.count = Math.min(160, hit.length);
+    for (let q = 0; q < tags.count; q++){ const c = hit[q].c, top = (c.sectionTops && c.sectionTops[c.sectionTops.length - 1]) || c.height || CURB + 3; _p.set(c.x, top + 2, c.z); _s.set(.32, 4, .32); _m4.compose(_p, _qi, _s); tags.setMatrixAt(q, _m4); }
+    tags.instanceMatrix.needsUpdate = true;
+    reachFill.visible = reachEdge.visible = tags.visible = tiles.visible = wall.visible = true;
+    const sp = screenOf(x, CURB + 3, z);
+    if (sp){ reachLbl.style.color = MEGA_TYPES[kind].colour; reachLbl.innerHTML = `<b>${hit.length} building${hit.length === 1 ? '' : 's'} · ${fx[2]}</b>reach ${r} plots · ${nt} plots covered`; reachLbl.style.left = sp[0] + 'px'; reachLbl.style.top = (sp[1] - 20) + 'px'; reachLbl.hidden = false; } else reachLbl.hidden = true;
+  }
+  wrap('showMegaGhost', function (orig, kind, cell, turned){ const r = orig(kind, cell, turned); try { reachShow(kind && cell ? kind : null, typeof megaGhost !== 'undefined' ? megaGhost : null); } catch (e) {} return r; });
+  setInterval(() => { if (reachEdge.visible && (typeof megaPick === 'undefined' || !megaPick)) reachShow(null); }, 300);
+  // placed: a signal arcs from the megastructure to each building in reach, nearest first, and each one flashes and shows the boost
+  E.onEv('mega', d => { const fx = REACH_FX[d.kind]; if (!fx || !d.m) return; setTimeout(() => boostWave(d.m, d.kind), 400); });
+  function boostWave(m, kind){
+    if (typeof scene === 'undefined') return;
+    const fx = REACH_FX[kind], col = new THREE.Color(MEGA_TYPES[kind].colour || '#5ae8ff'), hit = touched(kind, m).sort((a, b) => megaD(a.c.i, a.c.j, m) - megaD(b.c.i, b.c.j, m)).slice(0, 40);
+    const top = new THREE.Vector3(m.x, (m.roofH || CURB + 4) + 1, m.z), r = reachOf(kind);
+    // the area, drawn once and swept outward
+    const ring = reachEdge.clone(); ring.material = reachEdge.material.clone(); ring.material.color.copy(col); ring.visible = true; ring.position.set(m.x, CURB + .12, m.z); scene.add(ring);
+    const t0 = performance.now();
+    (function grow(){ const k = Math.min(1, (performance.now() - t0)/1400), e = 1 - Math.pow(1 - k, 2); ring.scale.set((m.w + 2*r*e)*LOT, (m.h + 2*r*e)*LOT, 1); ring.material.opacity = k < .8 ? 1 : (1 - k)*5; if (k < 1) requestAnimationFrame(grow); else { scene.remove(ring); ring.material.dispose(); } })();
+    hit.forEach((b, q) => {
+      const dd = megaD(b.c.i, b.c.j, m), delay = 1400*Math.sqrt(dd/Math.max(1, r));
+      setTimeout(() => {
+        const end = new THREE.Vector3(b.c.x, (b.c.height || CURB + 2) + .3, b.c.z), mid = top.clone().lerp(end, .5); mid.y = Math.max(top.y, end.y) + 2 + dd*.4;
+        const pts = new THREE.QuadraticBezierCurve3(top, mid, end).getPoints(40), line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: 1, depthTest: false }));
+        line.layers.set(1); line.renderOrder = 998; line.frustumCulled = false; scene.add(line);
+        const spark = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: col, transparent: true, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending })); spark.scale.setScalar(1.2); spark.layers.set(1); spark.renderOrder = 999; scene.add(spark);
+        const a0 = performance.now();
+        (function fly(){ const k = Math.min(1, (performance.now() - a0)/450), n = Math.max(2, Math.round(k*40));
+          line.geometry.setDrawRange(Math.max(0, n - 14), Math.min(14, n)); spark.position.copy(pts[Math.min(40, n)]);
+          if (k < 1) return requestAnimationFrame(fly);
+          scene.remove(line); line.geometry.dispose(); line.material.dispose(); scene.remove(spark); spark.material.dispose();
+          pulseLevel(b.c, Math.max(1, b.lit || b.floors), b.z, true, col);
+          if (q < 24) floatText(b.c.x, (b.c.height || CURB + 2) + .4, b.c.z, fx[2], 'boost'); })();
+      }, delay + q*25);
+    });
+    if (hit.length) setTimeout(() => say(`${fx[0]} · ${hit.length} building${hit.length === 1 ? '' : 's'} in reach · ${fx[2]}`), 300);
+  }
 
   let hudQ = false; const hudSoon = () => { if (hudQ) return; hudQ = true; requestAnimationFrame(() => { hudQ = false; hud(); }); };
   const perMin = v => fmt(v) + '/min';

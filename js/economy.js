@@ -36,7 +36,8 @@ const ECON = (() => {
     caps: [2, 2, 2, 3, 4], capIndustry: 2,   // (E and D 2: any first home can take a second level, so the tutorial stack always works)
     prodMid: .95, prodFar: .8,
     accessMid: .8, accessFar: .3, accessMetro: .95, jobNear: 3, jobMid: 7, shopR: 3, stationR: 2, corpR: 3, factoryR: 2,
-    fill: 40, fillCheap: 20,   // (per model hour, toward the target: at the clicker pace a new level lights in a second or two)
+    fill: 40, fillCheap: 20, trickle: 8, trickleCheap: 3,   // (trickle: the rest of a lit level, per model hour: about 15 s to fill out)
+      // (per model hour, toward the target: at the clicker pace a new level lights in a second or two)
     baseline: .6, baselineH: 24, stipend: 15,
     startMoney: 800,
     metroTile: 25, metroStop: 150, hwTile: 120, hwFinish: 1500,
@@ -79,7 +80,7 @@ const ECON = (() => {
   document.documentElement.classList.add('econ');
   { const hs = document.createElement('style'); hs.textContent = 'html.econ #modeHint{display:none!important}'; document.head.appendChild(hs); }
   st = Object.assign(freshState(), st);
-  function freshState(){ return { on: true, v: 1, money: P.startMoney, tier: 0, fresh: true, last: Date.now(), peak: 0, best: {}, occ: {}, cores: {}, ups: {}, auto: false, tut: { step: 0, done: false }, hints: {}, firstZ: {}, stock: 0, corp: false, metroPaid: {}, hwPaid: {} }; }
+  function freshState(){ return { on: true, v: 1, money: P.startMoney, tier: 0, fresh: true, last: Date.now(), peak: 0, best: {}, occ: {}, cores: {}, ups: {}, auto: false, tut: { step: 0, done: false }, hints: {}, firstZ: {}, full: {}, stock: 0, corp: false, metroPaid: {}, hwPaid: {} }; }
   const save = () => { st.last = Date.now(); try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} };
   addEventListener('pagehide', save); addEventListener('beforeunload', save);
 
@@ -116,6 +117,7 @@ const ECON = (() => {
   const pv = { sales: 0, capTotal: 1, staffR: 0, staffL: 0, ratioR: 1, demand: 0, goodsShort: 0, unempAccR: 0, unempAccL: 0 };
   const R = E.r = { money: 0, rev: 0, pop: 0, popL: 0, supply: 0, used: 0, size: 0, emp: 0, breakdown: {}, demandZ: {}, dark: 0 };
   let peakLocal = st.peak || 0;
+  const arrived = new Map();   // (residents last announced per building: not saved, so opening a city doesn't replay arrivals)
   function step(dtH, live){
     const T = now();
     const coresAll = megaList('emitter'), cores = coresAll.filter(coreReady);
@@ -197,13 +199,30 @@ const ECON = (() => {
       if (b.isolated) target = 0;
       const cheap = b.lv < P.lvCheap;
       let occ = st.occ[b.k] || 0;
-      let r = target >= occ ? P.fill + (cheap ? P.fillCheap : 0) : 6; if (b.z !== 'R' && b.z !== 'L') r = 20;
-      occ += (target - occ)*Math.min(1, r*dtH); if (occ > b.floors) occ = b.floors;
+      // moving in: a level's first half arrives at once (it lights in a second), the rest trickle in over about fifteen seconds
+      const nextLight = Math.floor(occ + .5) + .5;
+      if (target >= occ){
+        if (target >= nextLight){ const r = P.fill + (cheap ? P.fillCheap : 0); occ = Math.min(occ + (target - occ)*Math.min(1, r*dtH), nextLight + .02); }
+        else occ += (target - occ)*Math.min(1, (P.trickle + (cheap ? P.trickleCheap : 0))*dtH);
+      } else occ += (target - occ)*Math.min(1, 6*dtH);
+      if (occ > b.floors) occ = b.floors;
       st.occ[b.k] = Math.round(occ*1000)/1000; b.occ = occ;
       const lit = Math.floor(occ + .5), best = st.best[b.k] || 0;   // (a level lights once it's about half full: homes short of work still light, they just earn less)
-      if (lit > best){ const pay = (lit - best)*P.bonus[b.z]*(b.z === 'R' && cheap ? P.cheapBonus : 1); bonus += pay; st.best[b.k] = lit; if (live) E.emit('light', { c: b.c, lit, pay, z: b.z, cap: b.cap, floors: b.floors }); }
+      let lightNow = false;
+      if (lit > best){ const pay = (lit - best)*P.bonus[b.z]*(b.z === 'R' && cheap ? P.cheapBonus : 1); bonus += pay; st.best[b.k] = lit; lightNow = true; if (live) E.emit('light', { c: b.c, lit, pay, z: b.z, cap: b.cap, floors: b.floors }); }
       b.lit = lit;
+      // people trickling in between light-ups: every few residents (homes) a small glow runs round the building's edges
+      if (b.z === 'R' || b.z === 'L'){ const ppl = occ*P.ppl[b.z], seen = arrived.get(b.k);
+        if (seen === undefined || ppl < seen || !live) arrived.set(b.k, ppl);
+        else if (ppl - seen >= (b.z === 'L' ? 2 : 3)){ arrived.set(b.k, ppl); if (!lightNow) E.emit('arrive', { c: b.c, z: b.z, n: Math.round(ppl - seen), lit }); } }
+      // full: every level it has lit and as many people as it can hold where it stands (within 5%). Once per height; a payout on top
+      const isFull = b.floors >= 1 && lit >= b.floors && b.eff > 0 && occ >= b.eff*.95 && !b.isolated && b.powered;
+      if (isFull && (st.full[b.k] || 0) < b.floors){
+        st.full[b.k] = b.floors;
+        if (live && st.fullInit){ const pay = Math.round(P.bonus[b.z]*b.floors*.5); bonus += pay; E.emit('full', { c: b.c, z: b.z, floors: b.floors, pay }); }
+      }
     }
+    st.fullInit = true;   // (an old save: whatever was already full is marked quietly the first time, no burst of jackpots)
     // jobs
     let accR = 0, accL = 0, popR = 0, popL = 0;
     const access = b => { let a = b.jobBand === 'near' ? 1 : b.jobBand === 'mid' ? P.accessMid : P.accessFar; if (b.station) a = Math.max(a, P.accessMetro); return a; };
@@ -511,6 +530,18 @@ const ECON = (() => {
   .econ-float { position: fixed; z-index: 5; pointer-events: none; font: 700 20px/1 'JetBrains Mono', monospace; color: #ffb347; text-shadow: 0 0 8px rgba(255,179,71,.7), 0 1px 0 #000; background: rgba(10,8,18,.72); padding: 5px 9px 6px; border-radius: 4px; transform: translate(-50%, -50%); animation: eFloat 1.6s ease-out forwards; white-space: nowrap; }
   .econ-float.cost { color: #ff8a98; font-size: 17px; text-shadow: 0 1px 0 #000; } .econ-float.big { color: #fff; font-size: 16px; letter-spacing: .14em; text-transform: uppercase; text-shadow: 0 0 10px rgba(56,232,224,.9), 0 1px 0 #000; } .econ-float.warn { color: #ff8a98; font-size: 17px; } .econ-float.boost { color: #5ae8ff; font-size: 16px; text-shadow: 0 0 8px rgba(90,232,255,.8), 0 1px 0 #000; }
   @keyframes eFloat { 0% { opacity: 0; transform: translate(-50%, -30%) scale(.7); } 12% { opacity: 1; transform: translate(-50%, -70%) scale(1.15); } 70% { opacity: 1; transform: translate(-50%, -170%) scale(1); } 100% { opacity: 0; transform: translate(-50%, -230%) scale(1); } }
+  .econ-float.arrive { font-size: 13px; color: #c9fffb; text-shadow: 0 1px 0 #000; padding: 3px 7px; animation-duration: 1.3s; }
+  .econ-jack { position: fixed; z-index: 7; pointer-events: none; transform: translate(-50%, -100%); text-align: center; font-family: 'JetBrains Mono', monospace; color: #fff; background: rgba(10,8,18,.94); border: 2px solid var(--jc); padding: 8px 12px 9px; box-shadow: 0 0 18px var(--jc), inset 0 0 12px rgba(255,255,255,.06); animation: ejIn .35s cubic-bezier(.2,1.5,.4,1) both; }
+  .econ-jack .reels { display: flex; gap: 6px; justify-content: center; } .econ-jack .reels i { font-style: normal; width: 38px; height: 42px; display: grid; place-items: center; font-size: 26px; background: #07060c; border: 1px solid rgba(255,255,255,.18); color: #9a92aa; }
+  .econ-jack .reels i.hit { color: var(--jc); border-color: var(--jc); text-shadow: 0 0 10px var(--jc); animation: ejHit .3s ease-out; }
+  .econ-jack .jt { margin-top: 7px; font-size: 13px; letter-spacing: .3em; text-transform: uppercase; color: #9a92aa; } .econ-jack .jp { font-size: 20px; font-weight: 700; color: #ffb347; opacity: .35; }
+  .econ-jack.win .jt { color: #fff; text-shadow: 0 0 10px var(--jc); animation: ejBlink .18s steps(2) 6; } .econ-jack.win .jp { opacity: 1; text-shadow: 0 0 10px rgba(255,179,71,.8); }
+  .econ-jack.win { animation: ejWin .5s ease-out; } .econ-jack.out { animation: ejOut .5s ease-in forwards; }
+  @keyframes ejIn { from { opacity: 0; transform: translate(-50%, -80%) scale(.6); } to { opacity: 1; transform: translate(-50%, -100%); } }
+  @keyframes ejHit { 0% { transform: scale(1.4); } 100% { transform: none; } }
+  @keyframes ejWin { 0% { transform: translate(-50%, -100%) scale(1.12); box-shadow: 0 0 40px var(--jc); } 100% { transform: translate(-50%, -100%); } }
+  @keyframes ejBlink { 50% { opacity: .3; } }
+  @keyframes ejOut { to { opacity: 0; transform: translate(-50%, -130%); } }
   .econ-reach { position: fixed; z-index: 6; pointer-events: none; transform: translate(-50%, -100%); font: 600 14px/1.35 'JetBrains Mono', monospace; color: #efe6d6; background: rgba(10,8,18,.9); border: 1px solid currentColor; padding: 7px 11px; text-align: center; white-space: nowrap; }
   .econ-reach b { display: block; font-size: 17px; } .econ-reach[hidden] { display: none; }
   .econ-office { box-sizing: border-box; position: fixed; z-index: 30; top: 0; right: 0; bottom: 0; width: min(420px, 100vw); overflow-y: auto; background: rgba(12,10,20,.97); border-left: 1px solid rgba(255,179,71,.35); color: #efe6d6;
@@ -713,7 +744,7 @@ const ECON = (() => {
   E.onEv('light', d => {
     const b = B.get(keyOf(d.c)) || d, z = d.z || (b && b.z) || 'R', c = d.c, y = (!c.lift && c.sectionTops && c.sectionTops[d.lit - 1]) || c.height || CURB + 2;
     const firstOfZone = !st.firstZ[z] && d.lit === 1; if (firstOfZone){ st.firstZ[z] = 1; save(); }
-    const topped = b && d.lit >= b.cap && d.lit > 1, tier = topped || firstOfZone ? 2 : d.lit === 1 && b && b.floors > 1 ? 0 : 1, climb = [600, 750, 950][tier];
+    const topped = false, tier = firstOfZone ? 2 : d.lit === 1 && b && b.floors > 1 ? 0 : 1, climb = [600, 750, 950][tier];
     surge(c, d.lit, z, () => pulseLevel(c, d.lit, z), tier);
     setTimeout(() => { floatText(c.x, y + .6, c.z, '+' + fmt(d.pay) + ' Scrip'); if (tier === 2) setTimeout(() => floatText(c.x, y + 1.6, c.z, topped ? 'Max height' : 'First ' + ZNAME[z].toLowerCase(), 'big'), 180); }, climb);
     // its own tone, climbing the scale with the level (a pentatonic step per level), a chord when it's a big one
@@ -723,6 +754,73 @@ const ECON = (() => {
   });
   E.onEv('build', d => { if (!d || !d.c) return; const c = d.c; setTimeout(() => { floatText(c.x, (c.height || CURB) + .4, c.z, '−' + fmt(d.cost) + ' Scrip', 'cost');
     const b = B.get(keyOf(c)); if (b && b.isolated) { floatText(c.x, (c.height || CURB) + 1.4, c.z, 'Isolated', 'warn'); if (st.hints.isolated) say('Isolated · nobody can reach it · connect it to the city with ground'); else hint('isolated'); } }, 60); });
+
+  /* ---------- people trickling in: a small glow runs up one corner of the building and round its top edge (lighter than a light-up, and a different shape) ---------- */
+  const trickles = [];
+  E.onEv('arrive', d => {
+    const c = d.c; if (typeof scene === 'undefined' || trickles.length > 6 || !c) return;
+    const tops = c.sectionTops || [], y1 = (!c.lift && tops[Math.max(0, (d.lit || 1) - 1)]) || c.height || CURB + 2, y0 = c.lift ? c.lift.y : CURB;
+    const hw = (typeof SIDE !== 'undefined' ? SIDE : 3)/2 + .06, k0 = Math.random()*4 | 0, dir = Math.random() < .5 ? 1 : 3;
+    const corner = q => { const a = [[-1, -1], [1, -1], [1, 1], [-1, 1]][(k0 + q*dir) % 4]; return [a[0]*hw, a[1]*hw]; };
+    const pts = [], add = (x, y, z) => pts.push(new THREE.Vector3(c.x + x, y, c.z + z));
+    const [ax, az] = corner(0); add(ax, y0 + .05, az); add(ax, y1, az);
+    for (let q = 1; q <= 4; q++){ const [x, z] = corner(q); add(x, y1, z); }
+    const path = new THREE.CurvePath(); for (let q = 1; q < pts.length; q++) path.add(new THREE.LineCurve3(pts[q - 1], pts[q]));
+    const col = new THREE.Color(ZCOL[d.z] || 0x38e8e0), SEG = 160;
+    const tube = new THREE.Mesh(new THREE.TubeGeometry(path, SEG, .055, 4, false), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: .9, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending }));
+    const head = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: col, transparent: true, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending })); head.scale.setScalar(.7);
+    for (const o of [tube, head]){ o.layers.set(1); o.renderOrder = 997; o.frustumCulled = false; scene.add(o); }
+    const t0 = performance.now(), T = 1100; trickles.push(tube);
+    (function run(){ const k = Math.min(1, (performance.now() - t0)/T), hd = k*(2 - k), tl = Math.max(0, hd - .22), a = Math.floor(tl*SEG), b = Math.max(a + 1, Math.ceil(hd*SEG));
+      tube.geometry.setDrawRange(a*4*6, (b - a)*4*6); tube.material.opacity = .9*(k < .85 ? 1 : (1 - k)/.15); head.position.copy(path.getPointAt(Math.min(1, Math.max(0, hd)))); head.material.opacity = tube.material.opacity;
+      if (k < 1) return requestAnimationFrame(run);
+      for (const o of [tube, head]){ scene.remove(o); if (o.geometry) o.geometry.dispose(); o.material.dispose(); } trickles.splice(trickles.indexOf(tube), 1); })();
+    setTimeout(() => floatText(c.x, y1 + .3, c.z, '+' + d.n + (d.n === 1 ? ' resident' : ' residents'), 'arrive'), 350);
+    try { if (typeof sfx !== 'undefined' && sfx.tone && Math.random() < .6) sfx.tone(1175 + Math.random()*200, { gain: .035, dur: .18, glide: .95 }); } catch (e) {}
+  });
+
+  /* ---------- a full building: the jackpot. Its windows strobe through the neon, Scrip chips fountain off the roof, searchlights sweep,
+     and a slot sign over it spins three reels that land on the zone's glyph, then FULL HOUSE and the payout counting up ---------- */
+  const GLYPH = { R: '⌂', L: '◆', C: '¥', I: '⚙', K: '▲' }, FULLNAME = { R: 'Full house', L: 'Full house', C: 'Packed', I: 'Full shift', K: 'Full floor' };
+  let jackQ = [], jackOn = false;
+  E.onEv('full', d => { if (jackQ.length >= 3){ floatText(d.c.x, (d.c.height || CURB + 2) + .4, d.c.z, FULLNAME[d.z] + ' +' + fmt(d.pay), 'big'); return; } jackQ.push(d); if (!jackOn) nextJack(); });
+  function nextJack(){ const d = jackQ.shift(); if (!d){ jackOn = false; return; } jackOn = true; try { jackpot(d); } catch (e) { console.warn('jackpot', e); } setTimeout(nextJack, 2600); }
+  function jackpot(d){
+    const c = d.c, top = (c.sectionTops && c.sectionTops[c.sectionTops.length - 1]) || c.height || CURB + 3, zc = ZCOL[d.z] || 0x38e8e0;
+    const NEON = [zc, 0xff4fa3, 0xffd34a, 0x38e8e0, 0xb26bff];
+    for (let q = 0; q < 8; q++) setTimeout(() => pulseLevel(c, Math.max(1, d.floors), d.z, true, NEON[q % NEON.length]), q*120);
+    setTimeout(() => pulseLevel(c, Math.max(1, d.floors), d.z, true, 0xffffff), 1500);
+    if (typeof scene !== 'undefined'){
+      const chips = [], g = new THREE.Group(); scene.add(g);
+      for (let q = 0; q < 70; q++){ const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: q % 3 ? 0xffc04a : NEON[q % NEON.length], transparent: true, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending }));
+        sp.scale.setScalar(.35 + Math.random()*.3); sp.layers.set(1); sp.renderOrder = 999; sp.position.set(c.x, top + .4, c.z); sp.visible = false; g.add(sp);
+        const a = Math.random()*Math.PI*2, sp0 = 1.5 + Math.random()*3.5; chips.push({ sp, v: new THREE.Vector3(Math.cos(a)*sp0, 9 + Math.random()*7, Math.sin(a)*sp0), t0: q*14 }); }
+      const beams = [], bgeo = new THREE.CylinderGeometry(.18, 1.1, 14, 12, 1, true); bgeo.translate(0, 7, 0);
+      for (let q = 0; q < 4; q++){ const bm = new THREE.Mesh(bgeo, new THREE.MeshBasicMaterial({ color: NEON[(q + 1) % NEON.length], transparent: true, opacity: 0, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+        bm.position.set(c.x, top, c.z); bm.layers.set(1); bm.renderOrder = 998; bm.frustumCulled = false; scene.add(bm); beams.push(bm); }
+      const t0 = performance.now(); let last = t0;
+      (function run(){ const now_ = performance.now(), el_ = now_ - t0, dt = Math.min(.05, (now_ - last)/1000); last = now_;
+        for (const ch of chips){ if (el_ < ch.t0) continue; ch.sp.visible = true; ch.v.y -= 22*dt; ch.sp.position.addScaledVector(ch.v, dt); ch.sp.material.opacity = Math.max(0, 1 - (el_ - ch.t0)/2000); }
+        beams.forEach((bm, q) => { const k = el_/2400; bm.material.opacity = .28*Math.sin(Math.min(1, k)*Math.PI); bm.rotation.set(.45*Math.sin(el_/260 + q*1.6), q*Math.PI/2, .45*Math.cos(el_/310 + q*1.6)); });
+        if (el_ < 2600) return requestAnimationFrame(run);
+        scene.remove(g); for (const ch of chips) ch.sp.material.dispose(); for (const bm of beams){ scene.remove(bm); bm.material.dispose(); } bgeo.dispose(); })();
+    }
+    const p = screenOf(c.x, top + 1.2, c.z), sign = el('div', 'econ-jack'); sign.style.setProperty('--jc', '#' + new THREE.Color(zc).getHexString());
+    sign.innerHTML = `<div class="reels"><i></i><i></i><i></i></div><div class="jt">${FULLNAME[d.z]}</div><div class="jp">+0 Scrip</div>`;
+    const vw = innerWidth, sx_ = p ? Math.min(vw - 110, Math.max(110, p[0])) : vw/2, sy_ = p ? Math.min(innerHeight - 160, Math.max(190, p[1] - 30)) : innerHeight*.35;   // (kept on screen: a tall building's roof can be near the top)
+    sign.style.left = sx_ + 'px'; sign.style.top = sy_ + 'px';
+    document.body.appendChild(sign);
+    const reels = [...sign.querySelectorAll('.reels i')], pool = ['⌂', '◆', '¥', '⚙', '▲', '7', '⚡'], want = GLYPH[d.z] || '⚡';
+    const stopAt = [700, 950, 1200], t1 = performance.now(), snd = typeof sfx !== 'undefined' && sfx.tone ? sfx.tone : () => {};
+    let tk = 0;
+    (function spin(){ const e = performance.now() - t1; reels.forEach((r, q) => { if (e < stopAt[q]) r.textContent = pool[(Math.random()*pool.length) | 0]; else if (!r.dataset.done){ r.dataset.done = 1; r.textContent = want; r.classList.add('hit'); try { snd(784*Math.pow(2, q*4/12), { gain: .12, dur: .3 }); } catch (er) {} } });
+      if (e < stopAt[2] && (tk++ % 3 === 0)) try { snd(1568, { gain: .025, dur: .04, glide: 1 }); } catch (er) {}
+      if (e < stopAt[2]) return requestAnimationFrame(spin);
+      sign.classList.add('win'); try { [0, 4, 7, 12, 16, 19].forEach((n, q) => snd(523*Math.pow(2, n/12), { gain: .11, at: q*.07, dur: q === 5 ? 1.2 : .4 })); } catch (er) {}
+      const jp = sign.querySelector('.jp'), c0 = performance.now(); (function count(){ const k = Math.min(1, (performance.now() - c0)/700); jp.textContent = '+' + fmt(Math.round(d.pay*k)) + ' Scrip'; if (k < 1) requestAnimationFrame(count); })(); })();
+    setTimeout(() => sign.classList.add('out'), 2500); setTimeout(() => sign.remove(), 3100);
+    const m = document.getElementById('ehM'); if (m){ m.classList.remove('bump'); void m.offsetWidth; m.classList.add('bump'); }
+  }
 
   /* ---------- reach: while placing a megastructure with a reach, the area it covers and what it would touch; once placed, the boost runs out to each one ---------- */
   const REACH_FX = { radio: ['Psycho-Acoustic Grid', b => true, '+15% Scrip'], police: ['Police station', b => true, '+15 Grade'], square: ['Town square', b => b.z === 'R' || b.z === 'L', '+15% spending'],
@@ -958,12 +1056,18 @@ const ECON = (() => {
     const zoneBtn = z => () => document.querySelector(TOUCHY ? '.zones' : `.zone[data-zone="${z}"]`);
     const litCount = () => Object.values(st.best).reduce((s, n) => s + n, 0);
     const homesStacked = () => { for (const b of B.values()) if (b.z === 'R' && b.floors >= 2) return true; return false; };
+    const emptyN = () => { let n = 0; for (const c of cells.values()) if (!c.mega && !c.sections.length && !(c.below && c.below.length) && !c.lift && !c.wall) n++; return n; };
+    const homes = () => [...B.values()].filter(b => b.z === 'R');
+    const farHome = () => homes().some(b => b.band !== 'near' && !b.isolated);
     const beats = [
       { say: 'Goal: grow this sector into a city.', sub: `Climb six classifications to ${TIERS[TIERS.length - 1].name}, each unlocking new buildings. The glowing tower is your Emitter Core: it powers every building within 9 plots.`, next: true },
-      { say: `Pick Residential, then ${tap.toLowerCase()} 3 plots near the core.`, sub: 'Every lit level pays Scrip. A plot or two from the core is best: right beside it the air is poor.', target: zoneBtn('low'), count: () => [countZone('R'), 3], done: () => countZone('R') >= 3 },
-      { say: 'Pick Industrial and place a factory.', sub: 'It gives your residents jobs.', target: zoneBtn('ind'), done: () => countZone('I') >= 1 },
+      { say: `Pick Residential and ${tap.toLowerCase()} the ground right next to the core.`, sub: 'People move in, the lights come on, and every lit level pays Scrip.', target: zoneBtn('low'), done: () => countZone('R') >= 1 },
+      { say: () => homes().some(b => b.band === 'near') ? 'Too close to the core.' : 'Homes right beside the core get poor air.', sub: 'Within two plots of a core the air is poor, so homes there have a low Sector Grade and can\'t grow tall. Three plots out the air is clean.', next: true },
+      { say: `${tap} Residential again to put it down, then ${tap.toLowerCase()} the ground beside your city to lay 3 empty tiles in a row, away from the core.`, sub: 'Empty tiles extend the ground. Everything must connect to the city by ground, or it\'s isolated and nobody can move in.', target: () => document.querySelector('.zone.on') || null, enter: emptyN, count: b => [Math.max(0, emptyN() - b._base), 3], done: b => emptyN() - b._base >= 3 },
+      { say: `Now pick Residential and build a home on the far tile, 3 plots from the core.`, sub: 'Out there the air is clean and homes grow taller. But it\'s further from work, so keep jobs close.', target: zoneBtn('low'), done: farHome },
+      { say: 'Pick Industrial and place a factory near your homes.', sub: 'It gives them jobs. Homes far from work fill slowly.', target: zoneBtn('ind'), done: () => countZone('I') >= 1 },
       { say: 'Pick Commercial and place a shop.', sub: 'Shops earn the most Scrip.', target: zoneBtn('mid'), done: () => countZone('C') >= 1 },
-      { say: `Pick Residential and ${tap.toLowerCase()} a lit home's roof to stack a level.`, sub: 'Taller homes hold more people. If it says the Grade is too low, try a home further from the core.', target: zoneBtn('low'), done: homesStacked, nextAfter: 40 },
+      { say: `Pick Residential and ${tap.toLowerCase()} a lit home's roof to stack a level.`, sub: 'Taller homes hold more people. Fill one completely for a jackpot.', target: zoneBtn('low'), done: homesStacked, nextAfter: 40 },
       { say: `Next goal: ${TIERS[1].name}.`, sub: `Reach ${fmt(TIERS[1].pop)} residents. ${TOUCHY ? 'Tap' : 'Hover'} any building to see what it needs.`, next: true, last: true, target: () => document.getElementById('ehO') },
     ];
     let k = st.tut.done ? beats.length : Math.min(st.tut.step || 0, beats.length), lit = null;
@@ -973,7 +1077,7 @@ const ECON = (() => {
       if (k >= beats.length){ noteTut = false; noteEl.hidden = true; return; }
       const b = beats[k]; noteTut = true; clearTimeout(noteT);
       noteEl.innerHTML = ''; noteEl.className = 'econ-note';
-      const say = el('span', 'say'); say.textContent = b.say; const sub = el('span', 'sub'); sub.textContent = b.sub;
+      if (b.enter) b._base = b.enter(); const say = el('span', 'say'); say.textContent = typeof b.say === 'function' ? b.say() : b.say; const sub = el('span', 'sub'); sub.textContent = b.sub;
       const prog = el('div', 'prog'); beats.forEach((_, q) => prog.append(el('i', q <= k ? 'on' : '')));
       noteEl.append(say, sub); if (b.count){ const n = el('span', 'sub'); n.dataset.count = '1'; noteEl.append(n); }
       const row = el('div', 'row'); row.style.justifyContent = 'space-between'; row.append(prog);
@@ -985,13 +1089,13 @@ const ECON = (() => {
     function refresh(){
       const b = beats[k]; if (!b || noteEl.hidden) return;
       if (b.nextAfter && Date.now() - shownAt > b.nextAfter*1000 && !noteEl.querySelector('button.go')){ const go = el('button', 'go', 'Next'); go.type = 'button'; go.onclick = advance; const bt = noteEl.querySelector('.row > div:last-child'); if (bt) bt.append(go); }
-      const n = noteEl.querySelector('[data-count]'); if (n && b.count){ const [a, m] = b.count(); n.textContent = Math.min(a, m) + ' / ' + m; }
+      const n = noteEl.querySelector('[data-count]'); if (n && b.count){ const [a, m] = b.count(b); n.textContent = Math.min(a, m) + ' / ' + m; }
       const t = b.target && b.target(); if (t !== lit){ unpulse(); if (t){ t.classList.add('econ-pulse'); lit = t; } }
     }
     function advance(){ k++; st.tut.step = k; if (k >= beats.length) st.tut.done = true; save(); noteEl.classList.add('done-flash'); setTimeout(show, k >= beats.length ? 0 : 260); }
     function finish(){ k = beats.length; st.tut.done = true; st.tut.step = k; save(); show(); }
     for (const ev of ['build', 'office']) E.onEv(ev, d => { const b = beats[k]; if (b && b.ev === ev && (!b.test || b.test(d))) advance(); });
-    setInterval(() => { const b = beats[k]; if (!b) return; if (b.done && b.done()) advance(); else refresh(); }, 400);
+    setInterval(() => { const b = beats[k]; if (!b || noteEl.hidden) return; if (b.done && b.done(b)) advance(); else refresh(); }, 400);
     // (on a touch screen the gesture tutorial goes first, tutorial.js: these notes wait until it's done or skipped)
     const gestureDone = () => { if (!TOUCHY) return true; try { const g = JSON.parse(localStorage.getItem('touch:nt.tut') || 'null'); return !!(g && g.done); } catch (e) { return true; } };
     function start(){ if (k >= beats.length) return; if (!gestureDone()) return setTimeout(start, 2000); setTimeout(show, 1200); }

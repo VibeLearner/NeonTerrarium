@@ -11,6 +11,15 @@ Object.assign(M, {
   interiorCool: toon(0x2a4050,{em:0x5aa8e0, kind:'window'}), interiorPink: toon(0x40243a,{em:0xd870b0, kind:'window'}),
 });
 const LIT_ROOMS = [M.winLit, M.winLit, M.interiorCool, M.interiorPink];
+// Residential is lit like homes, not like the strip: warm umber and tungsten rooms behind the glass and moss-green neon on the trim,
+// so it reads apart from the commercial quarter's amber neon at a glance. Anything built from a residential style takes its windows from here.
+Object.assign(M, { neonMoss: toon(0x1c3814, { em: 0x6FC24A, kind: 'neon' }), resUmber: toon(0x4a2c1a, { em: 0xC9824E, kind: 'window' }), resUmber2: toon(0x45281a, { em: 0xB06A3C, kind: 'window' }), resTung: toon(0x56402a, { em: 0xE0A868, kind: 'window' }) });
+const RES_ROOMS = [M.resUmber, M.resUmber2, M.resTung, M.resUmber];
+GLOW.moss = new THREE.SpriteMaterial({ map: glowTex, color: 0x6FC24A, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }); NEON_GLOW.set(M.neonMoss, 'moss');   // (its halo)
+if (typeof NEON_NAME !== 'undefined') NEON_NAME.set(M.neonMoss, 'cyan');   // (the little icon signs are drawn in pink, cyan and amber only: a residential shopfront borrows the cyan set)
+const isRes = st => st && st.cls === 'low';
+const roomsOf = st => isRes(st) ? RES_ROOMS : LIT_ROOMS;   // a pick of lit rooms in this style
+const winOf = (st, m) => isRes(st) ? pick(RES_ROOMS) : m;  // a residential building swaps a generic lit window for one of its own
 const D = {
   low:  { walls:[M.concW,M.corrBlue,M.rustRed,M.cream2,M.teal2,M.concL], accent:[M.corrBlue,M.hazard,M.rustRed,M.teal2],
           ground:toon(0x5c5c64), trim:M.concD, roof:M.rustRed },
@@ -20,9 +29,9 @@ const D = {
   ind:  { walls:[M.concL,M.concM,toon(0x6a7066),M.corrBlue], accent:[M.hazard,M.orange], ground:toon(0x4e5054), trim:M.frame, roof:toon(0x4a5058) },
 };
 const STY = {
-  low:  { ...D.low, floors:[4,8], lit:.55, winSkip:.12, balcony:.4, ac:.45, bars:.3, potSill:.25, vines:.6, neon:.8, neonMats:ALLNEON,
-          shop:.45, garage:.2, glyphs:3, strips:.25, vents:.3, cables:.6, laundry:true,
-          roofN:3, roof:['shack','tank','antenna','dish','laundry','pots','billboard'], parapet:true, yaw:.22 },
+  low:  { ...D.low, floors:[4,8], lit:.55, winSkip:.12, balcony:.4, ac:.45, bars:.3, potSill:.25, vines:.6, neon:.8, neonMats:[M.neonMoss, M.neonMoss, M.neonMoss],
+          shop:0, garage:.2, glyphs:0, strips:.25, vents:.3, cables:.6, laundry:true,   // (no shopfronts or signs: homes, not the strip)
+          roofN:3, roof:['shack','tank','antenna','dish','laundry','pots'], parapet:true, yaw:.22 },
   mid:  { ...D.mid, lit:.6, winSkip:.08, balcony:.35, ac:.35, potSill:.2, vines:.35, neon:.9, neonMats:ALLNEON, awn:D.mid.accent,
           shop:.9, garage:.25, glyphs:3, strips:.45, vents:.25, cables:.45,
           roofN:2, roof:['tank','antenna','billboard','ring','dish','pots'], parapet:true, yaw:.12 },
@@ -33,6 +42,7 @@ const STY = {
 };
 U.torus = new THREE.TorusGeometry(.5,.06,6,20).toNonIndexed();
 for (const k in STY) STY[k].cls = k;
+STY.low.rooms = RES_ROOMS;   // (residential windows: umber and tungsten)
 const FH = 0.95, ISL_R = 12.4;
 const LOT = 3.8;   // plot spacing; the street is what's left between a plot's sidewalk and the next one
 const CORNERS = [[1,1],[1,-1],[-1,1],[-1,-1]];
@@ -159,7 +169,7 @@ function balcony(st,F,x,y0){
 function shopfront(st,F,L,y0){
   const wdt = L*.72;
   box(M.frame, F, 0, y0+.45, 0, wdt+.08, .8, .05);
-  box(pick(LIT_ROOMS), F, 0, y0+.3, .015, wdt, .52, .07);
+  box(pick(roomsOf(st)), F, 0, y0+.3, .015, wdt, .52, .07);
   box(M.shutter, F, 0, y0+.68, .045, wdt, .26, .06);
   for (let k=0;k<3;k++) box(M.metalDark, F, 0, y0+.58+k*.08, .078, wdt, .02, .045);
   if (chance(.7)) box(pick(st.awn||AWN), F, 0, y0+.9, .2, L*.8, .05, .42, 0, .3);
@@ -177,7 +187,7 @@ function shopfront(st,F,L,y0){
 function garage(st,F,L,y0){
   const wdt = Math.min(L*.7, 1.1);
   box(pick([M.hazard,st.trim,M.frame]), F, 0, y0+.46, 0, wdt+.1, .84, .05);
-  box(pick([M.interiorCool,M.interiorCool,M.winLit]), F, 0, y0+.34, .015, wdt, .6, .07);
+  box(winOf(st, pick([M.interiorCool,M.interiorCool,M.winLit])), F, 0, y0+.34, .015, wdt, .6, .07);
   box(M.shutter, F, 0, y0+.74, .045, wdt, .18, .06);
   box(M.neonAmber, F, 0, y0+.92, .07, .06, .06, .06); glow(F, 0, y0+.92, .08, 'amber', .6);
   if (chance(.5*S.clutter)) for (const s of [-1,1]) box(pick([M.hazard,M.cloth2]), F, s*(wdt/2+.12), .12, .3, .08, .24, .08);   // bollards
@@ -247,7 +257,7 @@ function signFree(F, x, y, w, h, projecting, out){
   for (const [cx, cy] of cand){ const sb = boxAt(cx, cy); if (SIGN_RES.every(r => !signsMeet(sb, r, SIGN_GAP))){ SIGN_RES.push(sb); log(sb, SIGN_RES); return [cx, cy]; } }
   return null;
 }
-function glyphSign(F,x,y,vertical,projecting){
+function glyphSign(F,x,y,vertical,projecting){ if (S.noSigns) return;
   if (LUX) return;   // the luxury towers keep to their own gold and ivory lights
   const kind = pick(vertical ? GLYPH_V : GLYPH_H);
   const w = SPR.size[kind][0]/PX, h = SPR.size[kind][1]/PX, col = GLYPH_GLOW[kind];
@@ -313,14 +323,14 @@ const ROOF = {
     cyl(M.metalDark,P,s.x,.15,s.z,.03,.3); put(U.sph, M.white2, under(P, T(s.x,.33,s.z,rnd(0,TAU),.44,.12,.44,.7))); },
   shack(P,spot,st){ const s=spot(.45); if(!s) return; const ry=rnd(-.3,.3);
     box(pick([M.corrBlue,M.rustRed,st.walls[0]]),P,s.x,.3,s.z,.7,.6,.55,ry); box(pick([M.rust,M.corrBlue]),P,s.x,.64,s.z,.82,.05,.67,ry,.14);
-    box(pick(LIT_ROOMS),P,s.x,.35,s.z+.28,.18,.16,.03,ry); },
+    box(pick(roomsOf(st)),P,s.x,.35,s.z+.28,.18,.16,.03,ry); },
   laundry(P,spot){ const s=spot(.45); if(!s) return; const Q = under(P, T(s.x,0,s.z,rnd(0,PI)));
     cyl(M.metalDark,Q,-.4,.3,0,.02,.6); cyl(M.metalDark,Q,.4,.3,0,.02,.6); box(M.metalDark,Q,0,.58,0,.8,.015,.015);
     const n=irand(2,3); for (let k=0;k<n;k++) plant(laundryKind(),Q,-.26+k*.52/Math.max(1,n-1),.575,0,.8,'t',true); },
   pots(P,spot){ const s=spot(.3); if(!s) return;
     for (let k=0;k<irand(2,4);k++) plant(pick(['fern','succulent','fern']),P,s.x+rnd(-.2,.2),0,s.z+rnd(-.2,.2),rnd(.65,.9)); },
   // big rooftop billboard on a frame
-  billboard(P,spot,st){ const s=spot(.45); if(!s) return;
+  billboard(P,spot,st){ if (S.noSigns) return; const s=spot(.45); if(!s) return;
     const Q = under(P, T(s.x,0,s.z,rnd(0,PI)));
     for (const x of [-.32,.32]) cyl(M.frame,Q,x,.55,0,.03,1.1);
     box(M.frame,Q,0,.62,0,.8,.04,.05); box(M.frame,Q,0,.62,-.12,.03,.04,.25);
@@ -434,7 +444,7 @@ function annex(st,f,c){
   const aw=rnd(.5,.85), ah=rnd(.45,.75), ad=rnd(.35,.55);
   const x=rnd(-f.len/2+aw/2, Math.max(-f.len/2+aw/2+.01, f.len/2-aw/2)), yy=rnd(ah/2+.05, Math.max(ah/2+.06, c.h-ah/2));
   put(roundedBox(aw,ah,ad,.03), pick(st.walls.concat(st.accent)), under(f.F, T(x,yy,ad/2-.02)));
-  box(pick(LIT_ROOMS), f.F, x, yy+.04, ad-.01, aw*.5, ah*.4, .04);
+  box(pick(roomsOf(st)), f.F, x, yy+.04, ad-.01, aw*.5, ah*.4, .04);
   box(pick([M.rust, M.corrBlue, st.accent[0]]), f.F, x, yy+ah/2+.03, ad/2, aw+.12, .04, ad+.14, 0, .15);
   for (const s of [-1,1]) box(M.metalDark, f.F, x+s*aw*.3, yy-ah/2-.12, ad*.35, .04, .34, .04, 0, -.75);
   if (chance(.4)) acUnit(f.F, x+aw/2+.14, yy);
@@ -484,7 +494,7 @@ function pod(st, P0, c, opts={}){
   put(roundedBox(w, ch, d*.5, coreR), shell, under(P, T(0,cy,-d/4)));
   let roomW = w, roomX = 0;
   if (wrap){ put(roundedBox(w*.45, ch, d*.5, coreR), shell, under(P, T(w*.275, cy, d/4))); roomW = w*.55; roomX = -w*.225; }
-  const lit = opts.lit || (chance(.65) ? M.winLit : pick(LIT_ROOMS));
+  const lit = opts.lit || (isRes(st) ? pick(RES_ROOMS) : chance(.65) ? M.winLit : pick(LIT_ROOMS));
   box(lit, P, roomX, cy, .02, roomW-.14, ch-.04, .04);                       // lit back wall
   if (wrap) box(lit, P, roomX+roomW/2-.02, cy, d/4, .04, ch-.04, d/2-.14);   // lit side wall where it wraps
   box(pick([M.wood, M.cream2, M.teal2]), P, roomX, .115, d/4, roomW-.12, .03, d/2-.12);   // floor
@@ -521,7 +531,7 @@ function podHouse(lot, st, P0){
     const sx = base.ox + bw/2 + .35, P2 = T(sx, 0, base.oz+rnd(-.2,.2));
     box(pick([M.wood, M.concW, M.cream2]), under(P0,P2), 0, .38, 0, .7, .76, .8);
     put(U.prism, D.low.roof, under(P0, under(P2, T(0,.76,0,PI/2,.95,.32,.8))));
-    box(M.winLit, under(P0,P2), .36, .42, 0, .03, .28, .32);
+    box(winOf(st, M.winLit), under(P0,P2), .36, .42, 0, .03, .28, .32);
   }
   const pin = v => lot.aloft ? clamp(v, -1.05, 1.05) : v;   // (on a scaffold deck: posts stay on the planks)
   for (const [sx,sz] of CORNERS) if (chance(.5)) box(M.frame, P0, pin(base.ox+sx*(bw/2+.25)), .6, pin(base.oz+sz*(bd/2+.2)), .07, 1.2, .07);   // posts under the overhang
@@ -571,7 +581,7 @@ function gardenTower(lot, st, P0){
     for (const f of faces(w,w)){
       const F = under(P, T(f.nx*f.half, -h/2, f.nz*f.half, f.ry));
       box(M.frame, F, .04, h/2, .005, .4, h-.12, .05);
-      box(chance(st.lit) ? pick([M.winLit,M.interiorCool]) : M.glassTeal, F, .04, h/2, .015, .32, h-.16, .07);
+      box(chance(st.lit) ? winOf(st, pick([M.winLit,M.interiorCool])) : M.glassTeal, F, .04, h/2, .015, .32, h-.16, .07);
       box(M2.ecoGreen, F, -.26, h/2, .01, .09, h-.2, .05);
     }
     // a curved planter balcony wrapping part of the tower, stepping round a little each level
@@ -622,14 +632,14 @@ function octoHouse(lot, st, P0){
   const wf = top[7].F, wl = top[7].len;
   const Wn = under(wf, T(0, ht*.55, .08, 0, 1,1,1, -.18));
   box(M.frame, Wn, 0, 0, 0, wl*.95, ht*.78, .06);
-  box(pick([M.winLit,M.winLit,M.interiorCool]), Wn, 0, 0, .03, wl*.85, ht*.68, .04);
+  box(winOf(st, pick([M.winLit,M.winLit,M.interiorCool])), Wn, 0, 0, .03, wl*.85, ht*.68, .04);
   for (const s of [-1,1]) box(M.frame, Wn, s*wl*.14, 0, .06, .03, ht*.68, .03);
   // door with a lamp on the landing side, reached by stairs
   const df = top[1].F;
   box(M.frame, df, 0, .45, .01, .4, .82, .05); box(M2.door, df, 0, .43, .03, .32, .76, .05);
   box(M.bulb, df, 0, .9, .08, .06, .06, .06); glow(df, 0, .9, .14, 'warm', .7);
   box(M.cream2, top[2].F, -.1, .6, .03, .18, .28, .04);   // small keypad and signs
-  for (const s of [-1,1]) box(pick(LIT_ROOMS), top[3].F, s*.13, .6, .02, .14, .3, .05);
+  for (const s of [-1,1]) box(pick(roomsOf(st)), top[3].F, s*.13, .6, .02, .14, .3, .05);
   roundVent(top[3].F, -.1, .22, .09); roundVent(top[3].F, .12, .22, .09);
   // landing slab and stairs down (not on the street: a small step and a ladder down the wall)
   if (raisedLot(lot)){
@@ -665,7 +675,7 @@ function stiltFactory(lot, st, P0){
   for (let x=-w/2+.35; x < w/2-.2; x += .42){ box(M.frame, lean, x, 0, .06, .36, h*.8, .03); box(chance(st.lit)?M.interiorCool:M.glassDark, lean, x, 0, .075, .3, h*.74, .02); }
   // side face details
   const Fs = under(P, T(w/2, 0, 0, PI/2));
-  for (let x=-d/2+.3; x<d/2-.2; x+=.4) box(chance(st.lit)?M.winLit:M.glassDark, Fs, x, h*.7, .02, .22, .18, .05);
+  for (let x=-d/2+.3; x<d/2-.2; x+=.4) box(chance(st.lit)?winOf(st, M.winLit):M.glassDark, Fs, x, h*.7, .02, .22, .18, .05);
   glyphSign(Fs, 0, h*.35, false, false);
   // legs: angled pairs with feet
   for (const sx of [-.8,-.1,.6].map(v=>v*w/1.6)) for (const sz of [-1,1]){
@@ -699,8 +709,8 @@ function arcBuilding(lot, st, P0){
   put(arcGeo(rIn, rOut, floors*FH, th0, len), mat, C);
   for (let fl=0; fl<floors; fl++){
     const y = fl*FH;
-    put(arcGeo(rOut-.01, rOut+.05, .36, th0, len), chance(st.lit) ? pick(LIT_ROOMS) : M.glassTeal, under(C, T(0, y+.36, 0)));
-    put(arcGeo(rIn-.05, rIn+.01, .36, th0, len), chance(st.lit) ? M.winLit : M.glassDark, under(C, T(0, y+.36, 0)));
+    put(arcGeo(rOut-.01, rOut+.05, .36, th0, len), chance(st.lit) ? pick(roomsOf(st)) : M.glassTeal, under(C, T(0, y+.36, 0)));
+    put(arcGeo(rIn-.05, rIn+.01, .36, th0, len), chance(st.lit) ? winOf(st, M.winLit) : M.glassDark, under(C, T(0, y+.36, 0)));
     if (fl > 0){
       put(arcGeo(rIn-.08, rOut+.22, .07, th0, len), st.trim, under(C, T(0, y, 0)));
       put(arcGeo(rOut+.19, rOut+.23, .22, th0, len), M.frame, under(C, T(0, y+.07, 0)));
@@ -776,7 +786,7 @@ function deckHouse(lot, st, P0){
   for (let k=0;k<irand(2,3);k++){
     const Pm = under(P0, T(W/2-.25, deckY, -Dd/2+.4+k*.38, -PI/2));
     box(pick([M.frame, M.red2, M.corrBlue]), Pm, 0, .3, 0, .3, .6, .26);
-    box(pick([M.interiorCool, M.interiorPink, M.winLit]), Pm, 0, .4, .135, .22, .2, .02);
+    box(winOf(st, pick([M.interiorCool, M.interiorPink, M.winLit])), Pm, 0, .4, .135, .22, .2, .02);
   }
   box(M.wood, P0, 0, deckY+.14, Dd/2-.3, .5, .04, .15); box(M.frame, P0, 0, deckY+.07, Dd/2-.3, .42, .14, .1);
   if (chance(.7*S.green)) plant(pick(['fern','bush','g_fern2']), P0, -W/2+.25, deckY, Dd/2-.25, .75);
@@ -811,7 +821,7 @@ function deckHouse(lot, st, P0){
   const bw = W-.4, bd = Dd-.4, bh = rnd(.75,.95), by = tY+.12;
   box(pick([M.concM, M.concDD, M.frame, st.walls[0]]), P0, 0, by+bh/2, 0, bw, bh, bd);
   box(M.concD, P0, 0, by+bh+.2, 0, bw-.7, .4, bd-.7);
-  const litMat = chance(.5) ? M3.greenLit : pick([M.winLit, M.interiorCool]);
+  const litMat = isRes(st) ? pick(RES_ROOMS) : chance(.5) ? M3.greenLit : pick([M.winLit, M.interiorCool]);
   for (const [nx,nz,len] of [[0,1,bw],[0,-1,bw],[1,0,bd],[-1,0,bd]]){
     const Q = under(P0, T(nx*(bw/2-.18), by+bh+.2, nz*(bd/2-.18), Math.atan2(nx,nz)));
     box(M.concDD, Q, 0, 0, 0, len-.36, .5, .08, 0, -.72);
@@ -1307,7 +1317,7 @@ function slabTower(lot, st, P0){
   const floors = lot.mf ? Math.max(1, Math.min(irand(7,11), lot.mf)) : irand(7,11), mat = pick(st.walls);   // (built into a gap under a side pod: low enough to fit)
   // lobby: recessed glass floor under the first slab, on columns
   const lobby = { w:w-.5, d:d-.5, h:FH, y:0, ox:0, oz:0, ry:0 };
-  glassRoom(P0, lobby, pick([M.interiorCool,M.winLit]));
+  glassRoom(P0, lobby, winOf(st, pick([M.interiorCool,M.winLit])));
   for (const [sx,sz] of CORNERS) box(st.trim, P0, sx*(w/2-.1), FH/2, sz*(d/2-.1), .14, FH, .14);
   y = FH; fl = 1;
   slab(st, P0, {...lobby, w, d}, y, .12, 1);
@@ -1502,7 +1512,7 @@ function pottedPlant(P, x, z, s = 1){ put(U.cyl16, pick([M.pot, M.inBrick2, M.in
 function crateAt(P, x, y, z, s = 1){ box(M.crate, P, x, y + .11*s, z, .24*s, .22*s, .24*s, rnd(-.3, .3)); box(M.inWood2, P, x, y + .11*s, z, .25*s, .03, .25*s); }
 function moss(P, x, y, z, n = 3){ for (let k=0; k<n; k++) blob(M.inMoss, P, x + rnd(-.2, .2), y, z + rnd(-.2, .2), rnd(.06, .12), .4); }
 // a neon word on a dark board, on a bracket or flat on the wall
-function wordSign(F, kind, x, y, z, k, col, halo){ box(M.frame, F, x, y, z - .03, SPR.size[kind][0]/PX*k + .06, SPR.size[kind][1]/PX*k + .06, MIN_T); plant(kind, F, x, y, z, k, 'c', true); glow(F, x, y, z + .04, col, halo ?? .9 + .6*k); }   // the halo sits right on the board (out in front, the high camera saw it as a blob below the sign)
+function wordSign(F, kind, x, y, z, k, col, halo){ if (S.noSigns) return; box(M.frame, F, x, y, z - .03, SPR.size[kind][0]/PX*k + .06, SPR.size[kind][1]/PX*k + .06, MIN_T); plant(kind, F, x, y, z, k, 'c', true); glow(F, x, y, z + .04, col, halo ?? .9 + .6*k); }   // the halo sits right on the board (out in front, the high camera saw it as a blob below the sign)
 // a gabled roof along local x over a w x d box (ridge along x), with eaves; returns nothing
 function gable(P, y, w, d, rise, mat, over = .15){ put(U.prism, mat, under(P, T(0, y, 0, PI/2, d + 2*over, rise, w + 2*over))); }
 
@@ -2373,7 +2383,7 @@ function foodPlaza(lot, st, P0){
 }
 
 // neon graffiti sprayed on a wall: a tag or doodle somewhere low on the face (it's what people can reach)
-function neonTag(F, L, h, n = 1){
+function neonTag(F, L, h, n = 1){ if (S.noSigns) return;
   for (let k=0; k<n; k++){ const kind = pick(NEON_GRAF), w = SPR.size[kind][0]/PX*.9;
     if (w > L - .2) continue;
     plant(kind, F, rnd(-L/2 + w/2 + .08, L/2 - w/2 - .08), rnd(.32, Math.min(h - .2, 1.1)), .02, .9, 'c', true); }
@@ -2663,7 +2673,7 @@ function hall(lot, st, P0){
   for (let i=0;i<3;i++){
     const z = -c.d/2 + c.d/6 + i*c.d/3;
     put(U.prism, D[st.cls].roof, under(Pr, T(0,0,z,PI/2,c.d/3,.45,c.w)));
-    box(pick([M.winLit,M.interiorCool]), Pr, 0, .2, z+c.d/12, c.w*.9, .03, c.d/7, 0, .95);
+    box(winOf(st, pick([M.winLit,M.interiorCool])), Pr, 0, .2, z+c.d/12, c.w*.9, .03, c.d/7, 0, .95);
   }
   box(M.frame, Pr, 0, .5, 0, .06, .06, c.d);   // roof catwalk rail
   chimneyAt(P0, c.w/2-.3, c.h, -c.d/2+.3);

@@ -531,7 +531,7 @@ const ICONS = {
 };
 const NEON_NAME = new Map([[M.neonPink,'pink'],[M.neonCyan,'cyan'],[M.neonAmber,'amber']]);
 // flat: glued to the wall; projecting: a blade sign sticking out from the wall, readable from the side
-function iconSign(st, F, x, y, projecting, k=.62){
+function iconSign(st, F, x, y, projecting, k=.62){ if (S.noSigns) return;
   const color = LUX ? 'amber' : NEON_NAME.get(pick(st.neonMats)), kind = `sign_${pick(ICONS[st.cls])}_${color}`;
   const w = SPR.size[kind][0]/PX*k;
   if (typeof signFree === 'function'){ const at = signFree(F, x, y, w, SPR.size[kind][1]/PX*k, projecting, w + .16); if (!at) return; x = at[0]; y = at[1]; }   // (no room: another sign is there, or it moved along the wall: buildings.js)

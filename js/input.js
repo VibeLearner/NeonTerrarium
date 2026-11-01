@@ -72,7 +72,9 @@ function touchPan(dx, dy){
 }
 const pmidX = () => { const [a,b] = [...ptrs.values()]; return (a.x + b.x)/2; };
 function paintAt(x, y){
-  const t = targetOf(pickAt(x, y)); if (!t) return;
+  const pk0 = pickAt(x, y);
+  if (!S.zone && pk0 && pk0.c && pk0.c.mega && typeof ECON !== 'undefined' && ECON.on && ECON.megaClick && megas.has(pk0.c.mega) && ECON.megaClick(megas.get(pk0.c.mega))) return;   // (economy: a click on an Emitter Core shows its reach, or fixes it)
+  const t = targetOf(pk0); if (!t) return;
   const k = t.type === 'empty' || t.type === 'side' ? ckey(t.i, t.j) : t.type === 'megaUp' ? 'mega:' + t.m.id : ckey(t.c.i, t.c.j);
   if (act.done.has(k)) return;               // each spot changes at most once per stroke
   act.done.add(k); applyTarget(t);
@@ -380,7 +382,7 @@ function endPtr0(e){
       if ((hwMode || mtMode) && tt && typeof TT !== 'undefined' && TT.tap(e.clientX, e.clientY)){ /* (handled there) */ }
       else if (hwMode) hwClick(e.clientX, e.clientY, tt); else if (mtMode) mtClick(e.clientX, e.clientY, tt); else if (megaPick) placeMegaHere(e.clientX, e.clientY);
       else { const pk = !S.zone && typeof TUI !== 'undefined' ? pickAt(e.clientX, e.clientY) : null;   // (no zone picked: a tap on a megastructure shows its button, or its card)
-        if (pk && pk.c && pk.c.mega && megas.has(pk.c.mega)) TUI.megaTap(megas.get(pk.c.mega), e.clientX, e.clientY); else { act.done = new Set(); paintAt(e.clientX, e.clientY); } } }
+        if (pk && pk.c && pk.c.mega && megas.has(pk.c.mega)){ if (!(typeof ECON !== 'undefined' && ECON.on && ECON.megaClick && ECON.megaClick(megas.get(pk.c.mega)))) TUI.megaTap(megas.get(pk.c.mega), e.clientX, e.clientY); } else { act.done = new Set(); paintAt(e.clientX, e.clientY); } } }
   }
   ptrs.delete(e.pointerId);
   if (!ptrs.size){ dragging = false; act = null; }

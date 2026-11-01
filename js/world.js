@@ -6,7 +6,7 @@
 // each floor belonging to a zone. Every piece is generated from a seed made of its grid position and floor number,
 // so editing one spot never reshuffles anything else.
 const ZONES = {
-  low:  { key:'A', name:'Residential', col:'#38E8E0' },
+  low:  { key:'A', name:'Residential', col:'#6FC24A' },   // (moss green: residential is lit like homes; cyan neon read as commercial)
   mid:  { key:'B', name:'Commercial',  col:'#FFB347' },
   high: { key:'C', name:'Luxury',      col:'#FF4FA3' },
   ind:  { key:'D', name:'Industrial',  col:'#E8E03A' },
@@ -310,9 +310,10 @@ function saveStyle(){ try { localStorage.setItem(STYLE_KEY, JSON.stringify(STYLE
 const styleNow = () => ({ clutter: STYLE.clutter, green: STYLE.green, neon: STYLE.neon });
 const DEFAULT_STYLE = { clutter: 1, green: 1, neon: 1 };
 function withStyle(st, fn){
-  const was = { clutter: S.clutter, green: S.green, neon: S.neon }, u = st || DEFAULT_STYLE;
+  const was = { clutter: S.clutter, green: S.green, neon: S.neon, noSigns: S.noSigns }, u = st || DEFAULT_STYLE;
   S.clutter = u.clutter === undefined ? 1 : u.clutter; S.green = u.green === undefined ? 1 : u.green; S.neon = u.neon === undefined ? 1 : u.neon;
-  try { return fn(); } finally { S.clutter = was.clutter; S.green = was.green; S.neon = was.neon; }
+  S.noSigns = !!(st && st.cls === 'low');   // (residential carries no signs at all: they made it read as commercial. buildings.js, sprites.js)
+  try { return fn(); } finally { S.clutter = was.clutter; S.green = was.green; S.neon = was.neon; S.noSigns = was.noSigns; }
 }
 function hash(...a){ let h = 2166136261; for (const v of a){ const s = String(v); for (let k=0;k<s.length;k++){ h ^= s.charCodeAt(k); h = Math.imul(h, 16777619); } } return h >>> 0; }
 
@@ -1671,7 +1672,7 @@ function rooftopBoard(c, y){
   if (lot && lot.hasCarPad) return;   // a car pad on the roof: no roof billboard or side board
   const hv = hash('board', c.i, c.j, c.sections.length, top.seed), r = hv % 100;
   let size = -1;
-  if ((top.zone === 'mid' || top.zone === 'low') && y > 4.5 && r < (top.zone === 'mid' ? 45 : 28)) size = y > 6.5 ? 2 : 1;
+  if (top.zone === 'mid' && y > 4.5 && r < 45) size = y > 6.5 ? 2 : 1;   // (residential roofs carry no billboards: they made homes read as commercial)
   else if (top.zone === 'mid' && r < 72) size = 0;
   // and on the commercial streets, often a board hung off the side of the building too, part way up (never on the
   // face that has the wall hologram)

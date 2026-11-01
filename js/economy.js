@@ -572,6 +572,8 @@ const ECON = (() => {
   .econ-obj .r.ok div b { color: #5affa8; } .econ-obj .r.ok .bar i { background: #5affa8; } .econ-obj .r.lim .bar i { background: #ffb347; } .econ-obj .r.lim div span::before { content: '▸ '; color: #ffb347; }
   .econ-obj .u { margin-top: 8px; color: #9a92aa; font-size: 11px; } .econ-obj .u em { color: #c9fffb; font-style: normal; }
   html.touch .econ-obj { top: calc(112px + env(safe-area-inset-top,0px)); left: max(12px, env(safe-area-inset-left,0px)); width: 200px; padding: 7px 9px; } html.touch .econ-corp { top: calc(250px + env(safe-area-inset-top,0px)); }
+  html.econ .gdeck { top: calc(var(--econ-obj-b, 190px) + 10px); }   /* (the left column, top to bottom: goals, the Grid's player, Buildings) */
+  html.econ:not(.gdeck-on) .bmenu { top: calc(var(--econ-obj-b, 190px) + 12px); }
   .econ-legend { position: fixed; z-index: 5; left: 50%; transform: translateX(-50%); top: calc(74px + env(safe-area-inset-top,0px)); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; max-width: calc(100vw - 32px);
     font: 12px/1.3 'JetBrains Mono', monospace; color: #efe6d6; background: rgba(12,10,20,.94); border: 1px solid rgba(122,184,255,.5); padding: 8px 12px; }
   .econ-legend[hidden] { display: none; } .econ-legend b { color: #7ab8ff; letter-spacing: .14em; text-transform: uppercase; font-size: 11px; font-weight: 500; }
@@ -624,14 +626,20 @@ const ECON = (() => {
   let objKey = '';
   function objectives(){
     const done = st.tier >= TIERS.length - 1, nt = TIERS[Math.min(st.tier + 1, TIERS.length - 1)];
-    if (done){ const k = 'done'; if (objKey !== k){ objKey = k; objEl.innerHTML = `<div class="h"><small>Sector</small><b>${TIERS[st.tier].name}</b></div><div class="u">Every classification reached. The coast is open.</div>`; } return; }
+    if (done){ const k = 'done'; if (objKey !== k){ objKey = k; objEl.innerHTML = `<div class="h"><small>Sector</small><b>${TIERS[st.tier].name}</b></div><div class="u">Every classification reached. The coast is open.</div>`; } stackLeft(); return; }
     const req = [['Residents', R.pop, nt.pop], ['Scrip per min', Math.max(0, R.rev), nt.inc]]; if (nt.size) req.push(['Lit buildings', R.size, nt.size]);
     const fr = req.filter(r => r[2]).map(r => Math.min(1, r[1]/r[2])), overall = fr.reduce((a, b) => a + b, 0)/fr.length, lim = Math.min(...fr);
     const rows = req.filter(r => r[2]).map((r, k) => { const f = fr[k]; return `<div class="r ${f >= 1 ? 'ok' : f === lim ? 'lim' : ''}"><div><span>${r[0]}</span><b>${fmt(Math.min(r[1], r[2]))} / ${fmt(r[2])}</b></div><div class="bar"><i style="width:${100*f}%"></i></div></div>`; }).join('');
     const opens = (nt.opens || '').split(',').slice(0, 3).map(x => x.trim()).filter(Boolean).join(', ');
     const html = `<div class="h"><small>Next · ${nt.name}</small><span>${Math.floor(overall*100)}%</span></div><div class="ov"><i style="width:${100*overall}%"></i></div>${rows}${opens ? `<div class="u">Unlocks <em>${opens}</em></div>` : ''}`;
     if (html !== objKey){ objKey = html; objEl.innerHTML = html; }
+    stackLeft();
   }
+  // keep the left column from overlapping: the goals' bottom, then the Grid player's (which the Buildings menu sits under, style.css)
+  let stackT = 0;
+  function stackLeft(){ cancelAnimationFrame(stackT); stackT = requestAnimationFrame(() => { const de = document.documentElement, r = objEl.getBoundingClientRect();
+    if (r.height){ const b = Math.ceil(r.bottom) + 'px'; if (de.style.getPropertyValue('--econ-obj-b') !== b) de.style.setProperty('--econ-obj-b', b); }
+    const gd = document.querySelector('.gdeck'); if (gd && de.classList.contains('gdeck-on')){ const g = gd.getBoundingClientRect(); if (g.height){ const b2 = Math.ceil(g.bottom) + 'px'; if (de.style.getPropertyValue('--gdeck-b') !== b2) de.style.setProperty('--gdeck-b', b2); } } }); }
   const corpEl = el('div', 'econ-corp', `<button type="button" data-c="0">Factory</button><button type="button" data-c="1">Corps</button>`); corpEl.hidden = true; corpEl.setAttribute('role', 'group'); corpEl.setAttribute('aria-label', 'Industrial kind');
   document.body.appendChild(corpEl);
   corpEl.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; st.corp = b.dataset.c === '1'; corpSync(); save(); });
@@ -1324,17 +1332,21 @@ const ECON = (() => {
     const zoneBtn = z => () => document.querySelector(TOUCHY ? '.zones' : `.zone[data-zone="${z}"]`);
     const litCount = () => Object.values(st.best).reduce((s, n) => s + n, 0);
     const homesStacked = () => { for (const b of B.values()) if (b.z === 'R' && b.floors >= 2) return true; return false; };
+    // the new empty tiles laid since the step began, and how far out from the core the furthest one (joined to the city) reaches
+    const emptyKeys = () => { const k_ = new Set(); for (const c of cells.values()) if (!c.mega && !c.sections.length && !(c.below && c.below.length) && !c.lift && !c.wall) k_.add(keyOf(c)); return k_; };
+    const farTile = b => { const m = megaList('emitter')[0]; if (!m || !b._base) return 0; let best = 0;
+      for (const c of cells.values()){ if (c.mega || c.sections.length || c.lift || c.wall || b._base.has(keyOf(c))) continue; best = Math.max(best, megaD(c.i, c.j, m)); } return best; };
     const emptyN = () => { let n = 0; for (const c of cells.values()) if (!c.mega && !c.sections.length && !(c.below && c.below.length) && !c.lift && !c.wall) n++; return n; };
     const homes = () => [...B.values()].filter(b => b.z === 'R');
     const farHome = () => homes().some(b => b.band !== 'near' && !b.isolated);
-    const coreAt = () => { const m = megaList('emitter')[0]; return m ? { w: [m.x, (m.roofH || CURB + 6) + 1, m.z] } : null; };
+    const coreAt = () => { const m = megaList('emitter')[0]; return m ? { w: [m.x, (m.roofH || CURB + 6) + 3, m.z], gap: 40 } : null; };
     const homeAt = f => () => { const b = homes().find(f || (() => true)); return b ? { w: [b.c.x, ((b.c.sectionTops && b.c.sectionTops[b.c.sectionTops.length - 1]) || b.c.height || CURB + 3) + .6, b.c.z] } : null; };
     const elAt = f => () => { const e = f(); return e ? { el: e } : null; };
     const beats = [
       { say: 'Goal: grow this sector into a city.', sub: `Climb six classifications to ${TIERS[TIERS.length - 1].name}, each unlocking new buildings. This glowing tower is your Emitter Core: it powers every building within 9 plots.`, next: true, at: coreAt },
       { say: `Pick Residential and ${tap.toLowerCase()} the ground right next to the core.`, sub: 'People move in, the lights come on, and every lit level pays Scrip.', target: zoneBtn('low'), at: elAt(zoneBtn('low')), done: () => countZone('R') >= 1 },
       { say: () => homes().some(b => b.band === 'near') ? 'Too close to the core.' : 'Homes right beside the core get poor air.', sub: 'Within two plots of a core the air is poor, so homes there have a low Sector Grade and can\'t grow tall. Three plots out the air is clean.', next: true, at: homeAt(b => b.band === 'near') },
-      { say: 'Now lay some empty ground.', sub: TOUCHY ? 'Tap Residential again so no zone is picked, then tap beside your city to place 3 empty tiles leading away from the core. Everything must connect by ground, or it\'s isolated and nobody can move in.' : 'Click Residential again (or press Esc) so no zone is picked, then click beside your city to place 3 empty tiles leading away from the core. Everything must connect by ground, or it\'s isolated and nobody can move in.', target: () => document.querySelector('.zone.on') || null, at: elAt(zoneBtn('low')), enter: emptyN, count: b => [Math.max(0, emptyN() - b._base), 3], done: b => emptyN() - b._base >= 3 },
+      { say: 'Now lay some empty ground.', sub: (TOUCHY ? 'Tap Residential again so no zone is picked, then tap' : 'Click Residential again (or press Esc) so no zone is picked, then click') + ' beside your city to place empty tiles in a line, away from the core, until one is 3 plots out. Everything must connect by ground, or it\'s isolated and nobody can move in.', target: () => document.querySelector('.zone.on') || null, at: elAt(zoneBtn('low')), enter: emptyKeys, count: b => [farTile(b), 3], countFmt: (a_, m_) => 'Furthest new tile: ' + a_ + ' of ' + m_ + ' plots out', done: b => farTile(b) >= 3 },
       { say: `Now pick Residential and build a home on the far tile, 3 plots from the core.`, sub: 'Out there the air is clean and homes grow taller. But it\'s further from work, so keep jobs close.', target: zoneBtn('low'), at: elAt(zoneBtn('low')), done: farHome },
       { say: 'Pick Industrial and place a factory near your homes.', sub: 'It gives them jobs. Homes far from work fill slowly.', target: zoneBtn('ind'), at: elAt(zoneBtn('ind')), done: () => countZone('I') >= 1 },
       { say: 'Pick Commercial and place a shop.', sub: 'Shops earn the most Scrip.', target: zoneBtn('mid'), at: elAt(zoneBtn('mid')), done: () => countZone('C') >= 1 },
@@ -1362,7 +1374,7 @@ const ECON = (() => {
       const b = beats[k]; const a = !noteEl.hidden && noteTut && b && b.at ? b.at() : null;
       let x = null, y = null, below = false;
       if (a && a.el){ const r = a.el.getBoundingClientRect(); if (r.width){ x = r.left + r.width/2; y = r.top - 14; if (r.top < innerHeight*.35){ y = r.bottom + 14; below = true; } } }
-      else if (a && a.w){ const p = screenOf(a.w[0], a.w[1], a.w[2]); if (p && p[1] > 60 && p[1] < innerHeight - 40){ x = p[0]; y = p[1] - 14; } }
+      else if (a && a.w){ const p = screenOf(a.w[0], a.w[1], a.w[2]); if (p && p[1] > 60 && p[1] < innerHeight - 40){ x = p[0]; y = p[1] - (a.gap || 24); } }
       const st_ = noteEl.style;
       if (x === null){ if (noteEl.classList.contains('anch')){ noteEl.classList.remove('anch', 'below'); st_.left = st_.top = st_.right = st_.bottom = st_.transform = ''; st_.removeProperty('--ax'); } return; }
       const w = noteEl.offsetWidth || 340, cx = Math.min(innerWidth - w/2 - 12, Math.max(w/2 + 12, x));
@@ -1373,7 +1385,7 @@ const ECON = (() => {
     function refresh(){
       const b = beats[k]; if (!b || noteEl.hidden) return;
       if (b.nextAfter && Date.now() - shownAt > b.nextAfter*1000 && !noteEl.querySelector('button.go')){ const go = el('button', 'go', 'Next'); go.type = 'button'; go.onclick = advance; const bt = noteEl.querySelector('.row > div:last-child'); if (bt) bt.append(go); }
-      const n = noteEl.querySelector('[data-count]'); if (n && b.count){ const [a, m] = b.count(b); n.textContent = Math.min(a, m) + ' / ' + m; }
+      const n = noteEl.querySelector('[data-count]'); if (n && b.count){ const [a, m] = b.count(b); n.textContent = b.countFmt ? b.countFmt(Math.min(a, m), m) : Math.min(a, m) + ' / ' + m; }
       const t = b.target && b.target(); if (t !== lit){ unpulse(); if (t){ t.classList.add('econ-pulse'); lit = t; } }
     }
     function advance(){ k++; st.tut.step = k; if (k >= beats.length) st.tut.done = true; save(); noteEl.classList.add('done-flash'); setTimeout(show, k >= beats.length ? 0 : 260); }

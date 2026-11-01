@@ -19,7 +19,7 @@ Balance source: the Economy Balancer artifact and the project doc `claude/econom
 
 ## How the game maps onto the model
 
-- **A building** is a plot with sections. **A level** is a section (a stacked piece, usually two to four floors). The model counted floors; here every per-floor number is tripled per level and the Sector Grade caps are in levels: E 1, D 1, C 2, B 3, A 4 (factories and corps 2). Stacking a level is the existing "click a roof to stack a section".
+- **A building** is a plot with sections. **A level** is a section (a stacked piece, usually two to four floors). The model counted floors; here every per-floor number is tripled per level and the Sector Grade caps are in levels: E 2, D 2, C 2, B 3, A 4 (factories and corps 2). Stacking a level is the existing "click a roof to stack a section".
 - **Isolation.** A building joins the city when it stands within two plots of another that has, starting from the megastructures, or within reach of a metro stop. An isolated one stays empty and says so.
 - **Light-up.** A level lighting for the first time pulses in its zone's color, pays a floating +Scrip, and that building is redrawn first. A building just placed starts dark (no flash of light).
 - **One zone per building.** A building only takes more of its own zone (corps only on corps).

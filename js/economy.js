@@ -531,17 +531,20 @@ const ECON = (() => {
   .econ-float.cost { color: #ff8a98; font-size: 17px; text-shadow: 0 1px 0 #000; } .econ-float.big { color: #fff; font-size: 16px; letter-spacing: .14em; text-transform: uppercase; text-shadow: 0 0 10px rgba(56,232,224,.9), 0 1px 0 #000; } .econ-float.warn { color: #ff8a98; font-size: 17px; } .econ-float.boost { color: #5ae8ff; font-size: 16px; text-shadow: 0 0 8px rgba(90,232,255,.8), 0 1px 0 #000; }
   @keyframes eFloat { 0% { opacity: 0; transform: translate(-50%, -30%) scale(.7); } 12% { opacity: 1; transform: translate(-50%, -70%) scale(1.15); } 70% { opacity: 1; transform: translate(-50%, -170%) scale(1); } 100% { opacity: 0; transform: translate(-50%, -230%) scale(1); } }
   .econ-float.arrive { font-size: 13px; color: #c9fffb; text-shadow: 0 1px 0 #000; padding: 3px 7px; animation-duration: 1.3s; }
-  .econ-jack { position: fixed; z-index: 7; pointer-events: none; transform: translate(-50%, -100%); text-align: center; font-family: 'JetBrains Mono', monospace; color: #fff; background: rgba(10,8,18,.94); border: 2px solid var(--jc); padding: 8px 12px 9px; box-shadow: 0 0 18px var(--jc), inset 0 0 12px rgba(255,255,255,.06); animation: ejIn .35s cubic-bezier(.2,1.5,.4,1) both; }
-  .econ-jack .reels { display: flex; gap: 6px; justify-content: center; } .econ-jack .reels i { font-style: normal; width: 38px; height: 42px; display: grid; place-items: center; font-size: 26px; background: #07060c; border: 1px solid rgba(255,255,255,.18); color: #9a92aa; }
-  .econ-jack .reels i.hit { color: var(--jc); border-color: var(--jc); text-shadow: 0 0 10px var(--jc); animation: ejHit .3s ease-out; }
-  .econ-jack .jt { margin-top: 7px; font-size: 13px; letter-spacing: .3em; text-transform: uppercase; color: #9a92aa; } .econ-jack .jp { font-size: 20px; font-weight: 700; color: #ffb347; opacity: .35; }
-  .econ-jack.win .jt { color: #fff; text-shadow: 0 0 10px var(--jc); animation: ejBlink .18s steps(2) 6; } .econ-jack.win .jp { opacity: 1; text-shadow: 0 0 10px rgba(255,179,71,.8); }
-  .econ-jack.win { animation: ejWin .5s ease-out; } .econ-jack.out { animation: ejOut .5s ease-in forwards; }
-  @keyframes ejIn { from { opacity: 0; transform: translate(-50%, -80%) scale(.6); } to { opacity: 1; transform: translate(-50%, -100%); } }
-  @keyframes ejHit { 0% { transform: scale(1.4); } 100% { transform: none; } }
-  @keyframes ejWin { 0% { transform: translate(-50%, -100%) scale(1.12); box-shadow: 0 0 40px var(--jc); } 100% { transform: translate(-50%, -100%); } }
-  @keyframes ejBlink { 50% { opacity: .3; } }
-  @keyframes ejOut { to { opacity: 0; transform: translate(-50%, -130%); } }
+  .econ-holo { --hc: #38e8e0; position: fixed; z-index: 7; pointer-events: none; transform: translate(-50%, -100%) skewX(-6deg); text-align: center; font-family: 'JetBrains Mono', monospace; color: #fff; padding: 8px 16px 9px; min-width: 190px;
+    background: linear-gradient(rgba(10,8,18,.55), rgba(10,8,18,.8)), repeating-linear-gradient(0deg, rgba(255,255,255,.06) 0 1px, transparent 1px 3px); border: 1px solid var(--hc); border-left-width: 4px; clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+    box-shadow: 0 0 22px var(--hc); animation: ehoIn .45s steps(6) both, ehoFlick 2.8s linear; }
+  .econ-holo small { display: block; font-size: 10.5px; letter-spacing: .32em; text-transform: uppercase; color: var(--hc); }
+  .econ-holo b { position: relative; display: block; font-size: 22px; letter-spacing: .14em; margin: 3px 0 2px; text-shadow: -2px 0 #ff2bd6, 2px 0 #2bf3ff; white-space: pre; }
+  .econ-holo b::after { content: attr(data-t); position: absolute; inset: 0; color: var(--hc); clip-path: inset(40% 0 45% 0); transform: translateX(4px); animation: ehoSlice .9s steps(1) infinite; }
+  .econ-holo span { display: block; font-size: 17px; font-weight: 700; color: #ffb347; text-shadow: 0 0 10px rgba(255,179,71,.7); }
+  .econ-holo.lock b { text-shadow: 0 0 12px var(--hc), 0 0 2px #fff; } .econ-holo.lock b::after { display: none; } .econ-holo.lock { animation: ehoLock .4s ease-out; }
+  .econ-holo.out { animation: ehoOut .5s steps(5) forwards; }
+  @keyframes ehoIn { from { opacity: 0; transform: translate(-50%, -100%) skewX(-6deg) scaleY(.05); } to { opacity: 1; transform: translate(-50%, -100%) skewX(-6deg); } }
+  @keyframes ehoFlick { 0%, 100% { opacity: 1; } 31% { opacity: 1; } 32% { opacity: .35; } 33% { opacity: 1; } 71% { opacity: 1; } 72% { opacity: .5; } 73% { opacity: 1; } }
+  @keyframes ehoSlice { 0% { clip-path: inset(40% 0 45% 0); transform: translateX(4px); } 33% { clip-path: inset(10% 0 70% 0); transform: translateX(-5px); } 66% { clip-path: inset(70% 0 8% 0); transform: translateX(3px); } }
+  @keyframes ehoLock { 0% { box-shadow: 0 0 50px var(--hc); filter: brightness(1.6); } 100% { box-shadow: 0 0 22px var(--hc); filter: none; } }
+  @keyframes ehoOut { to { opacity: 0; transform: translate(-50%, -100%) skewX(-6deg) scaleY(.05); } }
   .econ-reach { position: fixed; z-index: 6; pointer-events: none; transform: translate(-50%, -100%); font: 600 14px/1.35 'JetBrains Mono', monospace; color: #efe6d6; background: rgba(10,8,18,.9); border: 1px solid currentColor; padding: 7px 11px; text-align: center; white-space: nowrap; }
   .econ-reach b { display: block; font-size: 17px; } .econ-reach[hidden] { display: none; }
   .econ-office { box-sizing: border-box; position: fixed; z-index: 30; top: 0; right: 0; bottom: 0; width: min(420px, 100vw); overflow-y: auto; background: rgba(12,10,20,.97); border-left: 1px solid rgba(255,179,71,.35); color: #efe6d6;
@@ -779,46 +782,69 @@ const ECON = (() => {
     try { if (typeof sfx !== 'undefined' && sfx.tone && Math.random() < .6) sfx.tone(1175 + Math.random()*200, { gain: .035, dur: .18, glide: .95 }); } catch (e) {}
   });
 
-  /* ---------- a full building: the jackpot. Its windows strobe through the neon, Scrip chips fountain off the roof, searchlights sweep,
-     and a slot sign over it spins three reels that land on the zone's glyph, then FULL HOUSE and the payout counting up ---------- */
-  const GLYPH = { R: '⌂', L: '◆', C: '¥', I: '⚙', K: '▲' }, FULLNAME = { R: 'Full house', L: 'Full house', C: 'Packed', I: 'Full shift', K: 'Full floor' };
+  /* ---------- a full building: the uplink. A holographic scan sweeps down the building and back, it glitches between magenta and cyan,
+     a beam of light shoots up off the roof into the sky, glyphs of data rise off it like rain running backwards, and a hologram tag
+     over it decodes out of noise into FULL HOUSE and the payout ---------- */
+  const FULLNAME = { R: 'Full house', L: 'Full house', C: 'Packed', I: 'Full shift', K: 'Full floor' };
+  const NOISE = 'アイウエオカキクケコサシスセソタチツテトナニヌネノ0123456789ABCDEF#%&@$/\\<>';
+  const glyphTex = (() => { const out = []; for (const ch of 'アカサタナ01ﾊﾐﾑ7F#') { const cv = document.createElement('canvas'); cv.width = cv.height = 64; const g = cv.getContext('2d');
+    g.font = 'bold 44px "JetBrains Mono", monospace'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.shadowColor = '#fff'; g.shadowBlur = 10; g.fillStyle = '#fff'; g.fillText(ch, 32, 34); out.push(new THREE.CanvasTexture(cv)); } return out; })();
   let jackQ = [], jackOn = false;
   E.onEv('full', d => { if (jackQ.length >= 3){ floatText(d.c.x, (d.c.height || CURB + 2) + .4, d.c.z, FULLNAME[d.z] + ' +' + fmt(d.pay), 'big'); return; } jackQ.push(d); if (!jackOn) nextJack(); });
-  function nextJack(){ const d = jackQ.shift(); if (!d){ jackOn = false; return; } jackOn = true; try { jackpot(d); } catch (e) { console.warn('jackpot', e); } setTimeout(nextJack, 2600); }
+  function nextJack(){ const d = jackQ.shift(); if (!d){ jackOn = false; return; } jackOn = true; try { jackpot(d); } catch (e) { console.warn('uplink', e); } setTimeout(nextJack, 2800); }
   function jackpot(d){
-    const c = d.c, top = (c.sectionTops && c.sectionTops[c.sectionTops.length - 1]) || c.height || CURB + 3, zc = ZCOL[d.z] || 0x38e8e0;
-    const NEON = [zc, 0xff4fa3, 0xffd34a, 0x38e8e0, 0xb26bff];
-    for (let q = 0; q < 8; q++) setTimeout(() => pulseLevel(c, Math.max(1, d.floors), d.z, true, NEON[q % NEON.length]), q*120);
-    setTimeout(() => pulseLevel(c, Math.max(1, d.floors), d.z, true, 0xffffff), 1500);
+    const c = d.c, top = (c.sectionTops && c.sectionTops[c.sectionTops.length - 1]) || c.height || CURB + 3, y0 = c.lift ? c.lift.y : CURB, H = Math.max(1, top - y0);
+    const zc = new THREE.Color(ZCOL[d.z] || 0x38e8e0), MAG = new THREE.Color(0xff2bd6), CYA = new THREE.Color(0x2bf3ff), w = (typeof SIDE !== 'undefined' ? SIDE : 3) + .2;
+    // glitch: the whole building flickers magenta / cyan, off-beat, then settles in its own color
+    [0, 70, 190, 240, 380, 520].forEach((t, q) => setTimeout(() => pulseLevel(c, Math.max(1, d.floors), d.z, true, q % 2 ? MAG : CYA), t));
+    setTimeout(() => pulseLevel(c, Math.max(1, d.floors), d.z, true, zc), 1500);
+    const snd = typeof sfx !== 'undefined' && sfx.tone ? sfx.tone : () => {};
+    try { for (let q = 0; q < 7; q++) snd(900 + Math.random()*1600, { gain: .03, at: q*.045, dur: .05, glide: .6 + Math.random()*.6 }); } catch (e) {}
     if (typeof scene !== 'undefined'){
-      const chips = [], g = new THREE.Group(); scene.add(g);
-      for (let q = 0; q < 70; q++){ const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: q % 3 ? 0xffc04a : NEON[q % NEON.length], transparent: true, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending }));
-        sp.scale.setScalar(.35 + Math.random()*.3); sp.layers.set(1); sp.renderOrder = 999; sp.position.set(c.x, top + .4, c.z); sp.visible = false; g.add(sp);
-        const a = Math.random()*Math.PI*2, sp0 = 1.5 + Math.random()*3.5; chips.push({ sp, v: new THREE.Vector3(Math.cos(a)*sp0, 9 + Math.random()*7, Math.sin(a)*sp0), t0: q*14 }); }
-      const beams = [], bgeo = new THREE.CylinderGeometry(.18, 1.1, 14, 12, 1, true); bgeo.translate(0, 7, 0);
-      for (let q = 0; q < 4; q++){ const bm = new THREE.Mesh(bgeo, new THREE.MeshBasicMaterial({ color: NEON[(q + 1) % NEON.length], transparent: true, opacity: 0, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
-        bm.position.set(c.x, top, c.z); bm.layers.set(1); bm.renderOrder = 998; bm.frustumCulled = false; scene.add(bm); beams.push(bm); }
-      const t0 = performance.now(); let last = t0;
-      (function run(){ const now_ = performance.now(), el_ = now_ - t0, dt = Math.min(.05, (now_ - last)/1000); last = now_;
-        for (const ch of chips){ if (el_ < ch.t0) continue; ch.sp.visible = true; ch.v.y -= 22*dt; ch.sp.position.addScaledVector(ch.v, dt); ch.sp.material.opacity = Math.max(0, 1 - (el_ - ch.t0)/2000); }
-        beams.forEach((bm, q) => { const k = el_/2400; bm.material.opacity = .28*Math.sin(Math.min(1, k)*Math.PI); bm.rotation.set(.45*Math.sin(el_/260 + q*1.6), q*Math.PI/2, .45*Math.cos(el_/310 + q*1.6)); });
-        if (el_ < 2600) return requestAnimationFrame(run);
-        scene.remove(g); for (const ch of chips) ch.sp.material.dispose(); for (const bm of beams){ scene.remove(bm); bm.material.dispose(); } bgeo.dispose(); })();
+      const g = new THREE.Group(); g.position.set(c.x, 0, c.z); scene.add(g);
+      const add = o => { o.traverse(q => { q.layers.set(1); q.renderOrder = 998; q.frustumCulled = false; }); g.add(o); return o; };
+      const addMat = (col, op = 1) => new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: op, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+      // the scan: a bright square ring and a thin sheet, sweeping down the building and back up
+      const ringG = new THREE.EdgesGeometry(new THREE.BoxGeometry(w, .06, w)), ring = add(new THREE.LineSegments(ringG, new THREE.LineBasicMaterial({ color: CYA, transparent: true, depthTest: false })));
+      const sheet = add(new THREE.Mesh(new THREE.PlaneGeometry(w, w), addMat(CYA, .35))); sheet.rotation.x = -Math.PI/2;
+      // the uplink: a beam off the roof into the sky, a white core in a colored sheath
+      const beamG = new THREE.CylinderGeometry(.5, .5, 1, 16, 1, true); beamG.translate(0, .5, 0);
+      const coreG = new THREE.CylinderGeometry(.14, .14, 1, 8, 1, true); coreG.translate(0, .5, 0);
+      const beam = add(new THREE.Mesh(beamG, addMat(zc, 0))), coreB = add(new THREE.Mesh(coreG, addMat(0xffffff, 0)));
+      beam.position.y = coreB.position.y = top; const BEAM = 40;
+      const flare = add(new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: zc, transparent: true, opacity: 0, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending }))); flare.position.y = top + .3;
+      // the data: glyphs rising off the roof, flickering, each a little column of its own
+      const bits = [];
+      for (let q = 0; q < 46; q++){ const sp = add(new THREE.Sprite(new THREE.SpriteMaterial({ map: glyphTex[q % glyphTex.length], color: q % 4 ? zc : (q % 8 ? MAG : 0xffffff), transparent: true, opacity: 0, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending })));
+        const a = Math.random()*Math.PI*2, r = Math.random()*w*.9; sp.position.set(Math.cos(a)*r, top + Math.random()*.5, Math.sin(a)*r); sp.scale.setScalar(.45 + Math.random()*.25);
+        bits.push({ sp, v: 3 + Math.random()*5, t0: 350 + Math.random()*1100, k: q }); }
+      const t0 = performance.now();
+      (function run(){ const el_ = performance.now() - t0;
+        // scan: down in 450 ms, back up by 900, gone by 1100
+        const sk = Math.min(1, el_/900), sy = sk < .5 ? top - H*(sk*2) : y0 + H*((sk - .5)*2), so = el_ < 900 ? 1 : Math.max(0, 1 - (el_ - 900)/200);
+        ring.position.y = sheet.position.y = sy; ring.material.opacity = so; sheet.material.opacity = .35*so; ring.material.color.copy(Math.floor(el_/60) % 2 ? CYA : MAG);
+        // beam: shoots up at 500 ms, holds, thins out by 2.6 s
+        const bk = Math.max(0, Math.min(1, (el_ - 500)/250)), bf = el_ < 2000 ? 1 : Math.max(0, 1 - (el_ - 2000)/600), fl = .8 + Math.random()*.2;
+        beam.scale.set(1 + .4*(1 - bk), BEAM*bk, 1 + .4*(1 - bk)); coreB.scale.set(1, BEAM*bk, 1); beam.material.opacity = .4*bk*bf*fl; coreB.material.opacity = .95*bk*bf;
+        beam.scale.x = beam.scale.z = bf*(1 + .4*(1 - bk)) + .01; flare.material.opacity = bk*bf; flare.scale.setScalar(w*(1.4 + .6*Math.sin(el_/50)));
+        for (const b_ of bits){ const t = el_ - b_.t0; if (t < 0) continue; b_.sp.position.y += b_.v*.016; b_.sp.material.opacity = Math.max(0, Math.min(1, t/120) - t/1500)*(Math.random() < .12 ? .2 : 1);
+          if (Math.random() < .04) b_.sp.material.map = glyphTex[(Math.random()*glyphTex.length) | 0]; }
+        if (el_ < 2700) return requestAnimationFrame(run);
+        scene.remove(g); g.traverse(o => { if (o.material) o.material.dispose(); }); for (const gg of [ringG, beamG, coreG, sheet.geometry]) gg.dispose(); })();
+      setTimeout(() => { try { snd(110, { gain: .16, dur: .9, glide: .5 }); snd(220, { gain: .1, dur: 1.1, glide: .5 }); [0, 7, 12, 19].forEach((n, q) => snd(659*Math.pow(2, n/12), { gain: .08, at: .05 + q*.06, dur: q === 3 ? 1.3 : .5, glide: .9 })); } catch (e) {} }, 500);
     }
-    const p = screenOf(c.x, top + 1.2, c.z), sign = el('div', 'econ-jack'); sign.style.setProperty('--jc', '#' + new THREE.Color(zc).getHexString());
-    sign.innerHTML = `<div class="reels"><i></i><i></i><i></i></div><div class="jt">${FULLNAME[d.z]}</div><div class="jp">+0 Scrip</div>`;
-    const vw = innerWidth, sx_ = p ? Math.min(vw - 110, Math.max(110, p[0])) : vw/2, sy_ = p ? Math.min(innerHeight - 160, Math.max(190, p[1] - 30)) : innerHeight*.35;   // (kept on screen: a tall building's roof can be near the top)
-    sign.style.left = sx_ + 'px'; sign.style.top = sy_ + 'px';
-    document.body.appendChild(sign);
-    const reels = [...sign.querySelectorAll('.reels i')], pool = ['⌂', '◆', '¥', '⚙', '▲', '7', '⚡'], want = GLYPH[d.z] || '⚡';
-    const stopAt = [700, 950, 1200], t1 = performance.now(), snd = typeof sfx !== 'undefined' && sfx.tone ? sfx.tone : () => {};
-    let tk = 0;
-    (function spin(){ const e = performance.now() - t1; reels.forEach((r, q) => { if (e < stopAt[q]) r.textContent = pool[(Math.random()*pool.length) | 0]; else if (!r.dataset.done){ r.dataset.done = 1; r.textContent = want; r.classList.add('hit'); try { snd(784*Math.pow(2, q*4/12), { gain: .12, dur: .3 }); } catch (er) {} } });
-      if (e < stopAt[2] && (tk++ % 3 === 0)) try { snd(1568, { gain: .025, dur: .04, glide: 1 }); } catch (er) {}
-      if (e < stopAt[2]) return requestAnimationFrame(spin);
-      sign.classList.add('win'); try { [0, 4, 7, 12, 16, 19].forEach((n, q) => snd(523*Math.pow(2, n/12), { gain: .11, at: q*.07, dur: q === 5 ? 1.2 : .4 })); } catch (er) {}
-      const jp = sign.querySelector('.jp'), c0 = performance.now(); (function count(){ const k = Math.min(1, (performance.now() - c0)/700); jp.textContent = '+' + fmt(Math.round(d.pay*k)) + ' Scrip'; if (k < 1) requestAnimationFrame(count); })(); })();
-    setTimeout(() => sign.classList.add('out'), 2500); setTimeout(() => sign.remove(), 3100);
+    // the hologram tag: decodes out of noise, scanlines, a glitch slice now and then
+    const p = screenOf(c.x, top + 1.2, c.z), tag = el('div', 'econ-holo'); tag.style.setProperty('--hc', '#' + zc.getHexString());
+    const vw = innerWidth, tx = p ? Math.min(vw - 130, Math.max(130, p[0])) : vw/2, ty = p ? Math.min(innerHeight - 160, Math.max(170, p[1] - 30)) : innerHeight*.35;   // (kept on screen)
+    tag.style.left = tx + 'px'; tag.style.top = ty + 'px';
+    tag.innerHTML = `<small>Occupancy 100%</small><b data-t=""></b><span>+0 Scrip</span>`; document.body.appendChild(tag);
+    const nameEl = tag.querySelector('b'), payEl = tag.querySelector('span'), want = FULLNAME[d.z].toUpperCase(), t1 = performance.now();
+    (function decode(){ const e = performance.now() - t1, k = Math.min(1, Math.max(0, (e - 250)/700)), n = Math.floor(k*want.length);
+      let out = want.slice(0, n); for (let q = n; q < want.length; q++) out += want[q] === ' ' ? ' ' : NOISE[(Math.random()*NOISE.length) | 0];
+      nameEl.textContent = out; nameEl.dataset.t = out;
+      if (e > 950){ const pk = Math.min(1, (e - 950)/600); payEl.textContent = '+' + fmt(Math.round(d.pay*pk)) + ' Scrip'; if (pk >= 1 && !tag.classList.contains('lock')) tag.classList.add('lock'); }
+      if (e < 1600) requestAnimationFrame(decode); })();
+    setTimeout(() => tag.classList.add('out'), 2500); setTimeout(() => tag.remove(), 3000);
     const m = document.getElementById('ehM'); if (m){ m.classList.remove('bump'); void m.offsetWidth; m.classList.add('bump'); }
   }
 

@@ -2,7 +2,9 @@
 
 A city started as **Economy** on the title screen (New city → Mode) runs on Scrip. Sandbox cities, including every city made before this, never load any of it: `ECON.on` is false and every hook steps aside.
 
-Balance source: the Economy Balancer artifact and the project doc `claude/economy-balance.md`. Pace (Oct 31, owner): a clicker, not an idle game. The model's hour passes in one real minute (`K = 60` in economy.js), so every rate reads per minute, a level lights in a second or two, cores charge in seconds to two minutes, and nothing accrues while the game is closed. Classifications: 100, 300, 650, 1,100, 1,700, 2,500 residents (plus 500, 1,800, 4,500, 9,500, 16,000 Scrip/min, and 80 lit buildings for the coast).
+Balance (Nov 1, owner: "like Cookie Clicker", huge numbers, about 2.5 hours of active play to The coast): every (zone, level) is its own kind of building. Each costs 17% more than the last of its kind (`P.grow`); a level up costs 9x the one under it (`P.lvCost`) and makes 5.5x as much (`P.lvProd`). Base price / output per minute: Residential 15 / 12, Industrial 90 / 45, Commercial 220 / 110, Luxury 9,000 / 2,000, Corps 70,000 / 14,000. x2 upgrades per zone in the City office open at 10, 25, 50, 100, 150, 200, 250, 300 levels of that zone (cost: base x 100, 2,000, 50,000, 5M...). Megastructures add city-wide multipliers (x1.1 to x2, costs 8K to 1T). A lit level pays a minute of its output; a full building two minutes of its whole output. Tiles cost 5 Scrip, about 2% more per plot the city has. Numbers show in full to a million, then 1.23M, 4.56B, T, Qa... The tuning model is `tools/economy/ccmodel.js` (node; a greedy player, one purchase every 6 s): `node tools/economy/ccmodel.js '{"at":[4,12,28,55,95,150]}'` prints what a player has at each target time.
+
+Classifications need all of: residents, average satisfaction, power from the cores, employment, Scrip per minute and lit buildings (the TIERS table). Targets: Registered about 4 min, Zoned 12, Chartered 28, Incorporated 55, Sovereign 95, The coast 150.
 
 ## Where it lives
 
@@ -45,15 +47,21 @@ Balance source: the Economy Balancer artifact and the project doc `claude/econom
 - Power view: click a core (no zone picked) to see its reach and bands on the ground for 9 s (red poor air up to 2 plots, amber 95% output 3 to 5, green 80% output to the edge, grey no power), or press Power in the top bar (or V) to show every core's. A legend explains the colors.
 - Power surges (after the tutorial; the first about 2 min in, then every 3 to 5 min): a core glows yellow, orange, then red, 5 s each, with a label and a warning ring. Click it to open the stabilizer (keep the trace in the band for 4 s; the clock stops while you work); success pays a little Scrip. Ignore it and the core shuts down: its buildings go dark until you click it and crank it back up (click, tap or Space fills a bar that drains). After a restart its reach is 7 plots for 90 s. Charging a new core no longer has a mini game.
 - Objectives panel (top left, always shown; the Grid's player and the Buildings menu stack under it): the next classification, an overall bar (the average of its requirements), a bar per requirement (the one holding you back marked), and what it unlocks. The top bar's Next box is hidden.
+- Satisfaction (homes, 0 to 100): base 60; poor air near a core −20, mid −2, far +4; noise −6 per unit (up to −30); work near +8, far −12; shops near +6, none −6; an outage −20; Town square +10, Bath House +8, Police +4 in reach. It scales home output (x0.6 at 0 to x1.4 at 100) and the city's average is a classification requirement.
+- Noise: factories (louder per level, 2 plots), shops (a little, 1 plot) and the Grid, Foundry, Neon Dome, Market, Logistics Hub, Sky mall add up by density. Faint sound rings hang over homes that hear it (yellow, orange, red).
+- Maps: Power / Air / Noise buttons in the top bar (V cycles, Esc closes), each with a one-line legend. Clicking a core shows its own power reach for 9 s.
+- After an outage people drift back over about 90 s, and for 5 minutes a share stays away: 1% per 2.4 s the power was off, up to 60%.
+- Luxury is hidden from the zone bar until Chartered.
+- The first power surge explains itself over the core and holds its clock until you click Got it or the core.
 - Always night: the sky and lights are drawn as 23:00 (the clock, people and stories run on); the title room is lit for night too.
 - Tutorial notes hover over what they're about (the core, the zone button to use, the home in question, the objectives panel) with a pointer; tips sit at the bottom right on desktop (centered on touch and narrow windows).
-- Tutorial: the goal and core; a home right beside the core; why that's too close (poor air within two plots); deselect and lay empty tiles outward until one is 3 plots from the core (it checks the distance) (everything must connect by ground or it's isolated); a home on the far tile (clean air, but further from work); a factory; a shop; stack a level; next goal. Notes are one action each, the button to use pulsing, a progress strip; no dimming, no spotlight; skippable; replay from the Office. On touch it waits for the gesture tutorial first.
+- Tutorial: the goal and core; click the core (its reach shows); the Map buttons; a home right beside the core; why that's too close (poor air within two plots); deselect and lay empty tiles outward until one is 3 plots from the core (it checks the distance) (everything must connect by ground or it's isolated); a home on the far tile (clean air, but further from work); a factory; a shop; stack a level; next goal. Notes are one action each, the button to use pulsing, a progress strip; no dimming, no spotlight; skippable; replay from the Office. On touch it waits for the gesture tutorial first.
 - Hover (mouse) or tap with no zone picked (touch): a building's Grade, lit levels, cap, why it's struggling, taxes, next level's price.
 - Corps: with Industrial picked from Chartered on, a Factory / Corps switch appears.
 
 ## Residential look
 
-Residential is lit like homes: moss-green neon trim (`M.neonMoss`, halo `GLOW.moss`) and umber/tungsten windows (`RES_ROOMS`, buildings.js), in both modes; the zone color is moss (#9BD86A). The little icon signs on residential shopfronts still use the cyan art (only pink, cyan and amber are drawn).
+Residential is lit like homes: deep moss-green neon trim (`M.neonMoss`, #6FC24A, halo `GLOW.moss`) and umber/tungsten windows (`RES_ROOMS`, buildings.js), in both modes, and carries no signs at all: no shopfronts, icon, glyph or word signs, billboards or roof boards (`S.noSigns`, set by world.js withStyle). The zone color is #6FC24A.
 
 ## Console
 

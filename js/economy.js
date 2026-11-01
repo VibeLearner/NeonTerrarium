@@ -21,12 +21,27 @@ const ECON = (() => {
   // a level fills in a second or two, a core charges in seconds to a couple of minutes, and nothing builds up while the game is closed.
   const K = 60;   // model hours per real hour
   const P = {
-    pwr: { R: 3, C: 6, L: 9, I: 12, K: 9 }, stationPwr: 6, hwPwr: 8,
-    coreCap: 80, coreCost: 250, coreCostGrowth: 1.35, coreBuildMin: 20, coreBuildGrowth: 1.45, coreBuildMaxH: 2,
-    coreUpCost: 250, coreUpCostGrowth: 1.6, coreUpGain: .5, coreUpDecay: .85, coreUpPollCut: .2, coreJobs: 10, coreUpkeep: 10,
+    // Cookie Clicker style (owner, Nov 1): every (zone, level) is its own kind of building. Each one costs 17% more than the last of its kind;
+    // a level up costs 9x the one under it and makes 5.5x as much. x2 upgrades per zone open as you build (10, 25, 50... levels of it).
+    // Output is per minute at full staff. Tuned in a model (scratch ccmodel.js) for about 2.5 hours to The coast: see claude/economy-mode.md
+    Z: { R: { cost: 15, prod: 12 }, I: { cost: 90, prod: 45 }, C: { cost: 220, prod: 110 }, L: { cost: 9000, prod: 2000 }, K: { cost: 70000, prod: 14000 } },
+    lvCost: 9, lvProd: 5.5, grow: 1.17,
+    upAt: [10, 25, 50, 100, 150, 200, 250, 300], upMul: [100, 2000, 5e4, 5e6, 5e8, 5e10, 5e12, 5e14],
+    lightS: 60, lightFlat: 6, fullS: 120,   // (a level lighting pays a minute of its own output, plus a little; a full building, two minutes of the whole building's)
+    tileCost: 5, tileGrow: 1.02,
+    jobsC: 10, shopPpl: 45,
+    // noise sources: strength and radius in plots (a factory gets louder per level); megastructures [strength, radius]
+    noise: { I: 2.2, perLv: .6, rI: 2, C: .7, rC: 1, mega: { radio: [3.2, 3], club: [2.6, 2], market: [1.6, 2], foundry: [3.2, 3], logistics: [2.4, 2], mall: [1.4, 2] } },
+    // satisfaction (0 to 100) for a home: a base, then air, noise, work, shops, outages and megastructures
+    sat: { base: 60, airNear: -20, airMid: -2, airFar: 4, noise: 6, noiseMax: 30, jobNear: 8, jobFar: -12, shop: 6, outage: -20, square: 10, bath: 8, police: 4 },
+    // after an outage: people drift back over ~90 s; a share never comes back (more the longer it was dark: 1% per 2.4 s, up to 60%) for 5 min
+    outBackMs: 90e3, outBackRate: 1.6, outHoldMs: 300e3, outLossS: 2.4, outLossMax: .6,
+    pwr: { R: 1, C: 2, L: 3, I: 3, K: 4 }, stationPwr: 6, hwPwr: 8,
+    coreCap: 40, coreCost: 150, coreCostGrowth: 2.4, coreBuildMin: 20, coreBuildGrowth: 1.45, coreBuildMaxH: 2,
+    coreUpCost: 400, coreUpCostGrowth: 3.2, coreUpGain: .5, coreUpDecay: 1, coreUpPollCut: .2, coreJobs: 10, coreUpkeep: 10,
     coreReach: 9, coreNear: 2, coreMid: 5, coreReachLow: 7, lowMs: 90e3,   // (after a restart: 7 plots for 90 s)
     surgeFirst: 120e3, surgeGap: [180e3, 300e3], surgeStage: 5000,   // (power surges: the first two minutes after the tutorial, then every 3 to 5 min; 5 s per stage, yellow, orange, red)
-    ppl: { R: 24, L: 9 }, jobsI: 36, jobsK: 12, unempStay: .4,
+    ppl: { R: 24, L: 9 }, jobsI: 30, jobsK: 12, unempStay: .4,
     incR: 10, incRU: 2, incL: 60, incLU: 6, tax: .08, spend: .6,
     cCap: 450, cShare: .4, cStation: .3, luxSmall: .4, bigShop: 2,
     goodsFloor: 30, salesPerGood: 10, goodValue: 5, exportPre: .3, exportPost: .7, importPre: .5, importPost: .2, stockH: 2, corpBoost: .25,
@@ -39,37 +54,40 @@ const ECON = (() => {
     accessMid: .8, accessFar: .3, accessMetro: .95, jobNear: 3, jobMid: 7, shopR: 3, stationR: 2, corpR: 3, factoryR: 2,
     fill: 40, fillCheap: 20, trickle: 8, trickleCheap: 3,   // (trickle: the rest of a lit level, per model hour: about 15 s to fill out)
       // (per model hour, toward the target: at the clicker pace a new level lights in a second or two)
-    baseline: .6, baselineH: 24, stipend: 15,
-    startMoney: 800,
-    metroTile: 25, metroStop: 150, hwTile: 120, hwFinish: 1500,
+    stipend: 6,
+    startMoney: 500,   // (enough for the tutorial's home, tiles, factory and shop)
+    metroTile: 400, metroStop: 3000, hwTile: 2e6, hwFinish: 3e7,
   };
   // the megastructures: the tier each unlocks at, what it costs, the power it draws, the jobs it gives (per level for the Sky mall), and its reach in plots
-  const MEGA = {
-    radio:      { tier: 0, cost: 300,   pwr: 4,  jobs: 6,  reach: 7, upReach: 2, upCost: 500, upGrowth: 1.6, what: 'buildings within 7 plots earn 15% more' },
-    emitter:    { tier: 0, cost: 250,   pwr: 0,  jobs: 10, what: 'powers every building within 9 plots' },
-    wirenest:   { tier: 1, cost: 600,   pwr: 4,  jobs: 6,  what: 'Demand readout in the log, data income' },
-    square:     { tier: 1, cost: 400,   pwr: 4,  jobs: 6,  reach: 5, what: 'Residents in reach spend 15% more' },
-    police:     { tier: 2, cost: 1500,  pwr: 6,  jobs: 8,  reach: 7, upReach: 2, upCost: 1000, upGrowth: 1.6, what: 'Sector Grade +15 in reach' },
-    market:     { tier: 2, cost: 1500,  pwr: 8,  jobs: 10, what: 'A big shop anchor: 1,200 sales an hour' },
-    foundry:    { tier: 2, cost: 2000,  pwr: 16, jobs: 14, what: 'Factory output +20%' },
-    bathhouse:  { tier: 3, cost: 4000,  pwr: 6,  jobs: 0,  reach: 5, what: 'Cheap homes in reach work better' },
-    club:       { tier: 3, cost: 5000,  pwr: 10, jobs: 10, what: 'Spending +10% across the city' },
-    lidar:      { tier: 3, cost: 5000,  pwr: 6,  jobs: 0,  reach: 8, what: '+2% tax from homes in reach' },
-    mall:       { tier: 4, cost: 10000, pwr: 12, jobs: 8,  levelGrowth: 2, what: '2,000 big-shop sales an hour per level' },
-    logistics:  { tier: 4, cost: 12000, pwr: 14, jobs: 24, what: 'Better trade rates, more storage' },
-    greenhouse: { tier: 4, cost: 10000, pwr: 12, jobs: 12, what: 'Local food: 15% less goods demand' },
-    spire:      { tier: 5, cost: 30000, pwr: 10, jobs: 0,  after: 'foundry', what: 'The Overseer upgrades buildings for you' },
-    pagoda:     { tier: 5, cost: 40000, pwr: 14, jobs: 12, what: 'Luxury fills easier; visitors pay' },
+  const MEGA = {   // mul: a city-wide multiplier on all output once it stands (the Grid's is local instead: +15% in its reach)
+    radio:      { tier: 0, cost: 400,   mul: 1,    pwr: 4,  jobs: 6,  reach: 7, upReach: 2, upCost: 2e4, upGrowth: 20, what: 'buildings within 7 plots earn 15% more' },
+    emitter:    { tier: 0, cost: 150,   mul: 1,    pwr: 0,  jobs: 10, what: 'powers every building within 9 plots' },
+    wirenest:   { tier: 1, cost: 2e4,   mul: 1.1,  pwr: 4,  jobs: 6,  what: 'All output +10%; demand in the log' },
+    square:     { tier: 1, cost: 8e3,   mul: 1.15, pwr: 4,  jobs: 6,  reach: 5, what: 'All output +15%; homes in reach happier' },
+    police:     { tier: 2, cost: 5e5,   mul: 1.2,  pwr: 6,  jobs: 8,  reach: 7, upReach: 2, upCost: 2e6, upGrowth: 20, what: 'All output +20%; Grade +15 in reach' },
+    market:     { tier: 2, cost: 1e6,   mul: 1.25, pwr: 8,  jobs: 10, what: 'All output +25%' },
+    foundry:    { tier: 2, cost: 2e6,   mul: 1.25, pwr: 16, jobs: 14, what: 'All output +25%' },
+    bathhouse:  { tier: 3, cost: 5e7,   mul: 1.3,  pwr: 6,  jobs: 0,  reach: 5, what: 'All output +30%; homes in reach happier' },
+    club:       { tier: 3, cost: 1e8,   mul: 1.4,  pwr: 10, jobs: 10, what: 'All output +40%' },
+    lidar:      { tier: 3, cost: 2e8,   mul: 1.3,  pwr: 6,  jobs: 0,  reach: 8, what: 'All output +30%' },
+    mall:       { tier: 4, cost: 5e9,   mul: 1.6,  pwr: 12, jobs: 8,  levelGrowth: 10, what: 'All output +60%' },
+    logistics:  { tier: 4, cost: 1e10,  mul: 1.6,  pwr: 14, jobs: 24, what: 'All output +60%' },
+    greenhouse: { tier: 4, cost: 2e10,  mul: 1.5,  pwr: 12, jobs: 12, what: 'All output +50%' },
+    spire:      { tier: 5, cost: 5e11,  mul: 2,    pwr: 10, jobs: 0,  after: 'foundry', what: 'All output x2; the Overseer upgrades for you' },
+    pagoda:     { tier: 5, cost: 1e12,  mul: 2,    pwr: 14, jobs: 12, what: 'All output x2' },
   };
+
+  // each classification needs all of these: residents, their average satisfaction, power from the cores, employment, Scrip per minute, buildings lit
   const TIERS = [
     { name: 'Unlisted', pop: 0, inc: 0 },
-    { name: 'Registered', pop: 100, inc: 0, opens: 'Wire Nest, Town square, core upgrades, stabilizer' },
-    { name: 'Zoned', pop: 300, inc: 500, opens: 'Metro, Police station, Market Plaza, Foundry' },
-    { name: 'Chartered', pop: 650, inc: 1800, opens: 'Luxury, Corps, Bath House, Neon Dome, LIDAR Array' },
-    { name: 'Incorporated', pop: 1100, inc: 4500, opens: 'Sky highways, Sky mall, Logistics Hub, Hydroponic Farm' },
-    { name: 'Sovereign', pop: 1700, inc: 9500, opens: 'Data Spire, Cloud Pagoda' },
-    { name: 'The coast', pop: 2500, inc: 16000, size: 80, opens: 'The coast, through the Data Spire' },
+    { name: 'Registered', pop: 120, sat: 50, pwr: 40, emp: 0, inc: 100, lit: 8, opens: 'Wire Nest, Town square, core upgrades' },
+    { name: 'Zoned', pop: 400, sat: 55, pwr: 120, emp: 50, inc: 2500, lit: 20, opens: 'Metro, Police station, Market Plaza, Foundry' },
+    { name: 'Chartered', pop: 1300, sat: 58, pwr: 400, emp: 60, inc: 4e5, lit: 50, opens: 'Luxury, Corps, Bath House, Neon Dome, LIDAR Array' },
+    { name: 'Incorporated', pop: 2600, sat: 60, pwr: 800, emp: 65, inc: 3e7, lit: 100, opens: 'Sky highways, Sky mall, Logistics Hub, Hydroponic Farm' },
+    { name: 'Sovereign', pop: 4500, sat: 62, pwr: 1600, emp: 70, inc: 1.5e10, lit: 160, opens: 'Data Spire, Cloud Pagoda' },
+    { name: 'The coast', pop: 7000, sat: 65, pwr: 2800, emp: 72, inc: 5e10, lit: 220, opens: 'The coast, through the Data Spire' },
   ];
+  const REQS = [['pop', 'Residents'], ['sat', 'Satisfaction', '%'], ['pwr', 'Power'], ['emp', 'Employment', '%'], ['inc', 'Scrip per min'], ['lit', 'Lit buildings']];
   const GRADES = ['E', 'D', 'C', 'B', 'A'];
   const ZNAME = { R: 'Residential', C: 'Commercial', L: 'Luxury', I: 'Industrial', K: 'Corps' };
   const ZONEK = { low: 'R', mid: 'C', high: 'L', ind: 'I' };
@@ -81,7 +99,7 @@ const ECON = (() => {
   document.documentElement.classList.add('econ');
   { const hs = document.createElement('style'); hs.textContent = 'html.econ #modeHint{display:none!important}'; document.head.appendChild(hs); }
   st = Object.assign(freshState(), st);
-  function freshState(){ return { on: true, v: 1, money: P.startMoney, tier: 0, fresh: true, last: Date.now(), peak: 0, best: {}, occ: {}, cores: {}, ups: {}, auto: false, tut: { step: 0, done: false }, hints: {}, firstZ: {}, full: {}, stock: 0, corp: false, metroPaid: {}, hwPaid: {} }; }
+  function freshState(){ return { on: true, v: 1, money: P.startMoney, tier: 0, fresh: true, last: Date.now(), peak: 0, best: {}, occ: {}, cores: {}, ups: {}, auto: false, tut: { step: 0, done: false }, hints: {}, firstZ: {}, full: {}, up: {}, away: {}, back: {}, stock: 0, corp: false, metroPaid: {}, hwPaid: {} }; }
   const save = () => { st.last = Date.now(); try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} };
   addEventListener('pagehide', save); addEventListener('beforeunload', save);
 
@@ -96,7 +114,9 @@ const ECON = (() => {
   const megaList = kind => typeof megasOfKind === 'function' ? megasOfKind(kind) : [];
   const capFor = lv => P.caps[lv < 30 ? 0 : lv < 50 ? 1 : lv < 70 ? 2 : lv < 85 ? 3 : 4];
   const gradeOf = lv => GRADES[lv < 30 ? 0 : lv < 50 ? 1 : lv < 70 ? 2 : lv < 85 ? 3 : 4];
-  const fmt = n => Math.round(n).toLocaleString('en-US');
+  // numbers grow huge: in full up to a million, then 1.23M, 4.56B, 7.89T, Qa, Qi, Sx...
+  const BIG = ['', 'K', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc'];
+  const fmt = n => { if (!isFinite(n)) return '∞'; const a = Math.abs(n); if (a < 1e6) return Math.round(n).toLocaleString('en-US'); let k = 0, v = n; while (Math.abs(v) >= 1000 && k < BIG.length - 1){ v /= 1000; k++; } return (Math.abs(v) >= 100 ? v.toFixed(1) : v.toFixed(2)) + BIG[k]; };
   const now = () => Date.now();
 
   function coreState(m){ let s = st.cores[m.id]; if (!s) s = st.cores[m.id] = { up: 0, readyAt: 0 }; return s; }
@@ -110,8 +130,17 @@ const ECON = (() => {
   const megaReach = (m) => { const d = MEGA[m.kind]; return (d.reach || 0) + (d.upReach ? d.upReach*(st.ups[m.kind] || 0) : 0); };
   const megaUpCost = kind => Math.round(MEGA[kind].upCost*Math.pow(MEGA[kind].upGrowth, st.ups[kind] || 0));
   const countZone = z => { let n = 0; for (const c of cells.values()) if (isBld(c) && zoneOf(c) === z) n++; return n; };
-  const placeCost = z => Math.round(P.cost[z]*Math.pow(P.countGrowth, countZone(z)));
-  const upgradeCost = (z, lv) => Math.round(P.cost[z]*P.levelCost*Math.pow(P.levelGrowth, lv - 1));
+  // how many of each (zone, level) the city has: level index 0 is a building's first level (rebuilt each tick, and on demand)
+  const LVN = { R: [0, 0, 0, 0], C: [0, 0, 0, 0], L: [0, 0, 0, 0], I: [0, 0, 0, 0], K: [0, 0, 0, 0] };
+  function countLevels(){ for (const z in LVN) LVN[z].fill(0); for (const c of cells.values()) if (isBld(c)){ const z = zoneOf(c), f = Math.min(4, floorsOf(c)); if (LVN[z]) for (let q = 0; q < f; q++) LVN[z][q]++; } }
+  const levelsOf = z => LVN[z] ? LVN[z].reduce((a, b) => a + b, 0) : 0;
+  const unitCost = (z, q) => Math.round(P.Z[z].cost*Math.pow(P.lvCost, q)*Math.pow(P.grow, LVN[z][q]));   // the next level q (0 = a new building)
+  const placeCost = z => { countLevels(); return unitCost(z, 0); };
+  const upgradeCost = (z, lv) => { countLevels(); return unitCost(z, Math.min(3, lv)); };   // (lv: the levels it has now, so the next is index lv)
+  const tileCost = () => Math.round(P.tileCost*Math.pow(P.tileGrow, cells.size));
+  // the x2 upgrades: the k-th for a zone opens at P.upAt[k] levels of it and costs P.upMul[k] times its base price
+  const upNext = z => { const k = (st.up && st.up[z]) || 0; return k < P.upAt.length ? { k, at: P.upAt[k], cost: P.Z[z].cost*P.upMul[k], open: levelsOf(z) >= P.upAt[k] } : null; };
+  const megaMul = () => { let m = 1; if (typeof megas !== 'undefined') for (const x of megas.values()){ const d = MEGA[x.kind]; if (d && d.mul) m *= d.mul; } return m; };
   const transitStops = () => { const out = []; if (typeof metros === 'undefined') return out; for (const l of metros){ const n = l.tiles.length; for (let k = 0; k < n; k++) if (mtIsStop(l, k)) out.push(l.tiles[k]); } return out; };
   const hwDone = () => typeof highways !== 'undefined' && highways.some(h => h.done);
 
@@ -189,30 +218,46 @@ const ECON = (() => {
       if (b.powered) used += need;
       b.eff = b.powered ? Math.min(b.floors, b.cap) : 0;
     }
+    // noise: factories, shops and the loud megastructures, adding up by density (a few shops: a murmur; a factory row or the Grid: loud)
+    const srcs = [];
+    for (const b of rows){ if (!b.powered) continue; if (b.z === 'I' || b.z === 'K') srcs.push({ i: b.c.i, j: b.c.j, w: 1, h: 1, s: P.noise.I + P.noise.perLv*(b.floors - 1), r: P.noise.rI }); else if (b.z === 'C') srcs.push({ i: b.c.i, j: b.c.j, w: 1, h: 1, s: P.noise.C, r: P.noise.rC }); }
+    if (typeof megas !== 'undefined') for (const m of megas.values()){ const n = P.noise.mega[m.kind]; if (n) srcs.push({ i: m.i, j: m.j, w: m.w, h: m.h, s: n[0], r: n[1] }); }
+    noiseSrcs = srcs;
+    for (const b of rows) b.noise = noiseAt(b.c.i, b.c.j);
     // who moves in
-    let bonus = 0; const capPrev = Math.max(1, pv.capTotal);
-    const lshift = built('pagoda') ? 10 : 0;
+    let bonus = 0;
+    const lshift = built('pagoda') ? 10 : 0, T0 = now();
+    if (!st.away) st.away = {}; if (!st.back) st.back = {};
     for (const b of rows){
       let target = 0;
       if (b.z === 'R'){ const fill = (!b.corpNear || b.lv <= P.lvPricey) ? 1 : 1 - (1 - P.priceyMin)*(b.lv - P.lvPricey)/(100 - P.lvPricey); target = b.eff*fill*(P.unempStay + (1 - P.unempStay)*pv.ratioR); }
       else if (b.z === 'L') target = b.eff*Math.max(0, Math.min(1, (b.lv - P.lvLuxMin + lshift)/(P.lvLuxFull - P.lvLuxMin)));
-      else if (b.z === 'I') target = b.eff*pv.staffR;
-      else if (b.z === 'K') target = b.eff*pv.staffL;
-      else if (b.z === 'C') target = b.eff*Math.max(0, Math.min(1, pv.sales/capPrev));
+      else if (b.z === 'I') target = b.eff*Math.max(.25, pv.staffR);
+      else if (b.z === 'K') target = b.eff*Math.max(.25, pv.staffL);
+      else if (b.z === 'C') target = b.eff*Math.max(.25, pv.shopR);
       if (b.isolated) target = 0;
-      const cheap = b.lv < P.lvCheap;
+      // an outage: people leave; when the power's back they drift home over about 90 s, and the longer it was off, the more never come back
+      // (for a few minutes: then the place fills up as usual again)
       let occ = st.occ[b.k] || 0;
+      const aw = st.away[b.k], bk = st.back[b.k];
+      if (!b.powered && !b.isolated && occ > .3 && !aw && b.inRange === false) st.away[b.k] = { t: T0, occ };
+      if (b.powered && aw){ const lost = Math.min(P.outLossMax, (T0 - aw.t)/1000/P.outLossS); st.back[b.k] = { until: T0 + P.outBackMs, hold: T0 + P.outHoldMs, cap: aw.occ*(1 - lost), lost }; delete st.away[b.k]; }
+      const slow = bk && T0 < bk.until, held = bk && T0 < bk.hold; if (bk && !held) delete st.back[b.k];
+      if (held) target = Math.min(target, bk.cap);
+      const cheap = b.lv < P.lvCheap;
       // moving in: a level's first half arrives at once (it lights in a second), the rest trickle in over about fifteen seconds
       const nextLight = Math.floor(occ + .5) + .5;
       if (target >= occ){
-        if (target >= nextLight){ const r = P.fill + (cheap ? P.fillCheap : 0); occ = Math.min(occ + (target - occ)*Math.min(1, r*dtH), nextLight + .02); }
+        if (slow) occ += (target - occ)*Math.min(1, P.outBackRate*dtH);
+        else if (target >= nextLight){ const r = P.fill + (cheap ? P.fillCheap : 0); occ = Math.min(occ + (target - occ)*Math.min(1, r*dtH), nextLight + .02); }
         else occ += (target - occ)*Math.min(1, (P.trickle + (cheap ? P.trickleCheap : 0))*dtH);
       } else occ += (target - occ)*Math.min(1, 6*dtH);
       if (occ > b.floors) occ = b.floors;
       st.occ[b.k] = Math.round(occ*1000)/1000; b.occ = occ;
       const lit = Math.floor(occ + .5), best = st.best[b.k] || 0;   // (a level lights once it's about half full: homes short of work still light, they just earn less)
       let lightNow = false;
-      if (lit > best){ const pay = (lit - best)*P.bonus[b.z]*(b.z === 'R' && cheap ? P.cheapBonus : 1); bonus += pay; st.best[b.k] = lit; lightNow = true; if (live) E.emit('light', { c: b.c, lit, pay, z: b.z, cap: b.cap, floors: b.floors }); }
+      if (lit > best){ let pay = 0; for (let q = best; q < lit; q++) pay += unitOut(b.z, q)*P.lightS/60 + P.lightFlat*Math.pow(P.lvCost, q);
+        bonus += pay; st.best[b.k] = lit; lightNow = true; if (live) E.emit('light', { c: b.c, lit, pay, z: b.z, cap: b.cap, floors: b.floors }); }
       b.lit = lit;
       // people trickling in between light-ups: every few residents (homes) a small glow runs round the building's edges
       if (b.z === 'R' || b.z === 'L'){ const ppl = occ*P.ppl[b.z], seen = arrived.get(b.k);
@@ -222,7 +267,7 @@ const ECON = (() => {
       const isFull = b.floors >= 1 && lit >= b.floors && b.eff > 0 && occ >= b.eff*.95 && !b.isolated && b.powered;
       if (isFull && (st.full[b.k] || 0) < b.floors){
         st.full[b.k] = b.floors;
-        if (live && st.fullInit){ const pay = Math.round(P.bonus[b.z]*b.floors*.5); bonus += pay; E.emit('full', { c: b.c, z: b.z, floors: b.floors, pay }); }
+        if (live && st.fullInit){ let pay = 0; for (let q = 0; q < b.floors; q++) pay += unitOut(b.z, q); pay = Math.round(pay*P.fullS/60); bonus += pay; E.emit('full', { c: b.c, z: b.z, floors: b.floors, pay }); }
       }
     }
     st.fullInit = true;   // (an old save: whatever was already full is marked quietly the first time, no burst of jackpots)
@@ -230,76 +275,70 @@ const ECON = (() => {
     let accR = 0, accL = 0, popR = 0, popL = 0;
     const access = b => { let a = b.jobBand === 'near' ? 1 : b.jobBand === 'mid' ? P.accessMid : P.accessFar; if (b.station) a = Math.max(a, P.accessMetro); return a; };
     for (const b of rows){ if (b.z === 'R'){ const p = b.occ*P.ppl.R; popR += p; accR += p*access(b); } if (b.z === 'L'){ const p = b.occ*P.ppl.L; popL += p; accL += p*access(b); } }
-    let jobsR = megaJobs, jobsL = 0;
-    for (const b of rows){ if (b.z === 'I') jobsR += b.eff*P.jobsI; if (b.z === 'K') jobsL += b.eff*P.jobsK; }
+    let jobsR = megaJobs, jobsL = 0, cLv = 0;
+    for (const b of rows){ if (b.z === 'I') jobsR += b.eff*P.jobsI; if (b.z === 'C'){ jobsR += b.eff*P.jobsC; cLv += b.eff; } if (b.z === 'K') jobsL += b.eff*P.jobsK; }
     const empR = Math.min(jobsR, accR), empL = Math.min(jobsL, accL);
     const ratioR = accR > 0 ? empR/accR : 0, ratioL = accL > 0 ? empL/accL : 0;
-    pv.staffR = jobsR > 0 ? empR/jobsR : 0; pv.staffL = jobsL > 0 ? empL/jobsL : 0; pv.ratioR = popR > 0 ? empR/popR : 1;
+    pv.staffR = jobsR > 0 ? Math.min(1, accR/jobsR) : 0; pv.staffL = jobsL > 0 ? Math.min(1, accL/jobsL) : 0; pv.ratioR = popR > 0 ? empR/popR : 1;
     pv.unempAccR = accR - empR; pv.unempAccL = accL - empL;
-    // shops
-    let capTotal = 0, bigCap = 0;
-    for (const b of rows) if (b.z === 'C'){ const c = b.eff*P.cCap*(b.station ? 1 + P.cStation : 1); capTotal += c; if (b.eff >= P.bigShop) bigCap += c; }
-    const anchorCap = (built('market') ? 1200 : 0) + megaList('mall').reduce((s, m) => s + 2000*(m.levels || 1), 0);
-    capTotal += anchorCap; bigCap += anchorCap;
-    const luxCap = P.luxSmall + (1 - P.luxSmall)*(capTotal > 0 ? bigCap/capTotal : 0);
-    // wages, taxes and spending
-    let income = 0, demand = 0, lidarTax = 0;
-    const dome = built('club') ? 1.1 : 1;
-    for (const b of rows){
-      if (b.z !== 'R' && b.z !== 'L') { b.earn = 0; continue; }
-      const ppl = b.occ*P.ppl[b.z], ef = access(b)*(b.z === 'R' ? ratioR : ratioL);
-      const prod = (b.band === 'near' ? 1 : b.band === 'mid' ? P.prodMid : P.prodFar)*(b.lv < P.lvCheap ? Math.min(1, P.cheapProd + (b.covB ? .15 : 0)) : 1)*(b.covA ? 1.15 : 1);
-      const inc = ppl*(ef*(b.z === 'R' ? P.incR : P.incL)*prod + (1 - ef)*(b.z === 'R' ? P.incRU : P.incLU));
-      income += inc; if (b.covL) lidarTax += inc*.02;
-      const shop = b.station ? Math.max(.95, b.shopNear ? 1 : .85) : (b.shopNear ? 1 : .85);
-      demand += inc*P.spend*shop*(b.z === 'L' ? luxCap : 1)*(b.covS ? 1.15 : 1)*dome;
-      b.earn = inc*P.tax; b.ef = ef; b.prod = prod;
-    }
-    const taxes = income*P.tax + lidarTax;
-    // goods
-    let prodGoods = 0;
-    const foundry = built('foundry') ? 1.2 : 1;
-    for (const b of rows) if (b.z === 'I') prodGoods += b.occ*P.goodsFloor*(b.band === 'near' ? 1 : b.band === 'mid' ? P.prodMid : P.prodFar)*(b.corpNear ? 1 + P.corpBoost : 1)*foundry;
-    const hw = hwDone(), logi = built('logistics');
-    const importCut = Math.max(0, (hw ? P.importPost : P.importPre) - (logi ? .1 : 0)), exportRate = Math.min(1, (hw ? P.exportPost : P.exportPre) + (logi ? .2 : 0));
-    const wantSales = Math.min(demand, capTotal);
-    const needGoods = wantSales/P.salesPerGood*dtH*(built('greenhouse') ? .85 : 1);
-    const avail = st.stock + prodGoods*dtH;
-    let domestic, imported = 0, exportInc = 0;
-    if (avail >= needGoods){
-      domestic = wantSales; st.stock = avail - needGoods;
-      const stockCap = (P.stockH + (logi ? 4 : 0))*prodGoods;
-      if (st.stock > stockCap){ exportInc = (st.stock - stockCap)*P.goodValue*exportRate/dtH; st.stock = stockCap; }
-    } else { domestic = needGoods > 0 ? wantSales*avail/needGoods : 0; imported = wantSales - domestic; st.stock = 0; }
-    const commRev = P.cShare*(domestic + imported*(1 - importCut));
-    pv.sales = wantSales; pv.capTotal = capTotal; pv.demand = demand; pv.goodsShort = wantSales > 0 ? imported/wantSales : 0;
-    const visitors = (built('wirenest') ? (popR + popL)*.3 : 0) + (built('pagoda') ? popL*.5 : 0);
-    const upkeep = coresAll.length*P.coreUpkeep;
-    const revenue = taxes + commRev + exportInc + visitors - upkeep;
-    peakLocal = Math.max(peakLocal*Math.exp(-dtH/P.baselineH), revenue); st.peak = peakLocal;
-    let eff = Math.max(revenue, P.baseline*peakLocal);
-    const cheapest = Math.min(P.cost.R, P.cost.C);
-    if (eff < P.stipend && st.money < cheapest) eff = P.stipend;
-    st.money += eff*dtH + bonus;
+    pv.shopR = cLv > 0 ? Math.min(1, (popR + popL)/(cLv*P.shopPpl)) : 1;
+    // satisfaction, home by home: air, noise, work, shops, the power staying on, the megastructures in reach
+    let satW = 0, satN = 0;
+    for (const b of rows){ if (b.z !== 'R' && b.z !== 'L'){ b.sat = null; continue; }
+      const parts = [];
+      const add = (v, why) => { if (Math.round(v)) parts.push([Math.round(v), why]); return v; };
+      let sv = P.sat.base;
+      sv += add(b.band === 'near' ? P.sat.airNear*pollMul : b.band === 'mid' ? P.sat.airMid : P.sat.airFar, 'air');
+      sv += add(-Math.min(P.sat.noiseMax, b.noise*P.sat.noise), 'noise');
+      sv += add(b.station && b.jobBand === 'far' ? 0 : b.jobBand === 'near' ? P.sat.jobNear : b.jobBand === 'mid' ? 0 : P.sat.jobFar, 'work');
+      sv += add(b.shopNear ? P.sat.shop : -P.sat.shop, 'shops');
+      if (st.back[b.k] || st.away[b.k]) sv += add(P.sat.outage, 'outage');
+      sv += add((b.covS ? P.sat.square : 0) + (b.covB ? P.sat.bath : 0) + (b.covP ? P.sat.police : 0), 'megastructures');
+      b.sat = Math.max(0, Math.min(100, sv)); b.satParts = parts;
+      const w = b.occ*P.ppl[b.z]; satW += b.sat*w; satN += w; }
+    const sat = satN > 0 ? satW/satN : 0;
+    // output: every lit level makes its own Scrip (a level q makes P.lvProd^q times the first), scaled by how full it is, how happy and
+    // employed the homes are, the core's band, the Grid in reach, the zone's x2 upgrades and every megastructure's multiplier
+    const mm = megaMul(), out = { R: 0, C: 0, I: 0, L: 0, K: 0 };
+    for (const b of rows){ if (!b.powered){ b.earn = 0; continue; }
+      let e = 0; for (let q = 0; q < b.floors; q++){ const share = Math.max(0, Math.min(1, b.occ - q)); if (share > 0) e += share*unitOut(b.z, q, 1); }
+      const band = b.band === 'near' ? 1 : b.band === 'mid' ? P.prodMid : P.prodFar;
+      let mul = band*(b.covA ? 1.15 : 1);
+      if (b.z === 'R' || b.z === 'L'){ const ef = access(b)*(b.z === 'R' ? ratioR : ratioL); b.ef = ef; mul *= (.5 + .5*ef)*(.6 + .8*(b.sat || 0)/100); }
+      b.earn = e*mul*mm; out[b.z] += b.earn; }
+    const revenue = out.R + out.C + out.I + out.L + out.K;
+    let eff = revenue;
+    if (eff < P.stipend && st.money < P.Z.R.cost + tileCost()) eff = P.stipend;   // (never stuck: a trickle when there's nothing coming in and nothing to spend)
+    st.money += eff*dtH*60/K + bonus;   // (output is per real minute)
     // what the city shows
-    Object.assign(R, { rev: eff, raw: revenue, pop: popR + popL, popL, supply, used, demandAll, size: rows.filter(b => b.powered).length + (typeof megas !== 'undefined' ? megas.size : 0),
-      emp: (popR + popL) > 0 ? (empR + empL)/(popR + popL) : 0, jobsR, jobsL, accR, capTotal, demand, prodGoods, short: pv.goodsShort, constructing: coresAll.filter(m => !coreReady(m)),
-      breakdown: { 'Shop sales': commRev, 'Wage taxes': taxes, 'Exports': exportInc, 'Data and visitors': visitors, 'Core upkeep': -upkeep, 'Lost to import cut': -imported*importCut*P.cShare } });
+    const litN = rows.filter(b => b.powered && b.lit > 0).length;
+    Object.assign(R, { rev: eff, raw: revenue, pop: popR + popL, popL, supply, used, demandAll, sat, lit: litN, size: litN + (typeof megas !== 'undefined' ? megas.size : 0),
+      emp: (popR + popL) > 0 ? (empR + empL)/(popR + popL) : 0, jobsR, jobsL, accR, constructing: coresAll.filter(m => !coreReady(m)),
+      breakdown: { 'Homes': out.R, 'Shops': out.C, 'Factories': out.I, 'Luxury': out.L, 'Corps': out.K } });
     R.demandZ = {
       R: (jobsR - accR) > 15 ? 1 : pv.ratioR < .7 ? -1 : 0,
-      C: demand > capTotal*.85 ? 1 : demand < capTotal*.4 ? -1 : 0,
-      I: (pv.unempAccR > P.jobsI*1.2 || pv.goodsShort > .05) ? 1 : (pv.staffR < .6 ? -1 : 0),
+      C: pv.shopR >= 1 && (popR + popL) > cLv*P.shopPpl*1.3 ? 1 : pv.shopR < .5 ? -1 : 0,
+      I: pv.unempAccR > P.jobsI*1.2 ? 1 : (pv.staffR < .6 ? -1 : 0),
       L: st.tier >= 3 ? ((jobsL - accL) > 4 ? 1 : 0) : 0,
     };
     B.clear(); for (const b of rows) B.set(b.k, b);
-    for (const k of Object.keys(st.occ)) if (!B.has(k)) delete st.occ[k];   // (a building gone: the next on that plot starts empty, its best floor remembered)
-    // the tiers
+    countLevels();
+    for (const k of Object.keys(st.occ)) if (!B.has(k)){ delete st.occ[k]; delete st.away[k]; delete st.back[k]; }   // (a building gone: the next on that plot starts empty, its best floor remembered)
+    // the classifications: every requirement met
     while (st.tier < TIERS.length - 1){
       const t = TIERS[st.tier + 1];
-      if (R.pop < t.pop || R.rev < t.inc || (t.size && R.size < t.size)) break;
+      if (!REQS.every(([k]) => !t[k] || reqVal(k) >= t[k])) break;
       st.tier++; onTier(st.tier, live);
     }
   }
+  // a requirement's current value (satisfaction and employment as percentages)
+  function reqVal(k){ return k === 'pop' ? R.pop : k === 'sat' ? R.sat || 0 : k === 'pwr' ? R.supply : k === 'emp' ? (R.emp || 0)*100 : k === 'inc' ? R.rev : k === 'lit' ? R.lit || 0 : 0; }
+  // what one full level q of zone z makes per minute (with its x2 upgrades; pass raw to leave out the megastructures)
+  function unitOut(z, q, raw){ return P.Z[z].prod*Math.pow(P.lvProd, q)*Math.pow(2, (st.up && st.up[z]) || 0)*(raw ? 1 : megaMul()); }
+  // noise at a plot: each source adds its strength, fading out over its radius (in plots, from its footprint)
+  let noiseSrcs = [];
+  function noiseAt(i, j){ let n = 0; for (const s of noiseSrcs){ const d = Math.max(Math.max(s.i - i, 0, i - (s.i + s.w - 1)), Math.max(s.j - j, 0, j - (s.j + s.h - 1))); if (d <= s.r) n += s.s*(1 - d/(s.r + 1)); } return n; }
+  E.noiseAt = noiseAt;
 
   /* ---------- dark floors: unpowered buildings, and the floors nobody lives on yet ---------- */
   // world.js isDarkPlot asks: true = the whole building's lights off (core.js DARK), a positive number = every light above that height off,
@@ -373,10 +412,12 @@ const ECON = (() => {
   }
   const markCorp = (c, g) => { if (g.z !== 'K') return; for (const s of c.sections) if (s.zone === 'ind') s.corp = 1; if (c.below) for (const s of c.below) if (s.zone === 'ind') s.corp = 1; };
   function wrap(name, fn){ const orig = self[name]; if (typeof orig !== 'function') return; self[name] = function (){ return fn.call(this, orig, ...arguments); }; }
+  // new ground costs Scrip: 5 for the first, about 2% more for every plot the city already has (empty, or under a building placed with it)
   wrap('addPlatform', function (orig, i, j, zone){
-    if (!zone) return orig(i, j, zone);
-    const g = gateNew(zone); if (!g) return null;
-    const c = orig(i, j, zone); if (c){ charge(g.cost); markCorp(c, g); if (g.z === 'K') refresh([c]); E.emit('build', { c, z: g.z, fresh: true, cost: g.cost }); }
+    const tc = tileCost();
+    if (!zone){ if (!afford(tc)) return null; const c = orig(i, j, zone); if (c){ charge(tc); setTimeout(() => floatText(c.x, CURB + .4, c.z, '−' + fmt(tc) + ' Scrip', 'cost'), 40); E.emit('tile', { c, cost: tc }); } return c; }
+    const g = gateNew(zone); if (!g) return null; if (st.money < g.cost + tc){ afford(g.cost + tc); return null; }
+    const c = orig(i, j, zone); if (c){ charge(g.cost + tc); markCorp(c, g); if (g.z === 'K') refresh([c]); E.emit('build', { c, z: g.z, fresh: true, cost: g.cost + tc }); }
     return c;
   });
   wrap('addSection', function (orig, c, zone, opt = {}){
@@ -434,6 +475,14 @@ const ECON = (() => {
 
   /* ---------- upgrades bought in the City office ---------- */
   E.upCore = id => { const m = typeof megas !== 'undefined' && megas.get(id); if (!m || m.kind !== 'emitter' || st.tier < 1) return; const c = coreUpCost(m); if (!afford(c)) return; charge(c); coreState(m).up++; save(); renderOffice(); };
+  const UPNAME = {
+    R: ['Rewired walk-ups', 'Hot water on every floor', 'Rooftop gardens', 'Noise-proof glass', 'Smart co-ops', 'Sky bridges', 'Arcology lease', 'Vertical villages'],
+    C: ['Neon frontage', 'Late licences', 'Holo-menus', 'Drone delivery', 'Night markets', 'Data-loan kiosks', 'Mega-mall franchise', 'Sector brand'],
+    I: ['Second shift', 'Robot arms', 'Waste-heat loop', 'Fab printers', 'Lights-out lines', 'Fusion cell', 'Orbital supply', 'Nanoforge'],
+    L: ['Concierge desks', 'Private lifts', 'Sky pools', 'Bio-air', 'Penthouse holos', 'Cloud suites', 'Orbital views', 'Gilded spires'],
+    K: ['Quarterly targets', 'Shell companies', 'Lobbyists', 'Data harvest', 'Mergers', 'Sector charter', 'Board of AIs', 'The monopoly'],
+  };
+  E.upZone = z => { const u = upNext(z); if (!u || !u.open || !afford(u.cost)) return; charge(u.cost); st.up[z] = u.k + 1; save(); renderOffice(); say(`${UPNAME[z][u.k]} · ${ZNAME[z]} output x2`); };
   E.upMega = kind => { const d = MEGA[kind]; if (!d || !d.upCost || !built(kind) || (kind === 'radio' && st.tier < 1)) return; const c = megaUpCost(kind); if (!afford(c)) return; charge(c); st.ups[kind] = (st.ups[kind] || 0) + 1; save(); renderOffice(); };
   E.cutBuild = (id, ms) => { const m = megas.get(id); if (!m) return; const s = coreState(m); s.readyAt = Math.max(now(), s.readyAt - ms); hudSoon(); };
 
@@ -572,14 +621,17 @@ const ECON = (() => {
   .econ-obj .r.ok div b { color: #5affa8; } .econ-obj .r.ok .bar i { background: #5affa8; } .econ-obj .r.lim .bar i { background: #ffb347; } .econ-obj .r.lim div span::before { content: '▸ '; color: #ffb347; }
   .econ-obj .u { margin-top: 8px; color: #9a92aa; font-size: 11px; } .econ-obj .u em { color: #c9fffb; font-style: normal; }
   html.touch .econ-obj { top: calc(112px + env(safe-area-inset-top,0px)); left: max(12px, env(safe-area-inset-left,0px)); width: 200px; padding: 7px 9px; } html.touch .econ-corp { top: calc(250px + env(safe-area-inset-top,0px)); }
+  html.econ-nolux .zone[data-zone="high"], html.econ-nolux [data-perim="high"] { display: none !important; }   /* (Luxury stays hidden until Chartered) */
+  .zone.econ-new { animation: ePulse 1.1s ease-in-out 6; }
   html.econ .gdeck { top: calc(var(--econ-obj-b, 190px) + 10px); }   /* (the left column, top to bottom: goals, the Grid's player, Buildings) */
   html.econ:not(.gdeck-on) .bmenu { top: calc(var(--econ-obj-b, 190px) + 12px); }
-  .econ-legend { position: fixed; z-index: 5; left: 50%; transform: translateX(-50%); top: calc(74px + env(safe-area-inset-top,0px)); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; max-width: calc(100vw - 32px);
-    font: 12px/1.3 'JetBrains Mono', monospace; color: #efe6d6; background: rgba(12,10,20,.94); border: 1px solid rgba(122,184,255,.5); padding: 8px 12px; }
-  .econ-legend[hidden] { display: none; } .econ-legend b { color: #7ab8ff; letter-spacing: .14em; text-transform: uppercase; font-size: 11px; font-weight: 500; }
-  .econ-legend span { display: flex; align-items: center; gap: 6px; } .econ-legend i { width: 12px; height: 12px; display: inline-block; } .econ-legend small { color: #9a92aa; margin-left: 2px; } .econ-legend em { color: #ffb347; font-style: normal; }
-  .econ-legend button { all: unset; cursor: pointer; color: #9a92aa; padding: 2px 6px; } .econ-legend button:hover { color: #fff; }
-  .econ-hud button[aria-pressed="true"] { color: #12101a; background: #7ab8ff; }
+  .econ-legend { position: fixed; z-index: 5; left: 50%; transform: translateX(-50%); top: calc(76px + env(safe-area-inset-top,0px)); display: flex; align-items: center; gap: 14px; white-space: nowrap; max-width: calc(100vw - 32px);
+    font: 600 15px/1.2 'JetBrains Mono', monospace; color: #efe6d6; background: rgba(12,10,20,.95); border: 1px solid rgba(143,196,255,.55); padding: 9px 14px; }
+  .econ-legend[hidden] { display: none; } .econ-legend b { color: #8fc4ff; letter-spacing: .12em; text-transform: uppercase; font-size: 14px; }
+  .econ-legend span { display: flex; align-items: center; gap: 7px; } .econ-legend i { width: 15px; height: 15px; display: inline-block; } .econ-legend em { color: #b9b0c8; font-style: normal; font-weight: 400; font-size: 13px; }
+  .econ-legend button { all: unset; cursor: pointer; color: #9a92aa; padding: 2px 6px; font-size: 16px; } .econ-legend button:hover { color: #fff; }
+  .econ-hud .vw > div { display: flex; gap: 2px; } .econ-hud .vw button { padding: 3px 7px; font-size: 11px; letter-spacing: .08em; border: 1px solid rgba(143,196,255,.35); color: #8fc4ff; }
+  .econ-hud .vw button[aria-pressed="true"] { color: #12101a; background: #8fc4ff; }
   html.touch .econ-legend { top: auto; bottom: calc(150px + env(safe-area-inset-bottom,0px)); }
   .econ-mini .how { margin: 0 0 8px; color: #b9b0c8; font-size: 12px; line-height: 1.45; }
   .econ-mini .meter { height: 8px; background: rgba(255,255,255,.1); margin-top: 8px; } .econ-mini .meter i { display: block; height: 100%; width: 0; background: #5affa8; transition: width .1s; } .econ-mini .meter.big { height: 14px; }
@@ -619,7 +671,7 @@ const ECON = (() => {
     <div class="eh pw hide-t" id="ehPw"><small>Power</small><b id="ehPwV">0/0</b><div class="bar"><i id="ehPwB"></i></div></div>
     <div class="eh hide-s nx"><small id="ehTn">Next</small><b id="ehTv">0/100</b><div class="bar"><i id="ehTb"></i></div></div>
     <div class="eh hide-s" id="ehDm" hidden><small>Demand</small><div class="dm" id="ehDmV"></div></div>
-    <button type="button" id="ehV" aria-pressed="false" title="Power view: every core's reach and bands (V)">Power</button>
+    <div class="eh vw" role="group" aria-label="Map views"><small>Map</small><div><button type="button" id="ehV_power" aria-pressed="false" title="Where power reaches (V cycles the maps)">Power</button><button type="button" id="ehV_air" aria-pressed="false" title="Air pollution round the cores">Air</button><button type="button" id="ehV_noise" aria-pressed="false" title="Noise from factories, shops and the Grid">Noise</button></div></div>
     <button type="button" id="ehO" aria-haspopup="dialog">Office</button>`;
   document.body.appendChild(hudEl);
   const objEl = el('div', 'econ-obj'); objEl.setAttribute('role', 'status'); objEl.setAttribute('aria-label', 'Next classification'); document.body.appendChild(objEl);
@@ -627,9 +679,9 @@ const ECON = (() => {
   function objectives(){
     const done = st.tier >= TIERS.length - 1, nt = TIERS[Math.min(st.tier + 1, TIERS.length - 1)];
     if (done){ const k = 'done'; if (objKey !== k){ objKey = k; objEl.innerHTML = `<div class="h"><small>Sector</small><b>${TIERS[st.tier].name}</b></div><div class="u">Every classification reached. The coast is open.</div>`; } stackLeft(); return; }
-    const req = [['Residents', R.pop, nt.pop], ['Scrip per min', Math.max(0, R.rev), nt.inc]]; if (nt.size) req.push(['Lit buildings', R.size, nt.size]);
-    const fr = req.filter(r => r[2]).map(r => Math.min(1, r[1]/r[2])), overall = fr.reduce((a, b) => a + b, 0)/fr.length, lim = Math.min(...fr);
-    const rows = req.filter(r => r[2]).map((r, k) => { const f = fr[k]; return `<div class="r ${f >= 1 ? 'ok' : f === lim ? 'lim' : ''}"><div><span>${r[0]}</span><b>${fmt(Math.min(r[1], r[2]))} / ${fmt(r[2])}</b></div><div class="bar"><i style="width:${100*f}%"></i></div></div>`; }).join('');
+    const req = REQS.filter(([k]) => nt[k]).map(([k, lab, pc]) => [lab, Math.max(0, reqVal(k)), nt[k], pc]);
+    const fr = req.map(r => Math.min(1, r[1]/r[2])), overall = fr.reduce((a, b) => a + b, 0)/Math.max(1, fr.length), lim = Math.min(...fr);
+    const rows = req.map((r, k) => { const f = fr[k]; return `<div class="r ${f >= 1 ? 'ok' : f === lim ? 'lim' : ''}"><div><span>${r[0]}</span><b>${r[3] ? Math.floor(Math.min(r[1], r[2])) + ' / ' + r[2] + '%' : fmt(Math.min(r[1], r[2])) + ' / ' + fmt(r[2])}</b></div><div class="bar"><i style="width:${100*f}%"></i></div></div>`; }).join('');
     const opens = (nt.opens || '').split(',').slice(0, 3).map(x => x.trim()).filter(Boolean).join(', ');
     const html = `<div class="h"><small>Next · ${nt.name}</small><span>${Math.floor(overall*100)}%</span></div><div class="ov"><i style="width:${100*overall}%"></i></div>${rows}${opens ? `<div class="u">Unlocks <em>${opens}</em></div>` : ''}`;
     if (html !== objKey){ objKey = html; objEl.innerHTML = html; }
@@ -714,7 +766,7 @@ const ECON = (() => {
   const _v = new THREE.Vector3();
   function screenOf(x, y, z){ try { _v.set(x, y, z).project(cam); if (_v.z > 1) return null; const r = viewRect(); return [r.left + (_v.x*.5 + .5)*r.width, r.top + (1 - (_v.y*.5 + .5))*r.height]; } catch (e) { return null; } }
   function floatText(x, y, z, text, cls = ''){ const p = screenOf(x, y, z); if (!p) return; const f = el('div', 'econ-float ' + cls); f.textContent = text; f.style.left = p[0] + 'px'; f.style.top = (p[1] - 34) + 'px'; document.body.appendChild(f); setTimeout(() => f.remove(), 1700); }
-  const ZCOL = { R: 0x9bd86a, C: 0xffb347, L: 0xff4fa3, I: 0xe8e03a, K: 0xe8e03a };
+  const ZCOL = { R: 0x6fc24a, C: 0xffb347, L: 0xff4fa3, I: 0xe8e03a, K: 0xe8e03a };
   const pulseGeo = new THREE.BoxGeometry(1, 1, 1), pulseEdge = new THREE.EdgesGeometry(pulseGeo), pulses = [];
   function pulseLevel(c, lit, z, whole, colOver){
     if (typeof scene === 'undefined' || pulses.length > (whole ? 70 : 8)) return;
@@ -987,10 +1039,12 @@ const ECON = (() => {
     $('ehTv').parentNode.title = doneAll ? '' : `${nt.name} needs ${fmt(nt.pop)} residents (${fmt(R.pop)} now)` + (nt.inc ? ` and ${fmt(nt.inc)} Scrip/min (${fmt(Math.max(0, R.rev))} now)` : '');
     const k = doneAll ? 1 : Math.min(kp, ki); $('ehTb').style.width = (k*100) + '%'; $('ehTb').style.background = byInc ? '#5affa8' : '';
     $('ehTn').textContent = doneAll ? TIERS[st.tier].name : 'Next · ' + nt.name + (nt.inc && !byInc && kp >= 1 ? '' : nt.inc && byInc ? ' · income' : '');
-    for (const zb of document.querySelectorAll('.zone[data-zone]')){ const z = zoneNow(zb.dataset.zone); if (!z || !P.cost[z]) continue;
+    for (const zb of document.querySelectorAll('.zone[data-zone]')){ const z = zoneNow(zb.dataset.zone); if (!z || !P.Z[z]) continue;
       const locked = (z === 'L' || z === 'K') && st.tier < 3, cost = placeCost(z), can = !locked && st.money >= cost;
       zb.classList.toggle('econ-cant', !locked && !can); zb.dataset.econCost = locked ? 'Chartered' : fmt(cost); }
     objectives();
+    { const can = ['R', 'C', 'I', 'L', 'K'].some(z => { const u = upNext(z); return u && u.open && st.money >= u.cost && !((z === 'L' || z === 'K') && st.tier < 3); }); const ob = $('ehO'); if (ob.classList.contains('ready') !== can){ ob.classList.toggle('ready', can); ob.textContent = can ? 'Office ●' : 'Office'; ob.title = can ? 'An upgrade is ready to buy' : ''; } }
+    { const nl = st.tier < 3, de = document.documentElement; if (de.classList.contains('econ-nolux') !== nl){ de.classList.toggle('econ-nolux', nl); if (!nl){ const zb = document.querySelector('.zone[data-zone="high"]'); if (zb){ zb.classList.add('econ-new'); setTimeout(() => zb.classList.remove('econ-new'), 7000); } } } }
     const dm = $('ehDm'); dm.hidden = !built('wirenest');
     if (!dm.hidden){ const d = R.demandZ; $('ehDmV').innerHTML = ['R', 'C', 'I', 'L'].filter(z => z !== 'L' || st.tier >= 3).map(z => `<span class="${d[z] > 0 ? 'up' : d[z] < 0 ? 'dn' : ''}" title="${ZNAME[z]} demand">${z}${d[z] > 0 ? '▲' : d[z] < 0 ? '▼' : '·'}</span>`).join(''); }
     corpSync();
@@ -998,7 +1052,7 @@ const ECON = (() => {
   }
   let offT = 0;
   document.getElementById('ehO').addEventListener('click', () => toggleOffice());
-  document.getElementById('ehV').addEventListener('click', () => VIEW.toggle());
+  for (const k of ['power', 'air', 'noise']) document.getElementById('ehV_' + k).addEventListener('click', () => VIEW.toggle(k));
 
   /* ---------- the City office: the next goal first, the rest folded away ---------- */
   const officeEl = el('aside', 'econ-office'); officeEl.hidden = true; officeEl.setAttribute('role', 'dialog'); officeEl.setAttribute('aria-label', 'City office'); document.body.appendChild(officeEl);
@@ -1007,15 +1061,21 @@ const ECON = (() => {
   addEventListener('keydown', e => { if (e.key === 'Escape' && !officeEl.hidden){ toggleOffice(false); e.stopPropagation(); } }, true);
   const openSec = { power: true };
   officeEl.addEventListener('toggle', e => { const d = e.target; if (d.dataset && d.dataset.sec) openSec[d.dataset.sec] = d.open; }, true);
-  const sec = (key, title, body) => `<details data-sec="${key}" ${openSec[key] ? 'open' : ''}><summary>${title}</summary>${body}</details>`;
+  const sec = (key, title, body, def) => `<details data-sec="${key}" ${(openSec[key] ?? def) ? 'open' : ''}><summary>${title}</summary>${body}</details>`;
   function renderOffice(){
     const keepScroll = officeEl.scrollTop, out = [];
     out.push(`<header><h2>City office</h2><button class="x" type="button" aria-label="Close the City office">✕</button></header>`);
     out.push(`<div class="stats"><div><small>Scrip</small><b>${fmt(st.money)}</b></div><div><small>Per min</small><b>${fmt(R.rev)}</b></div><div><small>Residents</small><b>${fmt(R.pop)}</b></div></div>`);
     if (st.tier < TIERS.length - 1){ const t = TIERS[st.tier + 1];
       const m = (lab, a, b) => `<div class="meter"><div><span>${lab}</span><span>${fmt(Math.min(a, b))} / ${fmt(b)}</span></div><div class="bar"><i style="width:${Math.min(100, 100*a/b)}%"></i></div></div>`;
-      out.push(`<div class="next"><small style="color:#9a92aa;letter-spacing:.14em;text-transform:uppercase;font-size:10px">Next classification</small><div class="nm">${t.name}</div><p>Unlocks ${t.opens}</p>${m('Residents', R.pop, t.pop)}${t.inc ? m('Scrip per min', R.rev, t.inc) : ''}${t.size ? m('Lit buildings', R.size, t.size) : ''}</div>`);
+      out.push(`<div class="next"><small style="color:#9a92aa;letter-spacing:.14em;text-transform:uppercase;font-size:10px">Next classification</small><div class="nm">${t.name}</div><p>Unlocks ${t.opens}</p>${REQS.filter(([k]) => t[k]).map(([k, lab]) => m(lab, reqVal(k), t[k])).join('')}</div>`);
     } else out.push(`<div class="next"><div class="nm">Every classification reached</div><p>The coast is open through the Data Spire.</p></div>`);
+    // the x2 upgrades: one per zone at a time, open once you've built enough of that zone
+    { let ups = '';
+      for (const z of ['R', 'C', 'I', 'L', 'K']){ if ((z === 'L' || z === 'K') && st.tier < 3) continue; const u = upNext(z); if (!u) continue;
+        ups += `<div class="row"><div>${UPNAME[z][u.k] || ZNAME[z] + ' ' + (u.k + 1)}<small>${ZNAME[z]} output x2${u.open ? '' : ' · opens at ' + u.at + ' ' + ZNAME[z].toLowerCase() + ' levels (' + levelsOf(z) + ')'}</small></div>` +
+          `<button class="btn" data-upz="${z}" ${u.open && st.money >= u.cost ? '' : 'disabled'}>${fmt(u.cost)}</button></div>`; }
+      out.push(sec('ups', 'Upgrades', ups || '<p>All bought.</p>', true)); }
     // power
     const cores = megaList('emitter');
     let pw = `<p>${fmt(R.used)} of ${fmt(R.supply)} in use${R.demandAll > R.supply ? ' · <span style="color:#ff8a98">' + fmt(R.demandAll - R.supply) + ' short</span>' : ''}. Closest buildings get power first; nothing past ${P.coreReach} plots.</p>`;
@@ -1050,6 +1110,7 @@ const ECON = (() => {
     const b = e.target.closest('button'); if (!b || b.disabled) return;
     if (b.classList.contains('x')) return toggleOffice(false);
     if (b.dataset.up) return E.upCore(b.dataset.up);
+    if (b.dataset.upz) return E.upZone(b.dataset.upz);
     if (b.dataset.upm) return E.upMega(b.dataset.upm);
     if (b.dataset.mini){ toggleOffice(false); return MINI.open(b.dataset.mini); }
     if (b.dataset.restart){ toggleOffice(false); return RESTART.open(b.dataset.restart); }
@@ -1069,13 +1130,14 @@ const ECON = (() => {
     if (b.z === 'R' && b.corpNear && b.lv > P.lvPricey) return 'Priced out by corps';
     if (b.z === 'C' && b.occ < b.eff*.5) return 'Not enough shoppers nearby';
     if ((b.z === 'I' || b.z === 'K') && b.occ < b.eff*.6) return 'Short of workers';
+    if (b.noise >= 2.5 && (b.z === 'R' || b.z === 'L')) return 'Noisy here · factories, shops or the Grid nearby';
     if (b.band === 'near') return 'Beside a core · poor air';
     return null;
   }
   function infoOf(c){
     const b = B.get(keyOf(c)); if (!b) return null;
     const why = whyOf(b);
-    return { head: `${ZNAME[b.z]} · Grade ${gradeOf(b.lv)}`, lines: [`${b.lit} of ${b.floors} level${b.floors > 1 ? 's' : ''} lit · max ${b.cap}`, why ? '! ' + why : '✓ Doing well', b.floors < b.cap && b.powered && !b.isolated ? (() => { const cst = upgradeCost(b.z, b.floors), w = etaTxt(cst); return 'Next level · ' + fmt(cst) + ' Scrip' + (st.money >= cst ? ' · ready now' : w ? ' · ready in ' + w : ''); })() : null].filter(Boolean), bad: !!why };
+    return { head: `${ZNAME[b.z]} · Grade ${gradeOf(b.lv)}`, lines: [`${b.lit} of ${b.floors} level${b.floors > 1 ? 's' : ''} lit · max ${b.cap}` + (b.earn ? ' · ' + fmt(b.earn) + '/min' : ''), ...(b.sat != null ? [(() => { const neg = (b.satParts || []).filter(p_ => p_[0] < 0).sort((a_, c_) => a_[0] - c_[0])[0]; return 'Satisfaction ' + Math.round(b.sat) + '%' + (neg ? ' · ' + neg[1] + ' ' + neg[0] : ''); })()] : []), why ? '! ' + why : '✓ Doing well', b.floors < b.cap && b.powered && !b.isolated ? (() => { const cst = upgradeCost(b.z, b.floors), w = etaTxt(cst); return 'Next level · ' + fmt(cst) + ' Scrip' + (st.money >= cst ? ' · ready now' : w ? ' · ready in ' + w : ''); })() : null].filter(Boolean), bad: !!why };
   }
   const infoText = i => [i.head, ...i.lines].join('\n');
   const tipEl = el('div', 'econ-tip'); document.body.appendChild(tipEl);
@@ -1100,46 +1162,75 @@ const ECON = (() => {
   // charge; the band narrows and the pull grows the longer it runs. A core's charge can be cut by half at most this way.
   /* ---------- the power view: click a core (or Power in the top bar, or V) to see how far it reaches and its bands, color-coded on the ground:
      poor air close in, 95% output in the middle, 80% out to the edge of its reach ---------- */
-  const BAND = [{ to: () => P.coreNear, col: '#ff5a3c', name: 'Poor air', what: 'Grade −25' }, { to: () => P.coreMid, col: '#ffbf3a', name: 'Mid', what: '95% output' }, { to: m => coreRch(m), col: '#8fe36a', name: 'Far', what: '80% output' }];
+  const VIEWS = {
+    power: { name: 'Power', keys: [['#8fc4ff', 'Full'], ['#4f86d9', '95%'], ['#2c4f8f', '80%'], ['#3a3446', 'None']] },
+    air:   { name: 'Air', keys: [['#c4553a', 'Poor'], ['#c9a03a', 'Fair'], ['#5fbf5a', 'Clean']] },
+    noise: { name: 'Noise', keys: [['#e8d36a', 'Low'], ['#ff9a3a', 'Moderate'], ['#ff4a4a', 'High']] },
+  };
   const VIEW = (() => {
-    const tileMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: .34, depthTest: false, depthWrite: false });
-    const tiles = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), tileMat, 1600); tiles.count = 0; tiles.frustumCulled = false; tiles.layers.set(1); tiles.renderOrder = 995;
-    tiles.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(1600*3), 3);
-    const lines = new THREE.Group(); lines.renderOrder = 996;
+    const tileMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: .38, depthTest: false, depthWrite: false });
+    const tiles = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), tileMat, 2000); tiles.count = 0; tiles.frustumCulled = false; tiles.layers.set(1); tiles.renderOrder = 995;
+    tiles.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(2000*3), 3);
+    const lines = new THREE.Group();
     if (typeof scene !== 'undefined'){ scene.add(tiles); scene.add(lines); }
     const leg = el('div', 'econ-legend'); leg.hidden = true; document.body.appendChild(leg);
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI/2, 0, 0)), pp = new THREE.Vector3(), ss = new THREE.Vector3(), cc = new THREE.Color();
-    let mode = null, until = 0, single = null;   // mode: 'one' (a core clicked) or 'all' (the toggle)
+    let mode = null, until = 0, single = null;
     function square(m, r, col){ const x0 = (m.i - r - .5)*LOT, x1 = (m.i + m.w - 1 + r + .5)*LOT, z0 = (m.j - r - .5)*LOT, z1 = (m.j + m.h - 1 + r + .5)*LOT, y = CURB + .14;
       const g = new THREE.BufferGeometry().setFromPoints([[x0, z0], [x1, z0], [x1, z1], [x0, z1]].map(([x, z]) => new THREE.Vector3(x, y, z)));
       const ln = new THREE.LineLoop(g, new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: .95, depthTest: false })); ln.layers.set(1); ln.renderOrder = 996; ln.frustumCulled = false; lines.add(ln); }
+    function colorAt(c, cores){
+      let best = Infinity, bm = null; for (const m of cores){ const d = megaD(c.i, c.j, m); if (d < best){ best = d; bm = m; } }
+      const K_ = VIEWS[mode].keys;
+      if (mode === 'power'){ if (!bm) return K_[3][0]; if (!coreOnline(bm) || best > coreRch(bm)) return best > coreRch(bm) + 3 ? null : K_[3][0]; return best <= P.coreNear ? K_[0][0] : best <= P.coreMid ? K_[1][0] : K_[2][0]; }
+      if (mode === 'air') return best <= P.coreNear ? K_[0][0] : best <= P.coreMid ? K_[1][0] : K_[2][0];
+      const n = noiseAt(c.i, c.j); return n < 1 ? null : n < 2.5 ? K_[0][0] : n < 5 ? K_[1][0] : K_[2][0];
+    }
     function draw(){
       for (const o of [...lines.children]){ lines.remove(o); o.geometry.dispose(); o.material.dispose(); }
-      const cores = mode === 'one' ? (single && megas.has(single.id) ? [single] : []) : megaList('emitter');
-      if (!mode || !cores.length){ tiles.visible = false; leg.hidden = true; return; }
+      const all = megaList('emitter'), cores = single && megas.has(single.id) ? [single] : all;
+      if (!mode){ tiles.visible = false; leg.hidden = true; sync(); return; }
       let n = 0;
-      for (const c of cells.values()){ if (n >= 1600) break; if (c.mega) continue;
-        let best = Infinity, bm = null; for (const m of cores){ const d = megaD(c.i, c.j, m); if (d < best){ best = d; bm = m; } }
-        if (!bm) continue; const out = best > coreRch(bm), live = coreOnline(bm); if (best > coreRch(bm) + 2) continue;
-        const band = out ? null : best <= P.coreNear ? BAND[0] : best <= P.coreMid ? BAND[1] : BAND[2];
-        cc.set(band ? band.col : '#4a4458'); if (!live) cc.multiplyScalar(.35);
-        pp.set(c.i*LOT, CURB + .08, c.j*LOT); ss.set(LOT*.94, LOT*.94, 1); m4.compose(pp, q, ss); tiles.setMatrixAt(n, m4); tiles.setColorAt(n, cc); n++; }
-      tiles.count = n; tiles.instanceMatrix.needsUpdate = true; tiles.instanceColor.needsUpdate = true; tiles.visible = true;
-      for (const m of cores){ square(m, P.coreNear, BAND[0].col); square(m, P.coreMid, BAND[1].col); square(m, coreRch(m), BAND[2].col); }
-      const one = cores.length === 1 ? cores[0] : null, so = one ? coreState(one) : null;
-      leg.innerHTML = `<b>${mode === 'one' ? 'Emitter Core' : 'Power view'}</b>` + BAND.map((b, k) => `<span><i style="background:${b.col}"></i>${b.name} · ${b.what}<small>${k === 0 ? 'up to ' + P.coreNear : k === 1 ? (P.coreNear + 1) + '–' + P.coreMid : (P.coreMid + 1) + '–' + (one ? coreRch(one) : P.coreReach)} plots</small></span>`).join('') +
-        `<span><i style="background:#4a4458"></i>No power<small>past ${one ? coreRch(one) : P.coreReach} plots</small></span>` + (so && so.lowUntil > now() ? `<em>Reach cut to ${P.coreReachLow} for ${fmtDur(so.lowUntil - now())} after the restart</em>` : '') + (so && so.off ? '<em>Offline: click it to restart</em>' : '') +
-        `<button type="button" aria-label="Close the power view">✕</button>`;
-      leg.hidden = false;
+      for (const c of cells.values()){ if (n >= 2000) break; if (c.mega) continue; const col = colorAt(c, mode === 'noise' ? all : cores); if (!col) continue;
+        cc.set(col); pp.set(c.i*LOT, CURB + .08, c.j*LOT); ss.set(LOT*.94, LOT*.94, 1); m4.compose(pp, q, ss); tiles.setMatrixAt(n, m4); tiles.setColorAt(n, cc); n++; }
+      tiles.count = n; tiles.instanceMatrix.needsUpdate = true; tiles.instanceColor.needsUpdate = true; tiles.visible = n > 0;
+      if (mode === 'power') for (const m of cores){ square(m, coreRch(m), '#8fc4ff'); }
+      if (mode === 'air') for (const m of cores){ square(m, P.coreNear, VIEWS.air.keys[0][0]); square(m, P.coreMid, VIEWS.air.keys[1][0]); }
+      const v = VIEWS[mode], one = single && megas.has(single.id) ? single : null, so = one ? coreState(one) : null;
+      let note_ = mode === 'power' ? `Reach ${one ? coreRch(one) : P.coreReach} plots` : mode === 'air' ? 'Poor air: lower Grade, unhappy homes' : 'From factories, shops, the Grid';
+      if (so && so.lowUntil > now()) note_ = `Reach ${P.coreReachLow} for ${fmtDur(so.lowUntil - now())}`;
+      if (so && so.off) note_ = 'Offline: click it to restart';
+      leg.innerHTML = `<b>${v.name}</b>` + v.keys.map(([c_, t]) => `<span><i style="background:${c_}"></i>${t}</span>`).join('') + `<em>${note_}</em><button type="button" aria-label="Close the map">✕</button>`;
+      leg.hidden = false; sync();
     }
     leg.addEventListener('click', e => { if (e.target.closest('button')) hide(); });
-    function show(m){ mode = 'one'; single = m; until = Date.now() + 9000; draw(); }
-    function toggle(){ if (mode === 'all') hide(); else { mode = 'all'; single = null; until = 0; draw(); } syncBtn(); }
-    function hide(){ mode = null; single = null; draw(); syncBtn(); }
-    const syncBtn = () => { const b = document.getElementById('ehV'); if (b) b.setAttribute('aria-pressed', String(mode === 'all')); };
-    setInterval(() => { if (!mode) return; if (mode === 'one' && Date.now() > until) return hide(); draw(); }, 1000);
-    addEventListener('keydown', e => { if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return; if ((e.key === 'v' || e.key === 'V') && !e.metaKey && !e.ctrlKey && !e.altKey){ toggle(); } if (e.key === 'Escape' && mode) hide(); });
+    function set(m_){ mode = m_; single = null; until = 0; draw(); }
+    function show(m){ mode = 'power'; single = m; until = Date.now() + 9000; draw(); E.emit('coreview'); }
+    function toggle(m_){ if (mode === m_ && !single) hide(); else set(m_); }
+    function hide(){ mode = null; single = null; draw(); }
+    const sync = () => { for (const k in VIEWS){ const b = document.getElementById('ehV_' + k); if (b) b.setAttribute('aria-pressed', String(mode === k && !single)); } };
+    setInterval(() => { if (!mode) return; if (single && Date.now() > until) return hide(); draw(); }, 1000);
+    addEventListener('keydown', e => { if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return; if ((e.key === 'v' || e.key === 'V') && !e.metaKey && !e.ctrlKey && !e.altKey){ const order = [null, 'power', 'air', 'noise']; set(order[(order.indexOf(mode) + 1) % order.length]); } if (e.key === 'Escape' && mode) hide(); });
     return { show, toggle, hide, get on(){ return mode; } };
+  })();
+
+  /* ---------- noise over homes: faint rings of sound hang over the homes that hear it, more and redder the louder it is ---------- */
+  const NOISEFX = (() => {
+    const tex = (() => { const cv = document.createElement('canvas'); cv.width = 128; cv.height = 64; const g = cv.getContext('2d'); g.strokeStyle = '#fff'; g.lineCap = 'round';
+      for (let k = 0; k < 3; k++){ g.globalAlpha = 1 - k*.28; g.lineWidth = 5 - k; const r = 14 + k*12; g.beginPath(); g.arc(64, 54, r, Math.PI*1.18, Math.PI*1.82); g.stroke(); } return new THREE.CanvasTexture(cv); })();
+    const live = new Map();
+    function sync(){
+      const want = new Set();
+      for (const b of B.values()){ if ((b.z !== 'R' && b.z !== 'L') || !b.lit || b.noise < 1) continue; want.add(b.k);
+        let o = live.get(b.k); if (!o){ if (live.size > 140) continue; const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); sp.layers.set(1); sp.renderOrder = 6; if (typeof scene !== 'undefined') scene.add(sp); o = { sp, ph: Math.random()*6 }; live.set(b.k, o); }
+        const top = (b.c.sectionTops && b.c.sectionTops[b.c.sectionTops.length - 1]) || b.c.height || CURB + 3;
+        o.lvl = b.noise < 2.5 ? 0 : b.noise < 5 ? 1 : 2; o.sp.material.color.set(VIEWS.noise.keys[o.lvl][0]); o.sp.position.set(b.c.x, top + .9, b.c.z); }
+      for (const [k, o] of live) if (!want.has(k)){ scene.remove(o.sp); o.sp.material.dispose(); live.delete(k); }
+    }
+    setInterval(() => { try { sync(); } catch (e) {} }, 1000);
+    (function run(){ requestAnimationFrame(run); if (!live.size) return; const t = performance.now()/1000;
+      for (const o of live.values()){ const k = (t*(.6 + o.lvl*.35) + o.ph) % 1; o.sp.scale.set(1.3 + k*.9 + o.lvl*.3, (1.3 + k*.9 + o.lvl*.3)*.5, 1); o.sp.material.opacity = (.25 + o.lvl*.2)*(1 - k); } })();
+    return {};
   })();
 
   /* ---------- smoke: each working core breathes out smog that hangs thick close in and thins out band by band to the edge of its reach ---------- */
@@ -1213,16 +1304,29 @@ const ECON = (() => {
   function powerTick(dms){
     const t = now(), cores = megaList('emitter');
     for (const m of cores){ const s = coreState(m);
-      if (s.surge){ if (MINI.openFor === m.id) s.surge.t0 += dms;   // (the clock stops while you're working on it)
+      if (s.surge){ if (MINI.openFor === m.id || s.surge.paused) s.surge.t0 += dms;   // (the clock stops while you're working on it, or reading about it)
         else if (t - s.surge.t0 >= 3*P.surgeStage) shutdown(m); } }
     if (!st.tut.done || st.tier < 0) return;
     if (!st.nextSurge) st.nextSurge = t + P.surgeFirst;
     if (t >= st.nextSurge && !cores.some(m => coreState(m).surge)){
       const ok = cores.filter(m => coreOnline(m)); st.nextSurge = t + P.surgeGap[0] + Math.random()*(P.surgeGap[1] - P.surgeGap[0]);
       if (ok.length){ const m = ok[(Math.random()*ok.length) | 0]; coreState(m).surge = { t0: t }; save();
-        say('Power surge! Click the Emitter Core to stabilize it'); try { if (typeof sfx !== 'undefined' && sfx.tone) [0, .18, .36].forEach(a => sfx.tone(880, { gain: .1, at: a, dur: .12, glide: 1 })); } catch (e) {} } }
+        if (!st.hints.surge){ st.hints.surge = 1; coreState(m).surge.paused = true; surgeIntro(m); } else say('Power surge! Click the Emitter Core to stabilize it'); try { if (typeof sfx !== 'undefined' && sfx.tone) [0, .18, .36].forEach(a => sfx.tone(880, { gain: .1, at: a, dur: .12, glide: 1 })); } catch (e) {} } }
     surgeMarks();
   }
+  // the first surge explains itself, over the core, with the clock held until you've read it or clicked the core
+  let surgeAt = null;
+  function surgeIntro(m){
+    noteEl.innerHTML = ''; noteEl.className = 'econ-note tip'; surgeAt = () => ({ w: [m.x, (m.roofH || CURB + 6) + 3, m.z], gap: 40 });
+    const sy = el('span', 'say'); sy.textContent = 'Power surge! Your Emitter Core is overloading.';
+    const sb = el('span', 'sub'); sb.textContent = 'It glows yellow, then orange, then red. Click the core and keep the trace inside the band to stabilize it. If it reaches red it shuts down, and its buildings go dark until you crank it back up. The clock waits until you click.';
+    const row = el('div', 'row'), ok = el('button', 'go', 'Got it'); ok.type = 'button'; ok.onclick = () => { const s = coreState(m); if (s.surge) s.surge.paused = false; noteEl.hidden = true; surgeAt = null; }; row.append(ok);
+    noteEl.append(el('span', 't', 'Power surge'), sy, sb, row); noteEl.hidden = false; clearTimeout(noteT); hintShowing = Date.now() + 120e3;
+  }
+  (function tipLoop(){ requestAnimationFrame(tipLoop); if (!surgeAt || noteTut) return; if (noteEl.hidden){ surgeAt = null; return; }
+    const a = surgeAt(), p = a && screenOf(a.w[0], a.w[1], a.w[2]), s_ = noteEl.style;
+    if (!p){ return; } const w = noteEl.offsetWidth || 340, cx = Math.min(innerWidth - w/2 - 12, Math.max(w/2 + 12, p[0]));
+    noteEl.classList.add('anch'); s_.left = cx + 'px'; s_.top = (p[1] - a.gap) + 'px'; s_.right = 'auto'; s_.bottom = 'auto'; s_.transform = 'translate(-50%, -100%)'; s_.setProperty('--ax', (p[0] - cx + w/2) + 'px'); })();
   function shutdown(m){ const s = coreState(m); s.surge = null; s.off = true; save(); say('Emitter Core offline · click it and crank it back up'); hudSoon();
     try { if (typeof sfx !== 'undefined' && sfx.tone){ sfx.tone(220, { gain: .16, dur: .9, glide: 1.6 }); sfx.tone(110, { gain: .14, dur: 1.2, glide: 1.5 }); } } catch (e) {} }
   // the label over a surging or dead core: what's wrong and what to do, with the time left
@@ -1255,7 +1359,7 @@ const ECON = (() => {
   (function markLoop(){ requestAnimationFrame(markLoop); if (!marks.size) return;
     for (const [id, lb] of marks){ const m = megas.get(id); if (!m) continue; const p = screenOf(m.x, (m.roofH || CURB + 6) + 1.5, m.z); if (!p){ lb.style.display = 'none'; continue; } lb.style.display = ''; lb.style.left = p[0] + 'px'; lb.style.top = p[1] + 'px'; } })();
   // clicking a megastructure with no zone picked (input.js): a core shows its reach, or opens the fix it needs
-  function coreClick(m){ const s = coreState(m); if (s.off) return RESTART.open(m.id); if (s.surge) return MINI.open(m.id); VIEW.show(m); return true; }
+  function coreClick(m){ const s = coreState(m); if (s.off) return RESTART.open(m.id); if (s.surge){ if (s.surge.paused){ s.surge.paused = false; if (surgeAt){ noteEl.hidden = true; surgeAt = null; } } return MINI.open(m.id); } VIEW.show(m); return true; }
   E.megaClick = m => { if (!m || m.kind !== 'emitter') return false; coreClick(m); return true; };
 
   const MINI = (() => {
@@ -1294,7 +1398,7 @@ const ECON = (() => {
       document.getElementById('emSaved').textContent = 'Stability ' + Math.round(100*stab/NEED) + '%';
       document.getElementById('emStab').style.width = (100*stab/NEED) + '%';
       const m = megas.get(id); if (!m || !coreState(m).surge){ close(); return; }
-      if (stab >= NEED){ const s = coreState(m); s.surge = null; const pay = 40 + 30*st.tier; st.money += pay; close(); hudSoon(); surgeMarks();
+      if (stab >= NEED){ const s = coreState(m); s.surge = null; const pay = Math.max(50, Math.round(R.rev*.5)); st.money += pay; close(); hudSoon(); surgeMarks();
         say('Core stabilized · +' + fmt(pay) + ' Scrip'); floatText(m.x, (m.roofH || CURB + 6) + 1, m.z, '+' + fmt(pay) + ' Scrip');
         try { if (typeof sfx !== 'undefined' && sfx.tone) [0, 4, 7, 12].forEach((n, q) => sfx.tone(523*Math.pow(2, n/12), { gain: .1, at: q*.06, dur: .4 })); } catch (e) {}
         pulseLevel({ x: m.x, z: m.z, sectionTops: [], height: m.roofH || CURB + 6 }, 1, 'R', true, new THREE.Color(0x7ab8ff)); }
@@ -1344,6 +1448,8 @@ const ECON = (() => {
     const elAt = f => () => { const e = f(); return e ? { el: e } : null; };
     const beats = [
       { say: 'Goal: grow this sector into a city.', sub: `Climb six classifications to ${TIERS[TIERS.length - 1].name}, each unlocking new buildings. This glowing tower is your Emitter Core: it powers every building within 9 plots.`, next: true, at: coreAt },
+      { say: 'Click your Emitter Core.', sub: 'See how far its power reaches.', at: coreAt, ev: 'coreview' },
+      { say: 'Switch maps up here.', sub: 'Power: where power reaches. Air: poor air near cores. Noise: factories, shops, the Grid. Press V to cycle.', next: true, at: elAt(() => document.querySelector('.econ-hud .vw')) },
       { say: `Pick Residential and ${tap.toLowerCase()} the ground right next to the core.`, sub: 'People move in, the lights come on, and every lit level pays Scrip.', target: zoneBtn('low'), at: elAt(zoneBtn('low')), done: () => countZone('R') >= 1 },
       { say: () => homes().some(b => b.band === 'near') ? 'Too close to the core.' : 'Homes right beside the core get poor air.', sub: 'Within two plots of a core the air is poor, so homes there have a low Sector Grade and can\'t grow tall. Three plots out the air is clean.', next: true, at: homeAt(b => b.band === 'near') },
       { say: 'Now lay some empty ground.', sub: (TOUCHY ? 'Tap Residential again so no zone is picked, then tap' : 'Click Residential again (or press Esc) so no zone is picked, then click') + ' beside your city to place empty tiles in a line, away from the core, until one is 3 plots out. Everything must connect by ground, or it\'s isolated and nobody can move in.', target: () => document.querySelector('.zone.on') || null, at: elAt(zoneBtn('low')), enter: emptyKeys, count: b => [farTile(b), 3], countFmt: (a_, m_) => 'Furthest new tile: ' + a_ + ' of ' + m_ + ' plots out', done: b => farTile(b) >= 3 },
@@ -1390,7 +1496,7 @@ const ECON = (() => {
     }
     function advance(){ k++; st.tut.step = k; if (k >= beats.length) st.tut.done = true; save(); noteEl.classList.add('done-flash'); setTimeout(show, k >= beats.length ? 0 : 260); }
     function finish(){ k = beats.length; st.tut.done = true; st.tut.step = k; save(); show(); }
-    for (const ev of ['build', 'office']) E.onEv(ev, d => { const b = beats[k]; if (b && b.ev === ev && (!b.test || b.test(d))) advance(); });
+    for (const ev of ['build', 'office', 'coreview']) E.onEv(ev, d => { const b = beats[k]; if (b && b.ev === ev && (!b.test || b.test(d))) advance(); });
     setInterval(() => { const b = beats[k]; if (!b || noteEl.hidden) return; if (b.done && b.done(b)) advance(); else refresh(); }, 400);
     // (on a touch screen the gesture tutorial goes first, tutorial.js: these notes wait until it's done or skipped)
     const gestureDone = () => { if (!TOUCHY) return true; try { const g = JSON.parse(localStorage.getItem('touch:nt.tut') || 'null'); return !!(g && g.done); } catch (e) { return true; } };

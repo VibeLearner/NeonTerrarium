@@ -13,9 +13,9 @@ Object.assign(M, {
 const LIT_ROOMS = [M.winLit, M.winLit, M.interiorCool, M.interiorPink];
 // Residential is lit like homes, not like the strip: warm umber and tungsten rooms behind the glass and moss-green neon on the trim,
 // so it reads apart from the commercial quarter's amber neon at a glance. Anything built from a residential style takes its windows from here.
-Object.assign(M, { neonMoss: toon(0x24401a, { em: 0x9BD86A, kind: 'neon' }), resUmber: toon(0x4a2c1a, { em: 0xC9824E, kind: 'window' }), resUmber2: toon(0x45281a, { em: 0xB06A3C, kind: 'window' }), resTung: toon(0x56402a, { em: 0xE0A868, kind: 'window' }) });
+Object.assign(M, { neonMoss: toon(0x1c3814, { em: 0x6FC24A, kind: 'neon' }), resUmber: toon(0x4a2c1a, { em: 0xC9824E, kind: 'window' }), resUmber2: toon(0x45281a, { em: 0xB06A3C, kind: 'window' }), resTung: toon(0x56402a, { em: 0xE0A868, kind: 'window' }) });
 const RES_ROOMS = [M.resUmber, M.resUmber2, M.resTung, M.resUmber];
-GLOW.moss = new THREE.SpriteMaterial({ map: glowTex, color: 0x9BD86A, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }); NEON_GLOW.set(M.neonMoss, 'moss');   // (its halo)
+GLOW.moss = new THREE.SpriteMaterial({ map: glowTex, color: 0x6FC24A, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }); NEON_GLOW.set(M.neonMoss, 'moss');   // (its halo)
 if (typeof NEON_NAME !== 'undefined') NEON_NAME.set(M.neonMoss, 'cyan');   // (the little icon signs are drawn in pink, cyan and amber only: a residential shopfront borrows the cyan set)
 const isRes = st => st && st.cls === 'low';
 const roomsOf = st => isRes(st) ? RES_ROOMS : LIT_ROOMS;   // a pick of lit rooms in this style
@@ -30,8 +30,8 @@ const D = {
 };
 const STY = {
   low:  { ...D.low, floors:[4,8], lit:.55, winSkip:.12, balcony:.4, ac:.45, bars:.3, potSill:.25, vines:.6, neon:.8, neonMats:[M.neonMoss, M.neonMoss, M.neonMoss],
-          shop:.45, garage:.2, glyphs:3, strips:.25, vents:.3, cables:.6, laundry:true,
-          roofN:3, roof:['shack','tank','antenna','dish','laundry','pots','billboard'], parapet:true, yaw:.22 },
+          shop:0, garage:.2, glyphs:0, strips:.25, vents:.3, cables:.6, laundry:true,   // (no shopfronts or signs: homes, not the strip)
+          roofN:3, roof:['shack','tank','antenna','dish','laundry','pots'], parapet:true, yaw:.22 },
   mid:  { ...D.mid, lit:.6, winSkip:.08, balcony:.35, ac:.35, potSill:.2, vines:.35, neon:.9, neonMats:ALLNEON, awn:D.mid.accent,
           shop:.9, garage:.25, glyphs:3, strips:.45, vents:.25, cables:.45,
           roofN:2, roof:['tank','antenna','billboard','ring','dish','pots'], parapet:true, yaw:.12 },
@@ -257,7 +257,7 @@ function signFree(F, x, y, w, h, projecting, out){
   for (const [cx, cy] of cand){ const sb = boxAt(cx, cy); if (SIGN_RES.every(r => !signsMeet(sb, r, SIGN_GAP))){ SIGN_RES.push(sb); log(sb, SIGN_RES); return [cx, cy]; } }
   return null;
 }
-function glyphSign(F,x,y,vertical,projecting){
+function glyphSign(F,x,y,vertical,projecting){ if (S.noSigns) return;
   if (LUX) return;   // the luxury towers keep to their own gold and ivory lights
   const kind = pick(vertical ? GLYPH_V : GLYPH_H);
   const w = SPR.size[kind][0]/PX, h = SPR.size[kind][1]/PX, col = GLYPH_GLOW[kind];
@@ -330,7 +330,7 @@ const ROOF = {
   pots(P,spot){ const s=spot(.3); if(!s) return;
     for (let k=0;k<irand(2,4);k++) plant(pick(['fern','succulent','fern']),P,s.x+rnd(-.2,.2),0,s.z+rnd(-.2,.2),rnd(.65,.9)); },
   // big rooftop billboard on a frame
-  billboard(P,spot,st){ const s=spot(.45); if(!s) return;
+  billboard(P,spot,st){ if (S.noSigns) return; const s=spot(.45); if(!s) return;
     const Q = under(P, T(s.x,0,s.z,rnd(0,PI)));
     for (const x of [-.32,.32]) cyl(M.frame,Q,x,.55,0,.03,1.1);
     box(M.frame,Q,0,.62,0,.8,.04,.05); box(M.frame,Q,0,.62,-.12,.03,.04,.25);
@@ -1512,7 +1512,7 @@ function pottedPlant(P, x, z, s = 1){ put(U.cyl16, pick([M.pot, M.inBrick2, M.in
 function crateAt(P, x, y, z, s = 1){ box(M.crate, P, x, y + .11*s, z, .24*s, .22*s, .24*s, rnd(-.3, .3)); box(M.inWood2, P, x, y + .11*s, z, .25*s, .03, .25*s); }
 function moss(P, x, y, z, n = 3){ for (let k=0; k<n; k++) blob(M.inMoss, P, x + rnd(-.2, .2), y, z + rnd(-.2, .2), rnd(.06, .12), .4); }
 // a neon word on a dark board, on a bracket or flat on the wall
-function wordSign(F, kind, x, y, z, k, col, halo){ box(M.frame, F, x, y, z - .03, SPR.size[kind][0]/PX*k + .06, SPR.size[kind][1]/PX*k + .06, MIN_T); plant(kind, F, x, y, z, k, 'c', true); glow(F, x, y, z + .04, col, halo ?? .9 + .6*k); }   // the halo sits right on the board (out in front, the high camera saw it as a blob below the sign)
+function wordSign(F, kind, x, y, z, k, col, halo){ if (S.noSigns) return; box(M.frame, F, x, y, z - .03, SPR.size[kind][0]/PX*k + .06, SPR.size[kind][1]/PX*k + .06, MIN_T); plant(kind, F, x, y, z, k, 'c', true); glow(F, x, y, z + .04, col, halo ?? .9 + .6*k); }   // the halo sits right on the board (out in front, the high camera saw it as a blob below the sign)
 // a gabled roof along local x over a w x d box (ridge along x), with eaves; returns nothing
 function gable(P, y, w, d, rise, mat, over = .15){ put(U.prism, mat, under(P, T(0, y, 0, PI/2, d + 2*over, rise, w + 2*over))); }
 
@@ -2383,7 +2383,7 @@ function foodPlaza(lot, st, P0){
 }
 
 // neon graffiti sprayed on a wall: a tag or doodle somewhere low on the face (it's what people can reach)
-function neonTag(F, L, h, n = 1){
+function neonTag(F, L, h, n = 1){ if (S.noSigns) return;
   for (let k=0; k<n; k++){ const kind = pick(NEON_GRAF), w = SPR.size[kind][0]/PX*.9;
     if (w > L - .2) continue;
     plant(kind, F, rnd(-L/2 + w/2 + .08, L/2 - w/2 - .08), rnd(.32, Math.min(h - .2, 1.1)), .02, .9, 'c', true); }

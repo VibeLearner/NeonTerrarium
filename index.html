@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <!-- every player goes to m.html: this page with smaller scripts (tools/mobile/build.js; phones from Oct 30, computers too from the same day). ?full keeps it here, with the full-size scripts, for testing -->
-<script>/* phone page */if(!/[?&]full\b/.test(location.search)){location.replace('m.html'+location.search+location.hash);document.write('<plaintext hidden>')}</script>
+<script>/* phone page */if(!/[?&]full\b/.test(location.search)&&!/#demo\b/.test(location.hash)){location.replace('m.html'+location.search+location.hash);document.write('<plaintext hidden>')}</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Neon Terrarium</title>
 <script src="js/benchboot.js?v=2026-10-30p"></script>   <!-- the phone benchmark, only with ?bench in the address (does nothing otherwise) -->
@@ -365,6 +365,7 @@
 <script src="js/staticcache.js?v=2026-10-27d"></script>
 <script src="js/neverseen.js?v=2026-10-26s"></script>
 <script src="js/economy.js?v=2026-11-01x"></script>
+<script src="js/demo.js?v=2026-11-02a"></script>   <!-- the 15 s demo clip, only with #demo in the address (does nothing otherwise) -->
 <script src="js/main.js?v=2026-10-30pw"></script>
 <script src="js/cityledger.js?v=2026-10-29a"></script>
 <script src="js/overseer.js?v=2026-10-31ec"></script>

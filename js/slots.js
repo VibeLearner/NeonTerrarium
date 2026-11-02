@@ -66,7 +66,7 @@ const SLOTS = (() => {
   }
   // the active city's slot brought up to date: its keys, its card, its picture
   async function checkpoint(opts = {}){
-    if (!SL.active) return null;
+    if (!SL.active || window.NT_DEMO) return null;   // (the demo clip's city is never copied into a slot: js/demo.js)
     if (!opts.noFlush) flush();
     const rec = (await getRec(SL.active)) || { id: SL.active, name: 'My city', created: Date.now() };
     rec.data = snapshot(); rec.meta = liveMeta(); rec.updated = Date.now();
@@ -79,6 +79,7 @@ const SLOTS = (() => {
   /* ---------- switching ---------- */
   // copy the active city away, put the chosen one in its place, and start again from it
   function swapIn(rec){
+    if (window.NT_DEMO) return;
     NT_SAVE_LOCK = true;   // (from here on, the way-out saves of the city just left are dropped: saveguard.js)
     for (const k of cityKeysNow()) lsDel(k);
     if (rec && rec.data) for (const [k, v] of Object.entries(rec.data)) if (NT_isCityKey(k)) lsSet(k, v);
@@ -188,7 +189,7 @@ const SLOTS = (() => {
     SL.cloudUser = lsGet(USER_KEY) || null;
     let id = lsGet(ACTIVE_KEY);
     try {
-      if (!id || !(await getRec(id))){   // (the first time: the city already here becomes the first slot)
+      if (!window.NT_DEMO && (!id || !(await getRec(id)))){   // (the first time: the city already here becomes the first slot)
         id = id || newId(); lsSet(ACTIVE_KEY, id);
         await putRec({ id, name: 'My city', created: Date.now(), updated: Date.now(), meta: { day: 1, residents: 0, plots: 0 }, data: snapshot() });
       }

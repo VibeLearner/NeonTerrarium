@@ -18,10 +18,22 @@ let NT_SAVE_LOCK = false;
 const NT_RAW = { set: Storage.prototype.setItem, remove: Storage.prototype.removeItem };
 Storage.prototype.setItem = function (k, v){ if (NT_SAVE_LOCK && this === window.localStorage && NT_isCityKey(k)) return; return NT_RAW.set.call(this, k, v); };
 Storage.prototype.removeItem = function (k){ if (NT_SAVE_LOCK && this === window.localStorage && NT_isCityKey(k)) return; return NT_RAW.remove.call(this, k); };
+// #demo (js/demo.js): a 15 second scripted demo clip with a city of its own. It keeps nothing and reads nothing of the player's: every
+// neonIsland.*, neonLooks.* and neonTerrarium.* key reads as never set (except the few the clip sets for itself, DEMO_KEYS) and writes to them are dropped
+window.NT_DEMO = /#demo\b/.test(location.hash);
+if (window.NT_DEMO){
+  NT_SAVE_LOCK = true;
+  const own = k => typeof k === 'string' && /^(neonIsland|neonLooks|neonTerrarium)\./.test(k);
+  const K = window.DEMO_KEYS = { 'neonIsland.coastAccessed': '3', 'neonIsland.boothSeen': '1' };   // (the Spire shows its ledger, not the first-visit question; the Booth tab without its beckon)
+  const get = Storage.prototype.getItem;
+  Storage.prototype.getItem = function (k){ if (this === window.localStorage && own(k)) return Object.prototype.hasOwnProperty.call(K, k) ? K[k] : null; return get.call(this, k); };
+  Storage.prototype.setItem = function (k, v){ if (this === window.localStorage && own(k)){ K[k] = String(v); return; } return NT_RAW.set.call(this, k, v); };
+  Storage.prototype.removeItem = function (k){ if (this === window.localStorage && own(k)){ delete K[k]; return; } return NT_RAW.remove.call(this, k); };
+}
 // the title screen shows on every load, unless a city switch just asked to go straight in
 (() => {
   let skip = false; try { skip = sessionStorage.getItem('neonTerrarium.skipTitle') === '1'; sessionStorage.removeItem('neonTerrarium.skipTitle'); } catch (e) {}
-  if (/[?&](notitle|tv=1)\b/.test(location.search) || navigator.webdriver) skip = true;   // (tests and the tools/ harnesses go straight in, and so does a return from the coast)
+  if (/[?&](notitle|tv=1)\b/.test(location.search) || navigator.webdriver || window.NT_DEMO) skip = true;   // (tests and the tools/ harnesses go straight in, and so does a return from the coast)
   if (/[?&]title\b/.test(location.search)) skip = false;   // (?title: show it anyway, for looking at it under a test browser)
   window.NT_TITLE = !skip;
   if (!skip) document.documentElement.classList.add('title-on', 'title-boot');   // (title-boot: a dark cover until the room's picture is in, so the city never shows loading first)

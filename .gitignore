@@ -8,3 +8,4 @@ assets/sprites/originals/police/
 assets/sprites/originals/robot/
 build/
 tools/demo/out/
+__pycache__/

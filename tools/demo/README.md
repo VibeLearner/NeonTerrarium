@@ -37,8 +37,9 @@ so nothing stutters. The sound: the clip plays again in real time in a hidden br
 is recorded (`tools/demo/audio.js`). Each pass first lets the city live for a few in-game hours and opens the apartment once to
 warm the lab up, so expect a few minutes before each starts.
 
-If a MacBook's screen can't fit a 1920 x 1080 window, the picture is made without a window (a clipped window was what put the
-trailer's title and log off center). Judge framing by the stills and the video, not by the Chrome window.
+Both passes run in a headless browser (no window), where the page is exactly 1920 x 1080 whatever your screen; a clipped window was
+what put the trailer's title and log off center. `--window` films the picture in a visible Chrome window instead, only if headless
+draws wrong on your Mac.
 
 `tools/demo/out/demo-log.txt` notes who was picked, when the room was ready, what was placed and every moment as it fired.
 

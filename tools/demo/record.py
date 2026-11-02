@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Record the Neon Terrarium demo clip: 15 s, 1920 x 1080, 60 fps, with the game's own sound.
 
-Runs on your own Mac (it needs the graphics card). Two passes, both at index.html?full#demo in Chrome:
+Runs on your own Mac (it needs the graphics card). Two passes, both at index.html?full#demo in headless Chrome (no window):
   1. the picture: the clip runs on a stepped clock (tools/demo/shim.js), every frame captured in turn, so nothing stutters or drops
   2. the sound: the clip plays again in real time (in a hidden browser) and everything the game sends to the speakers (the Grid's Booth loop, the two notes,
      the build sounds) is recorded straight from the game (tools/demo/audio.js).
@@ -72,7 +72,7 @@ def main():
     ap.add_argument('--stills', action='store_true', help='only save stills at key moments (PNG) and stop')
     ap.add_argument('--vertical', action='store_true', help='also make a 1080 x 1920 version for phones')
     ap.add_argument('--no-audio', action='store_true', help='skip the sound pass (the clip comes out silent)')
-    ap.add_argument('--headless', action='store_true', help='no browser window for the picture (some Macs draw WebGL slower or not at all headless)')
+    ap.add_argument('--window', action='store_true', help='film the picture in a visible Chrome window instead of the headless browser (only if headless draws wrong on your Mac)')
     ap.add_argument('--port', type=int, default=8794)
     ap.add_argument('--quality', type=int, default=95)
     ap.add_argument('--crf', type=int, default=16)
@@ -92,13 +92,15 @@ def main():
             page = ctx.new_page(); cdp = ctx.new_cdp_session(page); log_page(page)
             page.goto(url, wait_until='load')
             return browser, page, cdp
+        # headless by default: the page is exactly 1920 x 1080 whatever the screen, and nothing on the desktop can get in the way
+        a.headless = not a.window
         browser, page, cdp = open_page(a.headless)
         def grab(fmt='jpeg', quality=None):
             o = {'format': fmt, 'fromSurface': True, 'captureBeyondViewport': False}
             if fmt == 'jpeg': o['quality'] = quality or a.quality
             return base64.b64decode(cdp.send('Page.captureScreenshot', o)['data'])
-        # A screen too small for a 1920 x 1080 window (a MacBook's) clips it, and the frames would be its top-left part stretched, everything
-        # off center. Then the picture is made without a window, where the page is exactly 1920 x 1080. (A Retina window at twice the pixels is fine.)
+        # (--window: a screen too small for a 1920 x 1080 window (a MacBook's) clips it, and the frames would be its top-left part stretched,
+        # everything off center. Then it goes headless after all. A Retina window at twice the pixels is fine.)
         if not a.headless:
             png = grab('png'); w, h = struct.unpack('>II', png[16:24])
             if (w, h) != (1920, 1080) and not (w % 1920 == 0 and h % 1080 == 0 and w//1920 == h//1080):

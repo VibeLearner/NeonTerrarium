@@ -351,6 +351,11 @@ const FOL_SHADER = new THREE.ShaderMaterial({
     uniforms: { lightsOn: LIGHTS_ON, lodPlants: LOD.plants, map:{value:FOL_ATLAS.tex}, atlasSize:{value:FOL_ATLAS.size}, tint:FOL_UNI.tint, time:FOL_UNI.time, normalMode:FOL_UNI.normalMode, neonI:FOL_UNI.neonI, res:FOL_UNI.res, wind:FOL_UNI.wind },
     vertexShader: `uniform vec2 res; uniform float time; uniform float lodPlants; uniform float lightsOn; uniform float wind; varying float vPhase; attribute vec4 aVar; attribute float aFixed; attribute vec4 aRect; attribute vec2 aKind; attribute float aOn;
       varying vec2 vUv; varying float vShade; varying vec4 vRect; varying vec2 vKind; varying float vFlk; varying float vOn;` + FLK_GLSL + LIT_GLSL + `
+      // a plant lies on or against what it grows from (moss on the floor, ivy on a wall, a bush's foot on its pot), at the same depth: it's kept in front by a
+      // fixed nudge toward the camera, about 0.06 of a unit (the view is orthographic, near 10 to far 900: 2/890 of clip depth a unit). The polygon
+      // offset below did this alone, but how far it moves is up to each graphics chip: on some phones (a Pixel 7 in Chrome) it was too little, and the
+      // plants and the surface under them took turns in front as the view turned, a flicker (Nov 2)
+      const float DBIAS = 0.06*2.0/890.0;
       void main(){
         vShade = aVar.z; vRect = aRect; vKind = aKind; vOn = aKind.y > 0.5 ? litOn(aOn, lightsOn, time) : 1.0;
         // about one lit sign in ten flickers (picked from its random phase)
@@ -376,6 +381,7 @@ const FOL_SHADER = new THREE.ShaderMaterial({
             wp.xz += vec2(.75, .45)*(.35 + .65*lean)*wind*.05*tip;
           }
           gl_Position = projectionMatrix * viewMatrix * wp;
+          gl_Position.z -= DBIAS*gl_Position.w;
         } else {
           // free-standing: faces the camera, with its anchor and corners snapped to whole render pixels
           vec4 a = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(0.0,0.0,0.0,1.0);
@@ -383,7 +389,7 @@ const FOL_SHADER = new THREE.ShaderMaterial({
           vec2 ap = floor((a.xy*0.5 + 0.5)*res + 0.5);
           vec2 off = floor(vec2(projectionMatrix[0][0], projectionMatrix[1][1]) * local * vec2(sx, sy) * 0.5 * res + 0.5);
           off = mix(off, max(off, vec2(1.0)), step(vec2(1e-4), local));   // (at least a render pixel across: far out, small tufts rounded to nothing and the grass went)
-          gl_Position = vec4((ap + off)/res*2.0 - 1.0, a.z, 1.0);
+          gl_Position = vec4((ap + off)/res*2.0 - 1.0, a.z - DBIAS, 1.0);
         }
         // zoomed out: thin the plants and laundry (small sprites go first); lit signs always stay
         float thin = lodPlants * (aRect.w < 24.0 ? 0.6 : 0.4);   // (at most six tufts in ten, four plants in ten: fewer than before, since plants cost little and the gaps showed)

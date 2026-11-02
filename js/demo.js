@@ -351,12 +351,19 @@ const DEMO = (() => {
     return { cv, x: r.left + (beat + .12 - v.b0)/v.span*r.width, y: r.top + r.height - 6 - (pad - v.lo + .5)*rowH };
   }
   function addNote(k){
+    if (AUTO) return;   // (the sound pass put both in already: notesEarly)
     const [b, i] = MISSING[k], s = noteAt(b, i); if (!s) return warn('note', 'no strip');
     aim(s); click();
     const o = { clientX: s.x, clientY: s.y, bubbles: true, cancelable: true, pointerId: 1, pointerType: 'mouse', isPrimary: true, button: 0 };
     s.cv.setPointerCapture = () => {};   // (a scripted pointer has no capture to take)
     s.cv.dispatchEvent(new PointerEvent('pointerdown', Object.assign({ buttons: 1 }, o)));
     s.cv.dispatchEvent(new PointerEvent('pointerup', Object.assign({ buttons: 0 }, o)));
+  }
+
+  function notesEarly(){
+    const L = BOOTH.state.layers; if (!L.length) L.push([]);
+    for (const [b, i] of MISSING) L[0].push({ b, d: 1, i, v: .8 });
+    L[0].sort((x, y) => x.b - y.b);
   }
 
   /* ---------- setup ---------- */
@@ -510,6 +517,9 @@ const DEMO = (() => {
     at(MK.grid + .3, () => { const g = gridMega(); if (g) aim(toScreen({ x: g.x, y: (g.top || CURB + 2)*.7, z: g.z })); CUR.want = 1; }, 'to the Grid');
     at(MK.panel - .25, () => click(), 'click 1');
     at(MK.panel - .05, () => { click(); safe('panel', () => music.panel.show()); }, 'double click: panel');
+    // the sound pass plays in real time, where a slow frame could make a click late: there the two notes go into the loop's data well
+    // ahead (they first sound at 9.98 s and 10.58 s either way, on the next pass), so the music never depends on when a frame came
+    if (AUTO) at(8.6, notesEarly, 'notes, ahead');
     at(MK.note1 - .2, () => aim(noteAt(...MISSING[0])), 'aim note 1');
     at(MK.note1, () => addNote(0), 'note 1');
     at(MK.note2 - .2, () => aim(noteAt(...MISSING[1])), 'aim note 2');

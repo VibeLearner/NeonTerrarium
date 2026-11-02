@@ -98,11 +98,11 @@ def main():
             if fmt == 'jpeg': o['quality'] = quality or a.quality
             return base64.b64decode(cdp.send('Page.captureScreenshot', o)['data'])
         # A screen too small for a 1920 x 1080 window (a MacBook's) clips it, and the frames would be its top-left part stretched, everything
-        # off centre. Then the picture is made without a window, where the page is exactly 1920 x 1080. (A Retina window at twice the pixels is fine.)
+        # off center. Then the picture is made without a window, where the page is exactly 1920 x 1080. (A Retina window at twice the pixels is fine.)
         if not a.headless:
             png = grab('png'); w, h = struct.unpack('>II', png[16:24])
             if (w, h) != (1920, 1080) and not (w % 1920 == 0 and h % 1080 == 0 and w//1920 == h//1080):
-                print(f'  the browser window only shows {w} x {h} of the 1920 x 1080 picture: filming without a window instead, so nothing is off centre')
+                print(f'  the browser window only shows {w} x {h} of the 1920 x 1080 picture: filming without a window instead, so nothing is off center')
                 browser.close(); a.headless = True
                 browser, page, cdp = open_page(True)
         ev = page.evaluate

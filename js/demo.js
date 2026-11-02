@@ -173,7 +173,7 @@ const DEMO = (() => {
     S.cycle = false; S.idleRest = false; S.autoPerf = false; S.spin = false;
     safe('pixels', () => { if (RENDER_LINES !== 720) setRenderLines(720); });
     safe('weather', () => { LK.setAutoWeather(false, true); LK.setWeather('clear', true, true); if (LK.pick !== 'auto') LK.setPick('auto', true); });
-    if (CAP) window.__FULL_RATE = true;
+    if (CAP){ window.__FULL_RATE = true; safe('cache', () => { SC.mode = 'off'; }); }   // (render mode, as the film: the still-city cache off, every frame drawn the same way; it made the trailer's metro jump side to side)
     safe('resolution', () => { ZOOM_RES = 0; D.pinRes = true; H = 0; applyRenderRes(zoom); });
     safe('story', () => { if (STORY.engine === false) STORY.setEngine(true); });
     safe('cases', () => { if (typeof CASES !== 'undefined'){ CASES.paused = true; CASES.noStage = true; } });

@@ -21,6 +21,7 @@ ROOT = os.path.abspath(os.path.join(HERE, '..', '..'))
 OUT = os.path.join(HERE, 'out')
 FPS = 60
 STILLS = [.8, 2.0, 3.2, 4.4, 5.2, 5.5, 5.8, 6.6, 7.8, 8.9, 10.2, 11.0, 12.2, 13.6, 14.7]
+STILLS_LONG = [2.0, 4.4, 5.2, 5.6, 6.9, 8.2, 9.6, 11.4, 13.4, 15.6, 16.6, 18.0, 20.0, 21.5]
 
 
 def serve(port):
@@ -76,6 +77,7 @@ def main():
     ap.add_argument('--port', type=int, default=8794)
     ap.add_argument('--quality', type=int, default=95)
     ap.add_argument('--crf', type=int, default=16)
+    ap.add_argument('--long', action='store_true', help='the long cut: about 22 s, the apartment at an easy pace, no captions or badge')
     ap.add_argument('--nolab', action='store_true', help='checking only: leave the apartment out')
     ap.add_argument('--test', action='store_true', help='for checking on a machine without a graphics card: a small 640 x 360 picture at 30 fps, software drawing, no sound')
     a = ap.parse_args()
@@ -83,7 +85,7 @@ def main():
     VW, VH = 1920, 1080
     DSF = 1
     if a.test: VW, VH, DSF, FPS, a.no_audio = 1920, 1080, .5, 30, True   # (the desktop layout of every panel, drawn at half the pixels)
-    a.out = a.out or os.path.join(OUT, 'neon-terrarium-demo' + ('-test' if a.test else '-preview' if a.preview else '') + '.mp4')
+    a.out = a.out or os.path.join(OUT, 'neon-terrarium-demo' + ('-long' if a.long else '') + ('-test' if a.test else '-preview' if a.preview else '') + '.mp4')
     if not shutil.which('ffmpeg') and not a.stills: sys.exit('ffmpeg is needed: brew install ffmpeg')
     from playwright.sync_api import sync_playwright
     os.makedirs(OUT, exist_ok=True)
@@ -94,7 +96,7 @@ def main():
         def open_page(headless):
             browser = launch(pw, headless, soft=a.test)
             ctx = browser.new_context(viewport={'width': VW, 'height': VH}, device_scale_factor=DSF)
-            ctx.add_init_script(script=f'window.__DM_FPS = {FPS};' + ('window.__DM_NOLAB = true;' if a.nolab else '') + ('window.__DM_TEST = true;' if a.test else ''))
+            ctx.add_init_script(script=f'window.__DM_FPS = {FPS};' + ('window.__DM_NOLAB = true;' if a.nolab else '') + ('window.__DM_TEST = true;' if a.test else '') + ('window.__DM_LONG = true;' if a.long else ''))
             ctx.add_init_script(path=os.path.join(HERE, 'shim.js'))
             page = ctx.new_page(); cdp = ctx.new_cdp_session(page); log_page(page)
             page.goto(url, wait_until='load')
@@ -125,7 +127,7 @@ def main():
         frames = int(round(length*FPS)); every = 2 if a.preview else 1
         enc = None
         if a.stills:
-            want = sorted(int(round(s*FPS)) for s in STILLS if s < length)
+            want = sorted(int(round(s*FPS)) for s in (STILLS_LONG if a.long else STILLS) if s < length)
             sd = os.path.join(OUT, 'stills'); os.makedirs(sd, exist_ok=True)
         else:
             raw = os.path.splitext(a.out)[0] + '.video.mp4'
@@ -168,6 +170,7 @@ def main():
             try:
                 browser = launch(pw, True)
                 ctx = browser.new_context(viewport={'width': 1920, 'height': 1080}, device_scale_factor=1)
+                if a.long: ctx.add_init_script(script='window.__DM_LONG = true;')
                 ctx.add_init_script(path=os.path.join(HERE, 'audio.js'))
                 page = ctx.new_page(); log_page(page); page.goto(url, wait_until='load')
                 t0 = time.time()

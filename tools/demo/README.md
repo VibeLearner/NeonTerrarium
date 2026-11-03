@@ -53,3 +53,9 @@ film held for the lab, what was placed and every moment as it fired.
 ## Tuning
 
 Times are at the top of `js/demo.js` (`MK`, `CLICK_T`), captions in `CAPS`, the buildings in `BLOCKS`, the Booth loop in `js/demo_loop.js`, the city in `CITY`, `PLAZA` and `MEGAS`, and each shot's camera in `camAt`.
+
+## The long cut (about 22 s)
+
+`python3 tools/demo/record.py --long` (with `--stills` or `--vertical` as above) makes `neon-terrarium-demo-long.mp4`: the same clip with no captions
+and no "All footage captured in engine" badge, the apartment given about ten seconds so each step has room, and a longer look at the city and the
+title. Its apartment steps are in `RS` and its times in `MK` at the top of `js/demo.js`.

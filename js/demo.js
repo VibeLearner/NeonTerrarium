@@ -16,11 +16,12 @@
 // Nothing is saved and none of the player's own city or settings are read (saveguard.js, NT_DEMO).
 'use strict';
 const DEMO = (() => {
-  const D = { on: !!window.NT_DEMO, ready: false, playing: false, done: false, held: false, t: 0, frame: 0, drawn: 0, log: [], info: {}, failed: null, len: 15 };
+  const D = { on: !!window.NT_DEMO, ready: false, playing: false, done: false, held: false, t: 0, frame: 0, drawn: 0, log: [], info: {}, failed: null, len: window.__DM_LONG ? 22 : 15 };
   if (!D.on) return D;
   const CAP = !!window.__TR_CAPTURE;   // the picture pass: the recorder steps the clock and films each frame
   const AUTO = !!window.__DM_AUDIO;    // the sound pass: real time, nothing drawn, only what makes a sound
   const FPS = +window.__DM_FPS || 60;
+  const LONG = !!window.__DM_LONG;     // the long cut (tools/demo/record.py --long): about 22 s, the apartment at an easy pace, no captions or badge
   const NOLAB = !!window.__DM_NOLAB;   // (checking only, never in a recording: the apartment left out, tools/demo/record.py --test --nolab)
   const say = (...a) => { D.log.push(a.join(' ')); if (D.log.length > 500) D.log.shift(); console.log('[demo]', ...a); };
   const warn = (what, e) => { D.log.push('! ' + what + ': ' + (e && e.message || e)); console.warn('[demo] ' + what, e && e.stack ? e.stack.split('\n').slice(0, 3).join(' | ') : e); };
@@ -45,9 +46,13 @@ const DEMO = (() => {
   function withSeed(seed, fn){ const was = Math.random; Math.random = rng(seed >>> 0); try { return fn(); } finally { Math.random = was; } }
 
   /* ---------- the plan ---------- */
-  const MK = { person: 1.6, walk: 1.6, arrive: 4.55, inside: 5.0, furn: 5.0, room: 6.05, exit: 10.6, out: 11.05, title: 13.2 };
+  const MK = LONG ? { person: 1.6, walk: 1.6, arrive: 4.55, inside: 5.0, furn: 5.0, room: 6.05, exit: 16.1, out: 16.55, title: 18.6 }
+                  : { person: 1.6, walk: 1.6, arrive: 4.55, inside: 5.0, furn: 5.0, room: 6.05, exit: 10.6, out: 11.05, title: 13.2 };
+  // the apartment's steps, in seconds after the room is ready (R): [Plants, bonsai tile, over the table, set down, to close, close, zoom from, zoom to,
+  // color menu, new color, let go]
+  const RS = LONG ? [.7, 1.8, 2.7, 3.3, 4.2, 4.5, 4.9, 6.3, 7.1, 8.0, 9.2] : [.3, .9, 1.35, 1.65, 2.0, 2.25, 2.3, 3.1, 2.7, 3.1, 3.45];
   // [from, to, text, where]: top left over the city, top right in the apartment (its own panels are on the left)
-  const CAPS = [[.3, 1.6, 'Light up the night, tower by tower', 'tl'], [1.85, 4.95, 'Every window has a story', 'tl'], [6.6, 10.4, 'Make any home your own', 'tr']];
+  const CAPS = LONG ? [] : [[.3, 1.6, 'Light up the night, tower by tower', 'tl'], [1.85, 4.95, 'Every window has a story', 'tl'], [6.6, 10.4, 'Make any home your own', 'tr']];
   // the five buildings, in the order they go up; the first is a tenement (it has the apartment). Each block's clicks: a new building, then a floor each
   const BLOCKS = ['low', 'mid', 'high', 'ind', 'low'];
   const CLICK_T = [[.4, .75], [1.1, 1.4], [2.1, 2.45], [2.95], [3.45, 3.8]];
@@ -460,10 +465,10 @@ const DEMO = (() => {
   }
   const labReady = () => { const B = labB(); return FURN.open && $('furnish').classList.contains('live') && !(labPC() && labPC().transitioning) && B && B.inst && B.inst.size > 0 && !labWait(); };
   const AP = { on: false, started: false, roomOk: false, closed: false, exited: false, held0: null };
-  // (the hologram's own timeline is 3.05 s: it starts from the city camera's own view, glides down to the building, outlines the pod, builds it and
-  // resolves. The clip plays it whole but quickly, from the very frame the push in on her door ends, as a quick transition: it holds at H0 while the
-  // lab gets ready, unfilmed)
-  const H0 = .3, HC = H0, holoCurve = x => { x = clamp01(x); return .35*x + .65*ss5(x); };
+  // (the hologram's own timeline is 3.05 s: it opens on a wide view of the city, glides down to the building, outlines the pod, builds it and
+  // resolves. The clip skips the wide part: from the frame the push in on her door ends it plays from HC, already close over the building, to the
+  // room, as a quick transition. It holds at H0 while the lab gets ready, unfilmed)
+  const H0 = .3, HC = 1.8, holoCurve = x => { x = clamp01(x); return .6*x + .4*ss5(x); };
   const HOLD_MAX = window.__DM_TEST ? 7200e3 : 1200e3;   // (real time: twenty minutes for any one thing the lab is doing, two hours when checking with no graphics card)
   function hold(why){   // the film waits here (nothing drawn or filmed) until the lab is ready
     if (AP.heldWhy !== why){ AP.heldWhy = why; AP.held0 = Date.now(); AP.gaveUp = false; }
@@ -573,7 +578,7 @@ const DEMO = (() => {
   function labLetGo(){ const w = labWin(); safe('let go', () => w.PodBuilder.select(null)); }
   // the lab's view eases in on the bonsai once the catalog is closed (its own zoom, toward a point picked so the bonsai ends a little left of
   // the middle, clear of the inspector on the right): a zoom about P keeps P still, so the bonsai at Q ends at P + Z(Q - P)
-  const LZ = { from: MK.room + 2.3, to: MK.room + 3.1, max: 1.9 };
+  const LZ = { from: MK.room + RS[6], to: MK.room + RS[7], max: 1.9 };
   function labZoom(t){
     if (NOLAB || AUTO || FU.id === undefined || !FU.at || t < LZ.from || FU.zoomDone) return;
     const w = labWin(), T = w && w.PodBuilder && w.PodBuilder.touch; if (!T) return;
@@ -672,15 +677,15 @@ const DEMO = (() => {
     if (!AUTO && !NOLAB){
       at(MK.furn, () => { CUR.want = 0; }, 'apartment');
       const R = MK.room;
-      at(R + .3, () => { CUR.want = 1; labGroup(); }, 'Plants');
-      at(R + .9, labTile, 'bonsai tile');
-      at(R + 1.35, labAim, 'over the table');
-      at(R + 1.65, labPlace, 'set down');
-      at(R + 2.0, () => { const b = labEl('#bFlyX'); if (b) aim(labCenter(b)); }, 'to the catalog\'s close');
-      at(R + 2.25, () => { const b = labEl('#bFlyX'); if (b){ click('#ffffff'); b.click(); } }, 'the catalog closed');
-      at(R + 2.7, labSwatch, 'its color menu');
-      at(R + 3.1, labColor, 'a new color');
-      at(R + 3.45, labLetGo, 'let go of, so it shows clean');
+      at(R + RS[0], () => { CUR.want = 1; labGroup(); }, 'Plants');
+      at(R + RS[1], labTile, 'bonsai tile');
+      at(R + RS[2], labAim, 'over the table');
+      at(R + RS[3], labPlace, 'set down');
+      at(R + RS[4], () => { const b = labEl('#bFlyX'); if (b) aim(labCenter(b)); }, 'to the catalog\'s close');
+      at(R + RS[5], () => { const b = labEl('#bFlyX'); if (b){ click('#ffffff'); b.click(); } }, 'the catalog closed');
+      at(R + RS[8], labSwatch, 'its color menu');
+      at(R + RS[9], labColor, 'a new color');
+      at(R + RS[10], labLetGo, 'let go of, so it shows clean');
       at(MK.exit - .3, () => { const b = labEl('#ntExit'); if (b) aim(labCenter(b)); }, 'to Exit');
       at(MK.exit, labExit, 'Exit');
       at(MK.exit + .3, () => { CUR.want = 0; }, 'cursor away');
@@ -759,7 +764,7 @@ const DEMO = (() => {
     if (NOLAB && tw === 'tr') tw = '';
     if (E.tag.className !== tw) E.tag.className = tw;
     const dip = Math.min(1, ...TAGS.map(([a]) => ss(Math.abs(t - a)/.18)));
-    E.tag.style.opacity = (ss(seg(t, .3, .8))*dip).toFixed(3);
+    E.tag.style.opacity = LONG ? '0' : (ss(seg(t, .3, .8))*dip).toFixed(3);
     if (E.tNeon){ E.tNeon.style.opacity = String(neonAt(t - T)); E.tTerr.style.opacity = String(neonAt(t - T - .3)); }
     brackets(MONITOR && t >= MONITOR.t0 && t < MONITOR.t1 ? castPose('who') : null);
   }

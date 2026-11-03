@@ -60,11 +60,15 @@ Times are at the top of `js/demo.js` (`MK`, `CLICK_T`), captions in `CAPS`, the 
 "All footage captured in engine" badge, and everything at an easier pace.
 
 - The build runs to 5 s, the walk home to 6.5 s.
-- In the apartment, the furnisher's own sofa (the biggest seat it put in) is taken out before the film and put back on camera: the Furniture
-  catalog, its Sofas, that sofa from the catalog, set down where the furnisher had it but in another color; its color menu, and back to the
-  furnisher's color. The view eases in on it and back out.
+- In the apartment, the furnisher's own sofa (the biggest seat it put in) is noted and taken out before the film. On camera the cursor goes to
+  Furniture, its Sofas, and a tile of that same sofa, resting on each before it presses; the tile pressed is the very piece that comes in,
+  looking as its tile does. It rides under the cursor out of the catalog and across the room, and is set down where the furnisher had it.
+  Then its color menu, and the part that differs (the cushions, usually) goes to the color the furnisher had picked. The tile is chosen
+  beforehand as the one of that sofa whose own color is furthest from the furnisher's, so the change shows.
 - The household runs warm for this cut, so the furnisher's own rules light the home more (a lamp by the sofa, warm ceiling lights, bedside
-  lamps). Before Exit the work light goes off, and the home is seen by its own lamps.
+  lamps), and every lamp is set to a warm tungsten color (neon signs keep theirs). Before Exit the work light goes off, and the home is seen
+  by its own lamps.
+- No music: the Booth loop is left off (the game's own build sounds stay).
 - The pull out over the city starts at 23 s and the title holds to the end.
 
 Its apartment steps are in `RL` and its times in `MK` at the top of `js/demo.js`; the sofa is `SOFA`.

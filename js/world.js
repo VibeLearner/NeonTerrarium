@@ -2803,6 +2803,7 @@ function dropView(old){ if (old.view) world.remove(old.view); disposeData(old.da
 // Shadows redraw when a sweep ends.
 renderer.localClippingEnabled = true;
 const anims = [], heldRegions = new Map(), pendingRegions = new Set();
+let ANIM_KEEP = null;   // (see endAnim)
 const OUTLINE_GEO = new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1));
 function holdRegion(c){ const k = regKey(c.i, c.j); heldRegions.set(k, (heldRegions.get(k) || 0) + 1); }
 function releaseRegion(k){
@@ -2912,7 +2913,10 @@ function endAnim(i){
   for (const l of a.lines){ scene.remove(l); l.material.dispose(); }
   a.view.traverse(o => { if (o.isMesh && o.userData.isOv){ o.visible = true; return; } if (o.isMesh){ o.material = o.userData.baseMat || o.material; if (o.userData.baseLayer !== undefined) o.layers.mask = o.userData.baseLayer; else o.layers.set(0); } });
   showHidden(a.view, false);
-  a.mats.atlas.dispose(); a.mats.nrm.dispose();
+  // (the first sweep's materials are kept, never disposed: three deletes a compiled shader when the last material using it is disposed, so every
+  //  build compiled the sweep's shader again, a frame drop of its own on each build on a phone (a Pixel 7, Nov 3). Kept, the shader stays and every
+  //  later sweep's materials share it. Only the first build of a session pays for it)
+  if (!ANIM_KEEP) ANIM_KEEP = a.mats; else { a.mats.atlas.dispose(); a.mats.nrm.dispose(); }
   if (a.kind === 'remove'){ dropView(a.old); if (a.c.view) a.c.view.visible = true; }
   if (a.held) releaseRegion(a.reg);
   shadowDirty = true;

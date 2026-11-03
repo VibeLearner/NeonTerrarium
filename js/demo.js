@@ -47,7 +47,7 @@ const DEMO = (() => {
   /* ---------- the plan ---------- */
   const MK = { person: 1.6, walk: 1.6, arrive: 4.55, inside: 5.0, furn: 5.15, room: 6.45, exit: 10.6, out: 11.05, title: 13.2 };
   // [from, to, text, where]: top left over the city, top right in the apartment (its own panels are on the left)
-  const CAPS = [[.3, 1.6, 'Build it block by block', 'tl'], [1.85, 4.95, 'Follow anyone home', 'tl'], [6.6, 10.4, 'Furnish every apartment', 'tr']];
+  const CAPS = [[.3, 1.6, 'Light up the night, tower by tower', 'tl'], [1.85, 4.95, 'Every window has a story', 'tl'], [6.6, 10.4, 'Make any home your own', 'tr']];
   // the five buildings, in the order they go up; the first is a tenement (it has the apartment). Each block's clicks: a new building, then a floor each
   const BLOCKS = ['low', 'mid', 'high', 'ind', 'low'];
   const CLICK_T = [[.4, .75], [1.1, 1.4], [2.1, 2.45], [2.95], [3.45, 3.8]];

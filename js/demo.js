@@ -993,7 +993,9 @@ const DEMO = (() => {
         const B = labB(); D.info.pieces = B && B.inst ? B.inst.size : 0; D.info.tables = B && B.inst ? [...B.inst.values()].filter(i => i.rec && TABLES.has(i.rec.arch)).length : 0;
         if (LONG){ safe('sofas', () => labWin().PodBuilder.openCat('sofas')); await wait(3);
           await until(() => { const PB = labWin().PodBuilder; return PB.itemsDone && PB.itemsDone('sofas'); }, 120).catch(e => warn('sofas', e));
-          await sofaOut().catch(e => warn('sofa', e)); safe('warm lamps', lampsWarm); await wait(1); }
+          await sofaOut().catch(e => warn('sofa', e)); safe('warm lamps', lampsWarm); await wait(1);
+          // (the catalog remembers the last shelf per group: left on Chairs, so on camera Furniture opens there and the cursor goes on to Sofas)
+          safe('chairs', () => labWin().PodBuilder.openCat('chairs')); await wait(1); }
         safe('plants', () => labWin().PodBuilder.openCat('plants')); await wait(3);
         D.info.plantTiles = labDoc() ? labDoc().querySelectorAll('#bTiles .tile').length : 0;
         safe('fly', () => labWin().PodBuilder.closeFly());

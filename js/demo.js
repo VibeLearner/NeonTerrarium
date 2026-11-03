@@ -53,12 +53,7 @@ const DEMO = (() => {
   const CLICK_T = [[.35, .6], [.82, 1.02], [1.55, 1.8], [2.15], [2.55, 2.8]];
   // the Booth loop on the Grid from the first frame: 4 bars at 100 BPM (9.6 s a pass), a melody on the magic keys (pads 0 to 11, always in the
   // chord), its first bar missing two notes; the pass that starts at about 9.7 s is the first with them
-  const BPM = 100, LOOP_LEN = 4, LOOP_ID = 'Ldemo';
-  const MELODY = [[2.5, 8, .5], [3, 7, .5], [3.5, 5, .5], [4.5, 4, .5], [5, 5, .5], [5.5, 7, 1.5], [7, 6, .5], [7.5, 5, .5],
-    [8.5, 7, .5], [9, 9, .5], [9.5, 10, 1], [10.5, 9, .5], [11, 7, 1], [12.5, 5, .5], [13, 6, .5], [13.5, 7, 1.5], [15, 4, 1]];
-  const MISSING = [[.5, 7], [1.5, 9]];
-  window.DEMO_KEYS['neonIsland.booth'] = JSON.stringify({ loops: [{ id: LOOP_ID, name: 'Night shift', prog: 0, len: LOOP_LEN, voice: 'glass', bpm: BPM, ap: false, apAmt: .55,
-    layers: [MELODY.map(([b, i, d]) => ({ b, d, i, v: .8 }))], at: 1 }] });
+  const LOOP_ID = window.DEMO_LOOP.id, MISSING = window.DEMO_LOOP.missing;   // (the loop itself: js/demo_loop.js, read by booth.js before this file loads)
 
   /* ---------- the game, switched off: nothing acts unless the script says so (the stage's) ---------- */
   maybeSpawnMegas = () => {};
@@ -744,9 +739,10 @@ const DEMO = (() => {
   }
 
   /* ---------- getting ready, and playing ---------- */
-  const until = (cond, secs) => new Promise((res, rej) => { const s0 = performance.now();
-    const tk = () => { let ok = false; try { ok = cond(); } catch (e) {} if (ok) return res(); if (performance.now() - s0 > secs*1000) return rej(new Error('timed out')); requestAnimationFrame(tk); }; tk(); });
-  const wait = secs => { const s0 = performance.now(); return until(() => performance.now() - s0 >= secs*1000, secs + 5); };
+  // (a condition's time limit in real seconds; a wait in the page's own time)
+  const until = (cond, secs) => new Promise((res, rej) => { const s0 = Date.now();
+    const tk = () => { let ok = false; try { ok = cond(); } catch (e) {} if (ok) return res(); if (Date.now() - s0 > secs*1000) return rej(new Error('timed out')); requestAnimationFrame(tk); }; tk(); });
+  const wait = secs => { const s0 = performance.now(); return until(() => performance.now() - s0 >= secs*1000, 3600); };
   async function setup(){
     await Promise.race([Promise.all(['12px Silkscreen', '400 12px "JetBrains Mono"', '600 12px "JetBrains Mono"', '500 12px "Chakra Petch"', '600 12px "Chakra Petch"'].map(f => document.fonts.load(f).catch(() => null))).then(() => document.fonts.ready), new Promise(r => setTimeout(r, 20000))]).catch(() => null);
     overlay(); monSetup();
@@ -757,19 +753,19 @@ const DEMO = (() => {
     if (!AUTO && !NOLAB){
       // once into the apartment beforehand, with the buildings up: the lab furnishes the home for its household (kept, so the film's visit
       // finds the same home), and the Plants catalog's pictures are drawn
-      status('waking the apartment lab');
-      FURN.preload();
-      await until(() => FURN.warmed() && FURN.frame && FURN.ready, 400).catch(e => warn('lab warm', e));
+      // (no warm-up first: that is for live play, where the first visit must be quick; here the film holds for the lab anyway)
       status('furnishing the apartment once');
       if (FURN.openKey(PLAN.who.pod)){
-        await until(labReady, 400).catch(e => warn('dry run', e));
+        let lastW = null; const rep = () => { const B = labB(), w = !FURN.frame ? 'the lab page' : !$('furnish').classList.contains('live') ? 'the hologram' : labWait() || (B && B.inst && B.inst.size ? 'ready' : 'the pieces');
+          if (w !== lastW){ lastW = w; say('the apartment lab:', w); } };
+        await until(() => { rep(); return labReady(); }, window.__DM_TEST ? 7200 : 900).catch(e => warn('dry run', e));
         const B = labB(); D.info.pieces = B && B.inst ? B.inst.size : 0; D.info.tables = B && B.inst ? [...B.inst.values()].filter(i => i.rec && TABLES.has(i.rec.arch)).length : 0;
         safe('plants', () => labWin().PodBuilder.openCat('plants')); await wait(3);
         D.info.plantTiles = labDoc() ? labDoc().querySelectorAll('#bTiles .tile').length : 0;
         safe('fly', () => labWin().PodBuilder.closeFly());
         const b = labEl('#ntExit'); if (b) b.click(); else FURN.close();
         await until(() => !FURN.open && !FURN.hold, 30).catch(e => warn('dry run close', e)); await wait(1);
-        if (!FURN.frame){ FURN.preload(); await until(() => FURN.warmed() && FURN.frame && FURN.ready, 400).catch(e => warn('lab rewarm', e)); }
+        if (!FURN.frame){ FURN.preload(); await until(() => FURN.frame && FURN.ready, 900).catch(e => warn('lab page', e)); }
       } else warn('dry run', 'could not open ' + PLAN.who.pod);
     }
     clearBlocks();

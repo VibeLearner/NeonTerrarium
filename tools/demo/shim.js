@@ -51,11 +51,12 @@
   };
   let seed = 0x7a11e5 ^ (top ? 0 : (location.pathname.length*2654435761 >>> 0));
   Math.random = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0)/4294967296; };
+  window.__dmStep = step;
+  // every frame the page embeds (and theirs) is stepped with it, found afresh each time: Furnish pod's lab dropped out of a list of frames kept from
+  // when it loaded, and stood still from its fourth frame on
+  const kidsOf = (doc, out) => { for (const f of doc.querySelectorAll('iframe')){ try { const w = f.contentWindow; if (w && w.__dmStep){ out.push(w.__dmStep); kidsOf(w.document, out); } } catch (e) {} } return out; };
   if (top){
     window.__TR_CAPTURE = true;
-    const kids = window.__dmKids = new Set();
-    window.__step = (n = 1, ms = 1000/60) => { for (let i = 0; i < n; i++){ step(ms); for (const k of [...kids]) try { k(ms); } catch (e) {} } return clock; };
-  } else {
-    try { const kids = window.top.__dmKids; kids.add(step); window.addEventListener('pagehide', () => kids.delete(step)); } catch (e) {}
+    window.__step = (n = 1, ms = 1000/60) => { for (let i = 0; i < n; i++){ step(ms); for (const k of kidsOf(document, [])) try { k(ms); } catch (e) {} } return clock; };
   }
 })();

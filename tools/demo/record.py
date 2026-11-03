@@ -48,7 +48,7 @@ def launch(pw, headless, soft=False):
 
 
 def log_page(page):
-    page.on('console', lambda m: print('  page:', m.text[:1500]) if m.text.startswith('[demo]') or m.type == 'error' else None)
+    page.on('console', lambda m: print('  page:', m.text[:1500]) if m.text.startswith(('[demo]', 'Furnish pod', 'PodContext', 'PodRender', '[lab')) or m.type in ('error', 'warning') else None)
     page.on('pageerror', lambda e: print('  page error:', e))
     page.on('crash', lambda *_: print('  the page crashed (the graphics process may have run out of memory)'))
 

@@ -37,8 +37,8 @@ def serve(port):
     return srv
 
 
-def launch(pw, headless):
-    args = ['--autoplay-policy=no-user-gesture-required', '--disable-background-timer-throttling', '--disable-renderer-backgrounding',
+def launch(pw, headless, soft=False):
+    args = (['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] if soft else []) + ['--autoplay-policy=no-user-gesture-required', '--disable-background-timer-throttling', '--disable-renderer-backgrounding',
             '--disable-backgrounding-occluded-windows', '--ignore-gpu-blocklist', '--enable-gpu-rasterization', '--hide-scrollbars']
     try:
         return pw.chromium.launch(channel='chrome', headless=headless, args=args)
@@ -76,8 +76,12 @@ def main():
     ap.add_argument('--port', type=int, default=8794)
     ap.add_argument('--quality', type=int, default=95)
     ap.add_argument('--crf', type=int, default=16)
+    ap.add_argument('--test', action='store_true', help='for checking on a machine without a graphics card: a small 640 x 360 picture at 30 fps, software drawing, no sound')
     a = ap.parse_args()
-    a.out = a.out or os.path.join(OUT, 'neon-terrarium-demo' + ('-preview' if a.preview else '') + '.mp4')
+    global FPS
+    VW, VH = 1920, 1080
+    if a.test: VW, VH, FPS, a.no_audio = 640, 360, 30, True
+    a.out = a.out or os.path.join(OUT, 'neon-terrarium-demo' + ('-test' if a.test else '-preview' if a.preview else '') + '.mp4')
     if not shutil.which('ffmpeg') and not a.stills: sys.exit('ffmpeg is needed: brew install ffmpeg')
     from playwright.sync_api import sync_playwright
     os.makedirs(OUT, exist_ok=True)
@@ -86,8 +90,9 @@ def main():
     with sync_playwright() as pw:
         # ---------- 1. the picture ----------
         def open_page(headless):
-            browser = launch(pw, headless)
-            ctx = browser.new_context(viewport={'width': 1920, 'height': 1080}, device_scale_factor=1)
+            browser = launch(pw, headless, soft=a.test)
+            ctx = browser.new_context(viewport={'width': VW, 'height': VH}, device_scale_factor=1)
+            ctx.add_init_script(script=f'window.__DM_FPS = {FPS};')
             ctx.add_init_script(path=os.path.join(HERE, 'shim.js'))
             page = ctx.new_page(); cdp = ctx.new_cdp_session(page); log_page(page)
             page.goto(url, wait_until='load')
@@ -103,14 +108,14 @@ def main():
         # everything off center. Then it goes headless after all. A Retina window at twice the pixels is fine.)
         if not a.headless:
             png = grab('png'); w, h = struct.unpack('>II', png[16:24])
-            if (w, h) != (1920, 1080) and not (w % 1920 == 0 and h % 1080 == 0 and w//1920 == h//1080):
+            if (w, h) != (VW, VH) and not (w % 1920 == 0 and h % 1080 == 0 and w//1920 == h//1080):
                 print(f'  the browser window only shows {w} x {h} of the 1920 x 1080 picture: filming without a window instead, so nothing is off center')
                 browser.close(); a.headless = True
                 browser, page, cdp = open_page(True)
         ev = page.evaluate
         t0 = time.time()
         for _ in wait_ready(ev, t0):
-            ev('__step(2)'); time.sleep(.01)
+            ev(f'__step(2, {1000/FPS})'); time.sleep(.01)
         st = ev('DEMO.state()')
         print('ready:', json.dumps(st.get('info')))
         if not ev('DEMO.start()'): sys.exit('the clip would not start')
@@ -122,13 +127,21 @@ def main():
             sd = os.path.join(OUT, 'stills'); os.makedirs(sd, exist_ok=True)
         else:
             raw = os.path.splitext(a.out)[0] + '.video.mp4'
-            size, fps = ('1280:720', FPS//2) if a.preview else ('1920:1080', FPS)
+            size, fps = ('1280:720', FPS//2) if a.preview else (f'{VW}:{VH}', FPS)
             enc = subprocess.Popen(['ffmpeg', '-v', 'error', '-y', '-f', 'image2pipe', '-framerate', str(fps), '-c:v', 'mjpeg', '-i', '-',
                                     '-vf', f'scale={size}:flags=lanczos', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', str(a.crf + (5 if a.preview else 0)),
                                     '-pix_fmt', 'yuv420p', '-r', str(fps), raw], stdin=subprocess.PIPE)
         t1 = time.time()
+        # one picture per frame the film draws: while it holds (the apartment lab still working) the clock steps on and no picture is taken
+        held_steps = 0
         for f in range(frames):
-            ev('__step(1)')
+            d0 = ev('DEMO.drawn'); n = 0
+            while True:
+                ev(f'__step(1, {1000/FPS})')
+                if ev('DEMO.drawn') != d0: break
+                n += 1; held_steps += 1; time.sleep(.004)
+                if n % 600 == 0: print(f'  the film is holding for the apartment lab ({n} steps so far): ' + str(ev('DEMO.state().info.wait')))
+            if n > 2: print(f'  at {f/FPS:.2f}s the film held {n} steps for the lab')
             if a.stills:
                 if f in want:
                     p = os.path.join(sd, f'{f/FPS:05.2f}s.png'); open(p, 'wb').write(grab('png')); print('still', os.path.relpath(p, ROOT))
@@ -140,6 +153,7 @@ def main():
                 print(f'  {f/FPS:4.0f}s of {length:.0f}s   ({el:4.0f}s elapsed, about {eta/60:.1f} min to go)')
         st = ev('DEMO.state()')
         browser.close()
+        st['info']['heldSteps'] = held_steps
         with open(os.path.join(OUT, 'demo-log.txt'), 'w') as fh: fh.write(json.dumps(st.get('info'), indent=1) + '\n' + '\n'.join(st.get('log', [])) + '\n')
         if a.stills:
             srv.shutdown(); print('stills in', os.path.relpath(sd, ROOT), '(and what happened when in tools/demo/out/demo-log.txt)'); return

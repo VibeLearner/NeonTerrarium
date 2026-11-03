@@ -42,7 +42,7 @@
   };
   try {   // an audio clock on the film's clock (nothing is heard in this pass: the music is recorded in its own)
     const BA = window.BaseAudioContext || window.AudioContext;
-    if (BA) Object.defineProperty(BA.prototype, 'currentTime', { configurable: true, get(){ return (clock - 1000)/1000; } });
+    if (BA) Object.defineProperty(BA.prototype, 'currentTime', { configurable: true, get(){ const f = (window.top || window).__dmAudioT; return typeof f === 'function' ? f() : (clock - 1000)/1000; } });   // (the film's time once it rolls: js/demo.js)
   } catch (e) {}
   const getCtx = HTMLCanvasElement.prototype.getContext;
   HTMLCanvasElement.prototype.getContext = function (type, attrs){

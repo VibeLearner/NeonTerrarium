@@ -1,81 +1,113 @@
-// Neon Terrarium: the 15 second demo clip. Open the game with ?full#demo at the end of the address and it builds its own night city, then plays
-// a scripted, captioned clip of the game being played (tools/demo/record.py films it at 1920 x 1080, 60 fps, and records the game's own sound):
+// Neon Terrarium: the 15 second demo clip, played as a script on the trailer's stage engine (js/stage.js on the trailer branch). Open the game
+// with ?full#demo; tools/demo/record.py films it at 1920 x 1080, 60 fps, with the game's own sound.
 //
-//   0.0   building, up close: a cursor picks zones and places buildings round a plaza, the last a floor on a tenement there
-//   2.6   the person cam on someone who lives in that tenement, their log filling in, and in through their front door
-//   ~4.2  the hologram into their apartment (Furnish pod), furnished by the game from who lives there: the Plants catalog opened,
-//         a bonsai set on their table, its color changed in the piece's color menu, then Exit and the game's own power-down
-//   ~8.3  a pan to the Grid, a double click, the Acoustic Panel: the Booth loop that has been playing all along, two notes missing
-//         from its first bar. Both are drawn in and play on the very next pass, and the panel closes with the music going on
-//   ~11   the camera pulls out over the whole city at night and the title comes on
+// As on the stage, nothing in it is decided by the game. Its simulation is off (no one walks or decides, no traffic, no drones, no stories, no
+// cases, no landmark arrives on its own); the people on screen are a cast drawn from the script, each move written for them; every building is
+// made from a seed of its own, so every run builds the same city and the same apartment; and the film's clock is its own frame count, which
+// holds where it is while the apartment lab is still working (those frames are never filmed), so nothing ever lags or skips.
 //
-// The music is the game's: a Booth loop broadcast on the Grid from the first frame (the recorder records the game's own audio
-// in a second, real-time pass). Nothing is saved and none of the player's own city or settings are read (saveguard.js, NT_DEMO).
+//   0.0   up close on a plaza in a big night city: the cursor picks zones and builds; after the first two buildings the person cam opens on
+//         a resident of the first one, standing on the plaza; three more go up while they walk to their door and in
+//   4.05  the game's hologram into their apartment, furnished by the game for that household: the Plants catalog, a bonsai set on their
+//         table, picked, its color changed in its color menu; Exit, and the game's own power-down back to the city
+//   8.4   a pan to the Grid, a double click, the Acoustic Panel: the Booth loop that has played since the first frame is missing two notes;
+//         both are drawn in and play on the very next pass; the panel closes with the music going on
+//   11    the camera pulls out over the whole city and the title comes on
+//
+// Nothing is saved and none of the player's own city or settings are read (saveguard.js, NT_DEMO).
 'use strict';
 const DEMO = (() => {
-  const D = { on: !!window.NT_DEMO, ready: false, playing: false, done: false, t: -1, stage: 'off', log: [], info: {}, sfx: [], len: 15 };
+  const D = { on: !!window.NT_DEMO, ready: false, playing: false, done: false, held: false, t: 0, frame: 0, drawn: 0, log: [], info: {}, failed: null, len: 15 };
   if (!D.on) return D;
-  const CAP = !!window.__TR_CAPTURE, AUTO = !!window.__DM_AUDIO;   // (the video pass steps the clock; the audio pass plays in real time and starts by itself)
-  const say = (...a) => { D.log.push(a.join(' ')); console.log('[demo]', ...a); };
-  const warn = (what, e) => { D.log.push('! ' + what + ': ' + (e && e.message || e)); console.warn('[demo] ' + what, e); };
+  const CAP = !!window.__TR_CAPTURE;   // the picture pass: the recorder steps the clock and films each frame
+  const AUTO = !!window.__DM_AUDIO;    // the sound pass: real time, nothing drawn, only what makes a sound
+  const FPS = +window.__DM_FPS || 60;
+  const say = (...a) => { D.log.push(a.join(' ')); if (D.log.length > 500) D.log.shift(); console.log('[demo]', ...a); };
+  const warn = (what, e) => { D.log.push('! ' + what + ': ' + (e && e.message || e)); console.warn('[demo] ' + what, e && e.stack ? e.stack.split('\n').slice(0, 3).join(' | ') : e); };
   const safe = (what, f) => { try { return f(); } catch (e) { warn(what, e); return null; } };
-  maybeSpawnMegas = () => {};   // (nothing arrives unasked)
-
-  /* ---------- the plan ---------- */
-  // every time is fixed, so the picture and the music (recorded in a separate pass) line up; the furnishing fits into however much of
-  // MK.room to MK.exit the room is ready for
-  const MK = { build: 0, person: 2.6, enter: 2.75, furn: 4.2, room: 5.25, exit: 7.75, grid: 8.4, panel: 8.95, note1: 9.65, note2: 10.05, close: 10.85, out: 11.0, title: 12.6, end: 15 };
-  const CAPS = [
-    [.2, 2.4, 'Build it block by block'],
-    [2.85, 4.1, 'Follow anyone home'],
-    [5.35, 7.6, 'Furnish every apartment'],
-    [9.1, 10.75, 'Finish the song the city hears'],
-  ];
-  // the Booth loop the Grid broadcasts: 4 bars at 100 BPM (9.6 s a pass), a melody on the magic keys (pads 0 to 11, always in the chord),
-  // its first bar missing two notes. The pass that starts at 9.68 s is the first with them: they are drawn in just before it
-  const BPM = 100, BEAT = 60/BPM, LOOP_LEN = 4, LOOP_ID = 'Ldemo';
-  const MELODY = [[2.5, 8, .5], [3, 7, .5], [3.5, 5, .5],
-    [4.5, 4, .5], [5, 5, .5], [5.5, 7, 1.5], [7, 6, .5], [7.5, 5, .5],
-    [8.5, 7, .5], [9, 9, .5], [9.5, 10, 1], [10.5, 9, .5], [11, 7, 1],
-    [12.5, 5, .5], [13, 6, .5], [13.5, 7, 1.5], [15, 4, 1]];
-  const MISSING = [[.5, 7], [1.5, 9]];   // (beat, pad): the two the player adds
-  window.DEMO_KEYS['neonIsland.booth'] = JSON.stringify({ loops: [{ id: LOOP_ID, name: 'Night shift', prog: 0, len: LOOP_LEN, voice: 'glass', bpm: BPM, ap: false, apAmt: .55,
-    layers: [MELODY.map(([b, i, d]) => ({ b, d, i, v: .8 }))], at: 1 }] });
-  D.info.loop = { bpm: BPM, len: LOOP_LEN, missing: MISSING };
+  const $ = id => document.getElementById(id);
+  const html = document.documentElement;
 
   /* ---------- small maths ---------- */
-  const clamp01 = x => x < 0 ? 0 : x > 1 ? 1 : x;
+  const clamp = (x, a, b) => x < a ? a : x > b ? b : x, clamp01 = x => clamp(x, 0, 1);
   const ss = x => { x = clamp01(x); return x*x*(3 - 2*x); };
+  const ss5 = x => { x = clamp01(x); return x*x*x*(x*(x*6 - 15) + 10); };
   const ease = x => { x = clamp01(x); return x < .5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3)/2; };
   const expo = x => { x = clamp01(x); return x >= 1 ? 1 : 1 - Math.pow(2, -10*x); };
-  const lerp = (a, b, u) => a + (b - a)*u;
-  const elerp = (a, b, u) => Math.exp(lerp(Math.log(a), Math.log(b), u));
+  const lerp = (a, b, u) => a + (b - a)*u, elerp = (a, b, u) => Math.exp(lerp(Math.log(a), Math.log(b), u));
   const seg = (t, a, b) => clamp01((t - a)/(b - a));
   const follow = (cur, goal, k, dt) => cur + (goal - cur)*(1 - Math.exp(-k*dt));
-  const DEG = Math.PI/180;
-  const wrapA = a => Math.atan2(Math.sin(a), Math.cos(a));
+  const DEG = Math.PI/180, wrapA = a => Math.atan2(Math.sin(a), Math.cos(a));
 
-  /* ---------- the city: big, at night, every kind of building, an open plaza in the middle ---------- */
+  /* ---------- seeded numbers (the stage's) ---------- */
+  const rng = a => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0)/4294967296; };
+  const h32 = (...a) => { let h = 2166136261; const s = a.join('|'); for (let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+  function withSeed(seed, fn){ const was = Math.random; Math.random = rng(seed >>> 0); try { return fn(); } finally { Math.random = was; } }
+
+  /* ---------- the plan ---------- */
+  const MK = { person: 1.25, walk: 1.2, arrive: 3.5, inside: 3.9, furn: 4.05, room: 5.2, exit: 7.75, grid: 8.4, panel: 8.95, note1: 9.65, note2: 10.05, close: 10.85, out: 11.0, title: 12.6 };
+  const CAPS = [[.25, 1.2, 'Build it block by block'], [1.45, 3.85, 'Follow anyone home'], [5.35, 7.6, 'Furnish every apartment'], [9.1, 10.75, 'Finish the song the city hears']];
+  // the five buildings, in the order they go up; the first is a tenement (it has the apartment). Each block's clicks: a new building, then a floor each
+  const BLOCKS = ['low', 'mid', 'high', 'ind', 'low'];
+  const CLICK_T = [[.35, .6], [.82, 1.02], [1.55, 1.8], [2.15], [2.55, 2.8]];
+  // the Booth loop on the Grid from the first frame: 4 bars at 100 BPM (9.6 s a pass), a melody on the magic keys (pads 0 to 11, always in the
+  // chord), its first bar missing two notes; the pass that starts at about 9.7 s is the first with them
+  const BPM = 100, LOOP_LEN = 4, LOOP_ID = 'Ldemo';
+  const MELODY = [[2.5, 8, .5], [3, 7, .5], [3.5, 5, .5], [4.5, 4, .5], [5, 5, .5], [5.5, 7, 1.5], [7, 6, .5], [7.5, 5, .5],
+    [8.5, 7, .5], [9, 9, .5], [9.5, 10, 1], [10.5, 9, .5], [11, 7, 1], [12.5, 5, .5], [13, 6, .5], [13.5, 7, 1.5], [15, 4, 1]];
+  const MISSING = [[.5, 7], [1.5, 9]];
+  window.DEMO_KEYS['neonIsland.booth'] = JSON.stringify({ loops: [{ id: LOOP_ID, name: 'Night shift', prog: 0, len: LOOP_LEN, voice: 'glass', bpm: BPM, ap: false, apAmt: .55,
+    layers: [MELODY.map(([b, i, d]) => ({ b, d, i, v: .8 }))], at: 1 }] });
+
+  /* ---------- the game, switched off: nothing acts unless the script says so (the stage's) ---------- */
+  maybeSpawnMegas = () => {};
+  updateCars = () => {}; updateDrones = () => {}; updateTrips = () => {}; updateHighways = () => {};
+  mtAmbient = () => {}; mtRiders = () => {};
+  updateConveyors = () => {};
+  { const _rc = rebuildCell; rebuildCell = function (c){ return withSeed(h32('cell', c.i, c.j, ...c.sections.map(s => s.seed + ':' + (s.mf || 0))), () => _rc.call(this, c)); }; }
+  { const _rm = rebuildMega; rebuildMega = function (m){ return withSeed(h32('mega', m.kind, m.i, m.j, m.seed), () => _rm.apply(this, arguments)); }; }
+  { const _bc = rebuildConnections; rebuildConnections = function (){ return withSeed(h32('links'), () => _bc.apply(this, arguments)); }; }
+  { const _sa = syncAgents; syncAgents = function (){ return withSeed(h32('agents'), () => _sa.apply(this, arguments)); }; }
+  // (the residents are still worked out, so each pod has its household for Furnish pod, but nobody is moved or drawn: the cast is, below)
+  function settle(){
+    S.cycle = false; S.idleRest = false; S.autoPerf = false; S.spin = false;
+    safe('pixels', () => { if (RENDER_LINES !== 720) setRenderLines(720); });
+    safe('weather', () => { LK.setAutoWeather(false, true); LK.setWeather('clear', true, true); if (LK.pick !== 'auto') LK.setPick('auto', true); });
+    safe('speed', () => { if (typeof FF !== 'undefined' && FF.set) FF.set(1); });
+    safe('resolution', () => { ZOOM_RES = 0; H = 0; applyRenderRes(zoom); });
+    safe('story', () => { STORY.tick = () => {}; });
+    safe('cases', () => { if (typeof CASES !== 'undefined'){ CASES.paused = true; CASES.noStage = true; CASES.tick = () => {}; } });
+    safe('pacing', () => { if (typeof PACE !== 'undefined') PACE.off = true; });
+    safe('wirelog', () => { if (typeof WIRELOG !== 'undefined') WIRELOG.tick = () => {}; });
+    safe('police', () => { policeDroneAlert = () => false; });
+    if (CAP) safe('render', () => { SC.mode = 'off'; const T = typeof PH !== 'undefined' && PH.tests; if (T) T.noSlowFar = T.noSmall = T.noSpeed = true; if (typeof SD !== 'undefined') SD.on = false; if (typeof FARV !== 'undefined') FARV.on = false; });
+  }
+  const _ar = applyRenderRes;
+  applyRenderRes = function (){ return _ar(ZOOM_REF); };   // (the same pixels at every zoom)
+
+  /* ---------- the city: a big night city, every kind of building, an open plaza in the middle ---------- */
+  const HOUR = 20.6;
   const CITY = { i0: -16, i1: 12, j0: -12, j1: 12 };
-  const PLAZA = { i0: -4, i1: 0, j0: -2, j1: 2 };   // open ground; the clip builds on part of it
+  const PLAZA = { i0: -4, i1: 2, j0: -3, j1: 3 }, PC0 = { i: -1, j: 0 };
   const inPlaza = (i, j) => i >= PLAZA.i0 && i <= PLAZA.i1 && j >= PLAZA.j0 && j <= PLAZA.j1;
   const ringOf = (i, j) => !inPlaza(i, j) && i >= PLAZA.i0 - 1 && i <= PLAZA.i1 + 1 && j >= PLAZA.j0 - 1 && j <= PLAZA.j1 + 1;
-  const MEGAS = [['police', -14, -11, 3, 3], ['square', -12, -5, 5, 5], ['foundry', -15, 3, 6, 4], ['greenhouse', -15, 9, 5, 4], ['logistics', -9, 7, 6, 6],
-    ['wirenest', -5, -11, 4, 4], ['market', 2, -11, 4, 4], ['club', 7, -10, 4, 4], ['radio', 3, -4, 2, 2], ['spire', 7, -4, 3, 3],
-    ['square', 8, 1, 5, 5], ['pagoda', 6, 7, 5, 4], ['bathhouse', 2, 6, 3, 3], ['emitter', -2, 6, 2, 2]];
-  const LAWNS = [[-7, -2], [-7, -1], [-8, -2], [4, 1], [4, 2], [-1, 9], [0, 9], [-12, 1], [-11, 1]];
+  const MEGAS = [['radio', 3, -1, 2, 2], ['square', -12, -6, 5, 5], ['foundry', -15, 3, 6, 4], ['greenhouse', -14, 7, 5, 4], ['logistics', -8, 6, 6, 6],
+    ['market', -2, -11, 4, 4], ['club', 4, -10, 4, 4], ['spire', 7, -4, 3, 3], ['square', 7, 1, 5, 5], ['pagoda', 4, 7, 5, 4], ['bathhouse', 0, 7, 3, 3], ['emitter', -9, -11, 2, 2]];
+  const LAWNS = [[-8, -2], [-8, -1], [-9, -2], [1, 9], [-11, 1], [-10, 1], [9, 9]];
   const zoneAt = (i, j, u) => {
-    if (ringOf(i, j)) return 'low';
+    if (ringOf(i, j)) return u < .8 ? 'low' : 'mid';
     if (i <= -9 && j >= 2) return u < .8 ? 'ind' : 'mid';
-    if (i <= -5) return u < .78 ? 'low' : 'mid';
-    if (i >= 6) return u < .7 ? 'high' : 'mid';
-    return u < .62 ? 'mid' : u < .8 ? 'high' : 'low';
+    if (i <= -5) return u < .75 ? 'low' : 'mid';
+    if (i >= 5) return u < .7 ? 'high' : 'mid';
+    return u < .62 ? 'mid' : u < .82 ? 'high' : 'low';
   };
   function city(){
-    const R = mulberry32(20261102);
+    settle();
+    const R = rng(20261103);
     const inMega = (i, j) => MEGAS.some(([, mi, mj, w, h]) => i >= mi && i < mi + w && j >= mj && j < mj + h);
     const isLawn = (i, j) => LAWNS.some(([a, b]) => a === i && b === j);
     const secs = (zone, k) => { const out = []; for (let q = 0; q < k; q++) out.push({ zone, seed: Math.floor(R()*1e9), style: DEFAULT_STYLE }); return out; };
+    cells.clear(); for (const m of [...megas.values()]) megas.delete(m.id); metros.length = 0; highways.length = 0;
     let n = 0;
     for (let i = CITY.i0; i <= CITY.i1; i++) for (let j = CITY.j0; j <= CITY.j1; j++){
       const ci = Math.min(i - CITY.i0, CITY.i1 - i), cj = Math.min(j - CITY.j0, CITY.j1 - j);
@@ -83,32 +115,160 @@ const DEMO = (() => {
       const c = newCell(i, j); c.style = DEFAULT_STYLE; c.green = 'some'; n++;
       cells.set(ckey(i, j), c);
       if (inMega(i, j)) continue;
-      if (inPlaza(i, j)){ c.green = (i + j) & 1 ? 'grass' : 'none'; continue; }
-      if (isLawn(i, j)){ c.green = 'grass'; continue; }
+      if (inPlaza(i, j) || isLawn(i, j)){ c.green = 'grass'; continue; }
       const z = zoneAt(i, j, R()), v = R();
-      const k = ringOf(i, j) ? (v < .5 ? 2 : 3) : z === 'ind' ? (v < .5 ? 1 : 2) : v < .25 ? 1 : v < .62 ? 2 : v < .9 ? 3 : 4;
+      const k = ringOf(i, j) ? (v < .6 ? 1 : 2) : z === 'ind' ? (v < .5 ? 1 : 2) : v < .25 ? 1 : v < .62 ? 2 : v < .9 ? 3 : 4;
       c.sections = secs(z, Math.min(MAX_SECTIONS, k));
     }
-    for (const [kind, i, j, w, h] of MEGAS){ const m = placeMega(kind, i, j, Math.floor(R()*1e9), w, h, 1); if (!m){ warn('megastructure ' + kind, 'did not fit'); continue; } if (kind === 'square') m.centre = nextSquareCentre(m); }
+    let sq = 0;
+    for (const [kind, i, j, w, h] of MEGAS){ const m = placeMega(kind, i, j, Math.floor(R()*1e9), w, h, 1); if (!m){ warn('megastructure ' + kind, 'did not fit'); continue; }
+      if (kind === 'square' && typeof SQ_CENTRES !== 'undefined') m.centre = SQ_CENTRES[sq++ % SQ_CENTRES.length]; }
+    S.hour = HOUR;
     rebuildAll(); finishSync();
     D.info.city = { plots: n, megas: megas.size };
     say('city built:', JSON.stringify(D.info.city));
   }
   D.city = () => safe('city', city);
 
-  /* ---------- the page: the game's interface hidden, ours over it ---------- */
-  const html = document.documentElement;
+  /* ---------- the cast: each person's every move, as written (the stage's) ---------- */
+  // a part: { id, code (their look), keys: [[t, x, z, act, fx, fz, alpha], ...] }: between two keys they go in a straight line doing the earlier
+  // key's act (walk, idle, phone); standing, they face fx, fz; alpha: how much of them shows
+  const CAST = new Map();
+  function addCast(id, code, keys){
+    const K = keys.map(k => ({ t: k[0], x: k[1], z: k[2], act: k[3] || 'idle', fx: k[4], fz: k[5], a: k[6] ?? 1 }));
+    let d = 0; K.forEach((k, n) => { if (n) d += Math.hypot(k.x - K[n - 1].x, k.z - K[n - 1].z); k.d = d; });
+    CAST.set(id, { id, code, keys: K, ph: (h32('phase', id) % 1000)/100 });
+  }
+  function poseOf(P, t){
+    const K = P.keys; let a = K[0], b = K[0], u = 0;
+    if (t >= K[K.length - 1].t) a = b = K[K.length - 1];
+    else if (t > K[0].t){ for (let n = 1; n < K.length; n++) if (t <= K[n].t){ a = K[n - 1]; b = K[n]; u = (t - a.t)/Math.max(1e-6, b.t - a.t); break; } }
+    const x = lerp(a.x, b.x, u), z = lerp(a.z, b.z, u), dx = b.x - a.x, dz = b.z - a.z, moving = Math.hypot(dx, dz) > 1e-3 && b !== a;
+    return { x, y: CURB, z, act: a.act, moving, fx: moving ? dx : a.fx ?? 0, fz: moving ? dz : a.fz ?? 1, alpha: lerp(a.a, b.a, u), dist: lerp(a.d, b.d, u) };
+  }
+  const castPose = id => { const P = CAST.get(id); return P ? poseOf(P, D.t) : null; };
+  const STRIDE = 9/PPL_SPEED;   // walk frames per unit of ground (the game's own), so feet never slide
+  function frameOf(P, q, t){
+    if (q.moving) return Math.floor(q.dist*STRIDE + P.ph) % PPL.walk;
+    if (q.act === 'phone') return PG.F.COMM + Math.floor(t*2) % 4;
+    return F_IDLE + Math.floor(t*2.5 + P.ph) % PPL.idle;
+  }
+  updatePeople = function (){
+    const pos = pplMesh.geometry.attributes.aPos, spr = pplMesh.geometry.attributes.aSpr, fce = pplMesh.geometry.attributes.aFace, P = pos.array, Q = spr.array, FA = fce.array;
+    _camR.set(1, 0, 0).applyQuaternion(cam.quaternion);
+    let i = 0; const t = D.t, live = PG.live();
+    for (const p of CAST.values()){
+      const q = poseOf(p, t); if (q.alpha <= .002 || i >= PPL_MAX) continue;
+      const sd = q.fx*_camR.x + q.fz*_camR.z, flip = Math.abs(sd) > 1e-3 ? (sd < 0 ? -1 : 1) : 1;
+      P[i*3] = q.x; P[i*3 + 1] = q.y; P[i*3 + 2] = q.z;
+      Q[i*4] = live ? PG.shapeOf(p.code) : p.code & 31; Q[i*4 + 1] = frameOf(p, q, t); Q[i*4 + 2] = flip; Q[i*4 + 3] = Math.min(1, q.alpha);
+      FA[i*2] = q.fx; FA[i*2 + 1] = q.fz; i++;
+    }
+    pplMesh.geometry.instanceCount = i; pos.needsUpdate = spr.needsUpdate = fce.needsUpdate = true;
+    ddMesh.geometry.instanceCount = 0;
+  };
+
+  /* ---------- sight lines: what stands between a camera and a point ---------- */
+  const hAt = (x, z) => { const i = Math.round(x/LOT), j = Math.round(z/LOT), c = cells.get(ckey(i, j)); if (!c) return 0;
+    if (c.mega){ const m = megas.get(c.mega); return m ? m.top || CURB + 6 : 0; }
+    if (Math.abs(x - i*LOT) > SIDE*.55 || Math.abs(z - j*LOT) > SIDE*.55) return 0;
+    return c.sections.length ? c.height : CURB; };
+  function los(x, y, z, yw, pt){   // from (x, y, z) toward a camera at yaw yw and pitch pt: nothing in the way?
+    const cp = Math.cos(pt), dx = Math.sin(yw)*cp, dy = Math.sin(pt), dz = Math.cos(yw)*cp;
+    for (let s = .3; s < 160; s += .2){ const yy = y + dy*s; if (yy > 60) return true; const h = hAt(x + dx*s, z + dz*s); if (h > CURB + .05 && yy < h + .05) return false; }
+    return true;
+  }
+  const clearAll = (pts, yw, pt) => pts.every(p => los(p.x, CURB + .55, p.z, yw, pt));
+
+  /* ---------- planning: the buildings, the resident, their walk, the cameras, all worked out before the film rolls ---------- */
+  const PLAN = {};
+  const cellAt = (i, j) => cells.get(ckey(i, j));
+  function buildBlock(k){   // block k as the clicks build it (each click its own seed: the same buildings every time)
+    const b = PLAN.blocks[k], c = cellAt(b.i, b.j); if (!c) return;
+    b.clicks.forEach((ct, n) => withSeed(h32('block', k, n), () => addSection(c, b.zone)));
+  }
+  function clearBlocks(){ for (const b of PLAN.blocks){ const c = cellAt(b.i, b.j); if (c){ c.sections = []; c.green = PLAN.green.get(ckey(b.i, b.j)) || 'grass'; } } rebuildAll(); settleAll(); }
+  function doorOf(i, j){ const pl = places.get('c:' + i + ',' + j); return pl ? STORY.streetDoor(pl) : null; }
+  function settleAll(){ finishSync(); while (anims.length) endAnim(0); finishSync(); }
+  function plan(){
+    // 1. the first building alone, to see which way its door faces
+    const b1 = { i: PC0.i, j: PC0.j }, c1 = cellAt(b1.i, b1.j);
+    PLAN.green = new Map([[ckey(b1.i, b1.j), c1.green]]);
+    PLAN.blocks = [{ i: b1.i, j: b1.j, zone: BLOCKS[0], clicks: CLICK_T[0] }];
+    buildBlock(0); settleAll();
+    let d = doorOf(b1.i, b1.j); if (!d) throw new Error('the first building has no door');
+    const n = { x: Math.round(d.n[0]), z: Math.round(d.n[1]) }, tv = { x: -n.z, z: n.x };   // (its outward way, and across)
+    // 2. the other four: either side of it with a plot between, and two behind those; never in front of it, where the walk is
+    [[2, 0], [-2, 0], [2, -2], [-2, -2]].forEach(([a, b], q) => {
+      const k = q + 1, i = b1.i + a*tv.x + b*n.x, j = b1.j + a*tv.z + b*n.z;
+      if (!inPlaza(i, j)) warn('plan', 'block ' + k + ' is off the plaza at ' + i + ',' + j);
+      PLAN.blocks.push({ i, j, zone: BLOCKS[k], clicks: CLICK_T[k] }); PLAN.green.set(ckey(i, j), (cellAt(i, j) || {}).green);
+    });
+    for (let k = 1; k < 5; k++) buildBlock(k);
+    settleAll();
+    d = doorOf(b1.i, b1.j) || d;
+    PLAN.door = { key: d.key, wall: { x: d.wall.x, z: d.wall.z }, stand: { x: d.stand.x, z: d.stand.z }, n: [d.n[0], d.n[1]] };
+    // 3. the resident: the first member of the lowest household in the first building
+    safe('pods', () => podsResync(c1));
+    const hh = [...POD_HH.values()].filter(x => x.row.cell[0] === b1.i && x.row.cell[1] === b1.j && x.members.some(id => people.has(id))).sort((a, b) => a.row.floor - b.row.floor);
+    if (!hh.length) throw new Error('nobody lives in the first building');
+    const p = people.get(hh[0].members.find(id => people.has(id)));
+    let nm = null; safe('name', () => { const sp = STORY.sp(p); if (sp && sp.first) nm = (sp.first + (sp.last ? ' ' + sp.last : '')).toUpperCase(); });
+    const job = safe('job', () => STORY.JOB_WORD[STORY.jobKind(p)]) || null;
+    PLAN.who = { id: p.id, code: p.row, pod: hh[0].key, floor: hh[0].row.floor, name: nm || 'RESIDENT', job, household: hh[0].members.length };
+    // 4. their walk: from a little out on the plaza straight to their door, and in
+    const N = { x: PLAN.door.n[0], z: PLAN.door.n[1] }, st = PLAN.door.stand;
+    const S0 = { x: st.x + N.x*1.75 + N.z*.35, z: st.z + N.z*1.75 - N.x*.35 };
+    PLAN.walk = [S0, st, PLAN.door.wall];
+    const pts = []; for (let k = 0; k <= 12; k++){ const u = k/12; pts.push({ x: lerp(S0.x, st.x, u), z: lerp(S0.z, st.z, u) }); }
+    // 5. the cameras: the main one from the plaza side, three-quarter on; the person cam's feed from the side, steeper; both with nothing in the way
+    const yN = Math.atan2(N.x, N.z);
+    const pick = (offs, pitches) => { for (const pt of pitches) for (const o of offs) if (clearAll(pts, yN + o, pt*DEG)) return { yaw: yN + o, pitch: pt*DEG, ok: true };
+      return { yaw: yN + offs[0], pitch: pitches[pitches.length - 1]*DEG, ok: false }; };
+    PLAN.cam = pick([.55, -.55, .4, -.4, .75, -.75, .2, -.2], [34, 38, 42, 48]);
+    PLAN.feed = pick([1.05, -1.05, .85, -.85, 1.3, -1.3, .6, -.6], [44, 50, 56, 62]);
+    if (!PLAN.cam.ok) warn('plan', 'no clear main camera angle on the walk');
+    if (!PLAN.feed.ok) warn('plan', 'no clear person cam angle on the walk');
+    // where the main camera looks: between the buildings and the walk, then closer on the door
+    const bx = PLAN.blocks.reduce((a, b) => a + b.i*LOT, 0)/5, bz = PLAN.blocks.reduce((a, b) => a + b.j*LOT, 0)/5;
+    PLAN.look = { x: lerp(bx, S0.x, .45), z: lerp(bz, S0.z, .45) };
+    PLAN.look2 = { x: lerp(c1.x, st.x, .6), z: lerp(c1.z, st.z, .6) };
+    // 6. a few people out on the plaza in front of the buildings, crossing it (looks taken from the city's residents)
+    PLAN.extras = [];
+    const crowd = pplList.filter(q => q.id !== p.id && !q.cop && !q.archivist && q.row !== undefined);
+    [[3.1, -2.6, 2.6, .44], [3.9, 2.8, -2.4, .4], [2.3, -2.9, -1.2, .38]].forEach(([fwd, a0, a1, v], k) => {
+      const q = crowd[(k*37 + 11) % Math.max(1, crowd.length)]; if (!q) return;
+      const P0 = { x: c1.x + N.x*fwd*LOT/2.2 + tv.x*a0*LOT, z: c1.z + N.z*fwd*LOT/2.2 + tv.z*a0*LOT }, P1 = { x: c1.x + N.x*fwd*LOT/2.2 + tv.x*a1*LOT, z: c1.z + N.z*fwd*LOT/2.2 + tv.z*a1*LOT };
+      PLAN.extras.push({ id: 'x' + k, code: q.row, keys: [[0, P0.x, P0.z, 'walk', 0, 1, 1], [Math.hypot(P1.x - P0.x, P1.z - P0.z)/v, P1.x, P1.z, 'walk', 0, 1, 1]] });
+    });
+    D.info.plan = { door: PLAN.door.n, who: PLAN.who, cam: { yaw: +PLAN.cam.yaw.toFixed(2), pitch: Math.round(PLAN.cam.pitch/DEG), clear: PLAN.cam.ok },
+      feed: { yaw: +PLAN.feed.yaw.toFixed(2), pitch: Math.round(PLAN.feed.pitch/DEG), clear: PLAN.feed.ok }, blocks: PLAN.blocks.map(b => b.i + ',' + b.j + ' ' + b.zone) };
+    say('plan:', JSON.stringify(D.info.plan));
+    // (the buildings stay up for now: the apartment is furnished once before the film, below; then the plaza is cleared)
+  }
+  function castUp(){
+    const [S0, st, wall] = PLAN.walk, N = PLAN.door.n;
+    addCast('who', PLAN.who.code, [
+      [0, S0.x, S0.z, 'phone', N[0], N[1]], [MK.walk, S0.x, S0.z, 'walk', -N[0], -N[1]], [MK.arrive, st.x, st.z, 'walk'],
+      [MK.arrive + .1, st.x + (wall.x - st.x)*.3, st.z + (wall.z - st.z)*.3, 'walk'], [MK.inside, wall.x, wall.z, 'walk', -N[0], -N[1], 0]]);
+    for (const x of PLAN.extras) addCast(x.id, x.code, x.keys);
+  }
+
+  /* ---------- the page: the game's interface hidden, the script's on top ---------- */
   function overlay(){
     html.classList.add('dm-on');
     const st = document.createElement('style'); st.id = 'dmStyle';
     st.textContent = `
-      html.dm-on body > *:not(#view):not(#dmOv):not(canvas):not(#gridPanel):not(#furnish):not(.zonebar):not(#monitor):not(#npcSel):not(#gridDeck){visibility:hidden!important}
+      html.dm-on body > *:not(#view):not(#dmOv):not(canvas):not(#gridPanel):not(#furnish):not(.zonebar):not(#monitor){visibility:hidden!important}
       html.dm-on .zonebar{visibility:hidden!important}
       html.dm-on.dm-zones .zonebar .zones{visibility:visible!important}
       html.dm-on .zonebar .zones .rot,html.dm-on .zonebar .zones .furnbtn{visibility:hidden!important}
-      html.dm-on #monitor,html.dm-on #npcSel,html.dm-on #gridDeck{visibility:hidden!important}
-      html.dm-on.dm-mon #monitor:not([hidden]),html.dm-on.dm-mon #npcSel:not([hidden]){visibility:visible!important}
-      html.dm-on #monitor{transform:scale(1.3);transform-origin:top right;top:3vh!important;right:2.2vw!important;max-height:calc(90vh/1.3)!important;overflow:hidden}
+      html.dm-on #monitor{visibility:hidden!important}
+      html.dm-on #monitor.tr-keep{visibility:visible!important;transform:scale(var(--monk,1.4));transform-origin:top right;top:3vh!important;right:2vh!important;max-height:calc(94vh/var(--monk,1.4))!important;overflow:hidden;transition:none!important;animation:none!important}
+      html.dm-on #monitor.tr-keep *{transition:none!important;animation:none!important}
+      html.dm-on #monitor.tr-keep #monPin, html.dm-on #monitor.tr-keep #monClose{visibility:hidden!important}
+      html.dm-on #monitor.tr-keep #monTabs{display:none!important}
+      html.dm-on .furnish-frame{transition:none!important}
       html.dm-on, html.dm-on *{cursor:none!important}
       html.dm-on #dmOv.ask, html.dm-on #dmOv.ask *{cursor:pointer!important}
       #dmOv{position:fixed;inset:0;z-index:2147483000;pointer-events:none;font-family:'Chakra Petch','JetBrains Mono',sans-serif;-webkit-font-smoothing:antialiased}
@@ -116,7 +276,14 @@ const DEMO = (() => {
       #dmOv > .fill{position:absolute;inset:0;opacity:0}
       #dmBlack{background:#04050b}
       #dmShade{background:radial-gradient(ellipse 70% 60% at 50% 50%,rgba(6,7,16,.28),rgba(6,7,16,.78))}
-      #dmCur{position:absolute;left:0;top:0;width:30px;height:30px;margin:-3px 0 0 -4px;opacity:0;will-change:transform;filter:drop-shadow(0 3px 6px rgba(0,0,0,.55))}
+      #dmSel{position:absolute;left:0;top:0;width:0;height:0;display:none}
+      #dmSel b{position:absolute;width:22px;height:22px;border:3px solid #38e8e0;filter:drop-shadow(0 0 6px rgba(56,232,224,.9))}
+      #dmSel b:nth-child(1){left:0;top:0;border-right:0;border-bottom:0}
+      #dmSel b:nth-child(2){right:0;top:0;border-left:0;border-bottom:0}
+      #dmSel b:nth-child(3){left:0;bottom:0;border-right:0;border-top:0}
+      #dmSel b:nth-child(4){right:0;bottom:0;border-left:0;border-top:0}
+      #dmSel i{position:absolute;left:50%;top:-14px;width:8px;height:8px;margin-left:-4px;background:#ff4fa3;transform:rotate(45deg);box-shadow:0 0 10px #ff4fa3}
+      #dmCur{position:absolute;left:0;top:0;width:30px;height:30px;margin:-3px 0 0 -4px;opacity:0;filter:drop-shadow(0 3px 6px rgba(0,0,0,.55))}
       #dmRing{position:absolute;left:0;top:0;width:64px;height:64px;margin:-32px 0 0 -32px;border-radius:50%;border:2px solid #fff;opacity:0}
       #dmCap{position:absolute;left:0;bottom:0;padding:0 0 8.5vh 4.8vw;width:60vw;height:28vh;display:flex;flex-direction:column;justify-content:flex-end;
         background:radial-gradient(ellipse 62% 70% at 0% 100%,rgba(4,6,14,.78),rgba(4,6,14,.42) 45%,transparent 75%);opacity:0}
@@ -127,7 +294,6 @@ const DEMO = (() => {
         background:radial-gradient(ellipse 80% 80% at 100% 100%,rgba(4,6,14,.6),transparent 70%);opacity:0}
       #dmTag span{font-weight:600;font-size:1.5vh;letter-spacing:.32em;text-transform:uppercase;color:rgba(234,250,255,.86);text-shadow:0 1px 6px rgba(0,0,0,.7)}
       #dmTag u{display:block;width:7px;height:7px;margin-bottom:.45vh;background:#38e8e0;box-shadow:0 1px 8px rgba(56,232,224,.8);text-decoration:none}
-      /* the title: the trailer's SVG, cropped to what it draws so it sits in the middle of the frame */
       #dmTitle{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
       #dmTitle svg{width:62vw;max-height:52vh;height:auto;display:block;overflow:visible}
       #dmTitle #neon{filter:drop-shadow(0 0 .35vw rgba(255,74,110,.85)) drop-shadow(0 0 1.6vw rgba(255,74,110,.45))}
@@ -136,7 +302,7 @@ const DEMO = (() => {
       #dmMsg b{display:block;font-family:Silkscreen,ui-monospace,monospace;font-weight:400;font-size:22px;letter-spacing:.14em;color:#38e8e0;margin-bottom:6px}`;
     document.head.appendChild(st);
     const ov = document.createElement('div'); ov.id = 'dmOv';
-    ov.innerHTML = '<i class="fill" id="dmShade"></i><div id="dmTitle"></div>'
+    ov.innerHTML = '<i class="fill" id="dmShade"></i><div id="dmSel"><b></b><b></b><b></b><b></b><i></i></div><div id="dmTitle"></div>'
       + '<div id="dmCap"><b></b><i></i></div>'
       + '<div id="dmTag"><u></u><span>All footage captured in engine</span></div>'
       + '<svg id="dmCur" viewBox="0 0 30 30" aria-hidden="true"><path d="M4 3 L4 24 L9.6 18.8 L13.4 27.2 L17.2 25.5 L13.5 17.3 L21 17.3 Z" fill="#f4fbff" stroke="#0a0c16" stroke-width="1.6" stroke-linejoin="round"/></svg>'
@@ -144,19 +310,19 @@ const DEMO = (() => {
       + '<div id="dmMsg"><b>Demo clip</b><span id="dmStatus">building the city</span></div>';
     document.body.appendChild(ov);
     const q = s => ov.querySelector(s);
-    D.el = { ov, black: q('#dmBlack'), shade: q('#dmShade'), cur: q('#dmCur'), ring: q('#dmRing'), cap: q('#dmCap'), capT: q('#dmCap b'), capL: q('#dmCap i'),
+    D.el = { ov, black: q('#dmBlack'), shade: q('#dmShade'), sel: q('#dmSel'), cur: q('#dmCur'), ring: q('#dmRing'), cap: q('#dmCap'), capT: q('#dmCap b'), capL: q('#dmCap i'),
       tag: q('#dmTag'), title: q('#dmTitle'), msg: q('#dmMsg'), status: q('#dmStatus') };
     D.el.black.style.opacity = '1';
+    const monk = () => html.style.setProperty('--monk', (1.4*innerHeight/1080).toFixed(3)); monk(); addEventListener('resize', monk);
     if (CAP || AUTO) D.el.msg.hidden = true;
   }
-  async function title(){
+  async function title(){   // the trailer's SVG, both words the same height, cropped to what it draws so it sits in the middle (the stage's)
     const txt = await fetch('assets/trailer/neon_terrarium_title.svg').then(r => r.text());
     const E = D.el; E.title.innerHTML = txt;
     const svg = E.title.querySelector('svg'); svg.removeAttribute('width'); svg.removeAttribute('height');
     E.title.style.visibility = 'hidden';
-    const g = [svg.querySelector('#neon'), svg.querySelector('#terrarium')];
-    const nb = g[0].getBBox(), tb = g[1].getBBox();
-    if (nb.height > 0 && tb.height > 0){   // both words the same letter height, the two lines centered on each other
+    const g = [svg.querySelector('#neon'), svg.querySelector('#terrarium')], nb = g[0].getBBox(), tb = g[1].getBBox();
+    if (nb.height > 0 && tb.height > 0){
       const k = nb.height/tb.height, gap = nb.height*.28, cx = nb.x + nb.width/2;
       const wrap = document.createElementNS('http://www.w3.org/2000/svg', 'g'); g[1].parentNode.insertBefore(wrap, g[1]); wrap.appendChild(g[1]);
       g[1].setAttribute('transform', `translate(${cx - tb.width*k/2} ${nb.y + nb.height + gap}) scale(${k}) translate(${-tb.x} ${-tb.y})`);
@@ -167,404 +333,354 @@ const DEMO = (() => {
   }
   const status = s => { D.stage = s; if (D.el) D.el.status.textContent = s; };
 
-  /* ---------- settings (none kept) ---------- */
-  const HOUR = 20.6;
-  function settle(){
-    S.cycle = false; S.idleRest = false; S.autoPerf = false; S.spin = false;
-    safe('pixels', () => { if (RENDER_LINES !== 720) setRenderLines(720); });
-    safe('weather', () => { LK.setAutoWeather(false, true); LK.setWeather('clear', true, true); if (LK.pick !== 'auto') LK.setPick('auto', true); });
-    if (CAP){ window.__FULL_RATE = true; safe('cache', () => { SC.mode = 'off'; }); }   // (render mode, as the film: the still-city cache off, every frame drawn the same way; it made the trailer's metro jump side to side)
-    safe('resolution', () => { ZOOM_RES = 0; D.pinRes = true; H = 0; applyRenderRes(zoom); });
-    safe('story', () => { if (STORY.engine === false) STORY.setEngine(true); });
-    safe('cases', () => { if (typeof CASES !== 'undefined'){ CASES.paused = true; CASES.noStage = true; } });
+  /* ---------- the person cam: the game's panel, filled in by the script (the stage's) ---------- */
+  const MONI = { el: null, cv: null, g: null, rt: null, fcam: null, pix: null, img: null, off: null, og: null, cur: null, shown: -1 };
+  const RW = 192, RH = 108, HALF = 2.6;
+  function monSetup(){
+    MONI.el = $('monitor'); MONI.cv = $('monFeed'); MONI.g = MONI.cv.getContext('2d');
+    MONI.rt = new THREE.WebGLRenderTarget(RW, RH, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, format: THREE.RGBAFormat });
+    MONI.fcam = new THREE.OrthographicCamera(-HALF*RW/RH, HALF*RW/RH, HALF, -HALF, NEAR, FAR); MONI.fcam.layers.enableAll(); MONI.fcam.layers.disable(6);
+    MONI.pix = new Uint8Array(RW*RH*4); MONI.off = document.createElement('canvas'); MONI.off.width = RW; MONI.off.height = RH; MONI.og = MONI.off.getContext('2d'); MONI.img = MONI.og.createImageData(RW, RH);
+    const tr = $('monTrace'); if (tr) tr.textContent = '';
   }
-  const _ar = applyRenderRes;
-  applyRenderRes = function (z){ return _ar(D.pinRes ? ZOOM_REF : z); };
-
-  /* ---------- people ---------- */
-  const doorOf = pl => pl && STORY.streetDoor(pl);
-  const doorN = d => { const n = d.n || d.dir || [0, 1], L = Math.hypot(n[0], n[1]) || 1; return { x: n[0]/L, z: n[1]/L }; };
-  const doorAt = d => d.stand || d.out || { x: d.x, z: d.z };
-  const cellOfPlace = id => { const m = /^c:(-?\d+),(-?\d+)$/.exec(id || ''); return m ? cells.get(ckey(+m[1], +m[2])) : null; };
-  function putInside(p, placeId){
-    if (p.scene) safe('end scene', () => STORY.endScene(p.scene, 'preempted'));
-    if (p.spot && p.spot.by === p.id) p.spot.by = null;
-    if (p.walk && p.walk.spot && p.walk.spot.by === p.id) p.walk.spot.by = null;
-    if (p.onBike) safe('bike', () => bikeLeave(p.onBike));
-    if (p.metro) safe('train', () => { for (const l of metros) if (l.train && Array.isArray(l.train.load)){ const k = l.train.load.indexOf(p); if (k >= 0) l.train.load.splice(k, 1); } });
-    p.custody = null; p.pause = null; p.rainRun = 0; p.eating = null;
-    p.walk = null; p.spot = null; p.patrol = null; p.metro = null; p.metroPlan = null; p.club = null; p.clubbing = false; p.ride = null; p.chain = null;
-    p.rush = false; p.hurry = false; p.at = placeId; p.until = pplNow + 9999;
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  let MONITOR = null;
+  function monitorScript(){
+    const w = PLAN.who, nth = ['ground', 'first', 'second', 'third', 'fourth', 'fifth', 'sixth'][w.floor] || (w.floor + 'th');
+    const first = w.name.split(' ')[0];
+    const cap = s => s.charAt(0) + s.slice(1).toLowerCase();
+    MONITOR = { t0: MK.person, t1: MK.inside + .02, actor: 'who', name: 'SUBJECT', sub: 'unknown', names: [[MK.person + .5, w.name, 'name verified']], clock: '20:36',
+      yaw: PLAN.feed.yaw, pitch: PLAN.feed.pitch,
+      log: [[MK.person + .5, '20:36', 'Comm call ends. Name on the screen: ' + cap(first) + '.'],
+            [MK.person + 1.2, '20:36', 'Heads across the plaza, toward the new tenement.'],
+            [MK.person + 1.9, '20:37', (w.job ? 'Works as a ' + w.job + '. ' : '') + 'Lives on the ' + nth + ' floor' + (w.household > 1 ? ', household of ' + w.household : '') + '.'],
+            [MK.arrive - .05, '20:37', 'Keys out. In through the front door.']] };
   }
-  function scene(id, cast, beats, log){
-    const sc = STORY.startScene({ id, beats, log, roles: {}, effects: {}, next: null, tier: 'case', prio: 9 }, cast, { done: (s, why) => say(id, 'ended', why) });
-    if (!sc) throw new Error(id + ' did not start');
-    return sc;
+  function monFrame(t){
+    const M = MONITOR && t >= MONITOR.t0 && t < MONITOR.t1 ? MONITOR : null;
+    if (!M){ if (MONI.cur){ MONI.cur = null; MONI.el.hidden = true; MONI.el.classList.remove('tr-keep'); } return; }
+    if (MONI.cur !== M){ MONI.cur = M; MONI.shown = -1; MONI.el.hidden = false; MONI.el.classList.add('tr-keep'); }
+    MONI.el.style.opacity = String(Math.min(1, ss((t - M.t0)/.25)));
+    { let nm = M.name, sb = M.sub; for (const [tn, n2, s2] of M.names) if (t >= tn){ nm = n2; sb = s2; } $('monName').textContent = nm; $('monSub').textContent = sb; }
+    const n = M.log.filter(l => t >= l[0]).length;
+    if (n !== MONI.shown){ MONI.shown = n; const body = $('monBody');
+      body.innerHTML = n ? M.log.slice(0, n).map(([, stamp, text]) => '<div class="ml reveal"><time>' + esc(stamp) + '</time><span>' + esc(text) + '</span></div>').join('') : '<p class="mon-empty">Nothing logged yet.</p>';
+      body.scrollTop = body.scrollHeight; }
+    // the feed: a camera of its own over the person, at the angle worked out for it (nothing in the way, every step of the walk)
+    const q = castPose(M.actor); if (!q) return;
+    const fc = MONI.fcam, cp = Math.cos(M.pitch), sy = Math.sin(M.yaw), cy = Math.cos(M.yaw), sp = Math.sin(M.pitch), y = q.y + .45;
+    fc.position.set(q.x + sy*cp*CAM_DIST, y + sp*CAM_DIST, q.z + cy*cp*CAM_DIST); fc.lookAt(q.x, y, q.z); fc.updateMatrixWorld();
+    const res0 = FOL_UNI.res.value.clone(), rt0 = renderer.getRenderTarget(), all0 = SIDE_ARC.all, ac = renderer.autoClear, glc = renderer.getContext();
+    try {
+      FOL_UNI.res.value.set(RW, RH); SIDE_ARC.all = true; cullFrame(fc); CULL.lvl = -1; CULL.sd = false; pplFeedPre(fc);
+      renderer.setRenderTarget(MONI.rt); renderer.setClearColor(0x05080f, 1); renderer.autoClear = true; renderer.render(scene, fc);
+      glc.readPixels(0, 0, RW, RH, glc.RGBA, glc.UNSIGNED_BYTE, MONI.pix);
+    } finally { pplFeedPost(); FOL_UNI.res.value.copy(res0); SIDE_ARC.all = all0; renderer.autoClear = ac; renderer.setRenderTarget(rt0); sideArc(); cullFrame(); }
+    const d = MONI.img.data; for (let r = 0; r < RH; r++){ const src = (RH - 1 - r)*RW*4; d.set(MONI.pix.subarray(src, src + RW*4), r*RW*4); }
+    MONI.og.putImageData(MONI.img, 0, 0);
+    const g = MONI.g, W = MONI.cv.width, Hh = MONI.cv.height;
+    g.fillStyle = '#05080f'; g.fillRect(0, 0, W, Hh); g.drawImage(MONI.off, 0, 0, W, Hh);
+    g.fillStyle = 'rgba(20,60,70,.18)'; g.fillRect(0, 0, W, Hh);
+    g.fillStyle = 'rgba(0,0,0,.22)'; for (let yy = 0; yy < Hh; yy += 3) g.fillRect(0, yy, W, 1);
+    const vg = g.createRadialGradient(W/2, Hh/2, Hh*.3, W/2, Hh/2, W*.62); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.55)'); g.fillStyle = vg; g.fillRect(0, 0, W, Hh);
+    g.font = '10px "Silkscreen", monospace'; g.textBaseline = 'top';
+    g.fillStyle = Math.floor(t/.6) % 2 ? '#ff4f6a' : 'rgba(255,79,106,.25)'; g.fillRect(8, 9, 6, 6);
+    g.fillStyle = '#e3d6bd'; g.fillText('REC', 18, 7);
+    g.textAlign = 'right'; g.fillText('CAM 04', W - 8, 7); g.textAlign = 'left';
+    g.fillText(M.clock, 8, Hh - 16);
   }
-  // the subject: lives in a tenement on the plaza with a pod (an apartment), and their front door opens onto the plaza
-  function cast(){
-    const ok = p => p && p.pod && p.home && !p.cop && !p.guard && !p.visitor && !p.archivist;
-    let best = null;
-    for (const p of pplList){
-      if (!ok(p)) continue;
-      const c = cellOfPlace(p.home); if (!c || !ringOf(c.i, c.j) || !c.sections.length || c.mega) continue;
-      const d = doorOf(places.get(p.home)); if (!d) continue;
-      const n = doorN(d), fi = c.i + Math.round(n.x), fj = c.j + Math.round(n.z);
-      if (!inPlaza(fi, fj)) continue;   // (the door must face the plaza)
-      const floor = +((p.pod || '').split('|')[2] || 0);
-      const s = -floor - Math.abs(c.i - (PLAZA.i0 + PLAZA.i1)/2)*.2 - Math.abs(c.j - (PLAZA.j0 + PLAZA.j1)/2)*.2;
-      if (!best || s > best.s) best = { p, c, d, n, front: { i: fi, j: fj }, s };
-    }
-    if (!best) throw new Error('nobody on the plaza with an apartment and a door onto it');
-    const { p, c, d, n } = best;
-    const at = doorAt(d);
-    D.c = { p, home: c, door: d, n, front: best.front, stand: { x: at.x + n.x*1.15, z: at.z + n.z*1.15 } };
-    D.c.yaw = Math.atan2(n.x, n.z) + .55;   // (the camera on the plaza side of the door, a little round)
-    // the plots the clip builds on: plaza plots near the tenement, but never the one in front of the door
-    const free = [];
-    for (let i = PLAZA.i0; i <= PLAZA.i1; i++) for (let j = PLAZA.j0; j <= PLAZA.j1; j++){
-      if (i === best.front.i && j === best.front.j) continue;
-      const dd = Math.hypot(i - best.front.i, j - best.front.j); if (dd > 2.9) continue;
-      free.push({ i, j, dd: dd + (Math.abs(i - best.front.i) + Math.abs(j - best.front.j) === 1 ? .6 : 0) });
-    }
-    free.sort((a, b) => a.dd - b.dd);
-    D.c.plots = free.slice(0, 5);
-    D.info.cast = { person: p.id, pod: p.pod, home: c.i + ',' + c.j, plots: D.c.plots.map(q => q.i + ',' + q.j) };
-    say('cast:', JSON.stringify(D.info.cast));
-  }
-  const stage1 = () => {   // out of the door to a spot a step in front of it, and waiting there
-    const p = D.c.p; putInside(p, p.home); p.speed = PPL_SPEED;
-    const node = STORY.nearestNode(D.c.stand.x, D.c.stand.z);
-    D.c.sc0 = scene('demo.out', { A: p.id }, [{ id: 'o0', who: ['A'], with: [], at: 'case', do: 'walk', anc: { kind: 'point', x: D.c.stand.x, z: D.c.stand.z, node }, hold: 600 }],
-      { o0: ['{A} steps out onto the plaza.'] });
-  };
-  const waiting = () => D.c && D.c.sc0 && D.c.sc0.b && D.c.sc0.b.id === 'o0' && D.c.sc0.phase === 'hold';
-  function goIn(){
-    const p = D.c.p;
-    safe('end out', () => STORY.endScene(D.c.sc0, 'done'));
-    D.c.sc1 = safe('in', () => scene('demo.in', { A: p.id }, [{ id: 'i0', who: ['A'], with: [], at: 'case', do: 'enter', anc: { kind: 'door', door: D.c.door, place: p.home }, hold: 60 }],
-      { i0: ['{A} goes in through the door.'] }));
-    p.hurry = true;
-  }
-  const inHome = () => { const p = D.c.p; return !p.walk && p.sc && p.sc.mode === 'in'; };
-  // the person cam's log: what the camera picks up from them
-  function reveal(tmpl, fact, channel = 'document', ctx = {}){
-    const p = D.c.p, c = { A: p.id }, learned = STORY.learnFrom(tmpl, c, new Set(Object.keys(c)), channel, null, ctx);
-    if (typeof PACE !== 'undefined') PACE.mine = true;
-    try { STORY.logLine(tmpl, c, ctx, 'reveal', { channel, fact: 'A.' + fact, paced: true }); } finally { if (typeof PACE !== 'undefined') PACE.mine = false; }
-    STORY.note(p.id, { t: STORY.clock, who: p.id, fact: 'A.' + fact, channel, verified: true, tmpl, cast: c, ctx, learned });
-    if (typeof MON !== 'undefined') MON.refresh();
-  }
-  function personOn(){
-    const p = D.c.p;
-    if (S.zone) selectZone(S.zone);
-    safe('hover', () => showHover(null));
-    safe('person cam', () => MON.open(p.id));
-    html.classList.add('dm-mon');
-    safe('log tab', () => { const b = document.querySelector('#monTabs [data-tab="log"]'); if (b) b.click(); });
-  }
-  function logLines(k){
-    const p = D.c.p, emp = safe('employer', () => STORY.employerName(p)) || 'the night market';
-    const floor = +((p.pod || '').split('|')[2] || 0) + 1, nth = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth'][floor - 1] || floor + 'th';
-    safe('log', () => [
-      () => reveal('Name tag on {A}: "{A.first}."', 'first-name'),
-      () => reveal('{A} is home from a shift at ' + emp + '.', 'employer'),
-      () => reveal('{A} lives at {place}, the ' + nth + ' floor.', 'home', 'document', { placeId: p.home })][k]());
+  const _v = new THREE.Vector3();
+  function brackets(q){
+    const E = D.el.sel;
+    if (!q || q.alpha < .5){ E.style.display = 'none'; return; }
+    _v.set(q.x, q.y + .42, q.z).project(cam);
+    const sx = (_v.x + 1)/2*innerWidth, sy = (1 - _v.y)/2*innerHeight, hpx = 1.0/(2*zoom)*innerHeight, w = hpx*.72, h = hpx*1.12;
+    E.style.display = 'block'; E.style.transform = `translate(${(sx - w/2).toFixed(1)}px,${(sy - h/2).toFixed(1)}px)`; E.style.width = w.toFixed(0) + 'px'; E.style.height = h.toFixed(0) + 'px';
   }
 
-  /* ---------- Furnish pod: the apartment lab in its own frame ---------- */
-  const labWin = () => { const f = FURN.frame || document.querySelector('#furnish iframe'); return f && f.contentWindow; };
+  /* ---------- their front door, opening as they go in and shutting after ---------- */
+  function doorAt(t){
+    const d = PLAN.door && doorByKey.get(PLAN.door.key); if (!d) return;
+    const v = t < MK.arrive - .2 ? 0 : t < MK.arrive + .1 ? ss(seg(t, MK.arrive - .2, MK.arrive + .1)) : t < MK.inside ? 1 : 1 - ss(seg(t, MK.inside, MK.inside + .3));
+    if (Math.abs(v - d.open) > 1e-4){ d.open = v; d.want = v > .5; const i = doorList.indexOf(d); if (i >= 0 && i < DOOR_MAX){ setPanel(i, d); doorPanel.instanceMatrix.needsUpdate = true; } }
+  }
+
+  /* ---------- the cursor: drawn, so it shows in the film ---------- */
+  const CUR = { x: 0, y: 0, tx: null, ty: null, pulse: -9, col: '#ffffff', on: 0, want: 0 };
+  function aim(s){ if (!s) return; CUR.tx = s.x; CUR.ty = s.y; CUR.want = 1; }
+  function click(col){ CUR.pulse = D.t; if (col) CUR.col = col; }
+  const toScreen = p => { _v.set(p.x, p.y, p.z).project(cam); return { x: (_v.x + 1)/2*innerWidth, y: (1 - _v.y)/2*innerHeight }; };
+
+  /* ---------- the build: each click as a player makes it ---------- */
+  function clickPoint(k, n){ const b = PLAN.blocks[k], c = cellAt(b.i, b.j); return { x: b.i*LOT, y: n && c ? c.height + .05 : CURB + .3, z: b.j*LOT }; }
+  function doClick(k, n){
+    const b = PLAN.blocks[k], c = cellAt(b.i, b.j); if (!c) return warn('click', 'no plot ' + b.i + ',' + b.j);
+    if (S.zone !== b.zone) selectZone(b.zone);
+    const tg = n ? { type: 'up', c } : { type: 'onto', c };
+    safe('hover', () => showHover(tg));
+    withSeed(h32('block', k, n), () => { if (!applyTarget(tg)) warn('click', 'did not build at ' + b.i + ',' + b.j); });
+    click(ZONES[b.zone] ? ZONES[b.zone].col : '#fff');
+  }
+
+  /* ---------- Furnish pod: the game's own hologram into their apartment, its time set by the film (the stage's) ---------- */
+  const labWin = () => { const f = FURN.frame; return f && f.contentWindow; };
+  const labPC = () => { const w = labWin(); return w && w.PodContext; };
   const labB = () => { const w = labWin(); return w && w.PodBuilder && w.PodBuilder._B; };
-  const labBusy = () => { const w = labWin(); return !w || !w.PodContext || w.PodContext.transitioning; };
-  const labLive = () => document.getElementById('furnish').classList.contains('live');
-  const labReady = () => FURN.open && labLive() && !labBusy() && (labB() && labB().inst && labB().inst.size > 0);
   const labDoc = () => { const w = labWin(); return w && w.document; };
-  const frameRect = () => { const f = FURN.frame || document.querySelector('#furnish iframe'); return f ? f.getBoundingClientRect() : { left: 0, top: 0 }; };
   const labEl = sel => { const d = labDoc(); return d && d.querySelector(sel); };
+  const frameRect = () => FURN.frame ? FURN.frame.getBoundingClientRect() : { left: 0, top: 0 };
   function labCenter(el){ const f = frameRect(), r = el.getBoundingClientRect(); return { x: f.left + r.left + r.width/2, y: f.top + r.top + r.height/2 }; }
-  function labNoCursor(){ const d = labDoc(); if (!d || d.getElementById('dmLab')) return; const st = d.createElement('style'); st.id = 'dmLab'; st.textContent = '*{cursor:none!important}'; d.head.appendChild(st); }
-  // a point in the room to the page, through the lab's own camera
-  function labScreen(x, y, z){
-    const B = labB(), w = labWin();
-    const V = B.cam.matrixWorldInverse.elements, P = B.cam.projectionMatrix.elements;
-    const ex = V[0]*x + V[4]*y + V[8]*z + V[12], ey = V[1]*x + V[5]*y + V[9]*z + V[13], ez = V[2]*x + V[6]*y + V[10]*z + V[14], ew = V[3]*x + V[7]*y + V[11]*z + V[15];
-    const cx = P[0]*ex + P[4]*ey + P[8]*ez + P[12]*ew, cy = P[1]*ex + P[5]*ey + P[9]*ez + P[13]*ew, cw = P[3]*ex + P[7]*ey + P[11]*ez + P[15]*ew;
-    const cv = w.document.getElementById('bCanvas') || w.document.querySelector('canvas'), r = cv.getBoundingClientRect(), f = frameRect();
-    return { cv, lx: r.left + (cx/cw + 1)/2*r.width, ly: r.top + (1 - cy/cw)/2*r.height, x: f.left + r.left + (cx/cw + 1)/2*r.width, y: f.top + r.top + (1 - cy/cw)/2*r.height };
+  function labNoCursor(){ const d = labDoc(); if (!d || !d.head || d.getElementById('dmLab')) return; const st = d.createElement('style'); st.id = 'dmLab'; st.textContent = '*{cursor:none!important}'; d.head.appendChild(st); }
+  function labWait(){   // the home still being built, its hologram city still coming, or its light not baked yet
+    const w = labWin(); if (!w) return 'the lab';
+    try { const PB = w.PodBuilder, PR = w.PodRender, PC = w.PodContext;
+      if (PB && PB.homePending && PB.homePending()) return 'build';
+      { const C = PC && PC._debug && PC._debug.state(); if (C && C.city && C.city.building) return 'the hologram city'; }
+      { const ws = PR && PR.warmState && PR.warmState(); if (ws && !ws.broken && (!ws.finished || !ws.matReady || ws.queue)) return 'shaders'; }
+      if (PB && PB.prOn && PB.prOn()) return !(PC._prDriving && PC._prDriving()) || (PR && PR.lightPending && PR.lightPending()) ? 'light' : false; } catch (e) {}
+    return false;
   }
-  const TABLES = new Set(['slab', 'crate', 'spool', 'holo', 'loop', 'block', 'cafe', 'kotatsu', 'fold', 'bar', 'drum', 'island', 'counter']);
-  function labTable(){   // the biggest table top in the home: the bonsai goes there, among what the home already has
-    const w = labWin(), B = labB(); let tb = null;
-    for (const i of B.inst.values()){ if (!i.rec || !TABLES.has(i.rec.arch)) continue; const s = safe('surf', () => w.PodBuilder.surfaces(i.rec.id)) || [];
-      for (const q of s){ const a = q.w*q.d; if (!tb || a > tb.a) tb = { i, q, a }; } }
-    if (!tb) return null;
-    const r = B.root.position; return { x: tb.q.x + r.x, y: tb.q.y + r.y, z: tb.q.z + r.z };
+  const labReady = () => { const B = labB(); return FURN.open && $('furnish').classList.contains('live') && !(labPC() && labPC().transitioning) && B && B.inst && B.inst.size > 0 && !labWait(); };
+  const AP = { on: false, started: false, roomOk: false, closed: false, exited: false, held0: null };
+  const H0 = .3, holoCurve = x => { x = clamp01(x); return .55*x + .45*ss5(x); };
+  function hold(why){   // the film waits here (nothing drawn or filmed) until the lab is ready; at most four minutes of real time
+    if (AP.held0 == null) AP.held0 = Date.now();
+    if (Date.now() - AP.held0 > 240e3){ if (!AP.gaveUp){ AP.gaveUp = true; warn('apartment', 'waited 4 min for the lab (' + why + '): going on'); } return false; }
+    if (D.info.wait !== why){ D.info.wait = why; say('waiting for the lab:', why); }
+    D.held = true; return true;
   }
-  const FU = { phase: 0 };
-  function labGroup(){ const b = labEl('#bRail [data-grp="plants"]'); if (b){ aim(labCenter(b)); click(); b.click(); } else warn('furnish', 'no Plants in the rail'); }
+  function aptTick(t){
+    if (AUTO || AP.closed || t < MK.furn) return;
+    if (!AP.on){ AP.on = !!safe('open', () => FURN.openKey(PLAN.who.pod)); if (!AP.on){ warn('apartment', 'did not open ' + PLAN.who.pod); AP.closed = true; return; } say('apartment', PLAN.who.pod); }
+    const ov = $('furnish'), fr = FURN.frame, PC = labPC(), B = labB(), w = labWin();
+    if (!fr || !PC || !PC._debug){ hold('the lab page'); return; }
+    if (CAP && w) w.Math.random = rng(h32('lab', D.frame));
+    if (B) B.needs = true;
+    if (B && B.on && !B.raf) safe('lab loop', () => { const PB = w.PodBuilder; if (B.warmHold && PB.warmHold) PB.warmHold(false); if (!B.raf && PB.pauseRender) PB.pauseRender(false); });
+    if (AP.exited) return;
+    const DUR = PC._debug.DUR || 3.05, st = PC._debug.state(), live = ov.classList.contains('live');
+    fr.style.opacity = '1';
+    if (t < MK.room){   // the hologram flies in
+      const u = H0 + (DUR - H0)*holoCurve((t - MK.furn)/(MK.room - MK.furn));
+      if (!live){ hold('the hologram'); return; }
+      if (!st || !st.trans){ if (!AP.started) hold('the hologram to start'); return; }
+      const lw = labWait(); st.trans.holding = !!lw; st.trans.holdBuild = lw === 'build';
+      if (!AP.started){
+        if (!(st.ready && st.shown && !st.pendingHome)){ PC._debug.hold(H0); hold('the city'); return; }
+        if (lw){ PC._debug.hold(H0); hold(lw); return; }
+        AP.started = true; AP.held0 = null; say('hologram rolling at', t.toFixed(2));
+      }
+      PC._debug.hold(u);
+      return;
+    }
+    if (st && st.trans){ PC._debug.hold(DUR + .01); return; }   // (its last frame, then the room)
+    if (!AP.roomOk){
+      if (PC.transitioning){ hold('the hologram to end'); return; }
+      const lw = labWait(); if (lw){ hold('the room: ' + lw); return; }
+      AP.roomOk = true; AP.held0 = null; labNoCursor(); D.info.roomAt = +t.toFixed(2); say('the room is ready at', t.toFixed(2));
+    }
+  }
+  // the furnishing, a step at a time: the Plants catalog, a bonsai tile, set on their table, picked, its color menu, a new color
+  function labGroup(){ const b = labEl('#bRail [data-grp="plants"]'); if (b){ aim(labCenter(b)); click('#5aff7a'); b.click(); } else warn('furnish', 'no Plants in the rail'); }
+  const FU = {};
   function labTile(){
     const d = labDoc(); if (!d) return;
     const tiles = [...d.querySelectorAll('#bTiles .tile')];
     const t = tiles.find(x => x._it && x._it.arch === 'bonsai') || tiles.find(x => x._it && x._it.arch === 'snake') || tiles[0];
     if (!t) return warn('furnish', 'no tiles');
     try { t.scrollIntoView({ block: 'nearest' }); } catch (e) {}
-    aim(labCenter(t)); click(); t.click(); FU.arch = t._it && t._it.arch;
+    aim(labCenter(t)); click('#5aff7a'); t.click(); FU.arch = t._it && t._it.arch;
+  }
+  function labScreen(x, y, z){   // a point in the room to the page, through the lab's own camera (the stage's)
+    const B = labB(), w = labWin();
+    const V = B.cam.matrixWorldInverse.elements, P = B.cam.projectionMatrix.elements;
+    const ex = V[0]*x + V[4]*y + V[8]*z + V[12], ey = V[1]*x + V[5]*y + V[9]*z + V[13], ez = V[2]*x + V[6]*y + V[10]*z + V[14], ew = V[3]*x + V[7]*y + V[11]*z + V[15];
+    const cx = P[0]*ex + P[4]*ey + P[8]*ez + P[12]*ew, cy = P[1]*ex + P[5]*ey + P[9]*ez + P[13]*ew, cw = P[3]*ex + P[7]*ey + P[11]*ez + P[15]*ew;
+    const cv = w.document.getElementById('bCanvas') || w.document.querySelector('canvas'), r = cv.getBoundingClientRect(), f = frameRect();
+    const lx = r.left + (cx/cw + 1)/2*r.width, ly = r.top + (1 - cy/cw)/2*r.height;
+    return { cv, lx, ly, x: f.left + lx, y: f.top + ly };
+  }
+  const TABLES = new Set(['slab', 'crate', 'spool', 'holo', 'loop', 'block', 'cafe', 'kotatsu', 'fold', 'bar', 'drum', 'island', 'counter']);
+  function labTable(){
+    const w = labWin(), B = labB(); let tb = null;
+    for (const i of B.inst.values()){ if (!i.rec || !TABLES.has(i.rec.arch)) continue; const s = safe('surf', () => w.PodBuilder.surfaces(i.rec.id)) || [];
+      for (const q of s){ const a = q.w*q.d; if (!tb || a > tb.a) tb = { q, a }; } }
+    if (!tb) return null;
+    const r = B.root.position; return { x: tb.q.x + r.x, y: tb.q.y + r.y, z: tb.q.z + r.z };
+  }
+  function labAim(){   // over the table, before setting it down: the piece follows the pointer there
+    const w = labWin(), B = labB(); if (!B) return;
+    FU.at = labTable();
+    if (!FU.at){ warn('furnish', 'no table: on the floor'); const r = B.root.position, P = B.P; FU.at = { x: r.x + (P ? P.W*.5*(B.TILE || .5) : 2), y: r.y, z: r.z + (P ? P.D*.5*(B.TILE || .5) : 2) }; }
+    const s = labScreen(FU.at.x, FU.at.y, FU.at.z); aim(s);
+    s.cv.dispatchEvent(new w.PointerEvent('pointermove', { clientX: s.lx, clientY: s.ly, bubbles: true, cancelable: true, pointerId: 1, pointerType: 'mouse', isPrimary: true, button: -1, buttons: 0 }));
+    try { B.ptr.dirty = true; } catch (e) {}
   }
   function labPlace(){
-    const w = labWin(), B = labB(); if (!B) return;
-    let at = labTable();
-    if (!at){ warn('furnish', 'no table: on the floor in the middle'); const r = B.root.position, P = B.P; at = { x: r.x + (P ? P.W*.5*(B.TILE || .5) : 2), y: r.y, z: r.z + (P ? P.D*.5*(B.TILE || .5) : 2) }; }
+    const w = labWin(), B = labB(); if (!B || !FU.at) return;
     const before = new Set(B.inst.keys());
     if (!B.place) safe('start place', () => w.PodBuilder.startPlace(FU.arch || 'bonsai', 7));
-    const s = labScreen(at.x, at.y, at.z), o = { clientX: s.lx, clientY: s.ly, bubbles: true, cancelable: true, pointerId: 1, pointerType: 'mouse', isPrimary: true };
-    aim(s); click(); s.cv.setPointerCapture = () => {};
+    const s = labScreen(FU.at.x, FU.at.y, FU.at.z), o = { clientX: s.lx, clientY: s.ly, bubbles: true, cancelable: true, pointerId: 1, pointerType: 'mouse', isPrimary: true };
+    aim(s); click('#5aff7a'); s.cv.setPointerCapture = () => {};
     s.cv.dispatchEvent(new w.PointerEvent('pointermove', Object.assign({ button: -1, buttons: 0 }, o)));
     try { B.ptr.dirty = true; } catch (e) {}
     s.cv.dispatchEvent(new w.PointerEvent('pointerdown', Object.assign({ button: 0, buttons: 1 }, o)));
     s.cv.dispatchEvent(new w.PointerEvent('pointerup', Object.assign({ button: 0, buttons: 0 }, o)));
     if (B.place) safe('cancel place', () => w.PodBuilder.cancel());
     FU.id = [...B.inst.keys()].find(k => !before.has(k));
-    FU.at = at;
+    D.info.placed = FU.id !== undefined ? FU.arch || '?' : null;
     if (FU.id === undefined) warn('furnish', 'nothing was placed');
-    D.info.placed = FU.id !== undefined ? (FU.arch || '?') : null;
   }
-  function labSelect(){ const w = labWin(); if (FU.id === undefined) return; const s = labScreen(FU.at.x, FU.at.y + .25, FU.at.z); aim(s); click(); safe('select', () => w.PodBuilder.select(FU.id)); }
+  function labSelect(){ const w = labWin(); if (FU.id === undefined) return; const s = labScreen(FU.at.x, FU.at.y + .2, FU.at.z); aim(s); click('#ffffff'); safe('select', () => w.PodBuilder.select(FU.id)); }
   function labSwatch(){
     const B = labB(), inst = B && B.inst.get(FU.id); if (!inst) return;
     const k = Math.max(0, inst.slots.findIndex(sl => sl.kind !== 'e'));
     const b = labEl('#iSw .sw[data-i="' + k + '"]') || labEl('#iSw .sw'); if (!b) return warn('furnish', 'no color swatch');
-    aim(labCenter(b)); click(); b.click();
+    aim(labCenter(b)); click('#ffffff'); b.click();
   }
   function labColor(){
-    const d = labDoc(); const bs = d ? [...d.querySelectorAll('#iCP .pal button')] : []; if (!bs.length) return warn('furnish', 'no palette');
-    const sat = hex => { const n = parseInt(String(hex).replace('#', ''), 16), r = (n >> 16)/255, g = (n >> 8 & 255)/255, b = (n & 255)/255, mx = Math.max(r, g, b), mn = Math.min(r, g, b); return mx ? (mx - mn)/mx*mx : 0; };
+    const d = labDoc(), bs = d ? [...d.querySelectorAll('#iCP .pal button')] : []; if (!bs.length) return warn('furnish', 'no palette');
+    const sat = hex => { const n = parseInt(String(hex).replace('#', ''), 16), r = (n >> 16)/255, g = (n >> 8 & 255)/255, b = (n & 255)/255; return Math.max(r, g, b) - Math.min(r, g, b); };
     const pick = bs.slice().sort((a, b) => sat(b.dataset.c) - sat(a.dataset.c))[0];
-    aim(labCenter(pick)); click(); pick.click(); D.info.color = pick.dataset.c;
+    aim(labCenter(pick)); click(pick.dataset.c); pick.click(); D.info.color = pick.dataset.c;
   }
-  function labExit(){ const b = labEl('#ntExit'); if (b){ aim(labCenter(b)); click(); b.click(); } else FURN.close(); }
+  function labExit(){ AP.exited = true; const b = labEl('#ntExit'); if (b){ aim(labCenter(b)); click('#ffffff'); b.click(); } else FURN.close(); }
 
   /* ---------- the Grid and its Acoustic Panel ---------- */
   const gridMega = () => megasOfKind('radio')[0];
-  function noteAt(beat, pad){   // a spot on the panel's note strip
-    const cv = document.getElementById('gStripCv'); if (!cv) return null;
+  function noteAt(beat, pad){
+    const cv = $('gStripCv'); if (!cv) return null;
     const v = BOOTH._sv(), r = cv.getBoundingClientRect(), top = 24, rowH = (r.height - top - 10)/(v.hi - v.lo + 1);
     return { cv, x: r.left + (beat + .12 - v.b0)/v.span*r.width, y: r.top + r.height - 6 - (pad - v.lo + .5)*rowH };
   }
   function addNote(k){
-    if (AUTO) return;   // (the sound pass put both in already: notesEarly)
     const [b, i] = MISSING[k], s = noteAt(b, i); if (!s) return warn('note', 'no strip');
-    aim(s); click();
+    aim(s); click('#e8d553');
     const o = { clientX: s.x, clientY: s.y, bubbles: true, cancelable: true, pointerId: 1, pointerType: 'mouse', isPrimary: true, button: 0 };
-    s.cv.setPointerCapture = () => {};   // (a scripted pointer has no capture to take)
+    s.cv.setPointerCapture = () => {};
     s.cv.dispatchEvent(new PointerEvent('pointerdown', Object.assign({ buttons: 1 }, o)));
     s.cv.dispatchEvent(new PointerEvent('pointerup', Object.assign({ buttons: 0 }, o)));
+    D.info['note' + (k + 1)] = (BOOTH.state.layers[0] || []).some(x => Math.abs(x.b - b) < .26 && x.i === i);
   }
-
-  function notesEarly(){
+  function notesEarly(){   // (the sound pass, in real time: both notes in the loop's data well ahead of their first pass, so no frame can make them late)
     const L = BOOTH.state.layers; if (!L.length) L.push([]);
     for (const [b, i] of MISSING) L[0].push({ b, d: 1, i, v: .8 });
     L[0].sort((x, y) => x.b - y.b);
   }
 
-  /* ---------- setup ---------- */
-  const until = (cond, secs) => new Promise((res, rej) => { const t0 = performance.now();
-    const tick = () => { let ok = false; try { ok = cond(); } catch (e) {} if (ok) return res(); if (performance.now() - t0 > secs*1000) return rej(new Error('timed out')); requestAnimationFrame(tick); }; tick(); });
-  const wait = secs => { const t0 = performance.now(); return until(() => performance.now() - t0 >= secs*1000, secs + 5); };
-  async function setup(){
-    overlay(); settle();
-    const tl = title().catch(e => warn('title', e));
-    status('placing people');
-    await until(() => typeof pplReady !== 'undefined' && pplReady && !anims.length && !(typeof LOADP !== 'undefined' && LOADP.on), 180);
-    status('letting the city live a little');
-    S.hour = 10; FF.set(60); await wait(14); FF.set(1);
-    S.cycle = false; S.hour = HOUR;
-    cast();
-    status('waking the apartment lab');
-    FURN.preload();
-    await until(() => FURN.warmed() && FURN.frame, 300).catch(e => warn('lab warm', e));
-    // once through the apartment beforehand: the lab's first visit is its slowest, and the Plants catalog's pictures get drawn
-    status('opening the apartment once');
-    const t0 = performance.now();
-    if (FURN.openKey(D.c.p.pod)){
-      await until(labReady, 120).catch(e => warn('dry run', e));
-      D.info.roomMs = Math.round(performance.now() - t0);
-      labNoCursor();
-      safe('plants', () => labWin().PodBuilder.openCat('plants')); await wait(2.5);
-      safe('fly', () => labWin().PodBuilder.closeFly());
-      const b = labEl('#ntExit'); if (b) b.click(); else FURN.close();
-      await until(() => !FURN.open && !FURN.hold, 20).catch(e => warn('dry run close', e)); await wait(1);
-      if (!FURN.frame){ FURN.preload(); await until(() => FURN.warmed() && FURN.frame, 240).catch(e => warn('lab rewarm', e)); }
-    } else warn('dry run', 'could not open ' + D.c.p.pod);
-    status('night falling');
-    await until(() => Math.abs(LIGHTS_ON.value - LIGHTS_GOAL) < .01, 30).catch(e => warn('lights', e));
-    status('out of the door');
-    stage1();
-    await until(waiting, 60).catch(e => warn('out', e));
-    await tl;
-    buildPlan();
-    camAt(0, 0);
-    await wait(1);
-    D.ready = true;
-    status(CAP || AUTO ? 'ready' : 'click to play');
-    if (AUTO) go();
-    else if (!CAP){ D.el.ov.classList.add('ask'); D.el.status.innerHTML = 'click to play<br><small>about 15 s, with sound</small>'; D.el.ov.addEventListener('click', go, { once: true }); }
-    say('ready', JSON.stringify(D.info));
+  /* ---------- the camera, from the film's time ---------- */
+  const CAMP = { x: 0, y: TARGET_Y, z: 0, yaw: 0, zoom: 6, pitch: 36*DEG };
+  function camAt(t){
+    const P = PLAN, y0 = P.cam.yaw, p0 = P.cam.pitch;
+    const A = { x: P.look.x, y: CURB + 1.1, z: P.look.z, yaw: y0 - .1, zoom: 6.3, pitch: p0 + 2*DEG };
+    const B = { x: P.look2.x, y: CURB + .8, z: P.look2.z, yaw: y0 + .06, zoom: 4.9, pitch: p0 };
+    const g = gridMega(), G = { x: g ? g.x : B.x, y: CURB + 1.6, z: g ? g.z : B.z, yaw: y0 + .3, zoom: 7.6, pitch: 34*DEG };
+    const W = { x: -2*LOT, y: TARGET_Y, z: 0, yaw: y0 + .8, zoom: 32, pitch: 38*DEG };
+    const mix = (a, b, u) => ({ x: lerp(a.x, b.x, u), y: lerp(a.y, b.y, u), z: lerp(a.z, b.z, u), yaw: a.yaw + wrapA(b.yaw - a.yaw)*u, zoom: elerp(a.zoom, b.zoom, u), pitch: lerp(a.pitch, b.pitch, u) });
+    let c;
+    if (t < MK.grid) c = mix(A, B, ease(seg(t, 0, MK.inside)));
+    else if (t < MK.out) c = mix(B, G, ease(seg(t, MK.grid, MK.grid + .55)));
+    else { c = mix(G, W, ease(seg(t, MK.out, MK.title + .4))); c.yaw += .1*seg(t, MK.title, D.len); }
+    Object.assign(CAMP, c);
   }
+  { const _uc = updateCamera;
+    updateCamera = function (dt){
+      if (PLAN.cam && (D.playing || D.done)) safe('camera', () => {
+        camAt(D.t);
+        camGoal.set(CAMP.x, CAMP.y, CAMP.z); camT.copy(camGoal);
+        yaw = yawT = CAMP.yaw; zoom = zoomT = CAMP.zoom; PITCH = pitchT = CAMP.pitch;
+      });
+      const r = _uc(dt);
+      if (D.playing) safe('person cam', () => monFrame(D.t));
+      return r;
+    }; }
 
   /* ---------- the timeline ---------- */
-  let t0 = 0, lastT = 0, fired = 0;
-  const EV = [];
-  const at = (t, f, name) => { const e = { t, f, name }; if (!D.playing){ EV.push(e); return; } let k = fired; while (k < EV.length && EV[k].t <= t) k++; EV.splice(k, 0, e); };
-  function go(){
-    if (D.playing || !D.ready) return;
-    D.el.ov.classList.remove('ask'); D.el.msg.hidden = true;
-    D.playing = true; D.done = false; fired = 0; t0 = performance.now(); lastT = 0; D.t = 0;
-    safe('broadcast', () => BOOTH.broadcast(LOOP_ID, 'rewire'));   // the Booth loop on the Grid from the first frame
-    if (typeof window.__dmGo === 'function') safe('go hook', () => window.__dmGo());
-    say('rolling');
-  }
-  D.start = () => { if (!D.ready) return false; go(); return true; };
-  const clock = () => (performance.now() - t0)/1000;
-  const LT = t => t;
-
-  /* ---------- the build ---------- */
-  const CLICKS = [];
-  function planBuild(){
-    const zs = ['low', 'mid', 'low', 'high', 'mid'], ups = [1, 1, 0, 1, 0];
-    let t = .25;
-    D.c.plots.forEach((q, k) => { CLICKS.push({ t, i: q.i, j: q.j, zone: zs[k % zs.length], up: false }); t += .2;
-      for (let u = 0; u < ups[k % ups.length]; u++){ CLICKS.push({ t, i: q.i, j: q.j, zone: zs[k % zs.length], up: true }); t += .16; } });
-    CLICKS.push({ t: t + .02, i: D.c.home.i, j: D.c.home.j, zone: 'low', up: true, home: true });   // the last: a floor on top of their tenement
-    D.info.buildEnds = +(t + .02).toFixed(2);
-  }
-  function clickPoint(b){ const c = cells.get(ckey(b.i, b.j)); return { x: b.i*LOT, y: b.up && c ? c.height + .05 : CURB + .3, z: b.j*LOT }; }
-  function doClick(b){
-    if (S.zone !== b.zone) selectZone(b.zone);
-    const c = cells.get(ckey(b.i, b.j)); if (!c) return warn('click', 'no plot ' + b.i + ',' + b.j);
-    const tg = b.up ? (c.sections.length < MAX_SECTIONS ? { type: 'up', c } : null) : (c.sections.length ? null : { type: 'onto', c });
-    if (!tg) return warn('click', 'nothing to build at ' + b.i + ',' + b.j);
-    safe('hover', () => showHover(tg));
-    if (!applyTarget(tg)) warn('click', 'did not build at ' + b.i + ',' + b.j);
-    CUR.col = ZONES[b.zone] ? ZONES[b.zone].col : '#fff'; click();
-  }
-
-  /* ---------- the camera ---------- */
-  const CAM = { x: 0, z: 0, y: TARGET_Y, yaw: 0, zoom: 6, pitch: 36*DEG };
-  const P = { x: 0, z: 0 };
-  let from = null;
-  function camAt(t, dt){
-    const c = D.c; if (!c) return;
-    const plaza = { x: lerp(c.front.i*LOT, c.home.i*LOT, .25), z: lerp(c.front.j*LOT, c.home.j*LOT, .25) };
-    const p = c.p;
-    if (t < MK.person){   // up close on the plaza while it's built on, turning slowly
-      const u = t/MK.person;
-      Object.assign(CAM, { x: plaza.x, z: plaza.z, y: CURB + 1.1, yaw: c.yaw - .35 + .25*ease(u), zoom: elerp(6.4, 5.6, ss(u)), pitch: lerp(38, 35, ss(u))*DEG });
-      P.x = p.x ?? c.stand.x; P.z = p.z ?? c.stand.z;
-    }
-    else if (t < MK.furn + 2){   // in on them at their door
-      if (p.x !== undefined && !(p.sc && p.sc.mode === 'in')){ P.x = follow(P.x, p.x, 7, dt); P.z = follow(P.z, p.z, 7, dt); }
-      const u = ease(seg(t, MK.person, MK.person + .55));
-      const a = { x: plaza.x, z: plaza.z, yaw: c.yaw - .1, zoom: 5.6 };
-      Object.assign(CAM, { x: lerp(a.x, P.x, u), z: lerp(a.z, P.z, u), y: lerp(CURB + 1.1, CURB + .55, u), yaw: lerp(a.yaw, c.yaw, u), zoom: elerp(a.zoom, 3.3, u), pitch: lerp(35, 30, u)*DEG });
-    }
-    else if (t < LT(MK.grid)){ /* (the apartment covers the screen; after it the city comes back where it was) */ return; }
-    else if (t < LT(MK.out)){   // across to the Grid
-      if (!from) from = Object.assign({}, CAM);
-      const g = gridMega(), u = ease(seg(t, LT(MK.grid), LT(MK.grid) + .5));
-      const gx = g ? g.x : from.x, gz = g ? g.z : from.z;
-      Object.assign(CAM, { x: lerp(from.x, gx, u), z: lerp(from.z, gz, u), y: lerp(from.y, CURB + 1.4, u), yaw: from.yaw + wrapA(c.yaw + .3 - from.yaw)*u, zoom: elerp(from.zoom, 7.5, u), pitch: lerp(from.pitch/DEG, 34, u)*DEG });
-      CAM.g = Object.assign({}, CAM);
-    }
-    else {   // out over the whole city
-      const a = CAM.g || CAM, u = ease(seg(t, LT(MK.out), LT(MK.title) + .3)), v = seg(t, LT(MK.out), D.len);
-      Object.assign(CAM, { x: lerp(a.x, -2*LOT, u), z: lerp(a.z, 0, u), y: lerp(a.y, TARGET_Y, u), yaw: a.yaw + .5*u + .12*v, zoom: elerp(a.zoom, 34, u), pitch: lerp(a.pitch/DEG, 38, u)*DEG, g: a });
-    }
-    camGoal.set(CAM.x, CAM.y, CAM.z); camT.copy(camGoal);
-    yaw = yawT = CAM.yaw; zoom = zoomT = CAM.zoom; PITCH = pitchT = CAM.pitch;
-  }
-  const _uc = updateCamera;
-  updateCamera = function (dt){
-    if (D.playing) safe('frame', () => { S.hour = HOUR; camAt(D.t, dt); });
-    return _uc(dt);
-  };
-
-  /* ---------- the cursor: drawn, so it shows in the recording ---------- */
-  const CUR = { x: innerWidth*.62, y: innerHeight*.66, tx: null, ty: null, pulse: -9, col: '#ffffff', on: 0, want: 0 };
-  function aim(s){ if (!s) return; CUR.tx = s.x; CUR.ty = s.y; CUR.want = 1; }
-  function click(){ CUR.pulse = D.t; }
-  const _v = new THREE.Vector3();
-  const toScreen = p => { _v.set(p.x, p.y, p.z).project(cam); const r = canvas.getBoundingClientRect(); return { x: r.left + (_v.x + 1)/2*r.width, y: r.top + (1 - _v.y)/2*r.height }; };
-
-  function buildPlan(){
-    planBuild();
-    at(0, () => html.classList.add('dm-zones'), 'zones');
-    CLICKS.forEach((b, k) => {
-      at(b.t - .14, () => aim(toScreen(clickPoint(b))), 'aim ' + k);
-      at(b.t, () => doClick(b), 'click ' + k);
-    });
-    at(D.info.buildEnds + .25, () => { safe('hover', () => showHover(null)); CUR.want = 0; html.classList.remove('dm-zones'); }, 'build done');
-    at(MK.person, personOn, 'person cam');
-    at(MK.person + .15, () => logLines(0), 'log 1');
-    at(MK.enter, goIn, 'heads in');
-    at(MK.person + .7, () => logLines(1), 'log 2');
-    at(MK.person + 1.25, () => logLines(2), 'log 3');
-    // the apartment: opened the moment they're inside (or at MK.furn at the latest), through the game's own hologram
-    at(MK.furn, () => openHome('latest'), 'apartment');
-    // in the room: scheduled when it's ready (furnish(), below)
-    at(MK.exit, labExit, 'exit');
-    at(MK.exit + .05, () => { html.classList.remove('dm-mon'); safe('cam off', () => MON.close()); }, 'person cam off');
-    // the Grid
-    at(MK.grid + .3, () => { const g = gridMega(); if (g) aim(toScreen({ x: g.x, y: (g.top || CURB + 2)*.7, z: g.z })); CUR.want = 1; }, 'to the Grid');
-    at(MK.panel - .25, () => click(), 'click 1');
-    at(MK.panel - .05, () => { click(); safe('panel', () => music.panel.show()); }, 'double click: panel');
-    // the sound pass plays in real time, where a slow frame could make a click late: there the two notes go into the loop's data well
-    // ahead (they first sound at 9.98 s and 10.58 s either way, on the next pass), so the music never depends on when a frame came
-    if (AUTO) at(8.6, notesEarly, 'notes, ahead');
-    at(MK.note1 - .2, () => aim(noteAt(...MISSING[0])), 'aim note 1');
-    at(MK.note1, () => addNote(0), 'note 1');
-    at(MK.note2 - .2, () => aim(noteAt(...MISSING[1])), 'aim note 2');
-    at(MK.note2, () => addNote(1), 'note 2');
-    at(MK.close - .25, () => { const b = document.getElementById('gpClose'); if (b) aim((r => ({ x: r.left + r.width/2, y: r.top + r.height/2 }))(b.getBoundingClientRect())); }, 'to close');
-    at(MK.close, () => { click(); safe('close', () => music.panel.hide()); }, 'close panel');
-    at(MK.close + .25, () => { CUR.want = 0; }, 'cursor away');
-    at(MK.end, () => { D.playing = false; D.done = true; say('done at', D.t.toFixed(2));
+  const EV = []; let fired = 0;
+  const at = (t, f, name) => EV.push({ t, f, name });
+  function timeline(){
+    at(0, () => { html.classList.add('dm-zones'); safe('broadcast', () => BOOTH.broadcast(LOOP_ID, 'rewire')); }, 'zones up, the Booth loop on the Grid');
+    PLAN.blocks.forEach((b, k) => b.clicks.forEach((ct, n) => {
+      if (!AUTO) at(ct - .15, () => aim(toScreen(clickPoint(k, n))), 'aim ' + k + '.' + n);
+      at(ct, () => doClick(k, n), 'build ' + k + '.' + n + ' ' + b.zone);
+    }));
+    const last = Math.max(...CLICK_T.flat());
+    at(last + .25, () => { safe('hover', () => showHover(null)); if (S.zone) selectZone(null); CUR.want = 0; html.classList.remove('dm-zones'); }, 'build done');
+    if (!AUTO){
+      at(MK.furn, () => { CUR.want = 0; }, 'apartment');
+      const R = MK.room;
+      at(R + .15, () => { CUR.want = 1; labGroup(); }, 'Plants');
+      at(R + .6, labTile, 'bonsai tile');
+      at(R + .95, labAim, 'over the table');
+      at(R + 1.2, labPlace, 'set down');
+      at(R + 1.55, labSelect, 'picked');
+      at(R + 1.85, labSwatch, 'its color menu');
+      at(R + 2.2, labColor, 'a new color');
+      at(MK.exit - .25, () => { const b = labEl('#ntExit'); if (b) aim(labCenter(b)); }, 'to Exit');
+      at(MK.exit, labExit, 'Exit');
+      at(MK.exit + .3, () => { CUR.want = 0; }, 'cursor away');
+      at(MK.grid + .35, () => { const g = gridMega(); if (g) aim(toScreen({ x: g.x, y: (g.top || CURB + 3)*.6, z: g.z })); }, 'to the Grid');
+      at(MK.panel - .22, () => click('#5ae8ff'), 'click');
+      at(MK.panel - .05, () => { click('#5ae8ff'); safe('panel', () => music.panel.show()); }, 'double click: the Acoustic Panel');
+      at(MK.note1 - .22, () => aim(noteAt(...MISSING[0])), 'to note 1');
+      at(MK.note1, () => addNote(0), 'note 1');
+      at(MK.note2 - .22, () => aim(noteAt(...MISSING[1])), 'to note 2');
+      at(MK.note2, () => addNote(1), 'note 2');
+      at(MK.close - .25, () => { const b = $('gpClose'); if (b){ const r = b.getBoundingClientRect(); aim({ x: r.left + r.width/2, y: r.top + r.height/2 }); } }, 'to close');
+      at(MK.close, () => { click('#ffffff'); safe('close', () => music.panel.hide()); }, 'close the panel');
+      at(MK.close + .3, () => { CUR.want = 0; }, 'cursor away');
+    } else at(8.6, notesEarly, 'notes, ahead');
+    at(D.len, () => { D.playing = false; D.done = true; say('done at', D.t.toFixed(2));
       if (!CAP && !AUTO){ D.el.msg.hidden = false; D.el.status.innerHTML = 'click to play again'; D.el.ov.classList.add('ask'); D.el.ov.addEventListener('click', () => location.reload(), { once: true }); } }, 'end');
     EV.sort((a, b) => a.t - b.t);
   }
-  // the furnishing, from the moment the room is ready: the Plants catalog, a bonsai tile, set down on their table, picked, its color menu,
-  // a new color. Spread over what's left before the Exit (squeezed when the room was late, the color change dropped if there's no time)
-  function furnish(t){
-    const steps = [[.1, () => { CUR.want = 1; labGroup(); }, 'plants'], [.55, labTile, 'bonsai tile'], [1.05, labPlace, 'set down'], [1.45, labSelect, 'select it'],
-      [1.75, labSwatch, 'color menu'], [2.1, labColor, 'new color']];
-    const room = MK.exit - .25 - t, k = Math.min(1, room/2.15);
-    D.info.furnishSqueeze = +k.toFixed(2);
-    if (room < .8){ warn('furnish', 'the room was ready too late to furnish (' + t.toFixed(2) + ' s)'); return; }
-    for (const [d, f, name] of steps) at(t + d*k, f, name);
+
+  /* ---------- the clock: the film's own frame count (the stage's) ---------- */
+  // main.js asks frameNow() each frame for the time to draw it at (null: skip it). Held (the lab still working), the frame number stays where it is:
+  // nothing is drawn and the recorder takes no picture, so the film goes on exactly where it stopped. The sound pass runs on real time instead.
+  let rolling = false, rendered = false, base = 0, t0real = 0;
+  D.frameNow = now => {
+    if (!rolling) return now;
+    if (AUTO || D.held) return null;   // (the sound pass draws nothing)
+    rendered = true; D.drawn++; return base + D.frame*1000/FPS;
+  };
+  // the audio clock follows the film's (the recorder's clock shim reads this): the Booth loop and the Panel's strip move with the picture
+  window.__dmAudioT = () => rolling && !AUTO ? base/1000 + D.t : performance.now()/1000;
+  function tick(){
+    requestAnimationFrame(tick);
+    if (!rolling || D.done) return;
+    if (AUTO){ D.t = (performance.now() - t0real)/1000; safe('music', () => music.update(1/60)); }
+    else if (rendered){ D.frame++; rendered = false; D.t = D.frame/FPS; }
+    prep();
   }
-  function openHome(why){
-    if (D.furnOpened) return; D.furnOpened = true; CUR.want = 0;
-    D.info.furnAt = +D.t.toFixed(2); D.info.furnWhy = why;
-    if (!FURN.openKey(D.c.p.pod)) warn('furnish', 'did not open');
+  function prep(){
+    const t = D.t;
+    D.held = false;
+    safe('apartment', () => aptTick(t));
+    if (D.held) return;
+    while (fired < EV.length && EV[fired].t <= t){ const e = EV[fired++]; safe(e.name, e.f); D.log.push(t.toFixed(2) + ' ' + e.name); }
+    if (CAP) Math.random = rng(h32('frame', D.frame));
+    S.hour = HOUR;
+    safe('door', () => doorAt(t));
+    if (!AUTO) paint(t, 1/FPS);
   }
 
-  /* ---------- the overlay, drawn from the clock ---------- */
+  /* ---------- the overlay, drawn from the film's time ---------- */
   function cursor(t, dt){
     const E = D.el;
     CUR.on = follow(CUR.on, CUR.want, 10, dt);
     E.cur.style.opacity = CUR.on.toFixed(3);
-    if (CUR.tx !== null){ CUR.x = follow(CUR.x, CUR.tx, 13, dt); CUR.y = follow(CUR.y, CUR.ty, 13, dt); }
+    if (CUR.tx !== null){ if (CUR.x === 0 && CUR.y === 0){ CUR.x = CUR.tx + 60; CUR.y = CUR.ty + 70; } CUR.x = follow(CUR.x, CUR.tx, 13, dt); CUR.y = follow(CUR.y, CUR.ty, 13, dt); }
     const press = 1 - .14*Math.max(0, 1 - Math.abs(t - CUR.pulse)/.06);
     E.cur.style.transform = `translate(${CUR.x.toFixed(1)}px,${CUR.y.toFixed(1)}px) scale(${press.toFixed(3)})`;
     const u = (t - CUR.pulse)/.32;
-    if (u >= 0 && u < 1 && CUR.on > .05){ const r = .35 + .9*expo(u);
-      E.ring.style.opacity = (.85*(1 - u)*CUR.on).toFixed(3); E.ring.style.borderColor = CUR.col;
-      E.ring.style.transform = `translate(${CUR.x.toFixed(1)}px,${CUR.y.toFixed(1)}px) scale(${r.toFixed(3)})`; }
+    if (u >= 0 && u < 1 && CUR.on > .05){ E.ring.style.opacity = (.85*(1 - u)*CUR.on).toFixed(3); E.ring.style.borderColor = CUR.col;
+      E.ring.style.transform = `translate(${CUR.x.toFixed(1)}px,${CUR.y.toFixed(1)}px) scale(${(.35 + .9*expo(u)).toFixed(3)})`; }
     else E.ring.style.opacity = '0';
   }
   let capK = -1;
   function caption(t){
-    const E = D.el;
-    const k = CAPS.findIndex(([a, b]) => t >= a && t < b + .3);
+    const E = D.el, k = CAPS.findIndex(([a, b]) => t >= a && t < b + .3);
     if (k < 0){ E.cap.style.opacity = '0'; capK = -1; return; }
     const [a, b, text] = CAPS[k];
     if (k !== capK){ E.capT.textContent = text; capK = k; }
@@ -576,31 +692,67 @@ const DEMO = (() => {
     E.capL.style.transform = `scaleX(${expo(seg(t, a + .1, a + .55)).toFixed(3)})`;
   }
   const NEON = [[0, 0], [.05, 1], [.09, .15], [.15, 1], [.22, .35], [.27, 1], [.4, .7], [.46, 1]];
-  const neonAt = u => { let v = 0; for (const [k, a] of NEON) if (u >= k) v = a; return v; };
+  const neonAt = u => { if (u < 0) return 0; let v = 0; for (const [k, a] of NEON) if (u >= k) v = a; return v; };
   function paint(t, dt){
-    const E = D.el, T = LT(MK.title);
+    const E = D.el, T = MK.title;
     E.black.style.opacity = t < .3 ? (1 - ss(t/.3)).toFixed(3) : '0';
     E.shade.style.opacity = (.8*ss(seg(t, T - .3, T + .4))).toFixed(3);
     cursor(t, dt); caption(t);
     E.tag.style.opacity = ss(seg(t, .3, .8)).toFixed(3);
-    if (E.tNeon){ E.tNeon.style.opacity = String(t > T ? neonAt(t - T) : 0); E.tTerr.style.opacity = String(t > T + .3 ? neonAt(t - T - .3) : 0); }
+    if (E.tNeon){ E.tNeon.style.opacity = String(neonAt(t - T)); E.tTerr.style.opacity = String(neonAt(t - T - .3)); }
+    brackets(MONITOR && t >= MONITOR.t0 && t < MONITOR.t1 ? castPose('who') : null);
   }
-  function tick(){
-    requestAnimationFrame(tick);
-    if (!D.playing) return;
-    const t = clock(), dt = Math.max(0, Math.min(.1, t - lastT)); lastT = t; D.t = t;
-    while (fired < EV.length && EV[fired].t <= t){ const e = EV[fired++]; safe(e.name, e.f); D.log.push(t.toFixed(2) + ' ' + e.name); }
-    // through the door and gone: the apartment, a beat later
-    if (!D.furnOpened && t > MK.enter + .4 && inHome()){ if (D.inT === undefined) D.inT = t; if (t - D.inT > .25) openHome('inside'); }
-    // the room ready: the furnishing is fitted in before the Exit
-    if (D.furnOpened && D.roomAt === undefined && labReady()){ D.roomAt = t; D.info.roomAt = +t.toFixed(2); safe('lab cursor', labNoCursor); furnish(t); }
-    paint(t, dt);
-  }
-  D.state = () => ({ ready: D.ready, playing: D.playing, done: D.done, t: D.t, len: D.len, stage: D.stage, info: D.info, log: D.log.slice(-40) });
 
-  window.addEventListener('load', () => {
-    setup().then(() => requestAnimationFrame(tick))
-      .catch(e => { warn('setup', e); status('could not set up: ' + (e && e.message || e)); D.failed = String(e && e.message || e); });
-  });
+  /* ---------- getting ready, and playing ---------- */
+  const until = (cond, secs) => new Promise((res, rej) => { const s0 = performance.now();
+    const tk = () => { let ok = false; try { ok = cond(); } catch (e) {} if (ok) return res(); if (performance.now() - s0 > secs*1000) return rej(new Error('timed out')); requestAnimationFrame(tk); }; tk(); });
+  const wait = secs => { const s0 = performance.now(); return until(() => performance.now() - s0 >= secs*1000, secs + 5); };
+  async function setup(){
+    await Promise.race([Promise.all(['12px Silkscreen', '400 12px "JetBrains Mono"', '600 12px "JetBrains Mono"', '500 12px "Chakra Petch"', '600 12px "Chakra Petch"'].map(f => document.fonts.load(f).catch(() => null))).then(() => document.fonts.ready), new Promise(r => setTimeout(r, 20000))]).catch(() => null);
+    overlay(); monSetup();
+    await title().catch(e => warn('title', e));
+    status('working out the city');
+    await until(() => typeof pplReady !== 'undefined' && pplReady && STORY.on, 300).catch(e => warn('people', e));
+    plan(); castUp(); monitorScript(); timeline();
+    if (!AUTO){
+      // once into the apartment beforehand, with the buildings up: the lab furnishes the home for its household (kept, so the film's visit
+      // finds the same home), and the Plants catalog's pictures are drawn
+      status('waking the apartment lab');
+      FURN.preload();
+      await until(() => FURN.warmed() && FURN.frame && FURN.ready, 400).catch(e => warn('lab warm', e));
+      status('furnishing the apartment once');
+      if (FURN.openKey(PLAN.who.pod)){
+        await until(labReady, 400).catch(e => warn('dry run', e));
+        const B = labB(); D.info.pieces = B && B.inst ? B.inst.size : 0; D.info.tables = B && B.inst ? [...B.inst.values()].filter(i => i.rec && TABLES.has(i.rec.arch)).length : 0;
+        safe('plants', () => labWin().PodBuilder.openCat('plants')); await wait(3);
+        D.info.plantTiles = labDoc() ? labDoc().querySelectorAll('#bTiles .tile').length : 0;
+        safe('fly', () => labWin().PodBuilder.closeFly());
+        const b = labEl('#ntExit'); if (b) b.click(); else FURN.close();
+        await until(() => !FURN.open && !FURN.hold, 30).catch(e => warn('dry run close', e)); await wait(1);
+        if (!FURN.frame){ FURN.preload(); await until(() => FURN.warmed() && FURN.frame && FURN.ready, 400).catch(e => warn('lab rewarm', e)); }
+      } else warn('dry run', 'could not open ' + PLAN.who.pod);
+    }
+    clearBlocks();
+    status('night falling');
+    S.hour = HOUR; await until(() => Math.abs(LIGHTS_ON.value - LIGHTS_GOAL) < .01, 40).catch(e => warn('lights', e));
+    camAt(0); camGoal.set(CAMP.x, CAMP.y, CAMP.z); camT.copy(camGoal); yaw = yawT = CAMP.yaw; zoom = zoomT = CAMP.zoom; PITCH = pitchT = CAMP.pitch;
+    await wait(1);
+    D.ready = true;
+    status(CAP || AUTO ? 'ready' : 'click to play');
+    if (AUTO) start();
+    else if (!CAP){ D.el.ov.classList.add('ask'); D.el.status.innerHTML = 'click to play<br><small>15 s</small>'; D.el.ov.addEventListener('click', start, { once: true }); }
+    say('ready', JSON.stringify(D.info));
+  }
+  function start(){
+    if (!D.ready || rolling) return false;
+    D.el.ov.classList.remove('ask'); D.el.msg.hidden = true;
+    base = performance.now(); t0real = performance.now(); D.frame = 0; D.t = 0; rendered = false; rolling = true; D.playing = true;
+    last = base - 1000/FPS;   // (main.js: the first frame is one frame after this)
+    if (typeof window.__dmGo === 'function') safe('sound', () => window.__dmGo());
+    prep(); say('rolling'); return true;
+  }
+  D.start = start;
+  D.state = () => ({ ready: D.ready, playing: D.playing, done: D.done, held: D.held, t: D.t, frame: D.frame, drawn: D.drawn, len: D.len, stage: D.stage, info: D.info, log: D.log.slice(-60) });
+  addEventListener('load', () => { setup().then(() => requestAnimationFrame(tick)).catch(e => { warn('setup', e); status('could not set up: ' + (e && e.message || e)); D.failed = String(e && e.message || e); }); });
   return D;
 })();

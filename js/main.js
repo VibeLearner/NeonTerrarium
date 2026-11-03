@@ -22,6 +22,7 @@ PH.state = () => 'cache: ' + SC.state + (SC.why ? ' (' + SC.why + ')' : '') + ';
   + '; merges waiting ' + solidDirty.size + (SOLID_JOB ? ' (one under way)' : '') + (SOLID_HELD ? ' (held: the view is turning)' : '') + ', tier changes ' + TIER.changes + ', to free ' + DISPOSE_Q.length + '; drag ' + (dragging ? 'held' : 'off');
 function frame(now){
   requestAnimationFrame(frame);
+  if (window.NT_DEMO && typeof DEMO !== 'undefined' && DEMO.frameNow){ const n = DEMO.frameNow(now); if (n === null) return; now = n; }   // (#demo: the film's own clock, and nothing drawn while it holds: js/demo.js)
   if (typeof OVERSEER !== 'undefined' && OVERSEER.hold) return;   // (the Overseer's desk covers the screen: the city waits)
   if (typeof PRECINCT !== 'undefined' && PRECINCT.hold){ if (PRECINCT.live) try { simBody(now); } catch (e){ console.warn('desk sim', e); } return; }   // (and the Precinct desk: the city goes on under it undrawn, so its plan is live, policedesk.js)
   if (typeof GRIDPANEL !== 'undefined' && GRIDPANEL.hold) return;   // (so does the Acoustic Panel; the broadcast plays on)

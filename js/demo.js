@@ -556,6 +556,7 @@ const DEMO = (() => {
     s.cv.dispatchEvent(new w.PointerEvent('pointerdown', Object.assign({ button: 0, buttons: 1 }, o)));
     s.cv.dispatchEvent(new w.PointerEvent('pointerup', Object.assign({ button: 0, buttons: 0 }, o)));
     if (B.place) safe('cancel place', () => w.PodBuilder.cancel());
+    labLeave();   // (the pointer goes on to the catalog's close, off the room)
     FU.id = [...B.inst.keys()].find(k => !before.has(k));
     D.info.placed = FU.id !== undefined ? FU.arch || '?' : null;
     if (FU.id === undefined) warn('furnish', 'nothing was placed');
@@ -574,6 +575,8 @@ const DEMO = (() => {
     const pick = bs.slice().sort((a, b) => sat(b.dataset.c) - sat(a.dataset.c))[0];
     aim(labCenter(pick)); click(pick.dataset.c); pick.click(); D.info.color = pick.dataset.c;
   }
+  // the lab's own pointer off the room (its pointerleave: no hover outline on whatever ends up under where the pointer last was)
+  function labLeave(){ const w = labWin(), d = labDoc(), cv = d && (d.getElementById('bCanvas') || d.querySelector('canvas')); if (cv) safe('leave', () => cv.dispatchEvent(new w.PointerEvent('pointerleave', { pointerId: 1, pointerType: 'mouse', isPrimary: true }))); }
   function labLetGo(){ const w = labWin(); safe('let go', () => w.PodBuilder.select(null)); }
   // the lab's view eases in on the bonsai once the catalog is closed (its own zoom, toward a point picked so the bonsai ends a little left of
   // the middle, clear of the inspector on the right): a zoom about P keeps P still, so the bonsai at Q ends at P + Z(Q - P)
@@ -585,7 +588,7 @@ const DEMO = (() => {
       const f = frameRect(), cx = innerWidth*.44 - f.left, cy = innerHeight*.5 - f.top, Z = LZ.max;
       FU.zp = { x: (Z*s.lx - cx)/(Z - 1), y: (Z*s.ly - cy)/(Z - 1) }; FU.z = 1; }
     const want = elerp(1, LZ.max, ease(seg(t, LZ.from, LZ.to)));
-    if (Math.abs(want/FU.z - 1) > 1e-4){ safe('zoom', () => T.zoomAt(want/FU.z, FU.zp.x, FU.zp.y)); FU.z = want; }
+    if (Math.abs(want/FU.z - 1) > 1e-4){ safe('zoom', () => T.zoomAt(want/FU.z, FU.zp.x, FU.zp.y)); FU.z = want; labLeave(); }   // (zoomAt aims the lab's pointer: off the room again, or what the zoom slides under it lights up)
     if (t >= LZ.to) FU.zoomDone = true;
   }
   function labExit(){ AP.exited = true; if (FURN.frame) FURN.frame.style.opacity = '';   // (the game's own power-down hides it from here)

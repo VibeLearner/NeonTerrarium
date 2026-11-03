@@ -22,6 +22,7 @@ const DEMO = (() => {
   const CAP = !!window.__TR_CAPTURE;   // the picture pass: the recorder steps the clock and films each frame
   const AUTO = !!window.__DM_AUDIO;    // the sound pass: real time, nothing drawn, only what makes a sound
   const FPS = +window.__DM_FPS || 60;
+  const NOLAB = !!window.__DM_NOLAB;   // (checking only, never in a recording: the apartment left out, tools/demo/record.py --test --nolab)
   const say = (...a) => { D.log.push(a.join(' ')); if (D.log.length > 500) D.log.shift(); console.log('[demo]', ...a); };
   const warn = (what, e) => { D.log.push('! ' + what + ': ' + (e && e.message || e)); console.warn('[demo] ' + what, e && e.stack ? e.stack.split('\n').slice(0, 3).join(' | ') : e); };
   const safe = (what, f) => { try { return f(); } catch (e) { warn(what, e); return null; } };
@@ -80,7 +81,7 @@ const DEMO = (() => {
     safe('pacing', () => { if (typeof PACE !== 'undefined') PACE.off = true; });
     safe('wirelog', () => { if (typeof WIRELOG !== 'undefined') WIRELOG.tick = () => {}; });
     safe('police', () => { policeDroneAlert = () => false; });
-    if (CAP) safe('render', () => { SC.mode = 'off'; const T = typeof PH !== 'undefined' && PH.tests; if (T) T.noSlowFar = T.noSmall = T.noSpeed = true; if (typeof SD !== 'undefined') SD.on = false; if (typeof FARV !== 'undefined') FARV.on = false; });
+    if (CAP && !window.__DM_TEST) safe('render', () => { SC.mode = 'off'; const T = typeof PH !== 'undefined' && PH.tests; if (T) T.noSlowFar = T.noSmall = T.noSpeed = true; if (typeof SD !== 'undefined') SD.on = false; if (typeof FARV !== 'undefined') FARV.on = false; });
   }
   const _ar = applyRenderRes;
   applyRenderRes = function (){ return _ar(ZOOM_REF); };   // (the same pixels at every zoom)
@@ -169,13 +170,14 @@ const DEMO = (() => {
   };
 
   /* ---------- sight lines: what stands between a camera and a point ---------- */
-  const hAt = (x, z) => { const i = Math.round(x/LOT), j = Math.round(z/LOT), c = cells.get(ckey(i, j)); if (!c) return 0;
+  const hAt = (x, z, skip) => { const i = Math.round(x/LOT), j = Math.round(z/LOT), c = cells.get(ckey(i, j)); if (!c) return 0;
+    if (c.mega && c.mega === skip) return 0;
     if (c.mega){ const m = megas.get(c.mega); return m ? m.top || CURB + 6 : 0; }
     if (Math.abs(x - i*LOT) > SIDE*.55 || Math.abs(z - j*LOT) > SIDE*.55) return 0;
     return c.sections.length ? c.height : CURB; };
-  function los(x, y, z, yw, pt){   // from (x, y, z) toward a camera at yaw yw and pitch pt: nothing in the way?
+  function los(x, y, z, yw, pt, skip){   // from (x, y, z) toward a camera at yaw yw and pitch pt: nothing in the way?
     const cp = Math.cos(pt), dx = Math.sin(yw)*cp, dy = Math.sin(pt), dz = Math.cos(yw)*cp;
-    for (let s = .3; s < 160; s += .2){ const yy = y + dy*s; if (yy > 60) return true; const h = hAt(x + dx*s, z + dz*s); if (h > CURB + .05 && yy < h + .05) return false; }
+    for (let s = .3; s < 160; s += .2){ const yy = y + dy*s; if (yy > 60) return true; const h = hAt(x + dx*s, z + dz*s, skip); if (h > CURB + .05 && yy < h + .05) return false; }
     return true;
   }
   const clearAll = (pts, yw, pt) => pts.every(p => los(p.x, CURB + .55, p.z, yw, pt));
@@ -197,16 +199,28 @@ const DEMO = (() => {
     PLAN.blocks = [{ i: b1.i, j: b1.j, zone: BLOCKS[0], clicks: CLICK_T[0] }];
     buildBlock(0); settleAll();
     let d = doorOf(b1.i, b1.j); if (!d) throw new Error('the first building has no door');
-    const n = { x: Math.round(d.n[0]), z: Math.round(d.n[1]) }, tv = { x: -n.z, z: n.x };   // (its outward way, and across)
-    // 2. the other four: either side of it with a plot between, and two behind those; never in front of it, where the walk is
-    [[2, 0], [-2, 0], [2, -2], [-2, -2]].forEach(([a, b], q) => {
-      const k = q + 1, i = b1.i + a*tv.x + b*n.x, j = b1.j + a*tv.z + b*n.z;
-      if (!inPlaza(i, j)) warn('plan', 'block ' + k + ' is off the plaza at ' + i + ',' + j);
-      PLAN.blocks.push({ i, j, zone: BLOCKS[k], clicks: CLICK_T[k] }); PLAN.green.set(ckey(i, j), (cellAt(i, j) || {}).green);
-    });
-    for (let k = 1; k < 5; k++) buildBlock(k);
-    settleAll();
-    d = doorOf(b1.i, b1.j) || d;
+    const way = d => ({ x: Math.round(d.n[0]) || 0, z: Math.round(d.n[1]) || 0 });
+    // 2. the other four: either side of it with a plot between, and two behind those; never in front of it, where the walk is. Its door can turn
+    // to another side once they stand (a door faces the open side): then they go up again round the new side, until the door stays where it is
+    let n = way(d), tries = 0;
+    for (;;){
+      const tv = { x: -n.z, z: n.x };   // (across its outward way)
+      PLAN.blocks.length = 1;
+      [[2, 0], [-2, 0], [2, -2], [-2, -2]].forEach(([a, b], q) => {
+        const k = q + 1, i = b1.i + a*tv.x + b*n.x, j = b1.j + a*tv.z + b*n.z;
+        if (!inPlaza(i, j)) warn('plan', 'block ' + k + ' is off the plaza at ' + i + ',' + j);
+        PLAN.blocks.push({ i, j, zone: BLOCKS[k], clicks: CLICK_T[k] }); if (!PLAN.green.has(ckey(i, j))) PLAN.green.set(ckey(i, j), (cellAt(i, j) || {}).green);
+      });
+      for (let k = 1; k < 5; k++) buildBlock(k);
+      settleAll();
+      d = doorOf(b1.i, b1.j) || d; const n2 = way(d);
+      if ((n2.x === n.x && n2.z === n.z) || ++tries >= 4) break;
+      say('plan: the door turned to', JSON.stringify(n2), 'with the others up: placing them again');
+      for (let k = 1; k < 5; k++){ const b = PLAN.blocks[k], c = cellAt(b.i, b.j); if (c){ c.sections = []; c.green = PLAN.green.get(ckey(b.i, b.j)) || 'grass'; } }
+      rebuildAll(); settleAll(); n = n2;
+    }
+    const tv = { x: -n.z, z: n.x };
+    PLAN.tops = PLAN.blocks.map(b => { const c = cellAt(b.i, b.j); return c ? c.height : CURB + 3; });
     PLAN.door = { key: d.key, wall: { x: d.wall.x, z: d.wall.z }, stand: { x: d.stand.x, z: d.stand.z }, n: [d.n[0], d.n[1]] };
     // 3. the resident: the first member of the lowest household in the first building
     safe('pods', () => podsResync(c1));
@@ -228,11 +242,20 @@ const DEMO = (() => {
     PLAN.cam = pick([.55, -.55, .4, -.4, .75, -.75, .2, -.2], [34, 38, 42, 48]);
     PLAN.feed = pick([1.05, -1.05, .85, -.85, 1.3, -1.3, .6, -.6], [44, 50, 56, 62]);
     if (!PLAN.cam.ok) warn('plan', 'no clear main camera angle on the walk');
+    // the Grid, seen whole for the double click: the angle nearest the main one from which nothing stands in front of it
+    { const g = gridMega(); if (g){ const gp = []; for (const fx of [-.35, 0, .35]) for (const fz of [-.35, 0, .35]) gp.push({ x: g.x + fx*g.w*LOT, z: g.z + fz*g.h*LOT });
+        let best = null; for (const o of [0, .25, -.25, .5, -.5, .8, -.8, 1.1, -1.1, 1.5, -1.5, 2, -2, 2.6, -2.6, Math.PI]) for (const pt of [34, 40, 46]){
+          if (!best && gp.every(q => los(q.x, CURB + 1.2, q.z, PLAN.cam.yaw + o, pt*DEG, g.id))) best = { yaw: PLAN.cam.yaw + o, pitch: pt*DEG }; }
+        if (!best) warn('plan', 'no clear angle on the Grid');
+        const b = best || { yaw: PLAN.cam.yaw + .3, pitch: 40*DEG }, h = SIDE/2 + (g.w - 1)*LOT/2, top = g.top || CURB + 3, pts2 = [];
+        for (const [a, c] of [[-h, -h], [h, -h], [-h, h], [h, h]]) for (const y of [CURB, top]) pts2.push({ x: g.x + a, y, z: g.z + c });
+        PLAN.grid = { yaw: b.yaw, pitch: b.pitch, pts: pts2, clear: !!best }; } }
     if (!PLAN.feed.ok) warn('plan', 'no clear person cam angle on the walk');
-    // where the main camera looks: between the buildings and the walk, then closer on the door
-    const bx = PLAN.blocks.reduce((a, b) => a + b.i*LOT, 0)/5, bz = PLAN.blocks.reduce((a, b) => a + b.j*LOT, 0)/5;
-    PLAN.look = { x: lerp(bx, S0.x, .45), z: lerp(bz, S0.z, .45) };
-    PLAN.look2 = { x: lerp(c1.x, st.x, .6), z: lerp(c1.z, st.z, .6) };
+    // what the main camera frames: all five buildings (to their finished height) and the walk; then closer, the first building and its door
+    const box = (b, top) => { const h = SIDE/2, out = []; for (const [a, c] of [[-h, -h], [h, -h], [-h, h], [h, h]]) for (const y of [CURB, top]) out.push({ x: b.i*LOT + a, y, z: b.j*LOT + c }); return out; };
+    const walkPts = pts.map(q => ({ x: q.x, y: CURB + .8, z: q.z })).concat(pts.map(q => ({ x: q.x, y: CURB, z: q.z })));
+    PLAN.wide = PLAN.blocks.flatMap((b, k) => box(b, PLAN.tops[k])).concat(walkPts);
+    PLAN.near = box(PLAN.blocks[0], PLAN.tops[0]).concat(walkPts);
     // 6. a few people out on the plaza in front of the buildings, crossing it (looks taken from the city's residents)
     PLAN.extras = [];
     const crowd = pplList.filter(q => q.id !== p.id && !q.cop && !q.archivist && q.row !== undefined);
@@ -242,7 +265,7 @@ const DEMO = (() => {
       PLAN.extras.push({ id: 'x' + k, code: q.row, keys: [[0, P0.x, P0.z, 'walk', 0, 1, 1], [Math.hypot(P1.x - P0.x, P1.z - P0.z)/v, P1.x, P1.z, 'walk', 0, 1, 1]] });
     });
     D.info.plan = { door: PLAN.door.n, who: PLAN.who, cam: { yaw: +PLAN.cam.yaw.toFixed(2), pitch: Math.round(PLAN.cam.pitch/DEG), clear: PLAN.cam.ok },
-      feed: { yaw: +PLAN.feed.yaw.toFixed(2), pitch: Math.round(PLAN.feed.pitch/DEG), clear: PLAN.feed.ok }, blocks: PLAN.blocks.map(b => b.i + ',' + b.j + ' ' + b.zone) };
+      grid: PLAN.grid && { yaw: +PLAN.grid.yaw.toFixed(2), pitch: Math.round(PLAN.grid.pitch/DEG), clear: PLAN.grid.clear }, feed: { yaw: +PLAN.feed.yaw.toFixed(2), pitch: Math.round(PLAN.feed.pitch/DEG), clear: PLAN.feed.ok }, blocks: PLAN.blocks.map(b => b.i + ',' + b.j + ' ' + b.zone) };
     say('plan:', JSON.stringify(D.info.plan));
     // (the buildings stay up for now: the apartment is furnished once before the film, below; then the plaza is cleared)
   }
@@ -262,7 +285,7 @@ const DEMO = (() => {
       html.dm-on body > *:not(#view):not(#dmOv):not(canvas):not(#gridPanel):not(#furnish):not(.zonebar):not(#monitor){visibility:hidden!important}
       html.dm-on .zonebar{visibility:hidden!important}
       html.dm-on.dm-zones .zonebar .zones{visibility:visible!important}
-      html.dm-on .zonebar .zones .rot,html.dm-on .zonebar .zones .furnbtn{visibility:hidden!important}
+      html.dm-on .zonebar .zones .rot,html.dm-on .zonebar .zones .furnbtn,html.dm-on .zonebar .perim,html.dm-on .zonebar .zones .perim{visibility:hidden!important}
       html.dm-on #monitor{visibility:hidden!important}
       html.dm-on #monitor.tr-keep{visibility:visible!important;transform:scale(var(--monk,1.4));transform-origin:top right;top:3vh!important;right:2vh!important;max-height:calc(94vh/var(--monk,1.4))!important;overflow:hidden;transition:none!important;animation:none!important}
       html.dm-on #monitor.tr-keep *{transition:none!important;animation:none!important}
@@ -285,8 +308,8 @@ const DEMO = (() => {
       #dmSel i{position:absolute;left:50%;top:-14px;width:8px;height:8px;margin-left:-4px;background:#ff4fa3;transform:rotate(45deg);box-shadow:0 0 10px #ff4fa3}
       #dmCur{position:absolute;left:0;top:0;width:30px;height:30px;margin:-3px 0 0 -4px;opacity:0;filter:drop-shadow(0 3px 6px rgba(0,0,0,.55))}
       #dmRing{position:absolute;left:0;top:0;width:64px;height:64px;margin:-32px 0 0 -32px;border-radius:50%;border:2px solid #fff;opacity:0}
-      #dmCap{position:absolute;left:0;bottom:0;padding:0 0 8.5vh 4.8vw;width:60vw;height:28vh;display:flex;flex-direction:column;justify-content:flex-end;
-        background:radial-gradient(ellipse 62% 70% at 0% 100%,rgba(4,6,14,.78),rgba(4,6,14,.42) 45%,transparent 75%);opacity:0}
+      #dmCap{position:absolute;left:0;top:0;padding:7.5vh 0 0 4.8vw;width:60vw;height:28vh;display:flex;flex-direction:column;justify-content:flex-start;
+        background:radial-gradient(ellipse 62% 70% at 0% 0%,rgba(4,6,14,.78),rgba(4,6,14,.42) 45%,transparent 75%);opacity:0}
       #dmCap b{display:block;font-weight:600;font-size:5.2vh;line-height:1.04;letter-spacing:-.01em;color:#f3fbff;white-space:nowrap;text-shadow:0 3px 18px rgba(3,5,12,.75),0 1px 2px rgba(0,0,0,.7)}
       #dmCap i{display:block;margin-top:1.7vh;height:3px;width:5vw;background:#38e8e0;transform-origin:0 50%;box-shadow:0 2px 12px rgba(56,232,224,.55)}
       #dmCap i::after{content:'';display:block;margin-left:calc(5vw + 8px);width:14px;height:3px;background:#ff4fa3;box-shadow:0 2px 10px rgba(255,79,163,.6)}
@@ -335,7 +358,7 @@ const DEMO = (() => {
 
   /* ---------- the person cam: the game's panel, filled in by the script (the stage's) ---------- */
   const MONI = { el: null, cv: null, g: null, rt: null, fcam: null, pix: null, img: null, off: null, og: null, cur: null, shown: -1 };
-  const RW = 192, RH = 108, HALF = 2.6;
+  const RW = 192, RH = 108, HALF = 1.25;   // (closer than the game's 2.6: the person fills a good part of the feed)
   function monSetup(){
     MONI.el = $('monitor'); MONI.cv = $('monFeed'); MONI.g = MONI.cv.getContext('2d');
     MONI.rt = new THREE.WebGLRenderTarget(RW, RH, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, format: THREE.RGBAFormat });
@@ -450,7 +473,7 @@ const DEMO = (() => {
     D.held = true; return true;
   }
   function aptTick(t){
-    if (AUTO || AP.closed || t < MK.furn) return;
+    if (AUTO || NOLAB || AP.closed || t < MK.furn) return;
     if (!AP.on){ AP.on = !!safe('open', () => FURN.openKey(PLAN.who.pod)); if (!AP.on){ warn('apartment', 'did not open ' + PLAN.who.pod); AP.closed = true; return; } say('apartment', PLAN.who.pod); }
     const ov = $('furnish'), fr = FURN.frame, PC = labPC(), B = labB(), w = labWin();
     if (!fr || !PC || !PC._debug){ hold('the lab page'); return; }
@@ -560,7 +583,9 @@ const DEMO = (() => {
     s.cv.setPointerCapture = () => {};
     s.cv.dispatchEvent(new PointerEvent('pointerdown', Object.assign({ buttons: 1 }, o)));
     s.cv.dispatchEvent(new PointerEvent('pointerup', Object.assign({ buttons: 0 }, o)));
-    D.info['note' + (k + 1)] = (BOOTH.state.layers[0] || []).some(x => Math.abs(x.b - b) < .26 && x.i === i);
+    const has = () => (BOOTH.state.layers[0] || []).some(x => Math.abs(x.b - b) < .26 && x.i === i);
+    D.info['note' + (k + 1)] = has() ? 'drawn in' : 'added directly';
+    if (!has()){ warn('note', (k + 1) + ' did not land on the strip: added directly'); const L = BOOTH.state.layers; if (!L.length) L.push([]); L[0].push({ b, d: 1, i, v: .8 }); L[0].sort((x, y) => x.b - y.b); }
   }
   function notesEarly(){   // (the sound pass, in real time: both notes in the loop's data well ahead of their first pass, so no frame can make them late)
     const L = BOOTH.state.layers; if (!L.length) L.push([]);
@@ -570,11 +595,24 @@ const DEMO = (() => {
 
   /* ---------- the camera, from the film's time ---------- */
   const CAMP = { x: 0, y: TARGET_Y, z: 0, yaw: 0, zoom: 6, pitch: 36*DEG };
+  // a camera pose at this yaw and pitch that frames these points (the game's orthographic view: its right and up vectors, as input.js has
+  // them), with a margin, the points a little above the middle (lift: the zone bar is at the bottom)
+  function fit(pts, yw, pt, margin, lift){
+    const sy = Math.sin(yw), cy = Math.cos(yw), sp = Math.sin(pt), cp = Math.cos(pt);
+    const r = new THREE.Vector3(cy, 0, -sy), v = new THREE.Vector3(-sy*cp, -sp, -cy*cp), u = new THREE.Vector3().crossVectors(r, v);
+    let a0 = Infinity, a1 = -Infinity, b0 = Infinity, b1 = -Infinity;
+    for (const q of pts){ const a = q.x*r.x + q.y*r.y + q.z*r.z, b = q.x*u.x + q.y*u.y + q.z*u.z; a0 = Math.min(a0, a); a1 = Math.max(a1, a); b0 = Math.min(b0, b); b1 = Math.max(b1, b); }
+    const asp = innerWidth/Math.max(1, innerHeight), zoom = Math.max((b1 - b0)/2, (a1 - a0)/2/asp)*margin;
+    const ac = (a0 + a1)/2, bc = (b0 + b1)/2 - lift*zoom;
+    // (the point on that line of sight at street height, so the camera's target sits on the ground)
+    const P = new THREE.Vector3().addScaledVector(r, ac).addScaledVector(u, bc), k = (CURB + .5 - P.y)/v.y; P.addScaledVector(v, k);
+    return { x: P.x, y: P.y, z: P.z, yaw: yw, pitch: pt, zoom };
+  }
   function camAt(t){
     const P = PLAN, y0 = P.cam.yaw, p0 = P.cam.pitch;
-    const A = { x: P.look.x, y: CURB + 1.1, z: P.look.z, yaw: y0 - .1, zoom: 6.3, pitch: p0 + 2*DEG };
-    const B = { x: P.look2.x, y: CURB + .8, z: P.look2.z, yaw: y0 + .06, zoom: 4.9, pitch: p0 };
-    const g = gridMega(), G = { x: g ? g.x : B.x, y: CURB + 1.6, z: g ? g.z : B.z, yaw: y0 + .3, zoom: 7.6, pitch: 34*DEG };
+    const A = P.A || (P.A = fit(P.wide, y0 - .08, p0 + 2*DEG, 1.12, .1));
+    const B = P.B || (P.B = fit(P.near, y0 + .06, p0, 1.3, .12));
+    const G = P.G || (P.G = P.grid ? fit(P.grid.pts, P.grid.yaw, P.grid.pitch, 1.9, 0) : Object.assign({}, B, { zoom: 7.6 }));
     const W = { x: -2*LOT, y: TARGET_Y, z: 0, yaw: y0 + .8, zoom: 32, pitch: 38*DEG };
     const mix = (a, b, u) => ({ x: lerp(a.x, b.x, u), y: lerp(a.y, b.y, u), z: lerp(a.z, b.z, u), yaw: a.yaw + wrapA(b.yaw - a.yaw)*u, zoom: elerp(a.zoom, b.zoom, u), pitch: lerp(a.pitch, b.pitch, u) });
     let c;
@@ -606,7 +644,7 @@ const DEMO = (() => {
     }));
     const last = Math.max(...CLICK_T.flat());
     at(last + .25, () => { safe('hover', () => showHover(null)); if (S.zone) selectZone(null); CUR.want = 0; html.classList.remove('dm-zones'); }, 'build done');
-    if (!AUTO){
+    if (!AUTO && !NOLAB){
       at(MK.furn, () => { CUR.want = 0; }, 'apartment');
       const R = MK.room;
       at(R + .15, () => { CUR.want = 1; labGroup(); }, 'Plants');
@@ -619,6 +657,8 @@ const DEMO = (() => {
       at(MK.exit - .25, () => { const b = labEl('#ntExit'); if (b) aim(labCenter(b)); }, 'to Exit');
       at(MK.exit, labExit, 'Exit');
       at(MK.exit + .3, () => { CUR.want = 0; }, 'cursor away');
+    }
+    if (!AUTO){
       at(MK.grid + .35, () => { const g = gridMega(); if (g) aim(toScreen({ x: g.x, y: (g.top || CURB + 3)*.6, z: g.z })); }, 'to the Grid');
       at(MK.panel - .22, () => click('#5ae8ff'), 'click');
       at(MK.panel - .05, () => { click('#5ae8ff'); safe('panel', () => music.panel.show()); }, 'double click: the Acoustic Panel');
@@ -714,7 +754,7 @@ const DEMO = (() => {
     status('working out the city');
     await until(() => typeof pplReady !== 'undefined' && pplReady && STORY.on, 300).catch(e => warn('people', e));
     plan(); castUp(); monitorScript(); timeline();
-    if (!AUTO){
+    if (!AUTO && !NOLAB){
       // once into the apartment beforehand, with the buildings up: the lab furnishes the home for its household (kept, so the film's visit
       // finds the same home), and the Plants catalog's pictures are drawn
       status('waking the apartment lab');
@@ -734,7 +774,8 @@ const DEMO = (() => {
     }
     clearBlocks();
     status('night falling');
-    S.hour = HOUR; await until(() => Math.abs(LIGHTS_ON.value - LIGHTS_GOAL) < .01, 40).catch(e => warn('lights', e));
+    S.hour = HOUR; await wait(.3); LIGHTS_ON.value = LIGHTS_GOAL;   // (night already: the lights all on before the film, not coming on one by one)
+    await until(() => Math.abs(LIGHTS_ON.value - LIGHTS_GOAL) < .01, 40).catch(e => warn('lights', e));
     camAt(0); camGoal.set(CAMP.x, CAMP.y, CAMP.z); camT.copy(camGoal); yaw = yawT = CAMP.yaw; zoom = zoomT = CAMP.zoom; PITCH = pitchT = CAMP.pitch;
     await wait(1);
     D.ready = true;

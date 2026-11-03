@@ -34,7 +34,7 @@ if (window.NT_DEMO){
   // frames or handed to the worker is done at once, nothing is swapped for a stand-in or dropped by distance, shadows, clouds and soft effects
   // are drawn in full every frame, the camera isn't snapped to whole pixels and the person cam's feed is drawn every frame. (Not when the
   // clip is watched live, or in the sound pass, which plays in real time.)
-  if (window.__TR_CAPTURE){
+  if (window.__TR_CAPTURE && !window.__DM_TEST){   // (record.py --test, checking on a machine with no graphics card: the game's usual drawing)
     window.NT_RENDER = true;
     window.__NV_OFF = window.__SYNC_NOW = window.__STAGE_NOW = window.__GEN_MAIN = window.__KEEP_GEO = window.__ALERT_NOW = window.__DISPOSE_NOW = window.__KEEP_CPU = true;
     window.__TIER_OFF = window.__SOFT_FULL = window.__FULL_RATE = true;

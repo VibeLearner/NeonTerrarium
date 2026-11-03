@@ -76,11 +76,13 @@ def main():
     ap.add_argument('--port', type=int, default=8794)
     ap.add_argument('--quality', type=int, default=95)
     ap.add_argument('--crf', type=int, default=16)
+    ap.add_argument('--nolab', action='store_true', help='checking only: leave the apartment out')
     ap.add_argument('--test', action='store_true', help='for checking on a machine without a graphics card: a small 640 x 360 picture at 30 fps, software drawing, no sound')
     a = ap.parse_args()
     global FPS
     VW, VH = 1920, 1080
-    if a.test: VW, VH, FPS, a.no_audio = 640, 360, 30, True
+    DSF = 1
+    if a.test: VW, VH, DSF, FPS, a.no_audio = 1440, 810, .5, 30, True   # (the desktop layout of every panel, drawn at half the pixels)
     a.out = a.out or os.path.join(OUT, 'neon-terrarium-demo' + ('-test' if a.test else '-preview' if a.preview else '') + '.mp4')
     if not shutil.which('ffmpeg') and not a.stills: sys.exit('ffmpeg is needed: brew install ffmpeg')
     from playwright.sync_api import sync_playwright
@@ -91,8 +93,8 @@ def main():
         # ---------- 1. the picture ----------
         def open_page(headless):
             browser = launch(pw, headless, soft=a.test)
-            ctx = browser.new_context(viewport={'width': VW, 'height': VH}, device_scale_factor=1)
-            ctx.add_init_script(script=f'window.__DM_FPS = {FPS};')
+            ctx = browser.new_context(viewport={'width': VW, 'height': VH}, device_scale_factor=DSF)
+            ctx.add_init_script(script=f'window.__DM_FPS = {FPS};' + ('window.__DM_NOLAB = true;' if a.nolab else '') + ('window.__DM_TEST = true;' if a.test else ''))
             ctx.add_init_script(path=os.path.join(HERE, 'shim.js'))
             page = ctx.new_page(); cdp = ctx.new_cdp_session(page); log_page(page)
             page.goto(url, wait_until='load')
@@ -108,13 +110,13 @@ def main():
         # everything off center. Then it goes headless after all. A Retina window at twice the pixels is fine.)
         if not a.headless:
             png = grab('png'); w, h = struct.unpack('>II', png[16:24])
-            if (w, h) != (VW, VH) and not (w % 1920 == 0 and h % 1080 == 0 and w//1920 == h//1080):
+            if (w, h) != (int(VW*DSF), int(VH*DSF)) and not (w % 1920 == 0 and h % 1080 == 0 and w//1920 == h//1080):
                 print(f'  the browser window only shows {w} x {h} of the 1920 x 1080 picture: filming without a window instead, so nothing is off center')
                 browser.close(); a.headless = True
                 browser, page, cdp = open_page(True)
         ev = page.evaluate
         t0 = time.time()
-        for _ in wait_ready(ev, t0):
+        for _ in wait_ready(ev, t0, 14400 if a.test else 1500):
             ev(f'__step(2, {1000/FPS})'); time.sleep(.01)
         st = ev('DEMO.state()')
         print('ready:', json.dumps(st.get('info')))

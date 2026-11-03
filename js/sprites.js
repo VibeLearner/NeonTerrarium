@@ -10,7 +10,8 @@ Object.assign(SPR.size, { gt0:[16,15], gt1:[15,9], gt2:[10,8], gt3:[13,8], gt4:[
 for (let k = 0; k < 10; k++) SPR.anchor['gt' + k] = 0;
 SPR.img = {}; for (const k in SPR.size) SPR.img[k] = 'assets/sprites/' + k + '.png';
 const PX = 18; // sprite pixels per world unit at the default 480p zoom, so one sprite pixel is about one screen pixel
-const FOL_UNI = { tint:{ value:new THREE.Color(1,1,1) }, time:{ value:0 }, normalMode:{ value:0 }, neonI:{ value:1 }, res:{ value:new THREE.Vector2(480,270) }, wind:{ value:1 } };
+const FOL_UNI = { tint:{ value:new THREE.Color(1,1,1) }, time:{ value:0 }, normalMode:{ value:0 }, neonI:{ value:1 }, res:{ value:new THREE.Vector2(480,270) }, wind:{ value:1 },
+  swayBand:{ value: typeof TOUCH !== 'undefined' && TOUCH.on ? 1 : 0 } };   // (touch: plants sway as whole pieces, see the plant shader)
 const FOL_MAT = {}, FOL_LIST = {};
 // Flickering lights: a few neon tubes, signs, lamps and windows are on their way out. Each has its own id; most
 // of the time it burns steady, then every so often it stutters through a short episode of cutting out and
@@ -348,7 +349,7 @@ const FOL_ATLAS = (() => {
   return { tex, size: new THREE.Vector2(AW, AH), repaint(){ for (const k of kinds) if (SG.has(k)) paint(k); }, stats };
 })();
 const FOL_SHADER = new THREE.ShaderMaterial({
-    uniforms: { lightsOn: LIGHTS_ON, lodPlants: LOD.plants, map:{value:FOL_ATLAS.tex}, atlasSize:{value:FOL_ATLAS.size}, tint:FOL_UNI.tint, time:FOL_UNI.time, normalMode:FOL_UNI.normalMode, neonI:FOL_UNI.neonI, res:FOL_UNI.res, wind:FOL_UNI.wind },
+    uniforms: { lightsOn: LIGHTS_ON, lodPlants: LOD.plants, map:{value:FOL_ATLAS.tex}, atlasSize:{value:FOL_ATLAS.size}, tint:FOL_UNI.tint, time:FOL_UNI.time, normalMode:FOL_UNI.normalMode, neonI:FOL_UNI.neonI, res:FOL_UNI.res, wind:FOL_UNI.wind, swayBand:FOL_UNI.swayBand },
     vertexShader: `uniform vec2 res; uniform float time; uniform float lodPlants; uniform float lightsOn; uniform float wind; varying float vPhase; attribute vec4 aVar; attribute float aFixed; attribute vec4 aRect; attribute vec2 aKind; attribute float aOn;
       varying vec2 vUv; varying float vShade; varying vec4 vRect; varying vec2 vKind; varying float vFlk; varying float vOn;` + FLK_GLSL + LIT_GLSL + `
       // a plant lies on or against what it grows from (moss on the floor, ivy on a wall, a bush's foot on its pot), at the same depth: it's kept in front by a
@@ -397,12 +398,17 @@ const FOL_SHADER = new THREE.ShaderMaterial({
       }`,
     side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4,
     fragmentShader: `uniform sampler2D map; uniform vec2 atlasSize; uniform vec3 tint; uniform float normalMode; uniform float neonI;
-      uniform float time; uniform float wind;
+      uniform float time; uniform float wind; uniform float swayBand;
       varying vec2 vUv; varying float vShade; varying float vPhase; varying vec4 vRect; varying vec2 vKind; varying float vFlk; varying float vOn;
       void main(){
         vec2 texSize = floor(vRect.zw + 0.5); float swayType = vKind.x;
         vec2 tx = vUv * texSize;                 // position in texels
         float row = floor(tx.y);
+        // On a touch screen (swayBand 1) the sway moves whole pieces instead of row by row: a plant or a piece of laundry shifts as one, a hanging
+        // vine in three pieces. A phone draws each pixel big, and rows sliding one at a time read as scanlines crawling over the plants (Pixel 7, Nov 3)
+        // (each piece moves as its middle row would; a standing plant as the row three quarters up, where its leaves are, so it still visibly sways)
+        if (swayBand > 0.5){ float bh = texSize.y/(swayType > 1.5 && swayType < 2.5 ? 3.0 : 1.0), at = swayType > 2.5 && swayType < 3.5 ? 0.75 : 0.5;
+          row = min(texSize.y - 1.0, floor((floor(row/bh) + at)*bh)); }
         float fromTop = (texSize.y - row) / texSize.y, fromBottom = (row + 0.5) / texSize.y;
         float ph = vPhase, sh = 0.0;
         if (swayType > 0.5 && swayType < 1.5)       // laundry: hangs from the line, the hem swings furthest

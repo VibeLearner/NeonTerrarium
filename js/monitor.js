@@ -51,7 +51,7 @@ const MON = (() => {
       dRT = new THREE.WebGLRenderTarget(1, 1, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, depthBuffer: false });
       dMat = new THREE.ShaderMaterial({ uniforms: { tD: { value: null }, uv: { value: new THREE.Vector2() } }, depthTest: false, depthWrite: false,
         vertexShader: 'void main(){ gl_Position = vec4(position.xy, 0.0, 1.0); }',
-        fragmentShader: '#include <packing>\nuniform sampler2D tD; uniform vec2 uv; void main(){ gl_FragColor = packDepthToRGBA(texture2D(tD, uv).x); }' });
+        fragmentShader: 'precision highp sampler2D;\n#include <packing>\nuniform sampler2D tD; uniform vec2 uv; void main(){ gl_FragColor = packDepthToRGBA(texture2D(tD, uv).x); }' });
       dScene = new THREE.Scene(); const q = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), dMat); q.frustumCulled = false; dScene.add(q); dCam = new THREE.Camera();
     }
     const r = viewRect();

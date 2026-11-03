@@ -75,7 +75,9 @@ function paintAt(x, y){
   const pk0 = pickAt(x, y);
   if (!S.zone && pk0 && pk0.c && pk0.c.mega && typeof ECON !== 'undefined' && ECON.on && ECON.megaClick && megas.has(pk0.c.mega) && ECON.megaClick(megas.get(pk0.c.mega))) return;   // (economy: a click on an Emitter Core shows its reach, or fixes it)
   const t = targetOf(pk0); if (!t) return;
-  const k = t.type === 'empty' || t.type === 'side' ? ckey(t.i, t.j) : t.type === 'megaUp' ? 'mega:' + t.m.id : ckey(t.c.i, t.c.j);
+  // (by its plot: one that exists, or the plot a new piece makes on open sky: a building's, a side building's, and a Perimeter wall's, which made its tile
+  //  with it but has no plot yet. A wall on open sky used to read the plot it didn't have, throw, and build nothing, Nov 3)
+  const k = t.type === 'megaUp' ? 'mega:' + t.m.id : t.c ? ckey(t.c.i, t.c.j) : ckey(t.i, t.j);
   if (act.done.has(k)) return;               // each spot changes at most once per stroke
   act.done.add(k); applyTarget(t);
 }
@@ -168,7 +170,7 @@ const AIM_PX = 36, SNAP_PX = 40;
 let AIM = null, DIRECT = null;
 const plotPx = () => LOT*(canvas.clientHeight || innerHeight)/(2*zoom);
 const camSig = () => camGoal.x.toFixed(3) + ',' + camGoal.z.toFixed(3) + ',' + zoomT.toFixed(3) + ',' + yawT.toFixed(4) + ',' + pitchT.toFixed(4);
-const aimKey = t => !t ? null : t.type === 'empty' || t.type === 'side' ? t.type + ckey(t.i, t.j) : t.type === 'megaUp' ? 'mega:' + t.m.id : t.type + ckey(t.c.i, t.c.j);
+const aimKey = t => !t ? null : t.type === 'megaUp' ? 'mega:' + t.m.id : t.type + (t.c ? ckey(t.c.i, t.c.j) : ckey(t.i, t.j));   // (by its plot, as paintAt keys a stroke)
 function touchAimAt(x, y){
   const t = targetOf(pickAt(x, y)); if (t) return { t, x, y };
   // nothing to build where the ray landed (a wall that takes no pod, the pavement round a building, a gap): the plot whose outline on screen is
@@ -234,6 +236,39 @@ function freshUndo(f){   // (quietly, for the height pick that replaces it)
   if (!freshOk(f)) return false;
   f.c.sections.pop(); freshRebuild(f.c); FRESH = null; return true;
 }
+// With a mouse (owner, Nov 3): in highway or metro mode, a press on the open end of the line being built and a drag lays track through the plots the
+// pointer passes, a piece at a time, as clicking each next plot would (the same rules: where one says no, the drawing stops there). The plot is the one
+// the pointer is over at the track's height, and a fast drag catches up a couple of pieces a move, the rest when the button is let go. A drag that
+// starts anywhere else turns the view, as before. (A finger draws track its own way: transit-touch.js)
+function tdLine(){
+  if (hwMode) return hwActive && highways.includes(hwActive) && !hwActive.done ? hwActive : null;
+  if (mtMode) return mtActive && metros.includes(mtActive) && !mtActive.done && !mtActive.loop ? mtActive : null;
+  return null;
+}
+function tdOnEnd(cx, cy){
+  const l = tdLine(); if (!l) return false;
+  const k = l.tiles.length - 1, isEnd = pk => !!pk && ((pk.kind === 'hwTile' && pk.h === l && pk.k === k) || (pk.kind === 'mtTile' && pk.l === l && pk.k === k));
+  return isEnd(hwMode ? hwPick(cx, cy, true) : mtPick(cx, cy)) || isEnd(hwMode ? hwPickTouch(cx, cy) : mtPickTouch(cx, cy));   // (the end itself under the pointer, or the nearest of it and the plots beside it)
+}
+const _tdNdc = new THREE.Vector2(), _tdRay = new THREE.Raycaster();
+function tdPlotAt(cx, cy, y){
+  const r = canvas.getBoundingClientRect(); _tdNdc.set(((cx - r.left)/r.width)*2 - 1, -((cy - r.top)/r.height)*2 + 1); _tdRay.setFromCamera(_tdNdc, cam);
+  const o = _tdRay.ray.origin, d = _tdRay.ray.direction; if (Math.abs(d.y) < 1e-4) return null;
+  const t = (y - o.y)/d.y; if (t <= 0) return null;
+  return { i: Math.round((o.x + d.x*t)/LOT), j: Math.round((o.z + d.z*t)/LOT) };
+}
+function tdStep(cx, cy, max){
+  const l = tdLine(); if (!l) return;
+  const to = tdPlotAt(cx, cy, hwMode ? hwY(hwLevel) : MT_Y); if (!to) return;
+  for (let s = 0; s < max; s++){
+    const e = l.tiles[l.tiles.length - 1], di = to.i - e.i, dj = to.j - e.j; if (!di && !dj) break;
+    const st = Math.abs(di) >= Math.abs(dj) ? [Math.sign(di), 0] : [0, Math.sign(dj)];
+    const pk = { kind: hwMode ? 'hwGround' : 'mtGround', i: e.i + st[0], j: e.j + st[1], d: 0 };
+    const t = hwMode ? hwTargetAt(pk) : mtTargetAt(pk);
+    if (!t || t.type !== 'extend' || !t.ok || (t.h || t.l) !== l || !(hwMode ? hwApply(t) : mtApply(t))) break;
+    tEmit('tdraw');
+  }
+}
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 canvas.addEventListener('pointerdown', e => {
   if (HL && e.pointerType === 'touch') hlStop();   // (a finger's height pick ends when it lifts: a stray one left over just goes)
@@ -272,7 +307,7 @@ canvas.addEventListener('pointerdown', e => {
       act.kind = 'none'; } }, 550);
     return;
   }
-  if (e.button === 0 && (hwMode || mtMode)){ act = { kind: 'sky', x: e.clientX, y: e.clientY, moved: false }; return; }   // highway or metro mode: a click builds, a drag turns the view
+  if (e.button === 0 && (hwMode || mtMode)){ act = { kind: 'sky', x: e.clientX, y: e.clientY, moved: false, tdraw: tdOnEnd(e.clientX, e.clientY) }; return; }   // highway or metro mode: a click builds, a drag turns the view (or from a line's open end, lays track: tdStep)
   if (e.button === 0){
     // a click (no drag) builds; a drag rotates the view. With "Drag to paint" on, a drag that starts on the city paints instead.
     // (the city is only picked here when painting is on: the click itself picks on release, and a press that starts turning the
@@ -322,6 +357,7 @@ function pointerMove(e){
     return;
   }
   if (act.kind === 'npc'){ if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 5){ act.moved = true; if (e.pointerType === 'touch'){ act.kind = 'touch'; touchPan(e.clientX - act.x, e.clientY - act.y); } else act.kind = 'sky'; } return; }
+  if (act.kind === 'sky' && act.tdraw){ if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 5) act.moved = true; if (act.moved) tdStep(e.clientX, e.clientY, 2); return; }
   if (act.kind === 'sky'){ if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 5) act.moved = true; if (act.moved){ yawT -= dx*.008; tilt(); hover.visible = hoverFill.visible = hoverStrip.visible = false; if (megaPick) showMegaGhost(null); } return; }
   if (act.kind === 'right'){ if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 5) act.moved = true; if (act.moved){ yawT -= dx*.008; tilt(); } return; }
   if (act.kind === 'fresh2'){   // the building just made, pressed again and dragged: it goes, and the height pick takes its place
@@ -367,6 +403,7 @@ function endPtr0(e){
     }
     if (act.kind === 'right' && !act.moved && delMode){ delSel = null; showAreaSel(null); }
     else if (act.kind === 'right' && !act.moved){ if (hwMode) hwRightClick(e.clientX, e.clientY); else if (mtMode) mtRightClick(e.clientX, e.clientY); else if (megaPick) selectMega(null); else removeAt(pickAt(e.clientX, e.clientY)); }   // right-click while placing: put it down (highways are only cut in highway mode)
+    if (act.kind === 'sky' && act.moved && act.tdraw){ tdStep(e.clientX, e.clientY, 12); if (hwMode) hwHover(e.clientX, e.clientY); else if (mtMode) mtHover(e.clientX, e.clientY); }
     if (act.kind === 'sky' && !act.moved){ if (hwMode) hwClick(e.clientX, e.clientY); else if (mtMode) mtClick(e.clientX, e.clientY); else if (megaPick) placeMegaHere(e.clientX, e.clientY); else { act.done = new Set(); paintAt(e.clientX, e.clientY); } }
     if (act.kind === 'dtap' && !(typeof LOADP !== 'undefined' && LOADP.on)){
       if (act.started){ if (HL) hlBuild(); }

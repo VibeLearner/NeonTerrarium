@@ -51,5 +51,5 @@ film held for the lab, what was placed and every moment as it fired.
 
 ## Tuning
 
-Times are at the top of `js/demo.js` (`MK`, `CLICK_T`), captions in `CAPS`, the buildings in `BLOCKS`, the loop and its two missing
-notes in `MELODY` and `MISSING`, the city in `CITY`, `PLAZA` and `MEGAS`, and each shot's camera in `camAt`.
+Times are at the top of `js/demo.js` (`MK`, `CLICK_T`), captions in `CAPS`, the buildings in `BLOCKS`, the Booth loop and its two missing
+notes in `js/demo_loop.js`, the city in `CITY`, `PLAZA` and `MEGAS`, and each shot's camera in `camAt`.

@@ -740,7 +740,7 @@ const DEMO = (() => {
   }
   const sofaColorEl = () => { const d = labDoc(); if (!d) return null; const want = SOFA.want, bs = [...d.querySelectorAll('#iCP .pal button')];
     const near = bs.map(x => ({ x, d: cdist(x.dataset.c, want) })).sort((a, b) => a.d - b.d)[0];
-    return near && near.d < 18 ? near.x : d.querySelector('#iCP input[type=color]'); };
+    return near ? near.x : d.querySelector('#iCP input[type=color]'); };   // (the palette swatch nearest the furnisher's color: a swatch you see picked)
   function sofaColorBack(press){   // back to the color the furnisher picked for that part
     const w = labWin(), b = sofaColorEl(); if (!b) return warn('sofa', 'no color picker');
     aim(labCenter(b)); if (!press) return;

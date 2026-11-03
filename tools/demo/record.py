@@ -82,7 +82,7 @@ def main():
     global FPS
     VW, VH = 1920, 1080
     DSF = 1
-    if a.test: VW, VH, DSF, FPS, a.no_audio = 1440, 810, .5, 30, True   # (the desktop layout of every panel, drawn at half the pixels)
+    if a.test: VW, VH, DSF, FPS, a.no_audio = 1920, 1080, .5, 30, True   # (the desktop layout of every panel, drawn at half the pixels)
     a.out = a.out or os.path.join(OUT, 'neon-terrarium-demo' + ('-test' if a.test else '-preview' if a.preview else '') + '.mp4')
     if not shutil.which('ffmpeg') and not a.stills: sys.exit('ffmpeg is needed: brew install ffmpeg')
     from playwright.sync_api import sync_playwright

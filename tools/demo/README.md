@@ -43,6 +43,9 @@ frame at a time in render mode (every frame drawn whole, as the trailer's film w
 plays the clip in real time, drawing nothing, and records what the game sends to the speakers: the Grid's Booth loop, the two notes
 and the build sounds. `--window` films the picture in a visible Chrome window instead, only if headless draws wrong on your Mac.
 
+`--test` checks the clip on a machine with no graphics card (software drawing, the real layout at half the pixels, no sound, very slow);
+`--nolab` leaves the apartment out of a check.
+
 `tools/demo/out/demo-log.txt` notes the plan (the door, who lives there, the camera angles and whether they're clear), how long the
 film held for the lab, what was placed and every moment as it fired.
 

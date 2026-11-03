@@ -47,7 +47,8 @@ const DEMO = (() => {
 
   /* ---------- the plan ---------- */
   const MK = { person: 1.25, walk: 1.2, arrive: 3.5, inside: 3.9, furn: 4.05, room: 5.2, exit: 7.75, grid: 8.4, panel: 8.95, note1: 9.65, note2: 10.05, close: 10.85, out: 11.0, title: 12.6 };
-  const CAPS = [[.25, 1.2, 'Build it block by block'], [1.45, 3.85, 'Follow anyone home'], [5.35, 7.6, 'Furnish every apartment'], [9.1, 10.75, 'Finish the song the city hears']];
+  // [from, to, text, where]: top left over the city, top right in the apartment (its own panels are on the left), bottom left over the Acoustic Panel
+  const CAPS = [[.25, 1.2, 'Build it block by block', 'tl'], [1.45, 3.85, 'Follow anyone home', 'tl'], [5.35, 7.6, 'Furnish every apartment', 'tr'], [9.1, 10.75, 'Finish the song the city hears', 'bl']];
   // the five buildings, in the order they go up; the first is a tenement (it has the apartment). Each block's clicks: a new building, then a floor each
   const BLOCKS = ['low', 'mid', 'high', 'ind', 'low'];
   const CLICK_T = [[.35, .6], [.82, 1.02], [1.55, 1.8], [2.15], [2.55, 2.8]];
@@ -305,6 +306,9 @@ const DEMO = (() => {
       #dmRing{position:absolute;left:0;top:0;width:64px;height:64px;margin:-32px 0 0 -32px;border-radius:50%;border:2px solid #fff;opacity:0}
       #dmCap{position:absolute;left:0;top:0;padding:7.5vh 0 0 4.8vw;width:60vw;height:28vh;display:flex;flex-direction:column;justify-content:flex-start;
         background:radial-gradient(ellipse 62% 70% at 0% 0%,rgba(4,6,14,.78),rgba(4,6,14,.42) 45%,transparent 75%);opacity:0}
+      #dmCap.tr{left:auto;right:0;padding:9vh 3vw 0 0;align-items:flex-end;background:radial-gradient(ellipse 62% 70% at 100% 0%,rgba(4,6,14,.78),rgba(4,6,14,.42) 45%,transparent 75%)}
+      #dmCap.tr i{transform-origin:100% 50%}
+      #dmCap.bl{top:auto;bottom:0;padding:0 0 7vh 4.8vw;justify-content:flex-end;background:radial-gradient(ellipse 62% 70% at 0% 100%,rgba(4,6,14,.85),rgba(4,6,14,.5) 45%,transparent 75%)}
       #dmCap b{display:block;font-weight:600;font-size:5.2vh;line-height:1.04;letter-spacing:-.01em;color:#f3fbff;white-space:nowrap;text-shadow:0 3px 18px rgba(3,5,12,.75),0 1px 2px rgba(0,0,0,.7)}
       #dmCap i{display:block;margin-top:1.7vh;height:3px;width:5vw;background:#38e8e0;transform-origin:0 50%;box-shadow:0 2px 12px rgba(56,232,224,.55)}
       #dmCap i::after{content:'';display:block;margin-left:calc(5vw + 8px);width:14px;height:3px;background:#ff4fa3;box-shadow:0 2px 10px rgba(255,79,163,.6)}
@@ -461,9 +465,10 @@ const DEMO = (() => {
   const labReady = () => { const B = labB(); return FURN.open && $('furnish').classList.contains('live') && !(labPC() && labPC().transitioning) && B && B.inst && B.inst.size > 0 && !labWait(); };
   const AP = { on: false, started: false, roomOk: false, closed: false, exited: false, held0: null };
   const H0 = .3, holoCurve = x => { x = clamp01(x); return .55*x + .45*ss5(x); };
-  function hold(why){   // the film waits here (nothing drawn or filmed) until the lab is ready; at most four minutes of real time
-    if (AP.held0 == null) AP.held0 = Date.now();
-    if (Date.now() - AP.held0 > 240e3){ if (!AP.gaveUp){ AP.gaveUp = true; warn('apartment', 'waited 4 min for the lab (' + why + '): going on'); } return false; }
+  const HOLD_MAX = window.__DM_TEST ? 7200e3 : 1200e3;   // (real time: twenty minutes for any one thing the lab is doing, two hours when checking with no graphics card)
+  function hold(why){   // the film waits here (nothing drawn or filmed) until the lab is ready
+    if (AP.heldWhy !== why){ AP.heldWhy = why; AP.held0 = Date.now(); AP.gaveUp = false; }
+    if (Date.now() - AP.held0 > HOLD_MAX){ if (!AP.gaveUp){ AP.gaveUp = true; warn('apartment', 'waited ' + Math.round(HOLD_MAX/60e3) + ' min for the lab (' + why + '): going on'); } return false; }
     if (D.info.wait !== why){ D.info.wait = why; say('waiting for the lab:', why); }
     D.held = true; return true;
   }
@@ -562,7 +567,8 @@ const DEMO = (() => {
     const pick = bs.slice().sort((a, b) => sat(b.dataset.c) - sat(a.dataset.c))[0];
     aim(labCenter(pick)); click(pick.dataset.c); pick.click(); D.info.color = pick.dataset.c;
   }
-  function labExit(){ AP.exited = true; const b = labEl('#ntExit'); if (b){ aim(labCenter(b)); click('#ffffff'); b.click(); } else FURN.close(); }
+  function labExit(){ AP.exited = true; if (FURN.frame) FURN.frame.style.opacity = '';   // (the game's own power-down hides it from here)
+    const b = labEl('#ntExit'); if (b){ aim(labCenter(b)); click('#ffffff'); b.click(); } else FURN.close(); }
 
   /* ---------- the Grid and its Acoustic Panel ---------- */
   const gridMega = () => megasOfKind('radio')[0];
@@ -645,10 +651,12 @@ const DEMO = (() => {
       at(R + .15, () => { CUR.want = 1; labGroup(); }, 'Plants');
       at(R + .6, labTile, 'bonsai tile');
       at(R + .95, labAim, 'over the table');
-      at(R + 1.2, labPlace, 'set down');
-      at(R + 1.55, labSelect, 'picked');
-      at(R + 1.85, labSwatch, 'its color menu');
-      at(R + 2.2, labColor, 'a new color');
+      at(R + 1.15, labPlace, 'set down');
+      at(R + 1.3, () => { const b = labEl('#bFlyX'); if (b) aim(labCenter(b)); }, 'to the catalog\'s close');
+      at(R + 1.5, () => { const b = labEl('#bFlyX'); if (b){ click('#ffffff'); b.click(); } }, 'the catalog closed');
+      at(R + 1.75, labSelect, 'picked');
+      at(R + 2.0, labSwatch, 'its color menu');
+      at(R + 2.3, labColor, 'a new color');
       at(MK.exit - .25, () => { const b = labEl('#ntExit'); if (b) aim(labCenter(b)); }, 'to Exit');
       at(MK.exit, labExit, 'Exit');
       at(MK.exit + .3, () => { CUR.want = 0; }, 'cursor away');
@@ -717,8 +725,8 @@ const DEMO = (() => {
   function caption(t){
     const E = D.el, k = CAPS.findIndex(([a, b]) => t >= a && t < b + .3);
     if (k < 0){ E.cap.style.opacity = '0'; capK = -1; return; }
-    const [a, b, text] = CAPS[k];
-    if (k !== capK){ E.capT.textContent = text; capK = k; }
+    const [a, b, text, where] = CAPS[k];
+    if (k !== capK){ E.capT.textContent = text; E.cap.className = where || 'tl'; capK = k; }
     const i = expo(seg(t, a, a + .5)), o = ss(seg(t, b - .05, b + .25));
     E.cap.style.opacity = (1 - o).toFixed(3);
     E.capT.style.clipPath = `inset(-20% ${((1 - i)*100).toFixed(2)}% -20% 0)`;

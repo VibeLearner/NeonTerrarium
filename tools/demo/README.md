@@ -54,8 +54,17 @@ film held for the lab, what was placed and every moment as it fired.
 
 Times are at the top of `js/demo.js` (`MK`, `CLICK_T`), captions in `CAPS`, the buildings in `BLOCKS`, the Booth loop in `js/demo_loop.js`, the city in `CITY`, `PLAZA` and `MEGAS`, and each shot's camera in `camAt`.
 
-## The long cut (about 22 s)
+## The long cut (29 s)
 
-`python3 tools/demo/record.py --long` (with `--stills` or `--vertical` as above) makes `neon-terrarium-demo-long.mp4`: the same clip with no captions
-and no "All footage captured in engine" badge, the apartment given about ten seconds so each step has room, and a longer look at the city and the
-title. Its apartment steps are in `RS` and its times in `MK` at the top of `js/demo.js`.
+`python3 tools/demo/record.py --long` (with `--stills` or `--vertical` as above) makes `neon-terrarium-demo-long.mp4`: no captions and no
+"All footage captured in engine" badge, and everything at an easier pace.
+
+- The build runs to 5 s, the walk home to 6.5 s.
+- In the apartment, the furnisher's own sofa (the biggest seat it put in) is taken out before the film and put back on camera: the Furniture
+  catalog, its Sofas, that sofa from the catalog, set down where the furnisher had it but in another color; its color menu, and back to the
+  furnisher's color. The view eases in on it and back out.
+- The household runs warm for this cut, so the furnisher's own rules light the home more (a lamp by the sofa, warm ceiling lights, bedside
+  lamps). Before Exit the work light goes off, and the home is seen by its own lamps.
+- The pull out over the city starts at 23 s and the title holds to the end.
+
+Its apartment steps are in `RL` and its times in `MK` at the top of `js/demo.js`; the sofa is `SOFA`.

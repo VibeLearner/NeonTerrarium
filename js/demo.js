@@ -16,12 +16,13 @@
 // Nothing is saved and none of the player's own city or settings are read (saveguard.js, NT_DEMO).
 'use strict';
 const DEMO = (() => {
-  const D = { on: !!window.NT_DEMO, ready: false, playing: false, done: false, held: false, t: 0, frame: 0, drawn: 0, log: [], info: {}, failed: null, len: window.__DM_LONG ? 22 : 15 };
+  const D = { on: !!window.NT_DEMO, ready: false, playing: false, done: false, held: false, t: 0, frame: 0, drawn: 0, log: [], info: {}, failed: null, len: window.__DM_LONG ? 29 : 15 };
   if (!D.on) return D;
   const CAP = !!window.__TR_CAPTURE;   // the picture pass: the recorder steps the clock and films each frame
   const AUTO = !!window.__DM_AUDIO;    // the sound pass: real time, nothing drawn, only what makes a sound
   const FPS = +window.__DM_FPS || 60;
-  const LONG = !!window.__DM_LONG;     // the long cut (tools/demo/record.py --long): about 22 s, the apartment at an easy pace, no captions or badge
+  const LONG = !!window.__DM_LONG;     // the long cut (tools/demo/record.py --long): 29 s, no captions or badge, everything at an easy pace; in the
+                                       // apartment the furnisher's own sofa is taken out beforehand and put back on camera (see SOFA)
   const NOLAB = !!window.__DM_NOLAB;   // (checking only, never in a recording: the apartment left out, tools/demo/record.py --test --nolab)
   const say = (...a) => { D.log.push(a.join(' ')); if (D.log.length > 500) D.log.shift(); console.log('[demo]', ...a); };
   const warn = (what, e) => { D.log.push('! ' + what + ': ' + (e && e.message || e)); console.warn('[demo] ' + what, e && e.stack ? e.stack.split('\n').slice(0, 3).join(' | ') : e); };
@@ -46,16 +47,19 @@ const DEMO = (() => {
   function withSeed(seed, fn){ const was = Math.random; Math.random = rng(seed >>> 0); try { return fn(); } finally { Math.random = was; } }
 
   /* ---------- the plan ---------- */
-  const MK = LONG ? { person: 1.6, walk: 1.6, arrive: 4.55, inside: 5.0, furn: 5.0, room: 6.05, exit: 16.1, out: 16.55, title: 18.6 }
+  const MK = LONG ? { person: 2.1, walk: 2.1, arrive: 6.0, inside: 6.5, furn: 6.5, room: 7.6, exit: 22.6, out: 23.05, title: 25.2 }
                   : { person: 1.6, walk: 1.6, arrive: 4.55, inside: 5.0, furn: 5.0, room: 6.05, exit: 10.6, out: 11.05, title: 13.2 };
-  // the apartment's steps, in seconds after the room is ready (R): [Plants, bonsai tile, over the table, set down, to close, close, zoom from, zoom to,
-  // color menu, new color, let go]
-  const RS = LONG ? [.7, 1.8, 2.7, 3.3, 4.2, 4.5, 4.9, 6.3, 7.1, 8.0, 9.2] : [.3, .9, 1.35, 1.65, 2.0, 2.25, 2.3, 3.1, 2.7, 3.1, 3.45];
+  // the apartment's steps, in seconds after the room is ready (R). The 15 s clip: [Plants, bonsai tile, over the table, set down, to close, close,
+  // zoom from, zoom to, color menu, new color, let go]
+  const RS = [.3, .9, 1.35, 1.65, 2.0, 2.25, 2.3, 3.1, 2.7, 3.1, 3.45];
+  // the long cut: the sofa back in, in another color, then back to the furnisher's own; the view in and out again; the work light off
+  const RL = { grp: .8, tab: 1.6, tile: 2.5, aim: 3.4, place: 4.2, toClose: 5.0, close: 5.3, zFrom: 5.6, zTo: 7.0, swatch: 7.7, color: 8.8, letGo: 10.0,
+    zBack0: 10.5, zBack1: 11.8, toWork: 12.5, work: 12.9 };
   // [from, to, text, where]: top left over the city, top right in the apartment (its own panels are on the left)
   const CAPS = LONG ? [] : [[.3, 1.6, 'Light up the night, tower by tower', 'tl'], [1.85, 4.95, 'Every window has a story', 'tl'], [6.6, 10.4, 'Make any home your own', 'tr']];
   // the five buildings, in the order they go up; the first is a tenement (it has the apartment). Each block's clicks: a new building, then a floor each
   const BLOCKS = ['low', 'mid', 'high', 'ind', 'low'];
-  const CLICK_T = [[.4, .75], [1.1, 1.4], [2.1, 2.45], [2.95], [3.45, 3.8]];
+  const CLICK_T = LONG ? [[.5, .95], [1.5, 1.9], [2.8, 3.25], [3.9], [4.6, 5.05]] : [[.4, .75], [1.1, 1.4], [2.1, 2.45], [2.95], [3.45, 3.8]];
   // the Booth loop on the Grid from the first frame: 4 bars at 100 BPM (9.6 s a pass), a melody on the magic keys (pads 0 to 11, always in the
   // chord), its first bar missing two notes; the pass that starts at about 9.7 s is the first with them
   const LOOP_ID = window.DEMO_LOOP.id, MISSING = window.DEMO_LOOP.missing;   // (the loop itself: js/demo_loop.js, read by booth.js before this file loads)
@@ -563,7 +567,7 @@ const DEMO = (() => {
   function labSwatch(){
     const B = labB(), inst = B && B.inst.get(FU.id); if (!inst) return;
     { const w = labWin(), st = safe('state', () => w.PodBuilder.touch.state()); if (!(st && st.sel && st.sel.id === FU.id)) safe('select', () => w.PodBuilder.select(FU.id)); }   // (placing picks it already)
-    const k = Math.max(0, inst.slots.findIndex(sl => sl.kind !== 'e'));
+    const k = FU.slot != null ? FU.slot : Math.max(0, inst.slots.findIndex(sl => sl.kind !== 'e'));
     const b = labEl('#iSw .sw[data-i="' + k + '"]') || labEl('#iSw .sw'); if (!b) return warn('furnish', 'no color swatch');
     aim(labCenter(b)); click('#ffffff'); b.click();
   }
@@ -578,16 +582,100 @@ const DEMO = (() => {
   function labLetGo(){ const w = labWin(); safe('let go', () => w.PodBuilder.select(null)); }
   // the lab's view eases in on the bonsai once the catalog is closed (its own zoom, toward a point picked so the bonsai ends a little left of
   // the middle, clear of the inspector on the right): a zoom about P keeps P still, so the bonsai at Q ends at P + Z(Q - P)
-  const LZ = { from: MK.room + RS[6], to: MK.room + RS[7], max: 1.9 };
+  const LZ = LONG ? { from: MK.room + RL.zFrom, to: MK.room + RL.zTo, max: 1.55, back0: MK.room + RL.zBack0, back1: MK.room + RL.zBack1 }
+                  : { from: MK.room + RS[6], to: MK.room + RS[7], max: 1.9 };
   function labZoom(t){
     if (NOLAB || AUTO || FU.id === undefined || !FU.at || t < LZ.from || FU.zoomDone) return;
     const w = labWin(), T = w && w.PodBuilder && w.PodBuilder.touch; if (!T) return;
     if (!FU.zp){ const s = safe('zoom from', () => labScreen(FU.at.x, FU.at.y + .15, FU.at.z)); if (!s) { FU.zoomDone = true; return; }
       const f = frameRect(), cx = innerWidth*.44 - f.left, cy = innerHeight*.5 - f.top, Z = LZ.max;
       FU.zp = { x: (Z*s.lx - cx)/(Z - 1), y: (Z*s.ly - cy)/(Z - 1) }; FU.z = 1; }
-    const want = elerp(1, LZ.max, ease(seg(t, LZ.from, LZ.to)));
+    let want = elerp(1, LZ.max, ease(seg(t, LZ.from, LZ.to)));
+    if (LZ.back0 && t >= LZ.back0) want = elerp(LZ.max, 1, ease(seg(t, LZ.back0, LZ.back1)));   // (back out about the same point: the view it started from)
     if (Math.abs(want/FU.z - 1) > 1e-4){ safe('zoom', () => T.zoomAt(want/FU.z, FU.zp.x, FU.zp.y)); FU.z = want; labLeave(); }   // (zoomAt aims the lab's pointer: off the room again, or what the zoom slides under it lights up)
-    if (t >= LZ.to) FU.zoomDone = true;
+    if (t >= (LZ.back1 || LZ.to)) FU.zoomDone = true;
+  }
+  /* ---------- the long cut: the furnisher's sofa, out before the film and back in on camera ---------- */
+  // Before the film (the dry run) the biggest seat the furnisher put in the front room is noted (its piece, its spot, its turn, its colors) and
+  // taken out; Exit keeps the change, so the film's visit opens on the home without it. On camera: the Furniture catalog, its Sofas, that very
+  // sofa from the catalog, set down where the furnisher had it, in another color; then its color menu, and back to the furnisher's color.
+  const SOFA = {};
+  const SEAT = /sofa|couch|settee|futon|daybed|loveseat|sectional/i;
+  function sofaFind(){
+    const B = labB(); if (!B || !B.inst) return null; let best = null;
+    for (const [id, i] of B.inst){ const r = i.rec; if (!r || r.parent || i.kind === 'wall') continue;
+      if (!(SEAT.test(r.arch) || SEAT.test(i.name || ''))) continue;
+      const lb = i.lbox, a = lb && lb.max ? (lb.max.x - lb.min.x)*(lb.max.z - lb.min.z) : 1;
+      if (!best || a > best.a) best = { id, i, a }; }
+    return best;
+  }
+  const satOf = hex => { const n = parseInt(String(hex || '#888').replace('#', ''), 16), r = (n >> 16)/255, g = (n >> 8 & 255)/255, b = (n & 255)/255; return Math.max(r, g, b) - Math.min(r, g, b); };
+  const hueOf = hex => { const n = parseInt(String(hex || '#888').replace('#', ''), 16), r = (n >> 16)/255, g = (n >> 8 & 255)/255, b = (n & 255)/255, mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+    if (!d) return 0; const h = mx === r ? ((g - b)/d) % 6 : mx === g ? (b - r)/d + 2 : (r - g)/d + 4; return (h*60 + 360) % 360; };
+  function sofaOut(){   // (the dry run)
+    const w = labWin(), PB = w && w.PodBuilder, f = sofaFind(); if (!f){ warn('sofa', 'the furnisher put no sofa in'); return false; }
+    const r = f.i.rec, sl = f.i.slots || [];
+    // the slot to change on camera: the most colorful one that is not a glow (the cushions, usually)
+    let k = -1, ks = -1; sl.forEach((x, j) => { if (x.kind === 'e') return; const c = safe('color of', () => PB.colorOf(f.id, x.key)) || x.orig, v = satOf(c); if (v > ks){ ks = v; k = j; } });
+    if (k < 0) k = 0;
+    const key = sl[k] && sl[k].key, cur = (key && (safe('color of', () => PB.colorOf(f.id, key)) || sl[k].orig)) || '#b04a3a';
+    const h = hueOf(cur), warmish = h < 70 || h > 300;
+    Object.assign(SOFA, { arch: r.arch, seed: r.seed, x: r.x, y: r.y || 0, z: r.z, ry: r.ry || 0, colors: JSON.parse(JSON.stringify(r.colors || {})), slot: k, key,
+      orig: key && r.colors && r.colors[key] || null, cur, alt: warmish ? '#2f8f8a' : '#c8553d', name: f.i.name });
+    safe('sofa out', () => { PB.select(f.id); PB.touch.del(); PB.select(null); });
+    D.info.sofa = SOFA.name + ' (' + SOFA.arch + ')';
+    say('sofa noted and taken out:', SOFA.name, SOFA.arch, 'slot', key, 'furnisher color', SOFA.orig || 'its own', 'on camera first', SOFA.alt);
+    return true;
+  }
+  function labRail(grp){ const b = labEl('#bRail [data-grp="' + grp + '"]'); if (b){ aim(labCenter(b)); click('#5aff7a'); b.click(); } else warn('furnish', 'no ' + grp + ' in the rail'); }
+  function labTab(cat){ const b = labEl('#bCatTabs [data-cat="' + cat + '"]'); if (b){ aim(labCenter(b)); click('#5aff7a'); b.click(); } else safe('sofas', () => labWin().PodBuilder.openCat(cat)); }
+  function sofaTile(){   // the sofa's own tile (or the nearest like it), then that very sofa in hand, in the other color
+    const w = labWin(), d = labDoc(), B = labB(); if (!d || !B || !SOFA.arch) return;
+    const tiles = [...d.querySelectorAll('#bTiles .tile')];
+    const t = tiles.find(x => x._it && x._it.arch === SOFA.arch && x._it.seed === SOFA.seed) || tiles.find(x => x._it && x._it.arch === SOFA.arch) || tiles.find(x => x._it && SEAT.test(x._it.arch)) || tiles[0];
+    if (t){ try { t.scrollIntoView({ block: 'center' }); } catch (e) {} aim(labCenter(t)); click('#5aff7a'); t.click(); }
+    B.lastRy = SOFA.ry;
+    safe('sofa in hand', () => w.PodBuilder.startPlace(SOFA.arch, SOFA.seed));
+    // its colors: the furnisher's own on every part but one, which comes in another color (the ghost, put through the lab's own recolor)
+    const G = B.place && B.place.inst; if (G){ const tmp = -77; B.inst.set(tmp, G);
+      safe('sofa colors', () => { for (const [kk, v] of Object.entries(SOFA.colors)) if (kk !== SOFA.key) w.PodBuilder.setColor(tmp, kk, v); if (SOFA.key) w.PodBuilder.setColor(tmp, SOFA.key, SOFA.alt); });
+      B.inst.delete(tmp); }
+    FU.arch = SOFA.arch; FU.slot = SOFA.slot;
+    const r = B.root.position; FU.at = { x: SOFA.x + r.x, y: SOFA.y + r.y, z: SOFA.z + r.z };
+  }
+  function sofaAim(){ const w = labWin(); const s = labScreen(FU.at.x, FU.at.y, FU.at.z); aim(s);
+    s.cv.dispatchEvent(new w.PointerEvent('pointermove', { clientX: s.lx, clientY: s.ly, bubbles: true, cancelable: true, pointerId: 1, pointerType: 'mouse', isPrimary: true, button: -1, buttons: 0 }));
+    try { labB().ptr.dirty = true; } catch (e) {} }
+  function sofaPlace(){
+    const w = labWin(), B = labB(); if (!B || !FU.at) return;
+    const before = new Set(B.inst.keys()), s = labScreen(FU.at.x, FU.at.y, FU.at.z);
+    aim(s); click('#5aff7a'); s.cv.setPointerCapture = () => {};
+    const go = alt => { const o = { clientX: s.lx, clientY: s.ly, bubbles: true, cancelable: true, pointerId: 1, pointerType: 'mouse', isPrimary: true, altKey: alt };
+      s.cv.dispatchEvent(new w.PointerEvent('pointermove', Object.assign({ button: -1, buttons: 0 }, o))); try { B.ptr.dirty = true; } catch (e) {}
+      if (B.place && w.PodBuilder.touch.place) safe('place', () => w.PodBuilder.touch.place());   // (the ghost to the pointer now, not on the lab's next frame)
+      s.cv.dispatchEvent(new w.PointerEvent('pointerdown', Object.assign({ button: 0, buttons: 1 }, o)));
+      s.cv.dispatchEvent(new w.PointerEvent('pointerup', Object.assign({ button: 0, buttons: 0 }, o))); };
+    go(false);
+    if (B.place){ warn('sofa', 'blocked where the furnisher had it: set down anyway (Alt, as a player would)'); B.mods.alt = true; go(true); B.mods.alt = false; }
+    if (B.place) safe('cancel place', () => w.PodBuilder.cancel());
+    labLeave();
+    FU.id = [...B.inst.keys()].find(k => !before.has(k));
+    D.info.placed = FU.id !== undefined ? SOFA.name : null;
+    if (FU.id === undefined) warn('sofa', 'it was not set down');
+  }
+  function sofaColorBack(){   // back to the color the furnisher picked: its swatch in the palette, the piece's Original, or the full picker
+    const w = labWin(), d = labDoc(); if (!d) return;
+    const bs = [...d.querySelectorAll('#iCP .pal button')], want = SOFA.orig;
+    let b = want && bs.find(x => String(x.dataset.c).toLowerCase() === String(want).toLowerCase());
+    if (!want) b = d.querySelector('#iCP [data-r]');
+    if (b){ aim(labCenter(b)); click(want || SOFA.cur); b.click(); D.info.color = want || 'its own'; return; }
+    const ci = d.querySelector('#iCP input[type=color]'); if (!ci){ warn('sofa', 'no color picker'); return; }
+    aim(labCenter(ci)); click(want); ci.value = want; ci.dispatchEvent(new w.Event('input', { bubbles: true })); ci.dispatchEvent(new w.Event('change', { bubbles: true })); D.info.color = want;
+  }
+  function labWorkOff(press){
+    const B = labB(), b = labEl('#bWork'); if (!b) return warn('lights', 'no work light button');
+    if (!press){ aim(labCenter(b)); return; }
+    click('#ffcf8a'); if (B && B.work) b.click(); D.info.workLight = B ? (B.work ? 'still on' : 'off') : '?';
   }
   function labExit(){ AP.exited = true; if (FURN.frame) FURN.frame.style.opacity = '';   // (the game's own power-down hides it from here)
     const b = labEl('#ntExit'); if (b){ aim(labCenter(b)); click('#ffffff'); b.click(); } else FURN.close(); }
@@ -677,6 +765,21 @@ const DEMO = (() => {
     if (!AUTO && !NOLAB){
       at(MK.furn, () => { CUR.want = 0; }, 'apartment');
       const R = MK.room;
+      if (LONG){
+        at(R + RL.grp, () => { CUR.want = 1; labRail('furn'); }, 'Furniture');
+        at(R + RL.tab, () => labTab('sofas'), 'Sofas');
+        at(R + RL.tile, sofaTile, 'the sofa, in another color');
+        at(R + RL.aim, sofaAim, 'to where it stood');
+        at(R + RL.place, sofaPlace, 'set down');
+        at(R + RL.toClose, () => { const b = labEl('#bFlyX'); if (b) aim(labCenter(b)); }, 'to the catalog\'s close');
+        at(R + RL.close, () => { const b = labEl('#bFlyX'); if (b){ click('#ffffff'); b.click(); } }, 'the catalog closed');
+        at(R + RL.swatch, labSwatch, 'its color menu');
+        at(R + RL.color, sofaColorBack, 'the furnisher\'s color');
+        at(R + RL.letGo, labLetGo, 'let go of');
+        at(R + RL.toWork, () => labWorkOff(false), 'to the work light');
+        at(R + RL.work, () => labWorkOff(true), 'work light off: the home by its own lamps');
+        at(R + RL.work + .4, () => { CUR.want = 0; }, 'cursor away');
+      } else {
       at(R + RS[0], () => { CUR.want = 1; labGroup(); }, 'Plants');
       at(R + RS[1], labTile, 'bonsai tile');
       at(R + RS[2], labAim, 'over the table');
@@ -686,6 +789,8 @@ const DEMO = (() => {
       at(R + RS[8], labSwatch, 'its color menu');
       at(R + RS[9], labColor, 'a new color');
       at(R + RS[10], labLetGo, 'let go of, so it shows clean');
+      }
+      if (LONG) at(MK.exit - .5, () => { CUR.want = 1; }, 'cursor back');
       at(MK.exit - .3, () => { const b = labEl('#ntExit'); if (b) aim(labCenter(b)); }, 'to Exit');
       at(MK.exit, labExit, 'Exit');
       at(MK.exit + .3, () => { CUR.want = 0; }, 'cursor away');
@@ -781,6 +886,11 @@ const DEMO = (() => {
     status('working out the city');
     await until(() => typeof pplReady !== 'undefined' && pplReady && STORY.on, 300).catch(e => warn('people', e));
     plan(); castUp(); monitorScript(); timeline();
+    if (LONG && STORY.sp && !STORY.sp.__dm) safe('warm home', () => { const _sp = STORY.sp, pod = PLAN.who.pod;
+      STORY.sp = function (p){ const r = _sp.apply(this, arguments); if (!r || !p || p.pod !== pod) return r;
+        const tm = r.temper || { outgoing: .25, careful: .5, warm: .5 };
+        return Object.assign({}, r, { temper: Object.assign({}, tm, { warm: Math.max(tm.warm || 0, .85) }) }); };
+      STORY.sp.__dm = true; });
     // she was followed home on the person cam, so the game knows her: Furnish's Residents card names her as the cam did (lidar.js, the trace's match)
     safe('dossier', () => { if (typeof DOSSIER !== 'undefined' && PLAN.who) DOSSIER.markFull(PLAN.who.id, PLAN.who.pod); });
     if (!AUTO && !NOLAB){
@@ -793,6 +903,7 @@ const DEMO = (() => {
           if (w !== lastW){ lastW = w; say('the apartment lab:', w); } };
         await until(() => { rep(); return labReady(); }, window.__DM_TEST ? 7200 : 900).catch(e => warn('dry run', e));
         const B = labB(); D.info.pieces = B && B.inst ? B.inst.size : 0; D.info.tables = B && B.inst ? [...B.inst.values()].filter(i => i.rec && TABLES.has(i.rec.arch)).length : 0;
+        if (LONG){ safe('sofa', sofaOut); await wait(1); safe('sofas', () => labWin().PodBuilder.openCat('sofas')); await wait(3); }
         safe('plants', () => labWin().PodBuilder.openCat('plants')); await wait(3);
         D.info.plantTiles = labDoc() ? labDoc().querySelectorAll('#bTiles .tile').length : 0;
         safe('fly', () => labWin().PodBuilder.closeFly());

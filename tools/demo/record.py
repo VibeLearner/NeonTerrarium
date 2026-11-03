@@ -21,7 +21,7 @@ ROOT = os.path.abspath(os.path.join(HERE, '..', '..'))
 OUT = os.path.join(HERE, 'out')
 FPS = 60
 STILLS = [.8, 2.0, 3.2, 4.4, 5.2, 5.5, 5.8, 6.6, 7.8, 8.9, 10.2, 11.0, 12.2, 13.6, 14.7]
-STILLS_LONG = [2.0, 4.4, 5.2, 5.6, 6.9, 8.2, 9.6, 11.4, 13.4, 15.6, 16.6, 18.0, 20.0, 21.5]
+STILLS_LONG = [1.0, 2.5, 4.0, 5.5, 6.8, 7.2, 8.6, 10.2, 11.9, 13.5, 15.0, 16.6, 18.0, 19.5, 20.8, 22.0, 23.5, 26.0, 28.5]
 
 
 def serve(port):
@@ -77,7 +77,7 @@ def main():
     ap.add_argument('--port', type=int, default=8794)
     ap.add_argument('--quality', type=int, default=95)
     ap.add_argument('--crf', type=int, default=16)
-    ap.add_argument('--long', action='store_true', help='the long cut: about 22 s, the apartment at an easy pace, no captions or badge')
+    ap.add_argument('--long', action='store_true', help='the long cut: 29 s, no captions or badge, the furnisher'"'"'s sofa put back on camera, the work light off at the end')
     ap.add_argument('--nolab', action='store_true', help='checking only: leave the apartment out')
     ap.add_argument('--test', action='store_true', help='for checking on a machine without a graphics card: a small 640 x 360 picture at 30 fps, software drawing, no sound')
     a = ap.parse_args()

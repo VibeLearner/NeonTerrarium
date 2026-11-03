@@ -404,20 +404,23 @@ const FOL_SHADER = new THREE.ShaderMaterial({
         vec2 texSize = floor(vRect.zw + 0.5); float swayType = vKind.x;
         vec2 tx = vUv * texSize;                 // position in texels
         float row = floor(tx.y);
-        // On a touch screen (swayBand 1) the sway moves whole pieces instead of row by row: a plant or a piece of laundry shifts as one, a hanging
-        // vine in three pieces. A phone draws each pixel big, and rows sliding one at a time read as scanlines crawling over the plants (Pixel 7, Nov 3)
-        // (each piece moves as its middle row would; a standing plant as the row three quarters up, where its leaves are, so it still visibly sways)
-        if (swayBand > 0.5){ float bh = texSize.y/(swayType > 1.5 && swayType < 2.5 ? 3.0 : 1.0), at = swayType > 2.5 && swayType < 3.5 ? 0.75 : 0.5;
-          row = min(texSize.y - 1.0, floor((floor(row/bh) + at)*bh)); }
         float fromTop = (texSize.y - row) / texSize.y, fromBottom = (row + 0.5) / texSize.y;
-        float ph = vPhase, sh = 0.0;
+        float ph = vPhase;
+        // On a touch screen (swayBand 1) the sway moves a few bands instead of every row: rows sliding one at a time read as scanlines on a phone,
+        // which draws each pixel big (Pixel 7, Nov 3). A standing plant keeps its bottom third still (its pot or its base) and leans in three bands
+        // above it, more toward the top; laundry and hanging vines hang still from the top third and swing in two bands below. Each band moves in whole
+        // screen pixels rather than whole texels, so zoomed in (a texel several pixels wide) it glides in small steps instead of jumping
+        float hang = swayBand > 0.5 ? min(floor(fromTop*3.0), 2.0)/2.0 : fromTop;   // (laundry and vines: 0 at the top, 1 at the hem)
+        float lean = swayBand > 0.5 ? (fromBottom < 0.34 ? 0.0 : (min(floor((fromBottom - 0.34)/0.66*3.0), 2.0) + 1.0)/3.0) : fromBottom;   // (standing plants)
+        float sh = 0.0;
         if (swayType > 0.5 && swayType < 1.5)       // laundry: hangs from the line, the hem swings furthest
-          sh = wind*(1.3*sin(time*2.0 + ph - fromTop*1.4) + 0.45*sin(time*4.1 + ph*1.7))*fromTop;
+          sh = wind*(1.3*sin(time*2.0 + ph - hang*1.4) + 0.45*sin(time*4.1 + ph*1.7))*hang;
         else if (swayType > 1.5 && swayType < 2.5)  // hanging vines: a slow wave travelling down to the tips
-          sh = wind*(1.6*sin(time*1.3 + ph - fromTop*1.6) + 0.5*sin(time*2.9 + ph*2.0))*pow(fromTop, 1.4);
+          sh = wind*(1.6*sin(time*1.3 + ph - hang*1.6) + 0.5*sin(time*2.9 + ph*2.0))*pow(hang, 1.4);
         else if (swayType > 2.5 && swayType < 3.5)  // standing plants: tips lean with the breeze
-          sh = wind*(1.0*sin(time*1.6 + ph) + 0.3*sin(time*3.3 + ph*1.3))*fromBottom*fromBottom;
-        tx.x -= floor(sh + 0.5);                 // whole texels only, so pixels never break up
+          sh = wind*(1.0*sin(time*1.6 + ph) + 0.3*sin(time*3.3 + ph*1.3))*lean*lean;
+        if (swayBand > 0.5){ float tpp = max(abs(dFdx(tx.x)), 0.05); tx.x -= floor(sh/tpp + 0.5)*tpp; }   // (tpp: texels a screen pixel)
+        else tx.x -= floor(sh + 0.5);                 // whole texels only, so pixels never break up
         if (tx.x < 0.0 || tx.x >= texSize.x || tx.y < 0.0 || tx.y >= texSize.y) discard;
         vec4 c = texture2D(map, (floor(vRect.xy + 0.5) + floor(tx) + 0.5) / atlasSize);
         if (c.a < 0.5) discard;
@@ -427,6 +430,7 @@ const FOL_SHADER = new THREE.ShaderMaterial({
         gl_FragColor = normalMode > 0.5 ? vec4(0.5,0.5,1.0,1.0) : vec4(col, 1.0);
       }`,
 });
+FOL_SHADER.extensions.derivatives = true;   // (dFdx in the sway, on touch screens: WebGL 1 needs asking)
 mrtShader(FOL_SHADER, 'vec4(0.5, 0.5, 1.0, 1.0)'); FOL_SHADER.userData.cutout = true;   // (its normal-pass output, written alongside the color: core.js)
 // anchor: 'b' bottom sits on the point, 't' top hangs from it, 'c' centered
 // fixed: lie flat in P's orientation (P's local z is the surface's outward direction).

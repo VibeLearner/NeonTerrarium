@@ -254,6 +254,11 @@ const comp = new THREE.ShaderMaterial({
   },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
   fragmentShader: `
+    // A fragment shader reads an image at low precision unless it says otherwise (GLSL ES: sampler2D defaults to lowp). Computers read at full
+    // precision whatever the shader says; a phone's graphics chip (a Pixel 7's Mali) takes it at its word, about three decimal places. The depth
+    // came back in steps a fifth of a world unit apart, and the contact shadows took every step for a crease: stripes over flat roofs and walls that
+    // slid as the view moved (Nov 3). Every shader that reads the depth asks for full precision
+    precision highp sampler2D;
     const float SKY_H = ${SKY_H.toFixed(3)}, SKY_EL = ${SKY_EL.toFixed(3)};
     uniform sampler2D tColor; uniform sampler2D tDepth; uniform sampler2D tNormal;
     uniform vec2 res; uniform float near; uniform float far; uniform float camDist;
@@ -1003,7 +1008,7 @@ const cloudMat = new THREE.ShaderMaterial({
     tPrev:{value:null}, prevVP:{value:new THREE.Matrix4()}, dDrift:{value:new THREE.Vector2()}, slotN:{value:8}, slot:{value:0}, reset:{value:1},   // (carrying the last frame over: cloudFrame)
   },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
-  fragmentShader: CLOUD_NOISE + `
+  fragmentShader: 'precision highp sampler2D;\n' + CLOUD_NOISE + `
     uniform sampler2D tDepth; uniform mat4 invVP; uniform float time; uniform vec2 cloudOff;
     uniform sampler2D texSea; uniform sampler2D texRing;
     uniform vec3 sunDir; uniform vec3 sunCol; uniform vec3 skyTop; uniform vec3 skyBot; uniform vec3 cityGlow; uniform vec2 glowC;
@@ -1264,7 +1269,8 @@ const glowMix = new THREE.ShaderMaterial({
           open += step(.99999, texture2D(tD, clamp(sc + o, vec2(.002), vec2(.998))).x); }
         vOpen = open/5.0; }
       gl_Position = vec4(position.xy, 0.0, 1.0); }`,
-  fragmentShader: `uniform sampler2D t; uniform sampler2D tB; uniform sampler2D tH; uniform float night; uniform float smoothLook; uniform float on; varying vec2 vUv;
+  fragmentShader: `precision highp sampler2D;   // (the depth, tD, at full precision: see the composite's note)
+    uniform sampler2D t; uniform sampler2D tB; uniform sampler2D tH; uniform float night; uniform float smoothLook; uniform float on; varying vec2 vUv;
     uniform vec3 lift; uniform vec3 gain; uniform float sat; uniform float con; uniform float lit;
     uniform vec3 midG; uniform float midA; uniform vec3 pal8[8]; uniform float palBlend; uniform float grain; uniform float grainSize; uniform float fringe;
     uniform float flare; uniform float flareVis; uniform vec2 sunUv; uniform sampler2D tD; uniform vec3 flareCol; uniform float vig; uniform float bloomK; uniform float halK; uniform float time; uniform vec2 res; flat varying float vOpen;
@@ -1395,7 +1401,8 @@ const nightLightMat = new THREE.ShaderMaterial({
       vec2 off = (abs(cp.xy) - 1.0)*.5*res;
       if (max(off.x, off.y) > R*scale + 4.0) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
     }`,
-  fragmentShader: `uniform sampler2D tDepth; uniform sampler2D tNormal; uniform vec2 res; uniform mat4 invVP; uniform float lightI;
+  fragmentShader: `precision highp sampler2D;   // (the depth at full precision: see the composite's note)
+    uniform sampler2D tDepth; uniform sampler2D tNormal; uniform vec2 res; uniform mat4 invVP; uniform float lightI;
     varying vec3 vL; varying vec3 vC; varying float vR;
     void main(){
       vec2 uv = gl_FragCoord.xy/res;

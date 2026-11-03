@@ -1624,14 +1624,18 @@ function resize(){
   // makes both 540 lines), 720 is drawn at exactly 720 lines instead, a little under two screen pixels each
   const whole = t => Math.ceil(DH / Math.max(1, Math.round(DH / t)));
   BASE_H = RENDER_LINES === 0 ? Math.min(DH, SMOOTH_MAX) : whole(RENDER_LINES);
-  if (RENDER_LINES === 720 && BASE_H <= whole(480)) BASE_H = Math.min(DH, 720);
+  // (not on a touch screen, owner Nov 3: a phone's pixels are small and many, 720 lines on a 1082-pixel screen is one and a half screen pixels a line,
+  //  so every few rows blended into a soft line, read as scan lines over the buildings and plants (a Pixel 7). A touch screen keeps the whole number:
+  //  541 there, every pixel exactly two by two, and fewer pixels to draw)
+  const TOUCH_ON = typeof TOUCH !== 'undefined' && TOUCH.on;
+  if (RENDER_LINES === 720 && BASE_H <= whole(480) && !TOUCH_ON) BASE_H = Math.min(DH, 720);
   // A phone or tablet held upright: the lines are counted across the short side, the width, as they are on its side (claude/portrait-world-scale.md).
   // Counted down the long side, "720" upright was about 360 x 674, a quarter of the pixels on its side, and every building came out a few chunky
-  // pixels. Now about 720 across (720 x 1348 on a 1080 x 2022 screen), each a whole number of screen pixels, as on its side
+  // pixels. Now the lines are counted across, each a whole number of screen pixels both ways (540 x 1011 on a 1080 x 2022 screen, two by two), as on its side
   if (PORTRAIT_T() && RENDER_LINES !== 0){
     const wholeW = t => Math.ceil(DW / Math.max(1, Math.round(DW / t)));
-    let bw = wholeW(RENDER_LINES); if (RENDER_LINES === 720 && bw <= wholeW(480)) bw = Math.min(DW, 720);
-    BASE_H = Math.min(DH, Math.round(bw*DH/DW));
+    const bw = wholeW(RENDER_LINES), k = Math.max(1, Math.round(DW/bw));   // (a whole number of screen pixels a line, down as well as across: see above)
+    BASE_H = Math.min(DH, Math.ceil(DH/k));
   }
   // and the view framed by the short side too (ZK: input.js keeps zoom as the view's half height; ZK turns that into the short side's, which
   // is what the zoom limits, the starting zoom and the detail levels go by). A turn of the phone keeps the same short-side zoom: the same size

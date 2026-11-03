@@ -8,11 +8,10 @@
 //
 //   0.0   up close on a plaza in a big night city: the cursor picks zones and builds; after the first two buildings the person cam opens on
 //         a resident of the first one, standing on the plaza; three more go up while they walk to their door and in
-//   4.05  the game's hologram into their apartment, furnished by the game for that household: the Plants catalog, a bonsai set on their
-//         table, picked, its color changed in its color menu; Exit, and the game's own power-down back to the city
-//   8.4   a pan to the Grid, a double click, the Acoustic Panel: the Booth loop that has played since the first frame is missing two notes;
-//         both are drawn in and play on the very next pass; the panel closes with the music going on
-//   11    the camera pulls out over the whole city and the title comes on
+//   5.15  the game's hologram into their apartment, furnished by the game for that household: the Plants catalog, a bonsai set on their
+//         table, the view in on it, its color changed in its color menu; Exit, and the game's own power-down back to the city
+//   11.05 the camera pulls out over the whole city and the title comes on
+//   The Booth loop on the Grid plays under all of it from the first frame.
 //
 // Nothing is saved and none of the player's own city or settings are read (saveguard.js, NT_DEMO).
 'use strict';
@@ -46,13 +45,12 @@ const DEMO = (() => {
   function withSeed(seed, fn){ const was = Math.random; Math.random = rng(seed >>> 0); try { return fn(); } finally { Math.random = was; } }
 
   /* ---------- the plan ---------- */
-  const MK = { person: 1.25, walk: 1.2, arrive: 3.5, inside: 3.9, furn: 4.05, room: 5.2, exit: 7.75, grid: 8.4, panel: 8.95, note1: 9.65, note2: 10.05, close: 10.85, out: 11.0, title: 12.6 };
-  // [from, to, text, where]: top left over the city, top right in the apartment (its own panels are on the left), centered over the Acoustic Panel's
-  // District State (its big empty middle)
-  const CAPS = [[.25, 1.2, 'Build it block by block', 'tl'], [1.45, 3.85, 'Follow anyone home', 'tl'], [5.35, 7.6, 'Furnish every apartment', 'tr'], [9.1, 10.75, 'Finish the song the city hears', 'tc']];
+  const MK = { person: 1.6, walk: 1.6, arrive: 4.55, inside: 5.0, furn: 5.15, room: 6.45, exit: 10.6, out: 11.05, title: 13.2 };
+  // [from, to, text, where]: top left over the city, top right in the apartment (its own panels are on the left)
+  const CAPS = [[.3, 1.6, 'Build it block by block', 'tl'], [1.85, 4.95, 'Follow anyone home', 'tl'], [6.6, 10.4, 'Furnish every apartment', 'tr']];
   // the five buildings, in the order they go up; the first is a tenement (it has the apartment). Each block's clicks: a new building, then a floor each
   const BLOCKS = ['low', 'mid', 'high', 'ind', 'low'];
-  const CLICK_T = [[.35, .6], [.82, 1.02], [1.55, 1.8], [2.15], [2.55, 2.8]];
+  const CLICK_T = [[.4, .75], [1.1, 1.4], [2.1, 2.45], [2.95], [3.45, 3.8]];
   // the Booth loop on the Grid from the first frame: 4 bars at 100 BPM (9.6 s a pass), a melody on the magic keys (pads 0 to 11, always in the
   // chord), its first bar missing two notes; the pass that starts at about 9.7 s is the first with them
   const LOOP_ID = window.DEMO_LOOP.id, MISSING = window.DEMO_LOOP.missing;   // (the loop itself: js/demo_loop.js, read by booth.js before this file loads)
@@ -377,11 +375,11 @@ const DEMO = (() => {
     const w = PLAN.who, nth = ['ground', 'first', 'second', 'third', 'fourth', 'fifth', 'sixth'][w.floor] || (w.floor + 'th');
     const first = w.name.split(' ')[0];
     const cap = s => s.charAt(0) + s.slice(1).toLowerCase();
-    MONITOR = { t0: MK.person, t1: MK.inside + .02, actor: 'who', name: 'SUBJECT', sub: 'unknown', names: [[MK.person + .5, w.name, 'name verified']], clock: '20:36',
+    MONITOR = { t0: MK.person, t1: MK.inside + .02, actor: 'who', name: 'SUBJECT', sub: 'unknown', names: [[MK.person + .6, w.name, 'name verified']], clock: '20:36',
       yaw: PLAN.feed.yaw, pitch: PLAN.feed.pitch,
-      log: [[MK.person + .5, '20:36', 'Comm call ends. Name on the screen: ' + cap(first) + '.'],
-            [MK.person + 1.2, '20:36', 'Heads across the plaza, toward the new tenement.'],
-            [MK.person + 1.9, '20:37', (w.job ? 'Works as a ' + w.job + '. ' : '') + 'Lives on the ' + nth + ' floor' + (w.household > 1 ? ', household of ' + w.household : '') + '.'],
+      log: [[MK.person + .6, '20:36', 'Comm call ends. Name on the screen: ' + cap(first) + '.'],
+            [MK.person + 1.5, '20:36', 'Heads across the plaza, toward the new tenement.'],
+            [MK.person + 2.4, '20:37', (w.job ? 'Works as a ' + w.job + '. ' : '') + 'Lives on the ' + nth + ' floor' + (w.household > 1 ? ', household of ' + w.household : '') + '.'],
             [MK.arrive - .05, '20:37', 'Keys out. In through the front door.']] };
   }
   function monFrame(t){
@@ -580,7 +578,7 @@ const DEMO = (() => {
   function labLetGo(){ const w = labWin(); safe('let go', () => w.PodBuilder.select(null)); }
   // the lab's view eases in on the bonsai once the catalog is closed (its own zoom, toward a point picked so the bonsai ends a little left of
   // the middle, clear of the inspector on the right): a zoom about P keeps P still, so the bonsai at Q ends at P + Z(Q - P)
-  const LZ = { from: MK.room + 1.5, to: MK.room + 2.15, max: 1.9 };
+  const LZ = { from: MK.room + 2.3, to: MK.room + 3.1, max: 1.9 };
   function labZoom(t){
     if (NOLAB || AUTO || FU.id === undefined || !FU.at || t < LZ.from || FU.zoomDone) return;
     const w = labWin(), T = w && w.PodBuilder && w.PodBuilder.touch; if (!T) return;
@@ -633,19 +631,17 @@ const DEMO = (() => {
     const P = new THREE.Vector3().addScaledVector(r, ac).addScaledVector(u, bc), k = (CURB + .5 - P.y)/v.y; P.addScaledVector(v, k);
     return { x: P.x, y: P.y, z: P.z, yaw: yw, pitch: pt, zoom };
   }
-  const PUSH = 2.75;
+  const PUSH = 3.95;
   function camAt(t){
     const P = PLAN, y0 = P.cam.yaw, p0 = P.cam.pitch;
     const A = P.A || (P.A = fit(P.wide, y0 - .08, p0 + 2*DEG, 1.12, .1));
     const B = P.B || (P.B = fit(P.near, y0 + .06, p0, 1.3, .12));
-    const G = P.G || (P.G = P.grid ? fit(P.grid.pts, P.grid.yaw, P.grid.pitch, 1.9, 0) : Object.assign({}, B, { zoom: 7.6 }));
     const W = { x: -2*LOT, y: TARGET_Y, z: 0, yaw: y0 + .8, zoom: 32, pitch: 38*DEG };
     const mix = (a, b, u) => ({ x: lerp(a.x, b.x, u), y: lerp(a.y, b.y, u), z: lerp(a.z, b.z, u), yaw: a.yaw + wrapA(b.yaw - a.yaw)*u, zoom: elerp(a.zoom, b.zoom, u), pitch: lerp(a.pitch, b.pitch, u) });
     let c;
     // (wide on all five buildings until the last is up, drifting in a little; then in on the door as she reaches it)
-    if (t < MK.grid) c = mix(A, B, t < PUSH ? .1*ss(t/PUSH) : .1 + .9*ease(seg(t, PUSH, MK.inside)));
-    else if (t < MK.out) c = mix(B, G, ease(seg(t, MK.grid, MK.grid + .55)));
-    else { c = mix(G, W, ease(seg(t, MK.out, MK.title + .4))); c.yaw += .1*seg(t, MK.title, D.len); }
+    if (t < MK.out) c = mix(A, B, t < PUSH ? .1*ss(t/PUSH) : .1 + .9*ease(seg(t, PUSH, MK.inside)));
+    else { c = mix(B, W, ease(seg(t, MK.out, MK.title + .4))); c.yaw += .1*seg(t, MK.title, D.len); }   // (the long pull out over the whole city)
     Object.assign(CAMP, c);
   }
   { const _uc = updateCamera;
@@ -664,7 +660,7 @@ const DEMO = (() => {
   const EV = []; let fired = 0;
   const at = (t, f, name) => EV.push({ t, f, name });
   function timeline(){
-    at(0, () => { html.classList.add('dm-zones'); safe('broadcast', () => BOOTH.broadcast(LOOP_ID, 'rewire')); }, 'zones up, the Booth loop on the Grid');
+    at(0, () => { html.classList.add('dm-zones'); safe('broadcast', () => BOOTH.broadcast(LOOP_ID, 'rewire')); }, 'zones up, the Booth loop on the Grid (whole)');
     PLAN.blocks.forEach((b, k) => b.clicks.forEach((ct, n) => {
       if (!AUTO) at(ct - .15, () => aim(toScreen(clickPoint(k, n))), 'aim ' + k + '.' + n);
       at(ct, () => doClick(k, n), 'build ' + k + '.' + n + ' ' + b.zone);
@@ -674,31 +670,19 @@ const DEMO = (() => {
     if (!AUTO && !NOLAB){
       at(MK.furn, () => { CUR.want = 0; }, 'apartment');
       const R = MK.room;
-      at(R + .15, () => { CUR.want = 1; labGroup(); }, 'Plants');
-      at(R + .6, labTile, 'bonsai tile');
-      at(R + .95, labAim, 'over the table');
-      at(R + 1.15, labPlace, 'set down');
-      at(R + 1.3, () => { const b = labEl('#bFlyX'); if (b) aim(labCenter(b)); }, 'to the catalog\'s close');
-      at(R + 1.5, () => { const b = labEl('#bFlyX'); if (b){ click('#ffffff'); b.click(); } }, 'the catalog closed');
-      at(R + 1.75, labSwatch, 'its color menu');
-      at(R + 2.05, labColor, 'a new color');
-      at(R + 2.32, labLetGo, 'let go of, so it shows clean');
-      at(MK.exit - .25, () => { const b = labEl('#ntExit'); if (b) aim(labCenter(b)); }, 'to Exit');
+      at(R + .3, () => { CUR.want = 1; labGroup(); }, 'Plants');
+      at(R + .9, labTile, 'bonsai tile');
+      at(R + 1.35, labAim, 'over the table');
+      at(R + 1.65, labPlace, 'set down');
+      at(R + 2.0, () => { const b = labEl('#bFlyX'); if (b) aim(labCenter(b)); }, 'to the catalog\'s close');
+      at(R + 2.25, () => { const b = labEl('#bFlyX'); if (b){ click('#ffffff'); b.click(); } }, 'the catalog closed');
+      at(R + 2.7, labSwatch, 'its color menu');
+      at(R + 3.1, labColor, 'a new color');
+      at(R + 3.45, labLetGo, 'let go of, so it shows clean');
+      at(MK.exit - .3, () => { const b = labEl('#ntExit'); if (b) aim(labCenter(b)); }, 'to Exit');
       at(MK.exit, labExit, 'Exit');
       at(MK.exit + .3, () => { CUR.want = 0; }, 'cursor away');
     }
-    if (!AUTO){
-      at(MK.grid + .35, () => { const g = gridMega(); if (g) aim(toScreen({ x: g.x, y: (g.top || CURB + 3)*.6, z: g.z })); }, 'to the Grid');
-      at(MK.panel - .22, () => click('#5ae8ff'), 'click');
-      at(MK.panel - .05, () => { click('#5ae8ff'); safe('panel', () => music.panel.show()); }, 'double click: the Acoustic Panel');
-      at(MK.note1 - .22, () => aim(noteAt(...MISSING[0])), 'to note 1');
-      at(MK.note1, () => addNote(0), 'note 1');
-      at(MK.note2 - .22, () => aim(noteAt(...MISSING[1])), 'to note 2');
-      at(MK.note2, () => addNote(1), 'note 2');
-      at(MK.close - .25, () => { const b = $('gpClose'); if (b){ const r = b.getBoundingClientRect(); aim({ x: r.left + r.width/2, y: r.top + r.height/2 }); } }, 'to close');
-      at(MK.close, () => { click('#ffffff'); safe('close', () => music.panel.hide()); }, 'close the panel');
-      at(MK.close + .3, () => { CUR.want = 0; }, 'cursor away');
-    } else at(8.6, notesEarly, 'notes, ahead');
     at(D.len, () => { D.playing = false; D.done = true; say('done at', D.t.toFixed(2));
       if (!CAP && !AUTO){ D.el.msg.hidden = false; D.el.status.innerHTML = 'click to play again'; D.el.ov.classList.add('ask'); D.el.ov.addEventListener('click', () => location.reload(), { once: true }); } }, 'end');
     EV.sort((a, b) => a.t - b.t);
@@ -768,7 +752,7 @@ const DEMO = (() => {
     E.black.style.opacity = t < .3 ? (1 - ss(t/.3)).toFixed(3) : '0';
     E.shade.style.opacity = (.8*ss(seg(t, T - .3, T + .4))).toFixed(3);
     cursor(t, dt); caption(t);
-    const TAGS = [[MK.room - .1, 'tr'], [MK.exit + .3, ''], [MK.panel - .05, 'tc'], [MK.close, '']];
+    const TAGS = [[MK.room - .1, 'tr'], [MK.exit + .3, '']];
     let tw = ''; for (const [a, w] of TAGS) if (t >= a) tw = w;
     if (NOLAB && tw === 'tr') tw = '';
     if (E.tag.className !== tw) E.tag.className = tw;

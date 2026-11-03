@@ -20,7 +20,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, '..', '..'))
 OUT = os.path.join(HERE, 'out')
 FPS = 60
-STILLS = [.8, 2.2, 3.0, 3.8, 5.0, 5.9, 6.6, 7.3, 7.65, 8.6, 9.4, 10.2, 10.7, 11.6, 13.4, 14.6]
+STILLS = [.8, 2.0, 3.2, 4.4, 5.6, 7.0, 8.2, 9.3, 10.2, 11.0, 12.2, 13.6, 14.7]
 
 
 def serve(port):

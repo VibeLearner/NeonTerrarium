@@ -11,13 +11,14 @@ A 15 second clip of the game being played, for ads and social posts. Code: `js/d
 
 | Time | Shot |
 |---|---|
-| 0 to 1.25 s | Up close on a plaza in a big night city: the cursor picks zones and puts up the first two buildings |
-| 1.25 s | The person cam opens on a resident of the first building, standing on the plaza: their feed (always on them, at an angle with nothing in the way), their name and log |
-| 1.5 to 2.8 s | Three more buildings go up while they walk to their door, and in |
-| 4.05 s | The game's hologram into their apartment, furnished by the game for that household. The Plants catalog opens, a bonsai is set on their table, picked, and its color changed in its color menu |
-| 7.75 s | Exit, and the game's own power-down back to the city |
-| 8.4 s | A pan to the Grid, a double click, the Acoustic Panel. The Booth loop that has played since the first frame is missing two notes in its first bar; both are drawn in and play on the very next pass; the panel closes with the music going on |
-| 11 s | The camera pulls out over the whole city and the title comes on |
+| 0 to 1.6 s | Up close on a plaza in a big night city: the cursor picks zones and puts up the first two buildings |
+| 1.6 s | The person cam opens on a resident of the first building, standing on the plaza: their feed (always on them, at an angle with nothing in the way), their name and log |
+| 2.1 to 5 s | Three more buildings go up while they walk to their door, and in |
+| 5.15 s | The game's hologram into their apartment, furnished by the game for that household. The Plants catalog opens, a bonsai is set on their table, the view eases in on it and its color is changed in its color menu |
+| 10.6 s | Exit, and the game's own power-down back to the city |
+| 11.05 s | The camera pulls out over the whole city and the title comes on |
+
+The Grid's Booth loop (`js/demo_loop.js`) plays under the whole clip from the first frame.
 
 Captions name the beats, and "All footage captured in engine" stays in the bottom right corner throughout.
 
@@ -40,7 +41,7 @@ The first makes PNGs at the key moments in `tools/demo/out/stills/`. The second 
 
 Both run in a headless browser (no window), where the page is exactly 1920 x 1080 whatever your screen. The picture is filmed a
 frame at a time in render mode (every frame drawn whole, as the trailer's film was). The sound is recorded in a second pass that
-plays the clip in real time, drawing nothing, and records what the game sends to the speakers: the Grid's Booth loop, the two notes
+plays the clip in real time, drawing nothing, and records what the game sends to the speakers: the Grid's Booth loop
 and the build sounds. `--window` films the picture in a visible Chrome window instead, only if headless draws wrong on your Mac.
 
 `--test` checks the clip on a machine with no graphics card (software drawing, the real layout at half the pixels, no sound, very slow);
@@ -51,5 +52,4 @@ film held for the lab, what was placed and every moment as it fired.
 
 ## Tuning
 
-Times are at the top of `js/demo.js` (`MK`, `CLICK_T`), captions in `CAPS`, the buildings in `BLOCKS`, the Booth loop and its two missing
-notes in `js/demo_loop.js`, the city in `CITY`, `PLAZA` and `MEGAS`, and each shot's camera in `camAt`.
+Times are at the top of `js/demo.js` (`MK`, `CLICK_T`), captions in `CAPS`, the buildings in `BLOCKS`, the Booth loop in `js/demo_loop.js`, the city in `CITY`, `PLAZA` and `MEGAS`, and each shot's camera in `camAt`.

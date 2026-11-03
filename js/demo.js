@@ -623,7 +623,14 @@ const DEMO = (() => {
     const P = new THREE.Vector3().addScaledVector(r, ac).addScaledVector(u, bc), k = (CURB + .5 - P.y)/v.y; P.addScaledVector(v, k);
     return { x: P.x, y: P.y, z: P.z, yaw: yw, pitch: pt, zoom };
   }
-  const PUSH = 3.95;
+  // the push in on her starts once the first two buildings are up (the other three go up around it) and runs at one steady speed to her door,
+  // only easing in and out over its first and last moments (a trapezoid of speed: ramp r, steady, ramp r)
+  const PUSH = Math.max(...CLICK_T[1]) + .1;
+  function glide(t, a, b, r){
+    const T = b - a, x = t - a; if (x <= 0) return 0; if (x >= T) return 1;
+    r = Math.min(r, T/2); const v = 1/(T - r);
+    return x < r ? v*x*x/(2*r) : x > T - r ? 1 - v*(T - x)*(T - x)/(2*r) : v*(x - r/2);
+  }
   function camAt(t){
     const P = PLAN, y0 = P.cam.yaw, p0 = P.cam.pitch;
     const A = P.A || (P.A = fit(P.wide, y0 - .08, p0 + 2*DEG, 1.12, .1));
@@ -632,7 +639,7 @@ const DEMO = (() => {
     const mix = (a, b, u) => ({ x: lerp(a.x, b.x, u), y: lerp(a.y, b.y, u), z: lerp(a.z, b.z, u), yaw: a.yaw + wrapA(b.yaw - a.yaw)*u, zoom: elerp(a.zoom, b.zoom, u), pitch: lerp(a.pitch, b.pitch, u) });
     let c;
     // (wide on all five buildings until the last is up, drifting in a little; then in on the door as she reaches it)
-    if (t < MK.out) c = mix(A, B, t < PUSH ? .1*ss(t/PUSH) : .1 + .9*ease(seg(t, PUSH, MK.inside)));
+    if (t < MK.out) c = mix(A, B, glide(t, PUSH, MK.inside, .3));
     else { c = mix(B, W, ease(seg(t, MK.out, MK.title + .4))); c.yaw += .1*seg(t, MK.title, D.len); }   // (the long pull out over the whole city)
     Object.assign(CAMP, c);
   }

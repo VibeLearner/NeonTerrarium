@@ -309,7 +309,9 @@ function updateMegaFx(dt, time){ PH.subBegin();
   const lazy = typeof TOUCH !== 'undefined' && TOUCH.on, VP = lazy ? comp.uniforms.VP.value : null; MEGAFX_N++;
   for (const m of megas.values()) if (m.fx){
     if (lazy){ m._fxDt = (m._fxDt || 0) + dt;
-      if (((MEGAFX_N + m.i) & 7) && !megaOnScreen(VP, m)){ PH.sub('megastructure: ' + m.kind); continue; }
+      // (but not one whose live parts leave it, fx.roams: the police drones and bikes, the hub's cargo drones. Zoomed in, the station is often off
+      //  screen while a drone of its flies through the view, and it moved every eighth frame, a choppy drone, Pixel 7 Nov 3)
+      if (!m.fx.roams && ((MEGAFX_N + m.i) & 7) && !megaOnScreen(VP, m)){ PH.sub('megastructure: ' + m.kind); continue; }
       m.fx.update(m._fxDt, time); m._fxDt = 0; }
     else m.fx.update(dt, time);
     PH.sub('megastructure: ' + m.kind); }
@@ -3573,6 +3575,7 @@ function logisticsFx(m){
   };
   const _v = new THREE.Vector3();
   return {
+    roams: true,   // (its cargo drones fly out over the city: animated every frame on touch, see updateMegaFx)
     update(dt, t){
       beltTick(t); poolMat.opacity = typeof isNight === 'function' && isNight(S.hour) ? .45 : .06;
       for (const F of lifts){
@@ -4311,6 +4314,7 @@ function policeFx(m){
   POLICE_STATIONS.push(station); policeWire();
   const drone = drones[0];
   return {
+    roams: true,   // (its drones and bikes go out across the city: animated every frame on touch, see updateMegaFx)
     drone, drones, crew,
     // the station was turned: the screens, light bar, radar, pads and bays are where its new layout puts them, and the
     // drones, bikes and rounds carry on

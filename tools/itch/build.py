@@ -86,6 +86,11 @@ def main():
     p = os.path.join(OUT, page); s = open(p, encoding='utf-8').read()
     for url, rel in vend.items(): s = s.replace(url, rel)
     s = s.replace('<head>', '<head>\n' + NO_DEV, 1)
+    # no Economy mode on itch (owner, Nov 2): the Sandbox / Economy choice under New city goes, so every new city is Sandbox (title.js falls back
+    # to 'sandbox' with no choice there). Economy cities are only ever made from that choice, so economy.js stays loaded and does nothing (ECON.on false)
+    if page in ('index.html', 'm.html'):
+      s, n = re.subn(r'\s*<fieldset class="tmode">.*?</fieldset>', '', s, flags=re.S)
+      if n != 1: sys.exit('itch build: the New city mode choice (fieldset.tmode) was not found in %s: check tools/itch/build.py' % page)
     open(p, 'w', encoding='utf-8').write(s)
   check(saved)
   if os.path.exists(ZIP): os.remove(ZIP)

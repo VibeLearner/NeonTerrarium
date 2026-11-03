@@ -47,8 +47,9 @@ const DEMO = (() => {
 
   /* ---------- the plan ---------- */
   const MK = { person: 1.25, walk: 1.2, arrive: 3.5, inside: 3.9, furn: 4.05, room: 5.2, exit: 7.75, grid: 8.4, panel: 8.95, note1: 9.65, note2: 10.05, close: 10.85, out: 11.0, title: 12.6 };
-  // [from, to, text, where]: top left over the city, top right in the apartment (its own panels are on the left), bottom left over the Acoustic Panel
-  const CAPS = [[.25, 1.2, 'Build it block by block', 'tl'], [1.45, 3.85, 'Follow anyone home', 'tl'], [5.35, 7.6, 'Furnish every apartment', 'tr'], [9.1, 10.75, 'Finish the song the city hears', 'bl']];
+  // [from, to, text, where]: top left over the city, top right in the apartment (its own panels are on the left), centered over the Acoustic Panel's
+  // District State (its big empty middle)
+  const CAPS = [[.25, 1.2, 'Build it block by block', 'tl'], [1.45, 3.85, 'Follow anyone home', 'tl'], [5.35, 7.6, 'Furnish every apartment', 'tr'], [9.1, 10.75, 'Finish the song the city hears', 'tc']];
   // the five buildings, in the order they go up; the first is a tenement (it has the apartment). Each block's clicks: a new building, then a floor each
   const BLOCKS = ['low', 'mid', 'high', 'ind', 'low'];
   const CLICK_T = [[.35, .6], [.82, 1.02], [1.55, 1.8], [2.15], [2.55, 2.8]];
@@ -290,6 +291,7 @@ const DEMO = (() => {
       html.dm-on .furnish-frame{transition:none!important}
       html.dm-on, html.dm-on *{cursor:none!important}
       html.dm-on #dmOv.ask, html.dm-on #dmOv.ask *{cursor:pointer!important}
+      html.dm-on body > #dmOv#dmOv#dmOv#dmOv#dmOv#dmOv{visibility:visible!important}
       #dmOv{position:fixed;inset:0;z-index:2147483000;pointer-events:none;font-family:'Chakra Petch','JetBrains Mono',sans-serif;-webkit-font-smoothing:antialiased}
       #dmOv.ask{pointer-events:auto}
       #dmOv > .fill{position:absolute;inset:0;opacity:0}
@@ -309,11 +311,15 @@ const DEMO = (() => {
       #dmCap.tr{left:auto;right:0;padding:9vh 3vw 0 0;align-items:flex-end;background:radial-gradient(ellipse 62% 70% at 100% 0%,rgba(4,6,14,.78),rgba(4,6,14,.42) 45%,transparent 75%)}
       #dmCap.tr i{transform-origin:100% 50%}
       #dmCap.bl{top:auto;bottom:0;padding:0 0 7vh 4.8vw;justify-content:flex-end;background:radial-gradient(ellipse 62% 70% at 0% 100%,rgba(4,6,14,.85),rgba(4,6,14,.5) 45%,transparent 75%)}
+      #dmCap.tc{left:20vw;width:60vw;padding:10.5vh 0 0;align-items:center;text-align:center;background:radial-gradient(ellipse 55% 75% at 50% 30%,rgba(3,12,16,.88),rgba(3,12,16,.55) 50%,transparent 78%)}
+      #dmCap.tc i{transform-origin:50% 50%}
       #dmCap b{display:block;font-weight:600;font-size:5.2vh;line-height:1.04;letter-spacing:-.01em;color:#f3fbff;white-space:nowrap;text-shadow:0 3px 18px rgba(3,5,12,.75),0 1px 2px rgba(0,0,0,.7)}
       #dmCap i{display:block;margin-top:1.7vh;height:3px;width:5vw;background:#38e8e0;transform-origin:0 50%;box-shadow:0 2px 12px rgba(56,232,224,.55)}
       #dmCap i::after{content:'';display:block;margin-left:calc(5vw + 8px);width:14px;height:3px;background:#ff4fa3;box-shadow:0 2px 10px rgba(255,79,163,.6)}
       #dmTag{position:absolute;right:0;bottom:0;padding:0 3.3vw 4.8vh 11vw;height:14vh;display:flex;align-items:flex-end;gap:12px;
         background:radial-gradient(ellipse 80% 80% at 100% 100%,rgba(4,6,14,.6),transparent 70%);opacity:0}
+      #dmTag.tr{bottom:auto;top:20.5vh;padding:0 3vw 0 0;height:auto;background:none}
+      #dmTag.tc{bottom:auto;right:auto;left:0;width:100vw;top:22.5vh;padding:0;height:auto;justify-content:center;background:none}
       #dmTag span{font-weight:600;font-size:1.5vh;letter-spacing:.32em;text-transform:uppercase;color:rgba(234,250,255,.86);text-shadow:0 1px 6px rgba(0,0,0,.7)}
       #dmTag u{display:block;width:7px;height:7px;margin-bottom:.45vh;background:#38e8e0;box-shadow:0 1px 8px rgba(56,232,224,.8);text-decoration:none}
       #dmTitle{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
@@ -557,6 +563,7 @@ const DEMO = (() => {
   function labSelect(){ const w = labWin(); if (FU.id === undefined) return; const s = labScreen(FU.at.x, FU.at.y + .2, FU.at.z); aim(s); click('#ffffff'); safe('select', () => w.PodBuilder.select(FU.id)); }
   function labSwatch(){
     const B = labB(), inst = B && B.inst.get(FU.id); if (!inst) return;
+    { const w = labWin(), st = safe('state', () => w.PodBuilder.touch.state()); if (!(st && st.sel && st.sel.id === FU.id)) safe('select', () => w.PodBuilder.select(FU.id)); }   // (placing picks it already)
     const k = Math.max(0, inst.slots.findIndex(sl => sl.kind !== 'e'));
     const b = labEl('#iSw .sw[data-i="' + k + '"]') || labEl('#iSw .sw'); if (!b) return warn('furnish', 'no color swatch');
     aim(labCenter(b)); click('#ffffff'); b.click();
@@ -566,6 +573,20 @@ const DEMO = (() => {
     const sat = hex => { const n = parseInt(String(hex).replace('#', ''), 16), r = (n >> 16)/255, g = (n >> 8 & 255)/255, b = (n & 255)/255; return Math.max(r, g, b) - Math.min(r, g, b); };
     const pick = bs.slice().sort((a, b) => sat(b.dataset.c) - sat(a.dataset.c))[0];
     aim(labCenter(pick)); click(pick.dataset.c); pick.click(); D.info.color = pick.dataset.c;
+  }
+  function labLetGo(){ const w = labWin(); safe('let go', () => w.PodBuilder.select(null)); }
+  // the lab's view eases in on the bonsai once the catalog is closed (its own zoom, toward a point picked so the bonsai ends a little left of
+  // the middle, clear of the inspector on the right): a zoom about P keeps P still, so the bonsai at Q ends at P + Z(Q - P)
+  const LZ = { from: MK.room + 1.5, to: MK.room + 2.15, max: 1.9 };
+  function labZoom(t){
+    if (NOLAB || AUTO || FU.id === undefined || !FU.at || t < LZ.from || FU.zoomDone) return;
+    const w = labWin(), T = w && w.PodBuilder && w.PodBuilder.touch; if (!T) return;
+    if (!FU.zp){ const s = safe('zoom from', () => labScreen(FU.at.x, FU.at.y + .15, FU.at.z)); if (!s) { FU.zoomDone = true; return; }
+      const f = frameRect(), cx = innerWidth*.44 - f.left, cy = innerHeight*.5 - f.top, Z = LZ.max;
+      FU.zp = { x: (Z*s.lx - cx)/(Z - 1), y: (Z*s.ly - cy)/(Z - 1) }; FU.z = 1; }
+    const want = elerp(1, LZ.max, ease(seg(t, LZ.from, LZ.to)));
+    if (Math.abs(want/FU.z - 1) > 1e-4){ safe('zoom', () => T.zoomAt(want/FU.z, FU.zp.x, FU.zp.y)); FU.z = want; }
+    if (t >= LZ.to) FU.zoomDone = true;
   }
   function labExit(){ AP.exited = true; if (FURN.frame) FURN.frame.style.opacity = '';   // (the game's own power-down hides it from here)
     const b = labEl('#ntExit'); if (b){ aim(labCenter(b)); click('#ffffff'); b.click(); } else FURN.close(); }
@@ -609,6 +630,7 @@ const DEMO = (() => {
     const P = new THREE.Vector3().addScaledVector(r, ac).addScaledVector(u, bc), k = (CURB + .5 - P.y)/v.y; P.addScaledVector(v, k);
     return { x: P.x, y: P.y, z: P.z, yaw: yw, pitch: pt, zoom };
   }
+  const PUSH = 2.75;
   function camAt(t){
     const P = PLAN, y0 = P.cam.yaw, p0 = P.cam.pitch;
     const A = P.A || (P.A = fit(P.wide, y0 - .08, p0 + 2*DEG, 1.12, .1));
@@ -617,7 +639,8 @@ const DEMO = (() => {
     const W = { x: -2*LOT, y: TARGET_Y, z: 0, yaw: y0 + .8, zoom: 32, pitch: 38*DEG };
     const mix = (a, b, u) => ({ x: lerp(a.x, b.x, u), y: lerp(a.y, b.y, u), z: lerp(a.z, b.z, u), yaw: a.yaw + wrapA(b.yaw - a.yaw)*u, zoom: elerp(a.zoom, b.zoom, u), pitch: lerp(a.pitch, b.pitch, u) });
     let c;
-    if (t < MK.grid) c = mix(A, B, ease(seg(t, 0, MK.inside)));
+    // (wide on all five buildings until the last is up, drifting in a little; then in on the door as she reaches it)
+    if (t < MK.grid) c = mix(A, B, t < PUSH ? .1*ss(t/PUSH) : .1 + .9*ease(seg(t, PUSH, MK.inside)));
     else if (t < MK.out) c = mix(B, G, ease(seg(t, MK.grid, MK.grid + .55)));
     else { c = mix(G, W, ease(seg(t, MK.out, MK.title + .4))); c.yaw += .1*seg(t, MK.title, D.len); }
     Object.assign(CAMP, c);
@@ -654,9 +677,9 @@ const DEMO = (() => {
       at(R + 1.15, labPlace, 'set down');
       at(R + 1.3, () => { const b = labEl('#bFlyX'); if (b) aim(labCenter(b)); }, 'to the catalog\'s close');
       at(R + 1.5, () => { const b = labEl('#bFlyX'); if (b){ click('#ffffff'); b.click(); } }, 'the catalog closed');
-      at(R + 1.75, labSelect, 'picked');
-      at(R + 2.0, labSwatch, 'its color menu');
-      at(R + 2.3, labColor, 'a new color');
+      at(R + 1.75, labSwatch, 'its color menu');
+      at(R + 2.05, labColor, 'a new color');
+      at(R + 2.32, labLetGo, 'let go of, so it shows clean');
       at(MK.exit - .25, () => { const b = labEl('#ntExit'); if (b) aim(labCenter(b)); }, 'to Exit');
       at(MK.exit, labExit, 'Exit');
       at(MK.exit + .3, () => { CUR.want = 0; }, 'cursor away');
@@ -705,6 +728,7 @@ const DEMO = (() => {
     if (CAP) Math.random = rng(h32('frame', D.frame));
     S.hour = HOUR;
     safe('door', () => doorAt(t));
+    if (!AP.exited) safe('lab zoom', () => labZoom(t));
     if (!AUTO) paint(t, 1/FPS);
   }
 
@@ -741,7 +765,12 @@ const DEMO = (() => {
     E.black.style.opacity = t < .3 ? (1 - ss(t/.3)).toFixed(3) : '0';
     E.shade.style.opacity = (.8*ss(seg(t, T - .3, T + .4))).toFixed(3);
     cursor(t, dt); caption(t);
-    E.tag.style.opacity = ss(seg(t, .3, .8)).toFixed(3);
+    const TAGS = [[MK.room - .1, 'tr'], [MK.exit + .3, ''], [MK.panel - .05, 'tc'], [MK.close, '']];
+    let tw = ''; for (const [a, w] of TAGS) if (t >= a) tw = w;
+    if (NOLAB && tw === 'tr') tw = '';
+    if (E.tag.className !== tw) E.tag.className = tw;
+    const dip = Math.min(1, ...TAGS.map(([a]) => ss(Math.abs(t - a)/.18)));
+    E.tag.style.opacity = (ss(seg(t, .3, .8))*dip).toFixed(3);
     if (E.tNeon){ E.tNeon.style.opacity = String(neonAt(t - T)); E.tTerr.style.opacity = String(neonAt(t - T - .3)); }
     brackets(MONITOR && t >= MONITOR.t0 && t < MONITOR.t1 ? castPose('who') : null);
   }
@@ -758,6 +787,8 @@ const DEMO = (() => {
     status('working out the city');
     await until(() => typeof pplReady !== 'undefined' && pplReady && STORY.on, 300).catch(e => warn('people', e));
     plan(); castUp(); monitorScript(); timeline();
+    // she was followed home on the person cam, so the game knows her: Furnish's Residents card names her as the cam did (lidar.js, the trace's match)
+    safe('dossier', () => { if (typeof DOSSIER !== 'undefined' && PLAN.who) DOSSIER.markFull(PLAN.who.id, PLAN.who.pod); });
     if (!AUTO && !NOLAB){
       // once into the apartment beforehand, with the buildings up: the lab furnishes the home for its household (kept, so the film's visit
       // finds the same home), and the Plants catalog's pictures are drawn

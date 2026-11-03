@@ -20,6 +20,8 @@ const PCTUT = (() => {
   let st = load(KEY, null);
   if (!st){ st = { done: false, beats: {} }; save(KEY, st); }
   const tips = load(TIPS_KEY, {});
+  // (a new player's first city opens at the tutorial's zoom, rather than gliding there once the tutorial starts)
+  if (!st.done && typeof zoom !== 'undefined'){ zoom = zoomT = 12; }
 
   const ready = () => !(typeof TITLE !== 'undefined' && TITLE.on) && !(typeof LOADP !== 'undefined' && LOADP.on) && document.getElementById('view') &&
     !(typeof OVERSEER !== 'undefined' && OVERSEER.open) && !(typeof PRECINCT !== 'undefined' && PRECINCT.open) && !(typeof FURN !== 'undefined' && (FURN.open || FURN.pick)) &&
@@ -50,15 +52,27 @@ const PCTUT = (() => {
     if (!skipped && r.end) tip(r.end, 7000);
   }
   skipBtn.addEventListener('click', () => finish(true));
-  function begin(r){ R.run = r; R.k = 0; skipBtn.textContent = r === MAIN ? 'Skip tutorial' : 'Skip'; ov.hidden = false; show(); }
+  // (the tutorial starts at zoom 12, owner Nov 3: a little closer than the usual 13.2, so the first platform's tiles are easy to point at)
+  const TUT_ZOOM = 12;
+  function begin(r){ R.run = r; R.k = 0; skipBtn.textContent = r === MAIN ? 'Skip tutorial' : 'Skip'; ov.hidden = false;
+    if (r === MAIN && typeof zoomT !== 'undefined') zoomT = TUT_ZOOM*(typeof ZK !== 'undefined' ? ZK : 1);
+    show(); }
 
   /* ---------- the first time in a city ---------- */
-  const MAIN = { key: KEY, st, name: 'OPERATOR NOTE', end: 'Tutorial complete. All controls are under Hover for controls.', beats: [
+  const pieces = () => { let n = 0; for (const c of cells.values()) n += c.sections.length; return n; };
+  const MAIN = { key: KEY, st, name: 'OPERATOR NOTE', end: 'Tutorial complete. Keep building: more buildings and megastructures unlock as your city grows. All controls are under Hover for controls.', beats: [
     { id: 'tile', say: 'Click the sky beside the platform to add a tile', ghost: 'tap', arm: () => { let ok = false; const f = () => { ok = true; }; addEventListener('nt:tile', f, { once: true }); return () => ok; } },
     // (a click on an empty tile cycles its surface only with no zone picked: with one picked it builds, so the beat is passed over)
     { id: 'surface', say: 'Click a tile to cycle its surface', ghost: 'tap', skipIf: () => !!S.zone, arm: () => { let ok = false; const f = () => { ok = true; }; addEventListener('nt:surface', f, { once: true }); return () => ok || !!S.zone; } },
+    // (with no zone picked, Space puts the view in tilt mode, W and S tilting it; Space again goes back. Done once it's been on and is off again)
+    { id: 'tilt', say: 'With no zone picked, press Space to change the view\'s angle (W and S tilt it), then Space again to go back', ghost: 'tap', skipIf: () => !!S.zone,
+      arm: () => { let was = false; return () => { if (typeof tiltMode !== 'undefined' && tiltMode) was = true; return (was && !tiltMode) || !!S.zone; }; } },
     { id: 'zone', say: 'Pick a zone card below to choose what to build', ghost: 'tap', arm: () => () => !!S.zone },
     { id: 'build', say: 'Click a tile to place a building', ghost: 'tap', arm: () => { const n = built(); return () => built() > n; } },
+    { id: 'floor', say: 'With a zone picked, point at a tile or roof and press Space to build a single floor', ghost: 'tap', arm: () => { const n = pieces(); return () => pieces() > n; } },
+    // (tap Shift: the height pick, moving the mouse up or down; a click builds there. Done once a pick has been made and something built)
+    { id: 'shift', say: 'Tap Shift and move the mouse up or down to start a building higher, then click to build it', ghost: 'drag',
+      arm: () => { let was = false, e0 = 0; return () => { if (typeof HL !== 'undefined' && HL){ was = true; e0 = SC_EDITS; } return was && !HL && SC_EDITS > e0; }; } },   // (SC_EDITS: any edit, world.js; a pick can make a scaffold, a pod or a section)
   ] };
 
   /* ---------- the transit modes, the first time each is turned on ---------- */

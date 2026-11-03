@@ -602,9 +602,12 @@ const DEMO = (() => {
   const SOFA = {};
   const SEAT = /sofa|couch|settee|futon|daybed|loveseat|sectional/i;
   function sofaFind(){
-    const B = labB(); if (!B || !B.inst) return null; let best = null;
+    const B = labB(), w = labWin(); if (!B || !B.inst) return null; let best = null;
+    // the archs the lab files under Sofas (its catalog: pallet, modular, futon, corner, ...)
+    const sofas = new Set(safe('sofa archs', () => w.eval('Object.keys(CATK.sofas.archs)')) || []);
+    if (!sofas.size) safe('sofa items', () => { const E = w.PodBuilder.items('sofas'); for (const it of (E && E.items) || []) sofas.add(it.arch); });
     for (const [id, i] of B.inst){ const r = i.rec; if (!r || r.parent || i.kind === 'wall') continue;
-      if (!(SEAT.test(r.arch) || SEAT.test(i.name || ''))) continue;
+      if (!(sofas.has(r.arch) || SEAT.test(r.arch) || SEAT.test(i.name || ''))) continue;
       const lb = i.lbox, a = lb && lb.max ? (lb.max.x - lb.min.x)*(lb.max.z - lb.min.z) : 1;
       if (!best || a > best.a) best = { id, i, a }; }
     return best;
@@ -632,7 +635,7 @@ const DEMO = (() => {
   function sofaTile(){   // the sofa's own tile (or the nearest like it), then that very sofa in hand, in the other color
     const w = labWin(), d = labDoc(), B = labB(); if (!d || !B || !SOFA.arch) return;
     const tiles = [...d.querySelectorAll('#bTiles .tile')];
-    const t = tiles.find(x => x._it && x._it.arch === SOFA.arch && x._it.seed === SOFA.seed) || tiles.find(x => x._it && x._it.arch === SOFA.arch) || tiles.find(x => x._it && SEAT.test(x._it.arch)) || tiles[0];
+    const t = tiles.find(x => x._it && x._it.arch === SOFA.arch && x._it.seed === SOFA.seed) || tiles.find(x => x._it && x._it.arch === SOFA.arch) || tiles[0];
     if (t){ try { t.scrollIntoView({ block: 'center' }); } catch (e) {} aim(labCenter(t)); click('#5aff7a'); t.click(); }
     B.lastRy = SOFA.ry;
     safe('sofa in hand', () => w.PodBuilder.startPlace(SOFA.arch, SOFA.seed));

@@ -237,14 +237,6 @@ const DEMO = (() => {
     PLAN.cam = pick([.55, -.55, .4, -.4, .75, -.75, .2, -.2], [34, 38, 42, 48]);
     PLAN.feed = pick([1.05, -1.05, .85, -.85, 1.3, -1.3, .6, -.6], [44, 50, 56, 62]);
     if (!PLAN.cam.ok) warn('plan', 'no clear main camera angle on the walk');
-    // the Grid, seen whole for the double click: the angle nearest the main one from which nothing stands in front of it
-    { const g = gridMega(); if (g){ const gp = []; for (const fx of [-.35, 0, .35]) for (const fz of [-.35, 0, .35]) gp.push({ x: g.x + fx*g.w*LOT, z: g.z + fz*g.h*LOT });
-        let best = null; for (const o of [0, .25, -.25, .5, -.5, .8, -.8, 1.1, -1.1, 1.5, -1.5, 2, -2, 2.6, -2.6, Math.PI]) for (const pt of [34, 40, 46]){
-          if (!best && gp.every(q => los(q.x, CURB + 1.2, q.z, PLAN.cam.yaw + o, pt*DEG, g.id))) best = { yaw: PLAN.cam.yaw + o, pitch: pt*DEG }; }
-        if (!best) warn('plan', 'no clear angle on the Grid');
-        const b = best || { yaw: PLAN.cam.yaw + .3, pitch: 40*DEG }, h = SIDE/2 + (g.w - 1)*LOT/2, top = g.top || CURB + 3, pts2 = [];
-        for (const [a, c] of [[-h, -h], [h, -h], [-h, h], [h, h]]) for (const y of [CURB, top]) pts2.push({ x: g.x + a, y, z: g.z + c });
-        PLAN.grid = { yaw: b.yaw, pitch: b.pitch, pts: pts2, clear: !!best }; } }
     if (!PLAN.feed.ok) warn('plan', 'no clear person cam angle on the walk');
     // what the main camera frames: all five buildings (to their finished height) and the walk; then closer, the first building and its door
     const box = (b, top) => { const h = SIDE/2, out = []; for (const [a, c] of [[-h, -h], [h, -h], [-h, h], [h, h]]) for (const y of [CURB, top]) out.push({ x: b.i*LOT + a, y, z: b.j*LOT + c }); return out; };
@@ -260,7 +252,7 @@ const DEMO = (() => {
       PLAN.extras.push({ id: 'x' + k, code: q.row, keys: [[0, P0.x, P0.z, 'walk', 0, 1, 1], [Math.hypot(P1.x - P0.x, P1.z - P0.z)/v, P1.x, P1.z, 'walk', 0, 1, 1]] });
     });
     D.info.plan = { door: PLAN.door.n, who: PLAN.who, cam: { yaw: +PLAN.cam.yaw.toFixed(2), pitch: Math.round(PLAN.cam.pitch/DEG), clear: PLAN.cam.ok },
-      grid: PLAN.grid && { yaw: +PLAN.grid.yaw.toFixed(2), pitch: Math.round(PLAN.grid.pitch/DEG), clear: PLAN.grid.clear }, feed: { yaw: +PLAN.feed.yaw.toFixed(2), pitch: Math.round(PLAN.feed.pitch/DEG), clear: PLAN.feed.ok }, blocks: PLAN.blocks.map(b => b.i + ',' + b.j + ' ' + b.zone) };
+      feed: { yaw: +PLAN.feed.yaw.toFixed(2), pitch: Math.round(PLAN.feed.pitch/DEG), clear: PLAN.feed.ok }, blocks: PLAN.blocks.map(b => b.i + ',' + b.j + ' ' + b.zone) };
     say('plan:', JSON.stringify(D.info.plan));
     // (the buildings stay up for now: the apartment is furnished once before the film, below; then the plaza is cleared)
   }

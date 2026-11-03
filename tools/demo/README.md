@@ -14,7 +14,7 @@ A 15 second clip of the game being played, for ads and social posts. Code: `js/d
 | 0 to 1.6 s | Up close on a plaza in a big night city: the cursor picks zones and puts up the first two buildings |
 | 1.6 s | The person cam opens on a resident of the first building, standing on the plaza: their feed (always on them, at an angle with nothing in the way), their name and log |
 | 2.1 to 5 s | Three more buildings go up while they walk to their door, and in |
-| 5.15 s | The last part of the game's hologram, straight down over their building, into their apartment, furnished by the game for that household. The Plants catalog opens, a bonsai is set on their table, the view eases in on it and its color is changed in its color menu |
+| 5 s | A quick run of the game's hologram, from where the push in ends, into their apartment, furnished by the game for that household. The Plants catalog opens, a bonsai is set on their table, the view eases in on it and its color is changed in its color menu |
 | 10.6 s | Exit, and the game's own power-down back to the city |
 | 11.05 s | The camera pulls out over the whole city and the title comes on |
 

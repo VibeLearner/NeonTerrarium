@@ -45,7 +45,7 @@ const DEMO = (() => {
   function withSeed(seed, fn){ const was = Math.random; Math.random = rng(seed >>> 0); try { return fn(); } finally { Math.random = was; } }
 
   /* ---------- the plan ---------- */
-  const MK = { person: 1.6, walk: 1.6, arrive: 4.55, inside: 5.0, furn: 5.15, room: 6.05, exit: 10.6, out: 11.05, title: 13.2 };
+  const MK = { person: 1.6, walk: 1.6, arrive: 4.55, inside: 5.0, furn: 5.0, room: 6.05, exit: 10.6, out: 11.05, title: 13.2 };
   // [from, to, text, where]: top left over the city, top right in the apartment (its own panels are on the left)
   const CAPS = [[.3, 1.6, 'Light up the night, tower by tower', 'tl'], [1.85, 4.95, 'Every window has a story', 'tl'], [6.6, 10.4, 'Make any home your own', 'tr']];
   // the five buildings, in the order they go up; the first is a tenement (it has the apartment). Each block's clicks: a new building, then a floor each
@@ -460,9 +460,10 @@ const DEMO = (() => {
   }
   const labReady = () => { const B = labB(); return FURN.open && $('furnish').classList.contains('live') && !(labPC() && labPC().transitioning) && B && B.inst && B.inst.size > 0 && !labWait(); };
   const AP = { on: false, started: false, roomOk: false, closed: false, exited: false, held0: null };
-  // (the hologram's own timeline is 3.05 s: the city, a glide down, then from about 1.6 s straight down over the building with the pod outlined,
-  // built and resolved. The clip shows only that last part: it holds at H0 while the lab gets ready, unfilmed, then cuts in at HC)
-  const H0 = .3, HC = 1.6, holoCurve = x => { x = clamp01(x); return .7*x + .3*ss5(x); };
+  // (the hologram's own timeline is 3.05 s: it starts from the city camera's own view, glides down to the building, outlines the pod, builds it and
+  // resolves. The clip plays it whole but quickly, from the very frame the push in on her door ends, as a quick transition: it holds at H0 while the
+  // lab gets ready, unfilmed)
+  const H0 = .3, HC = H0, holoCurve = x => { x = clamp01(x); return .35*x + .65*ss5(x); };
   const HOLD_MAX = window.__DM_TEST ? 7200e3 : 1200e3;   // (real time: twenty minutes for any one thing the lab is doing, two hours when checking with no graphics card)
   function hold(why){   // the film waits here (nothing drawn or filmed) until the lab is ready
     if (AP.heldWhy !== why){ AP.heldWhy = why; AP.held0 = Date.now(); AP.gaveUp = false; }
@@ -750,7 +751,7 @@ const DEMO = (() => {
   const neonAt = u => { if (u < 0) return 0; let v = 0; for (const [k, a] of NEON) if (u >= k) v = a; return v; };
   function paint(t, dt){
     const E = D.el, T = MK.title;
-    E.black.style.opacity = t < .3 ? (1 - ss(t/.3)).toFixed(3) : !NOLAB && t >= MK.furn - .08 && t < MK.furn + .22 ? (t < MK.furn ? ss((t - MK.furn + .08)/.08) : 1 - ss((t - MK.furn)/.22)).toFixed(3) : '0';
+    E.black.style.opacity = t < .3 ? (1 - ss(t/.3)).toFixed(3) : '0';
     E.shade.style.opacity = (.8*ss(seg(t, T - .3, T + .4))).toFixed(3);
     cursor(t, dt); caption(t);
     const TAGS = [[MK.room - .1, 'tr'], [MK.exit + .3, '']];

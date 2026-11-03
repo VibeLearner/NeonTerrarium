@@ -808,3 +808,19 @@ html.touch #gridPanel .gpill{min-height:36px}
     min-height:44px;min-width:80px;padding:0 14px;font-size:0;background:var(--bg)}
   html.touch #prec .close::after{content:'CLOSE';font-size:12px;letter-spacing:.22em}
 }
+/* the tutorial on a computer (pctut.js): the phone's operator notes (touchui.css .ttut), placed top centre over the city; and its one-line notes */
+.pctut,.pctip{display:none}
+html:not(.touch) .pctut:not([hidden]){display:block;position:fixed;left:50%;top:calc(58px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:150;pointer-events:none;width:min(460px,calc(100vw - 32px))}
+html:not(.touch) .pctut .tt-note{display:grid;grid-template-columns:64px minmax(0,1fr) auto;align-items:center;column-gap:12px;padding:10px 12px;background:rgba(18,10,4,.92);border:1px dashed #ffb347;color:#ffe2b8;pointer-events:auto}
+html:not(.touch) .pctut .tt-txt{display:grid;gap:4px}
+html:not(.touch) .pctut .tt-note small{font:11px 'JetBrains Mono',monospace;letter-spacing:.14em;color:#ffb347}
+html:not(.touch) .pctut .tt-note b{font:500 15px/1.35 'Chakra Petch',sans-serif;letter-spacing:.04em}
+html:not(.touch) .pctut .tt-note button{padding:6px 10px;font-size:11px;color:#ffb347;border:1px solid rgba(255,179,71,.5);border-radius:0;background:transparent;cursor:pointer}
+html:not(.touch) .pctut .tt-note button:hover{color:#fff;border-color:#ffb347}
+html:not(.touch) .pctut .tt-demo{position:relative;width:64px;height:64px;overflow:hidden;border:1px solid rgba(255,179,71,.35);background:rgba(255,179,71,.06)}
+html:not(.touch) .pctut .tt-ghost{position:absolute;left:50%;top:50%;width:0;height:0;transform:scale(.5)}
+html:not(.touch) .pctut .tt-ghost i{position:absolute;left:-14px;top:-14px;width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.75);box-shadow:0 0 0 6px rgba(255,255,255,.2);opacity:0;transform-origin:center}
+html:not(.touch) .pctut .g-tap i:first-child{animation:ttTap 1.2s ease-out infinite}
+html:not(.touch) .pctut .g-drag i:first-child{animation:ttDrag 1.6s ease-in-out infinite}
+html:not(.touch) .pctip:not([hidden]){display:block;position:fixed;left:50%;top:calc(58px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:140;max-width:min(460px,calc(100vw - 32px));
+  padding:9px 13px;font:500 14px/1.4 'Chakra Petch',sans-serif;color:#ffe2b8;background:rgba(18,10,4,.92);border:1px solid rgba(255,179,71,.6);pointer-events:none;text-align:center}

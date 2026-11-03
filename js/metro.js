@@ -873,11 +873,13 @@ function mtShowGhost(t){
   hwGhost.g.visible = true;
 }
 let mtLastPt = null;
-function mtHover(cx, cy, touch){ mtLastPt = { x: cx, y: cy, touch }; const t = mtTargetAt(touch ? mtPickTouch(cx, cy) : mtPick(cx, cy)); mtShowGhost(t);
+// (the mouse picks as a finger does too, owner Nov 3: pointing at the air in front of a line, at the track's height, means the next piece there. Picked by
+//  the plane under the pointer, it took the station in front for itself, and the next piece came only by pointing at the ground under it)
+function mtHover(cx, cy, touch){ mtLastPt = { x: cx, y: cy, touch }; const t = mtTargetAt(mtPickTouch(cx, cy)); mtShowGhost(t);
   const say = !t ? '' : !t.ok ? t.why : t.type === 'loop' ? 'click to close the loop: the train will go round and round'
     : t.type === 'join' ? 'click to join the two lines into one' + (t.lost ? ' (a station right beside another becomes plain track)' : '') : t.note || '';
   const el = $('modeHint'); el.textContent = say || ''; el.hidden = !say; }
-function mtClick(cx, cy, touch){ const t = mtTargetAt(touch ? mtPickTouch(cx, cy) : mtPick(cx, cy)); if (mtApply(t)) mtHover(cx, cy, touch); }   // (touch: a tap, see mtPickTouch)
+function mtClick(cx, cy, touch){ const t = mtTargetAt(mtPickTouch(cx, cy)); if (mtApply(t)) mtHover(cx, cy, touch); }   // (touch: a tap, see mtPickTouch)
 function mtRightClick(cx, cy){ const pk = mtPick(cx, cy); if (pk && pk.kind === 'mtTile'){ mtCutAt(pk.l, pk.k); mtHover(cx, cy); } }
 function setMtMode(on, quiet){
   mtMode = on;

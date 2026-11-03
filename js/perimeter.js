@@ -258,7 +258,7 @@ let PERIM = null;   // the zone picked for Perimeter (one of the thin buttons un
 const wallNbrs = c => SIDES4.map(([a, b]) => cells.get(ckey(c.i + a, c.j + b))).filter(n => n && n.wall && !n.mega);
 const wallFree = c => !!c && !c.mega && !c.lift && !c.sections.length && !c.wall;
 const perimFlash = msg => { const h = document.getElementById('modeHint'); if (!h) return; h.textContent = msg; clearTimeout(perimFlash.t); perimFlash.t = setTimeout(() => { if (PERIM) perimHint(); }, 3000); };
-function perimHint(){ const h = document.getElementById('modeHint'); if (h && PERIM) h.textContent = 'Perimeter (' + WALL_ZONES[PERIM] + '): click an empty plot to raise a wall · click a wall\'s face to switch wall and gate · click its top to stack it higher · right-click takes the top off'; }
+function perimHint(){ const h = document.getElementById('modeHint'); if (h && PERIM) h.textContent = 'Perimeter (' + WALL_ZONES[PERIM] + '): click an empty plot or open sky to raise a wall · click a wall\'s face to switch wall and gate · click its top to stack it higher · right-click takes the top off'; }
 // a click in Perimeter mode: what it would do
 function perimTarget(pk){
   if (!pk) return null;

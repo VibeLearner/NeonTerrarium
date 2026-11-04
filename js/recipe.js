@@ -21,7 +21,7 @@ function recipeOf(c){
   if (at.length){ r.nbi = []; for (const [a, b] of at){ const n = cells.get(ckey(c.i + a, c.j + b)); if (n && !r.nbi.some(e => e[0] === a && e[1] === b)) r.nbi.push([a, b, { mega: !!n.mega, sec: n.sections.length, height: n.height, liftY: n.lift ? n.lift.y : null }]); } }
   // a luxury pod's walkways ask how far the neighbor's wall really stands (wallGap): the triangles of the neighbor in the corridor, taken here from its own geometry
   // (a bracketed pod's beams too: from its deck's edge to the wall, the whole height of its stack, see podBrackets)
-  const br = c.lift && c.lift.v === 2;
+  const br = c.lift && c.lift.v === 2 && !c.lift.sc;
   if (c.lift && c.sections[0] && (c.sections[0].zone === 'high' || br)) for (const [a, b] of SIDES4){
     const n = cells.get(ckey(c.i + a, c.j + b)), e = n && r.nbi.find(q => q[0] === a && q[1] === b); if (!e || !n.data || !n.data.geo) continue;
     const F = under(T(c.x, 0, c.z), T(0, 0, 0, Math.atan2(a, b))), { a: pa, b: pb } = br ? wallCorridor(F, POD_Z1, POD_FAR) : wallCorridor(F, LOT - 1.05, 1.6), y0 = c.lift.y;

@@ -330,6 +330,21 @@ function mtRemoveArea(r){
   mtReindex();
   return out;
 }
+// A plot gone from under a station's lift (a right-click on the bare plot): that station goes, the track stays (owner, Nov 4: track needs no plot under it,
+// a station does, for its lift). A middle station turns to plain track, a finished line's end station leaves the line open there, and a line's first
+// station goes with its piece of track (a line always starts at a station: the next plot is its first station now)
+function mtDropLiftless(){
+  const lost = s => !s || !cells.get(ckey(Math.round(s.x/LOT), Math.round(s.z/LOT)));
+  for (const l of [...metros]){
+    const keys = mtStationKeys(l); let drop0 = false, any = false;
+    for (const k of mtStops(l)){ const s = l.sides && l.sides[k]; if (!s) continue; const L = mtLiftSpot(l, k, s);
+      if (lost({ x: L.sx, z: L.sz }) || lost(L.stand)){ any = true; if (k === 0) drop0 = true; else keys.delete(mtTileKey(l.tiles[k])); } }
+    if (!any) continue;
+    const before = mtTouched(l), tiles = drop0 ? l.tiles.slice(1) : l.tiles;
+    if (!tiles.length){ mtRemove(l); continue; }
+    mtReshape(l, tiles, keys, mtSideKeys(l), l.loop && !drop0); mtCommit(l, before);
+  }
+}
 function mtClearAll(){ for (const l of metros) mtDropView(l); metros = []; mtActive = null; MT_SIG = null; mtReindex(); }
 function mtSave(){ try { localStorage.setItem(MT_SAVE_KEY, JSON.stringify(metros.map(l => ({ id: l.id, done: l.done, loop: !!l.loop, st: l.st, sides: l.sides, d0: l.tiles.length === 1 && l.dir0 ? l.dir0 : undefined, t: l.tiles.map(t => [t.i, t.j]) })))); } catch (e) {} }   // (d0: the way a lone first station faces, turned with a double tap on a touch screen)
 function mtLoad(){

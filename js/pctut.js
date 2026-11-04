@@ -99,13 +99,13 @@ const PCTUT = (() => {
     end: 'Right-click a piece to cut the road back. Every control is under Instructions.', beats: [
     { id: 'start', say: 'Click a plot to start a highway', ghost: 'tap', arm: () => { const n = highways.length; return () => highways.length > n; } },
     { id: 'height', say: 'Press [ or ] to set the height of the next piece', ghost: 'tap', arm: () => { const L = hwLevel; return () => hwLevel !== L; } },
-    { id: 'extend', say: 'Drag from the end of the road to lay it', ghost: 'drag', arm: () => { const n = tilesOf(hwOpen()); return () => tilesOf(hwOpen()) > n; } },
+    { id: 'extend', say: 'Point at the end of the road and tap Shift. Move the mouse to plan the route (blue), click to build it. Right-click cancels', ghost: 'tap', arm: () => { const n = tilesOf(hwOpen()); return () => tilesOf(hwOpen()) > n; } },
     { id: 'finish', say: 'Click the last piece to add the drop-off', ghost: 'tap', arm: () => { const n = doneOf(highways); return () => doneOf(highways) > n; } },
   ] };
   const MT = { key: 'neonIsland.tutPCMt', name: 'METRO', mode: () => typeof mtMode !== 'undefined' && mtMode,
     end: 'Click a straight piece to add a station. Right-click a piece to cut the line back.', beats: [
     { id: 'start', say: 'Click a plot to place the first station', ghost: 'tap', arm: () => { const n = metros.length; return () => metros.length > n; } },
-    { id: 'extend', say: 'Drag from the end of the line to lay the track', ghost: 'drag', arm: () => { const n = tilesOf(metros); return () => tilesOf(metros) > n; } },
+    { id: 'extend', say: 'Point at the end station and tap Shift. Move the mouse to plan the track (blue), click to build it. Right-click cancels', ghost: 'tap', arm: () => { const n = tilesOf(metros); return () => tilesOf(metros) > n; } },
     { id: 'finish', say: 'Click the last piece to finish it with a station', ghost: 'tap', arm: () => { const n = doneOf(metros); return () => doneOf(metros) > n; } },
   ] };
   for (const r of [HW, MT]) r.st = load(r.key, st.existing ? { done: true, beats: {}, existing: true } : { done: false, beats: {} });

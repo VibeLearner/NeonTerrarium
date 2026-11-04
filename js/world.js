@@ -2574,11 +2574,10 @@ function removePlatform(c){
   finishAnimsOn(c); solidDrop(c);   // (out of its block's merge at once: see removeArea)
   const old = { view: c.view, data: c.data }; c.view = null; c.data = null;
   cells.delete(ckey(c.i, c.j)); dirtyRegions.add(regKey(c.i, c.j));
-  // (a sky highway or metro over the plot is cut there, as delete mode cuts it (removeArea): a right-click on the bare plot left them standing on nothing)
-  const r = { i0: c.i, i1: c.i, j0: c.j, j1: c.j }, lines = [...(typeof hwRemoveArea === 'function' ? hwRemoveArea(r) : []), ...(typeof mtRemoveArea === 'function' ? mtRemoveArea(r) : [])];
-  const near = new Set(SIDES4.map(([a,b]) => cells.get(ckey(c.i+a, c.j+b))).filter(Boolean));
-  for (const [i, j] of lines){ const n = cells.get(ckey(i, j)); if (n && !n.mega) near.add(n); }
-  if (lines.length){ SC_DIRTY.unknown = true; shadowDirty = true; }
+  // (a station or drop-off whose lift stood on the plot goes; the track or road over it stays: track needs no plot under it, owner Nov 4)
+  if (typeof hwDropLiftless === 'function') hwDropLiftless();
+  if (typeof mtDropLiftless === 'function') mtDropLiftless();
+  const near = SIDES4.map(([a,b]) => cells.get(ckey(c.i+a, c.j+b))).filter(Boolean);
   refresh([...near]);
   startAnim(c, 'remove', PLAT_BOTTOM, CURB + 1.4, null, LOT, old);
 }

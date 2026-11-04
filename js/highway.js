@@ -192,6 +192,13 @@ function hwRemoveArea(r){
   }
   return out;
 }
+// a plot gone from under a drop-off's lift (a right-click on the bare plot): the drop-off goes, the road stays, open there again (owner, Nov 4)
+function hwDropLiftless(){
+  const lost = (x, z) => !cells.get(ckey(Math.round(x/LOT), Math.round(z/LOT)));
+  for (const h of highways){ if (!h.done) continue; const L = hwLiftSpot(h, h.side);
+    if (!lost(L.sx, L.sz) && !lost(L.stand.x, L.stand.z)) continue;
+    const e = h.tiles[h.tiles.length - 1]; h.done = false; hwCommit(h, [[e.i, e.j], [Math.round(L.sx/LOT), Math.round(L.sz/LOT)], [Math.round(L.stand.x/LOT), Math.round(L.stand.z/LOT)]]); }
+}
 function hwClearAll(){ for (const h of highways){ hwDropView(h); hwClearCars(h); } highways = []; hwActive = null; hwReindex(); }
 function hwSetLanes(n){
   hwLanesPick = n;
@@ -885,7 +892,7 @@ const transitWhy = (() => { let el = null, tm = 0;
 function hwClick(cx, cy, touch){ const t = hwTargetAt(hwPickTouch(cx, cy)); if (hwApply(t)) hwHover(cx, cy, touch); else if (t && !t.ok) transitWhy(t.why, cx, cy); }   // (touch: a tap, see hwPickTouch)
 function hwRightClick(cx, cy){ const pk = hwPick(cx, cy); if (pk && pk.kind === 'hwTile'){ hwCutAt(pk.h, pk.k); hwHover(cx, cy); } }
 // (with a finger, the outline aimed is aimed again at the new height or lanes instead: transit-touch.js)
-function hwSetLevel(L){ hwLevel = Math.max(HW_MIN_L, Math.min(HW_MAX_L, L)); const el = document.getElementById('hwLevel'); if (el) el.textContent = hwLevel; if (typeof TT !== 'undefined' && TT.relevel()) return; if (hwLastPt) hwHover(hwLastPt.x, hwLastPt.y, hwLastPt.touch); }
+function hwSetLevel(L){ hwLevel = Math.max(HW_MIN_L, Math.min(HW_MAX_L, L)); const el = document.getElementById('hwLevel'); if (el) el.textContent = hwLevel; if (typeof TP !== 'undefined' && TP && ptrLast){ tpUpdate(ptrLast.x, ptrLast.y); return; } if (typeof TT !== 'undefined' && TT.relevel()) return; if (hwLastPt) hwHover(hwLastPt.x, hwLastPt.y, hwLastPt.touch); }
 function hwSetLanesUI(n){ hwSetLanes(n); const el = document.getElementById('hwLanes'); if (el) el.textContent = n + ' lanes'; if (typeof TT !== 'undefined' && TT.relevel()) return; if (hwLastPt) hwHover(hwLastPt.x, hwLastPt.y, hwLastPt.touch); }
 function setHwMode(on, quiet){
   hwMode = on;

@@ -269,6 +269,95 @@ function tdStep(cx, cy, max){
     tEmit('tdraw');
   }
 }
+// Planning a run of track with the mouse (owner, Nov 4: dragging to lay it wasn't intuitive). In highway or metro mode: point at the open end of a line
+// (a metro's end station too), tap Shift, and a blue outline runs from that end to the plot under the pointer, plot by plot, as it moves: nothing is
+// built yet. A click builds the lot (piece by piece, by the same rules a click on each next plot follows: where one says no, it stops there and says
+// why); a right-click, Esc or Shift again lets the plan go. Where the plan can't go on, its last plot shows red and the reason is on the hint line.
+let TP = null;   // { l, hw, path: [{ i, j, L, ok }], why }
+const TP_MAX = 40;
+const tpGfx = (() => {
+  const blue = new THREE.MeshBasicMaterial({ color: 0x39b4ff, transparent: true, opacity: .95, depthTest: false, depthWrite: false });
+  const red = new THREE.MeshBasicMaterial({ color: 0xff4a5a, transparent: true, opacity: .95, depthTest: false, depthWrite: false });
+  const blueF = new THREE.MeshBasicMaterial({ color: 0x39b4ff, transparent: true, opacity: .2, depthTest: false, depthWrite: false });
+  const redF = new THREE.MeshBasicMaterial({ color: 0xff4a5a, transparent: true, opacity: .2, depthTest: false, depthWrite: false });
+  const box = new THREE.BoxGeometry(1, 1, 1), pool = [];
+  const make = () => { const g = new THREE.Group(), f = new THREE.Mesh(box, blueF), bars = [0, 1, 2, 3].map(() => new THREE.Mesh(box, blue));
+    f.renderOrder = 997; g.add(f); for (const b of bars){ b.renderOrder = 999; g.add(b); }
+    g.traverse(o => o.layers.set(1)); g.visible = false; scene.add(g); return { g, f, bars }; };
+  function show(path, hw){
+    const s = LOT*.86, t = .07;
+    for (let n = 0; n < Math.max(path.length, pool.length); n++){
+      if (n >= path.length){ pool[n].g.visible = false; continue; }
+      const q = pool[n] || (pool[n] = make()), p = path[n], y = hw ? hwY(p.L) : MT_Y;
+      q.g.position.set(p.i*LOT, y, p.j*LOT); q.g.visible = true;
+      q.f.material = p.ok ? blueF : redF; q.f.scale.set(s, .04, s);
+      q.bars.forEach((b, k) => { b.material = p.ok ? blue : red; const along = k < 2; b.scale.set(along ? s + t : t, t, along ? t : s + t); b.position.set(along ? 0 : (k === 2 ? -1 : 1)*s/2, 0, along ? (k === 0 ? -1 : 1)*s/2 : 0); });
+    }
+  }
+  return { show, hide(){ for (const q of pool) q.g.visible = false; } };
+})();
+// the line whose open end is under the pointer (or a metro's finished end station: the line carries on from it)
+function tpLineAt(cx, cy){
+  const ends = pk => { if (!pk) return null;
+    if (pk.kind === 'hwTile'){ const h = pk.h; return !h.done && pk.k === h.tiles.length - 1 ? h : null; }
+    if (pk.kind === 'mtTile'){ const l = pk.l; return !l.loop && pk.k === l.tiles.length - 1 ? l : null; }
+    return null; };
+  return hwMode ? ends(hwPick(cx, cy, true)) || ends(hwPickTouch(cx, cy)) : mtMode ? ends(mtPick(cx, cy)) || ends(mtPickTouch(cx, cy)) : null;
+}
+function tpStart(){
+  if (!ptrLast || !(hwMode || mtMode)) return;
+  const l = tpLineAt(ptrLast.x, ptrLast.y);
+  if (!l){ transitWhy(hwMode ? 'point at the open end of a road first, then tap Shift' : 'point at the end of a line first, then tap Shift', ptrLast.x, ptrLast.y); return; }
+  TP = { l, hw: hwMode, path: [], why: '' };
+  if (hwMode){ hwActive = l; hwShowGhost(null); } else { mtActive = l; mtShowGhost(null); }
+  tpUpdate(ptrLast.x, ptrLast.y); tEmit('plan');
+}
+function tpStop(){ TP = null; tpGfx.hide(); const h = $('modeHint'); h.textContent = ''; h.classList.remove('bad'); if (ptrLast){ if (hwMode) hwHover(ptrLast.x, ptrLast.y); else if (mtMode) mtHover(ptrLast.x, ptrLast.y); } }
+// the plots from the line's end to (to): along the way the line already runs first, then one turn
+function tpRoute(l, to){
+  const n = l.tiles.length, e = l.tiles[n - 1], pv = l.tiles[n - 2], di = to.i - e.i, dj = to.j - e.j, out = [];
+  let iFirst = Math.abs(di) >= Math.abs(dj);
+  if (pv){ const ai = e.i - pv.i, aj = e.j - pv.j; iFirst = ai ? Math.sign(di) !== -ai || !di : !(dj && Math.sign(dj) !== -aj); }
+  let i = e.i, j = e.j;
+  const go = (axis) => { if (axis === 'i') while (i !== to.i && out.length < TP_MAX){ i += Math.sign(di); out.push({ i, j }); } else while (j !== to.j && out.length < TP_MAX){ j += Math.sign(dj); out.push({ i, j }); } };
+  if (iFirst){ go('i'); go('j'); } else { go('j'); go('i'); }
+  return out;
+}
+// each plot checked as a click on it would be, with the plan's plots before it laid for the moment and then taken back (nothing built)
+function tpCheck(l, route){
+  const hw = TP.hw, keep = l.tiles.slice(), done = l.done, path = []; let why = '';
+  try {
+    for (const p of route){
+      if (l.tiles.some(t => t.i === p.i && t.j === p.j && (!hw || Math.abs(t.L - hwLevel) < 2))){ why = hw ? 'the road can\'t cross itself at this height' : 'the track can\'t cross itself'; path.push({ ...p, L: hwLevel, ok: false }); break; }
+      const t = hw ? hwTargetAt({ kind: 'hwGround', i: p.i, j: p.j, d: 0 }) : mtTargetAt({ kind: 'mtGround', i: p.i, j: p.j, d: 0 });
+      const ok = !!t && t.ok && (t.h || t.l) === l && (t.type === 'extend' || t.type === 'reopen');
+      if (!ok){ why = t && t.why ? t.why : ''; path.push({ ...p, L: t && t.L !== undefined ? t.L : hwLevel, ok: false }); break; }
+      path.push({ ...p, L: t.L, ok: true }); l.tiles.push(hw ? { i: p.i, j: p.j, L: t.L } : { i: p.i, j: p.j }); l.done = false;
+    }
+  } finally { l.tiles = keep; l.done = done; }
+  return { path, why };
+}
+function tpUpdate(cx, cy){
+  if (!TP) return;
+  const l = TP.l;
+  if (!(TP.hw ? hwMode && highways.includes(l) && !l.done : mtMode && metros.includes(l) && !l.loop)){ tpStop(); return; }
+  const to = tdPlotAt(cx, cy, TP.hw ? hwY(hwLevel) : MT_Y); if (!to) return;
+  const r = tpCheck(l, tpRoute(l, to)); TP.path = r.path; TP.why = r.why;
+  tpGfx.show(r.path, TP.hw);
+  const h = $('modeHint'), say = r.why ? whyShort(r.why) : ''; h.textContent = say; h.hidden = !say; h.classList.toggle('bad', !!say);
+}
+function tpConfirm(cx, cy){
+  if (!TP) return;
+  const l = TP.l, hw = TP.hw, todo = TP.path.filter(p => p.ok); let built = 0;
+  for (const p of todo){
+    const t = hw ? hwTargetAt({ kind: 'hwGround', i: p.i, j: p.j, d: 0 }) : mtTargetAt({ kind: 'mtGround', i: p.i, j: p.j, d: 0 });
+    if (!t || !t.ok || (t.h || t.l) !== l || !(t.type === 'extend' || t.type === 'reopen') || !(hw ? hwApply(t) : mtApply(t))){ if (t && !t.ok) transitWhy(t.why, cx, cy); break; }
+    built++;
+  }
+  if (!built && TP.why) transitWhy(TP.why, cx, cy);
+  if (built) tEmit('tdraw');
+  tpStop();
+}
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 canvas.addEventListener('pointerdown', e => {
   if (HL && e.pointerType === 'touch') hlStop();   // (a finger's height pick ends when it lifts: a stray one left over just goes)
@@ -307,7 +396,7 @@ canvas.addEventListener('pointerdown', e => {
       act.kind = 'none'; } }, 550);
     return;
   }
-  if (e.button === 0 && (hwMode || mtMode)){ act = { kind: 'sky', x: e.clientX, y: e.clientY, moved: false, tdraw: tdOnEnd(e.clientX, e.clientY) }; return; }   // highway or metro mode: a click builds, a drag turns the view (or from a line's open end, lays track: tdStep)
+  if (e.button === 0 && (hwMode || mtMode)){ act = { kind: 'sky', x: e.clientX, y: e.clientY, moved: false, tdraw: false }; return; }   // (laying a run of track: the plan, Shift: tpStart)   // highway or metro mode: a click builds, a drag turns the view (or from a line's open end, lays track: tdStep)
   if (e.button === 0){
     // a click (no drag) builds; a drag rotates the view. With "Drag to paint" on, a drag that starts on the city paints instead.
     // (the city is only picked here when painting is on: the click itself picks on release, and a press that starts turning the
@@ -327,6 +416,7 @@ function pointerMove(e){
     if (!delMode && !hwMode && !mtMode && !megaPick && e.pointerType !== 'touch'){ MON.hoverAt(e.clientX, e.clientY); if (MON.pick(e.clientX, e.clientY)){ hover.visible = hoverFill.visible = hoverStrip.visible = false; return; } }
     else MON.hoverAt(null);
     if (delMode){ hover.visible = hoverFill.visible = hoverStrip.visible = false; return; }
+    if (TP){ tpUpdate(e.clientX, e.clientY); return; }
     if (hwMode){ hwHover(e.clientX, e.clientY); return; }
     if (mtMode){ mtHover(e.clientX, e.clientY); return; }
     if (HL){ hlMove(e.clientX, e.clientY); return; }
@@ -403,9 +493,11 @@ function endPtr0(e){
       delSel = null; showAreaSel(null);
     }
     if (act.kind === 'right' && !act.moved && delMode){ delSel = null; showAreaSel(null); }
+    else if (act.kind === 'right' && !act.moved && TP) tpStop();
     else if (act.kind === 'right' && !act.moved){ if (hwMode) hwRightClick(e.clientX, e.clientY); else if (mtMode) mtRightClick(e.clientX, e.clientY); else if (megaPick) selectMega(null); else { const pk = pickAt(e.clientX, e.clientY), snap = RESTORE.snap(pk); removeAt(pk); if (snap) RESTORE.offer(snap, e.clientX, e.clientY); if (pk && pk.kind !== 'sky') tEmit('remove'); } }   // (a removal: a Restore button by the pointer for a few seconds, as a finger's hold-to-remove has: owner, Nov 4)   // right-click while placing: put it down (highways are only cut in highway mode)
     if (act.kind === 'sky' && act.moved && act.tdraw){ tdStep(e.clientX, e.clientY, 12); if (hwMode) hwHover(e.clientX, e.clientY); else if (mtMode) mtHover(e.clientX, e.clientY); }
-    if (act.kind === 'sky' && !act.moved){ if (hwMode) hwClick(e.clientX, e.clientY); else if (mtMode) mtClick(e.clientX, e.clientY); else if (megaPick) placeMegaHere(e.clientX, e.clientY); else { act.done = new Set(); paintAt(e.clientX, e.clientY); } }
+    if (act.kind === 'sky' && !act.moved && TP) tpConfirm(e.clientX, e.clientY);
+    else if (act.kind === 'sky' && !act.moved){ if (hwMode) hwClick(e.clientX, e.clientY); else if (mtMode) mtClick(e.clientX, e.clientY); else if (megaPick) placeMegaHere(e.clientX, e.clientY); else { act.done = new Set(); paintAt(e.clientX, e.clientY); } }
     if (act.kind === 'dtap' && !(typeof LOADP !== 'undefined' && LOADP.on)){
       if (act.started){ if (HL) hlBuild(); }
       else if (!unitAt(act.x, act.y)) tapBuild(act.x, act.y);   // (one floor; where one floor can't go, an ordinary tap)
@@ -440,13 +532,14 @@ const PAN_KEYS = ['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'
 let LAST_INPUT = performance.now();   // (rest when idle: main.js)
 for (const ev of ['pointerdown', 'pointermove', 'wheel', 'keydown', 'touchstart']) addEventListener(ev, () => { LAST_INPUT = performance.now(); }, { passive: true, capture: true });
 addEventListener('keyup', e => { const k = e.key.toLowerCase(); keys.delete(k); if (k === 'shift'){ keys.delete('shift');
-  if (shiftTap && performance.now() - shiftTap < 400){ if (HL) hlStop(); else hlStart(); } shiftTap = null; } });   // (a tap, not Shift held with another key: the height pick)
+  if (shiftTap && performance.now() - shiftTap < 400){ if (TP) tpStop(); else if (hwMode || mtMode) tpStart(); else if (HL) hlStop(); else hlStart(); } shiftTap = null; } });   // (a tap, not Shift held with another key: the height pick)
 addEventListener('blur', () => keys.clear());
 addEventListener('keydown', e => {
   if (e.target.closest && e.target.closest('input,select')) return;
   const k = e.key.toLowerCase();
   if (k === 'shift'){ keys.add('shift'); if (!e.repeat) shiftTap = performance.now(); } else shiftTap = null;
   if (HL && e.key === 'Escape'){ hlStop(); return; }
+  if (TP && e.key === 'Escape'){ tpStop(); return; }
   if (PAN_KEYS.includes(k)){ keys.add(k); MON.userPan(); e.preventDefault(); return; }
   if (k === 'h' || e.key === 'Home'){ centerView(); return; }
   if (e.key === ' '){ e.preventDefault(); if (e.repeat) return;

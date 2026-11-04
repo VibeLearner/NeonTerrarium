@@ -121,8 +121,10 @@ function frameBody(now){
   { // detail levels: only needed once zooming out outruns the screen's resolution (see applyRenderRes)
     // (by the size without the sharp view's extra lines: as the view settled and the resolution stepped up, the plants and fine pieces came back, and
     //  went again as soon as it moved: foliage popping in and out when turning zoomed out, owner Oct 25. Now they stay as they are while moving)
-    const loss = (zoomS()/ZOOM_REF)*(BASE_H/(H_LOD || H));   // (the short side's zoom: a phone held upright the same as on its side, sky.js ZK)   // 1 = every building keeps all its pixels
-    const t = clamp((loss - 1.15)/1.0, 0, 1), e = t*t*(3 - 2*t);
+    const lk = LOD_PICK.k[LOD_PICK.v] ?? 1;   // (the setting: Low thins sooner, High later, Full never)
+    const loss = lk ? (zoomS()/ZOOM_REF)*(BASE_H/(H_LOD || H))/lk : 0;   // (the short side's zoom: a phone held upright the same as on its side, sky.js ZK)   // 1 = every building keeps all its pixels
+    // (over a longer stretch of zoom than before (1.0): fewer small pieces go at each step of the wheel, owner Nov 4, pop-in)
+    const t = clamp((loss - 1.15)/1.4, 0, 1), e = t*t*(3 - 2*t);
     // (plants thin later and more gently than the fine pieces: they are a few percent of a frame (tools/procfol/MEASURE.md), and tufts vanishing while
     //  still a pixel tall showed as pop-in with the render fixed; from loss 1.6, fully thinned only by 3.2)
     const tp = clamp((loss - 1.6)/1.6, 0, 1), ep = tp*tp*(3 - 2*tp);

@@ -340,8 +340,8 @@ const ROOF = {
   ring(P,spot,st){ const s=spot(.4); if(!s) return;
     const m = pick(st.neonMats), r = rnd(.35,.5), Q = under(P, T(s.x,0,s.z,rnd(0,PI)));
     cyl(M.frame,Q,0,.5,0,.035,1);
-    put(U.torus, m, under(Q, T(0,1+r,0,0,2*r,2*r,2*r)));
-    put(U.torus, m, under(Q, T(0,1+r,0,0,2*r*.7,2*r*.7,2*r*.7)));
+    // (steady: the flicker some neon has made a whole ring blink out and back, owner Nov 4)
+    NO_FLICKER = true; try { put(U.torus, m, under(Q, T(0,1+r,0,0,2*r,2*r,2*r))); put(U.torus, m, under(Q, T(0,1+r,0,0,2*r*.7,2*r*.7,2*r*.7))); } finally { NO_FLICKER = false; }
     glow(Q,0,1+r,0,NEON_GLOW.get(m),2.4*r+1); },
   bonsai(P,spot){ const s=spot(.3); if(!s) return; bonsaiAt(P,s.x,0,s.z); },
   bamboo(P,spot){ const s=spot(.25); if(!s) return; bambooAt(P,s.x,0,s.z); },

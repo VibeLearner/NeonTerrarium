@@ -244,6 +244,8 @@ function keptOut(geo, m){
 // a light thin enough to fall between pixels when zoomed out (the metro pillars' strips): dropped with the fine details as the view goes out, instead of
 // kept like the other lights, where it shimmered in and out as the view moved (owner Oct 26). Set round the pieces that are, then cleared
 let FINE_LIGHT = false;
+// (set round a piece whose light must never stutter: a big neon ring reads as the ring blinking out of existence, owner Nov 4)
+let NO_FLICKER = false;
 // and each such light, as the line down its middle (start, end, its detail id, its glow kind, its color and glow color, when it switches on): once the view is far enough out
 // that the strip has gone with the fine details, the line is drawn in its place, a steady pixel wide whatever the zoom (world.js fineLines). Collected while a piece is made
 let curFine = null;
@@ -252,7 +254,7 @@ function put(geo, mat, m, lean){
   if (LUX){ let sub = LUX.mats.get(mat); if (!sub && LUX.auto && mat.userData && mat.userData.glow) sub = LUX.auto(mat); if (sub){ mat = sub; if (LUX.halo) LUX.halo(sub, m); } }
   if (DARK && !KEEP_LIGHT && mat.userData && DARK_SUB[mat.userData.glow] && (DARK === true ? posHash(m.elements[12], m.elements[13], m.elements[14]) < 82 : DARK > 0 && m.elements[13] > DARK)) mat = DARK_SUB[mat.userData.glow];   // (a number: economy mode, every light above that height is off: the floors nobody lives on yet, economy.js)
   let b = buckets.get(mat); if (!b){ b = { p: [], n: [], d: [], f: mat.userData && mat.userData.glow ? [] : null, o: mat.userData && mat.userData.glow ? [] : null }; buckets.set(mat, b); }
-  const fid = b.f ? (DARK === true && mat.userData.glow !== 'blink' ? heavyFlickerId() : flickerId(mat.userData.glow, DARK === -1 ? 1.6 : DARK === -2 ? 4 : 1)) : 0;   // (economy mode: -1 and -2, a building mid-way and far from its Emitter Core, flickers more)
+  let fid = b.f ? (DARK === true && mat.userData.glow !== 'blink' ? heavyFlickerId() : flickerId(mat.userData.glow, DARK === -1 ? 1.6 : DARK === -2 ? 4 : 1)) : 0; if (NO_FLICKER) fid = 0;   // (economy mode: -1 and -2, a building mid-way and far from its Emitter Core, flickers more)
   const did = b.f && !FINE_LIGHT ? 0 : detailId(geo, m), ord = b.f ? litOrder(m.elements[12], m.elements[13], m.elements[14]) : 0;   // lights are never dropped: they carry the look from far away
   if (FINE_LIGHT && did > 0 && curFine && geo === U.box){
     const e = m.elements; let a = 0, al = 0; for (let q = 0; q < 3; q++){ const l = Math.hypot(e[q*4], e[q*4 + 1], e[q*4 + 2]); if (l > al){ al = l; a = q; } }

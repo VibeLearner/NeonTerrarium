@@ -295,8 +295,8 @@ function addWall(c, i, j, zone){
 function stackWall(c){
   stageFinishAll();
   const top = wallTopOf(c);
-  if (top + WALL_TIER > CURB + MAX_HEIGHT + 1.5){ perimFlash('That wall is as tall as walls go.'); return null; }
-  if (c.wallCap !== undefined && top + WALL_TIER > c.wallCap - .05){ perimFlash('A highway or the metro runs over this wall: it can\'t go higher.'); return null; }
+  if (top + WALL_TIER > CURB + MAX_HEIGHT + 1.5){ perimFlash('This wall can\'t go any higher.'); return null; }
+  if (c.wallCap !== undefined && top + WALL_TIER > c.wallCap - .05){ perimFlash('A highway or metro is above: can\'t go higher.'); return null; }
   finishAnimsOn(c); holdRegion(c);
   const old = { view: c.view, data: c.data }; c.view = null; c.data = null;
   c.wall.n = (c.wall.n || 0) + 1;

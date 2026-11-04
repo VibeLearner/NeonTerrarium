@@ -2557,7 +2557,7 @@ const PLAT_BOTTOM = -5.6;
 function addPlatform(i, j, zone = null){
   if (Math.abs(i) > GRID_MAX || Math.abs(j) > GRID_MAX || cells.has(ckey(i,j))) return null;
   // phone mode (touch.js): a city grows to PHONE.maxPlots plots at most, so it stays smooth and fits a phone's memory (a bigger one loaded from a file still loads)
-  if (self.PHONE && PHONE.on && cells.size >= PHONE.maxPlots){ const h = document.getElementById('modeHint'); if (h){ h.classList.add('bad'); h.hidden = false; } if (h) h.textContent = 'This city is as big as a phone can keep smooth (' + PHONE.maxPlots + ' plots) · build up, or rebuild what\'s there'; return null; }
+  if (self.PHONE && PHONE.on && cells.size >= PHONE.maxPlots){ const h = document.getElementById('modeHint'); if (h){ h.classList.add('bad'); h.hidden = false; } if (h) h.textContent = 'Max city size on a phone: build up instead'; return null; }
   const c = newCell(i, j, zone ? [{ zone, seed: (Math.random()*1e9)|0, style: styleNow() }] : []);
   c.style = styleNow();
   cells.set(ckey(i,j), c);

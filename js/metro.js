@@ -876,7 +876,7 @@ let mtLastPt = null;
 // (the mouse picks as a finger does too, owner Nov 3: pointing at the air in front of a line, at the track's height, means the next piece there. Picked by
 //  the plane under the pointer, it took the station in front for itself, and the next piece came only by pointing at the ground under it)
 function mtHover(cx, cy, touch){ mtLastPt = { x: cx, y: cy, touch }; const t = mtTargetAt(mtPickTouch(cx, cy)); mtShowGhost(t);
-  const say = !t ? '' : !t.ok ? t.why : t.type === 'loop' ? 'click to close the loop: the train will go round and round'
+  const say = !t ? '' : !t.ok ? whyShort(t.why) : t.type === 'loop' ? 'click to close the loop: the train will go round and round'
     : t.type === 'join' ? 'click to join the two lines into one' + (t.lost ? ' (a station right beside another becomes plain track)' : '') : t.note || '';
   const el = $('modeHint'); el.textContent = say || ''; el.hidden = !say; el.classList.toggle('bad', !!say && !!t && !t.ok); }
 function mtClick(cx, cy, touch){ const t = mtTargetAt(mtPickTouch(cx, cy)); if (mtApply(t)) mtHover(cx, cy, touch); else if (t && !t.ok) transitWhy(t.why, cx, cy); }   // (refused: why, beside the pointer, highway.js transitWhy)   // (touch: a tap, see mtPickTouch)

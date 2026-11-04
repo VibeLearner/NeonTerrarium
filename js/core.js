@@ -160,6 +160,8 @@ const greenMat = () => pick([M.green1,M.green2,M.green3]);
 // details (railings, cables, window frames, small plants, crease outlines) turn to noise. Past the default zoom
 // these thin out gradually until the city reads as clean blocks of colour and light. 0 = full detail, 1 = far.
 const LOD = { fine: { value: 0 }, plants: { value: 0 }, lines: { value: 0 } };
+// the player's setting (Game Settings, Detail when zoomed out: playerui.js): 0 Low, 1 Medium, 2 High, 3 Full (nothing thins out). How far out the thinning starts and ends
+const LOD_PICK = { v: 1, k: [.8, 1, 1.6, 0] };
 // 1 in the Smooth render mode (see setRenderLines in sky.js): the shaders skip their pixel-art stepping and dithering
 const SMOOTH_LOOK = { value: 0 };
 // Thin and tiny pieces carry an id (1-255, 0 = always kept); as LOD.fine rises, more of them are dropped.

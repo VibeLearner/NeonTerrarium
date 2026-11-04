@@ -47,13 +47,13 @@ window.PUI = { panes: T.panes, pick: T.pick, bar: T.bar, open: () => { if (!deck
 
 // --- Graphics: presets, then the few choices most players want
 const PRESETS = {
-  performance: { name: 'Performance', note: 'Smoothest on laptops and older machines', lines: 480, cloudQ: 3, zoomRes: 1, farView: false, autoPerf: true, cap720: true, tiers: true,
+  performance: { name: 'Performance', note: 'Smoothest on laptops and older machines', lines: 480, lod: 0, cloudQ: 3, zoomRes: 1, farView: false, autoPerf: true, cap720: true, tiers: true,
     fx: { outlines: true, vclouds: true, rays: false, bloom: true, rim: true, grade: true, lights: true, ao: false, mist: false, wet: false } },
-  balanced: { name: 'Balanced', note: 'Recommended', lines: 720, cloudQ: 2, zoomRes: 1, farView: true, autoPerf: true, cap720: true, tiers: true,
+  balanced: { name: 'Balanced', note: 'Recommended', lines: 720, lod: 1, cloudQ: 2, zoomRes: 1, farView: true, autoPerf: true, cap720: true, tiers: true,
     fx: { outlines: true, vclouds: true, rays: true, bloom: true, rim: true, grade: true, lights: true, ao: true, mist: true, wet: true } },
-  quality: { name: 'Quality', note: 'Sharper clouds and lighting for a fast graphics card', lines: 720, cloudQ: 1, zoomRes: 1.6, farView: true, autoPerf: false, cap720: false, tiers: true,
+  quality: { name: 'Quality', note: 'Sharper clouds and lighting for a fast graphics card', lines: 720, lod: 2, cloudQ: 1, zoomRes: 1.6, farView: true, autoPerf: false, cap720: false, tiers: true,
     fx: { outlines: true, vclouds: true, rays: true, bloom: true, rim: true, grade: true, lights: true, ao: true, mist: true, wet: true } },
-  ultra: { name: 'Ultra', note: 'Smooth, full-resolution picture: the heaviest', lines: 0, cloudQ: 1, zoomRes: 0, farView: true, autoPerf: false, cap720: false, tiers: true,
+  ultra: { name: 'Ultra', note: 'Smooth, full-resolution picture: the heaviest', lines: 0, lod: 3, cloudQ: 1, zoomRes: 0, farView: true, autoPerf: false, cap720: false, tiers: true,
     fx: { outlines: true, vclouds: true, rays: true, bloom: true, rim: true, grade: true, lights: true, ao: true, mist: true, wet: true } },
 };
 const FX = ['outlines', 'vclouds', 'rays', 'bloom', 'rim', 'grade', 'lights', 'ao', 'mist', 'wet'];
@@ -62,15 +62,15 @@ const clickChip = (box, attr, v) => { const b = [...$(box).querySelectorAll('but
 let applying = false;
 function applyPreset(id){
   const p = PRESETS[id]; if (!p) return; applying = true;
-  try { clickChip('resChips', 'lines', p.lines); clickChip('cloudChips', 'q', p.cloudQ); clickChip('zoomResChips', 'f', p.zoomRes);
+  try { clickChip('resChips', 'lines', p.lines); clickChip('cloudChips', 'q', p.cloudQ); clickChip('lodChips', 'l', p.lod); clickChip('zoomResChips', 'f', p.zoomRes);
     setBox('farView', p.farView); setBox('autoPerf', p.autoPerf); setBox('cap720', p.cap720); setBox('tiers', p.tiers); for (const f of FX) setBox(f, p.fx[f]); }
   finally { applying = false; }
   lsSet(K + 'preset', id); saveFx(); markPreset();
 }
-const current = () => ({ lines: RENDER_LINES, cloudQ: S.cloudQ || 2, zoomRes: ZOOM_RES, farView: FARV.on, autoPerf: S.autoPerf !== false, cap720: CAP720, tiers: S.tiers !== false,
+const current = () => ({ lines: RENDER_LINES, lod: LOD_PICK.v, cloudQ: S.cloudQ || 2, zoomRes: ZOOM_RES, farView: FARV.on, autoPerf: S.autoPerf !== false, cap720: CAP720, tiers: S.tiers !== false,
   fx: Object.fromEntries(FX.map(f => [f, !!($(f) && $(f).checked)])) });
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-function which(){ const c = current(); for (const id in PRESETS){ const p = PRESETS[id]; if (same({ lines: p.lines, cloudQ: p.cloudQ, zoomRes: p.zoomRes, farView: p.farView, autoPerf: p.autoPerf, cap720: p.cap720, tiers: p.tiers, fx: p.fx }, c)) return id; } return 'custom'; }
+function which(){ const c = current(); for (const id in PRESETS){ const p = PRESETS[id]; if (same({ lines: p.lines, lod: p.lod, cloudQ: p.cloudQ, zoomRes: p.zoomRes, farView: p.farView, autoPerf: p.autoPerf, cap720: p.cap720, tiers: p.tiers, fx: p.fx }, c)) return id; } return 'custom'; }
 const presetRow = el('div', { class: 'pu-presets', role: 'group', 'aria-label': 'Graphics preset' });
 const presetBtn = {};
 for (const id in PRESETS){ const p = PRESETS[id]; presetBtn[id] = el('button', { onclick: () => applyPreset(id) }, el('b', { text: p.name }), el('small', { text: p.note })); presetRow.append(presetBtn[id]); }
@@ -80,12 +80,17 @@ function markPreset(){ const w = which(); for (const id in presetBtn) presetBtn[
 function saveFx(){ if (!applying) lsSet(K + 'fx', JSON.stringify(Object.fromEntries(FX.map(f => [f, !!($(f) && $(f).checked)])))); }
 for (const f of FX){ const b = $(f); if (b) b.addEventListener('change', () => { saveFx(); markPreset(); }); }
 for (const id of ['farView', 'autoPerf', 'cap720', 'tiers']){ const b = $(id); if (b) b.addEventListener('change', () => markPreset()); }
-for (const box of ['resChips', 'cloudChips', 'zoomResChips']){ const b = $(box); if (b) b.addEventListener('click', () => setTimeout(markPreset, 0)); }
+for (const box of ['resChips', 'cloudChips', 'zoomResChips', 'lodChips']){ const b = $(box); if (b) b.addEventListener('click', () => setTimeout(markPreset, 0)); }
+// detail when zoomed out (owner, Nov 4): how soon small pieces and plants thin out as the view zooms out (main.js, LOD_PICK). Kept here
+{ const box = $('lodChips'), pick = v => { LOD_PICK.v = v; for (const b of box.querySelectorAll('button')) b.classList.toggle('on', +b.dataset.l === v); lsSet(K + 'lod', String(v)); };
+  const q = lsGet(K + 'lod'); if (q !== null && +q >= 0 && +q <= 3) pick(+q); else { const pr = PRESETS[lsGet(K + 'preset')]; if (pr) pick(pr.lod); }   // (a preset picked before this setting existed: its level)
+  box.addEventListener('click', e => { const b = e.target.closest('button'); if (b) pick(+b.dataset.l); }); }
 // the clouds' quality isn't kept by the game either
 { const q = +lsGet(K + 'cloudQ'); if (q >= 1 && q <= 3) clickChip('cloudChips', 'q', q);
   $('cloudChips').addEventListener('click', () => setTimeout(() => lsSet(K + 'cloudQ', String(S.cloudQ || 2)), 0)); }
 
 const resBox = chipsRelabel('resChips', [['Chunky', 'Big, chunky pixels: the lightest'], ['Retro', 'Classic pixel art'], ['Crisp', 'Fine pixel art (recommended)'], ['Smooth', 'No pixel look, your screen\'s own resolution: the heaviest']]);
+const lodBox = chipsRelabel('lodChips', [['Low', 'Small details and plants thin out soonest when zoomed out: the lightest'], ['Medium', 'Recommended'], ['High', 'Details stay until much further out'], ['Full', 'Nothing thins out at any zoom: the heaviest']]);
 const cloudBox = chipsRelabel('cloudChips', [['Low', 'Clouds refresh more slowly: the lightest'], ['Medium', 'Recommended'], ['High', 'Clouds refresh fastest']]);
 const zoomBox = chipsRelabel('zoomResChips', [['Standard', 'The same resolution at every zoom: the lightest'], ['Sharper', 'Up to 1.6 times the resolution when zoomed out'], ['Sharpest', 'Up to your screen\'s own resolution when zoomed out: the heaviest']]);
 const farLab = relabel('farView', 'Sharp view when zoomed out', 'Zoomed out, the city sharpens to your screen\'s resolution as the view comes to rest, so distant buildings stay distinct');
@@ -93,7 +98,8 @@ const autoLab = relabel('autoPerf', 'Lower the resolution automatically when the
 T.panes.game.append(
   group('Graphics preset', presetRow, customNote),
   group('Pixel style', resBox),
-  group('Clouds', cloudBox));
+  group('Clouds', cloudBox),
+  group('Detail when zoomed out', lodBox));
 
 // --- Sound: the game's own section
 if (soundSec){ const h = soundSec.querySelector('h2'); if (h) h.remove(); T.panes.game.append(group('Sound', soundSec)); }

@@ -282,6 +282,12 @@
       <button data-q="2" class="on">Balanced</button>
       <button data-q="1">Sharp</button>
     </div>
+    <div class="chips" id="lodChips" aria-label="Detail when zoomed out">
+      <button data-l="0">Low</button>
+      <button data-l="1" class="on">Medium</button>
+      <button data-l="2">High</button>
+      <button data-l="3">Full</button>
+    </div>
     <h3 class="subhead">Optimize framerate</h3>
     <div class="togs">
       <label class="tog" title="After 10 seconds without any input, draw every other frame (30 a second) so a laptop runs cooler; any click or key brings it straight back"><input type="checkbox" id="idleRest"> Rest when idle</label>
@@ -314,7 +320,7 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/BufferGeometryUtils.js"></script>
 <!-- ?v= makes browsers fetch fresh copies after an update; change it with every release -->
 <script src="js/matreg.js?v=2026-10-13l"></script>
-<script src="js/core.js?v=2026-10-31ec"></script>
+<script src="js/core.js?v=2026-11-04l1"></script>
 <script src="js/spritegen.js?v=2026-10-13l"></script>
 <script src="js/spritegen_grass.js?v=2026-10-13l"></script>
 <script src="js/spritegen_shrubs.js?v=2026-10-13l"></script>
@@ -336,7 +342,7 @@
 <script src="js/peoplegen_roles.js?v=2026-10-13l"></script>
 <script src="js/peoplegen_umbrella.js?v=2026-10-13l"></script>
 <script src="js/peoplegen_held.js?v=2026-10-13l"></script>
-<script src="js/sprites.js?v=2026-11-03b"></script>
+<script src="js/sprites.js?v=2026-11-04l1"></script>
 <script src="js/buildings.js?v=2026-11-01w"></script>
 <script src="js/ground.js?v=2026-10-13l"></script>
 <script src="js/vehicles.js?v=2026-10-26k"></script>
@@ -371,7 +377,7 @@
 <script src="js/staticcache.js?v=2026-10-27d"></script>
 <script src="js/neverseen.js?v=2026-10-26s"></script>
 <script src="js/economy.js?v=2026-11-01x"></script>
-<script src="js/main.js?v=2026-10-30pw"></script>
+<script src="js/main.js?v=2026-11-04l1"></script>
 <script src="js/cityledger.js?v=2026-10-29a"></script>
 <script src="js/overseer.js?v=2026-10-31ec"></script>
 <script src="js/policedesk.js?v=2026-10-30t"></script>
@@ -381,7 +387,7 @@
 <script>document.getElementById('toTitle').addEventListener('click', () => { const tg = document.getElementById('deckToggle'); if (document.getElementById('deck').classList.contains('open')) tg.click(); (TITLE.fromGame || TITLE.show)(); });</script>
 <!-- the player's interface for the public build (settings dialog, city settings, folds): not on #dev -->
 <script src="js/pctut.js?v=2026-11-04r2"></script>   <!-- the tutorial on a computer (a touch screen has tutorial.js) -->
-<script src="js/playerui.js?v=2026-11-03a"></script>
+<script src="js/playerui.js?v=2026-11-04l1"></script>
 <!-- the touch screen's own pieces and its tutorial (nothing with a mouse and keyboard) -->
 <script src="js/touchui.js?v=2026-11-04r2"></script>
 <script src="js/tutorial.js?v=2026-11-04z"></script>

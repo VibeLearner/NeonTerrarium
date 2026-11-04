@@ -351,7 +351,7 @@ const FOL_ATLAS = (() => {
 const FOL_SHADER = new THREE.ShaderMaterial({
     uniforms: { lightsOn: LIGHTS_ON, lodPlants: LOD.plants, map:{value:FOL_ATLAS.tex}, atlasSize:{value:FOL_ATLAS.size}, tint:FOL_UNI.tint, time:FOL_UNI.time, normalMode:FOL_UNI.normalMode, neonI:FOL_UNI.neonI, res:FOL_UNI.res, wind:FOL_UNI.wind, swayBand:FOL_UNI.swayBand },
     vertexShader: `uniform vec2 res; uniform float time; uniform float lodPlants; uniform float lightsOn; uniform float wind; varying float vPhase; attribute vec4 aVar; attribute float aFixed; attribute vec4 aRect; attribute vec2 aKind; attribute float aOn;
-      varying vec2 vUv; varying float vShade; varying vec4 vRect; varying vec2 vKind; varying float vFlk; varying float vOn;` + FLK_GLSL + LIT_GLSL + `
+      varying vec2 vUv; varying float vShade; varying vec4 vRect; varying vec2 vKind; varying float vFlk; varying float vOn; varying float vFade;` + FLK_GLSL + LIT_GLSL + `
       // a plant lies on or against what it grows from (moss on the floor, ivy on a wall, a bush's foot on its pot), at the same depth: it's kept in front by a
       // fixed nudge toward the camera, about 0.06 of a unit (the view is orthographic, near 10 to far 900: 2/890 of clip depth a unit). The polygon
       // offset below did this alone, but how far it moves is up to each graphics chip: on some phones (a Pixel 7 in Chrome) it was too little, and the
@@ -394,13 +394,21 @@ const FOL_SHADER = new THREE.ShaderMaterial({
         }
         // zoomed out: thin the plants and laundry (small sprites go first); lit signs always stay
         float thin = lodPlants * (aRect.w < 24.0 ? 0.6 : 0.4);   // (at most six tufts in ten, four plants in ten: fewer than before, since plants cost little and the gaps showed)
-        if (aKind.y < 0.5 && fract(aVar.w*5.17) < thin) gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
+        // (each one fades out over a stretch of zoom, a dither of its pixels (owner, Nov 4: plants popping out and in as the view zoomed), rather than
+        //  going at once; gone altogether only once the fade is through)
+        vFade = 1.0;
+        if (aKind.y < 0.5){ float k = fract(aVar.w*5.17), f = (k - thin)/0.12 + 1.0; vFade = clamp(f, 0.0, 1.0); if (f <= 0.0) gl_Position = vec4(0.0, 0.0, 2.0, 1.0); }
       }`,
     side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4,
     fragmentShader: `uniform sampler2D map; uniform vec2 atlasSize; uniform vec3 tint; uniform float normalMode; uniform float neonI;
       uniform float time; uniform float wind; uniform float swayBand;
-      varying vec2 vUv; varying float vShade; varying float vPhase; varying vec4 vRect; varying vec2 vKind; varying float vFlk; varying float vOn;
+      varying vec2 vUv; varying float vShade; varying float vPhase; varying vec4 vRect; varying vec2 vKind; varying float vFlk; varying float vOn; varying float vFade;
       void main(){
+        // a plant fading out as the view zooms out (vFade, the vertex shader): its pixels go in a 4x4 ordered dither, screen-fixed, so it thins like pixel art
+        if (vFade < 0.999){ vec2 q = mod(floor(gl_FragCoord.xy), 4.0);
+          float b = q.y < 0.5 ? (q.x < 0.5 ? 0.0 : q.x < 1.5 ? 8.0 : q.x < 2.5 ? 2.0 : 10.0) : q.y < 1.5 ? (q.x < 0.5 ? 12.0 : q.x < 1.5 ? 4.0 : q.x < 2.5 ? 14.0 : 6.0)
+            : q.y < 2.5 ? (q.x < 0.5 ? 3.0 : q.x < 1.5 ? 11.0 : q.x < 2.5 ? 1.0 : 9.0) : (q.x < 0.5 ? 15.0 : q.x < 1.5 ? 7.0 : q.x < 2.5 ? 13.0 : 5.0);
+          if (vFade*16.0 <= b + 0.5) discard; }
         vec2 texSize = floor(vRect.zw + 0.5); float swayType = vKind.x;
         vec2 tx = vUv * texSize;                 // position in texels
         float row = floor(tx.y);

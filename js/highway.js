@@ -850,19 +850,35 @@ function hwShowGhost(t){
   hwGhost.pole.position.set(x, (top + by)/2, z); hwGhost.pole.scale.set(.06, Math.max(.01, top - by), .06);
   hwGhost.g.visible = true;
 }
+// The rules' reasons (hwTileWhy, mtTileWhy and the rest), cut down to a few plain words. Every refusal shows these, mouse and finger alike
+// (owner, Nov 4: error messages short and easy to understand)
+const WHY_SHORT = [
+  [/off the map/, 'Edge of the world'], [/megastructure/, 'Blocked by a megastructure'],
+  [/sky ramp would hit a building/, 'No room for the ramp: a building'], [/sky ramp/, 'No room for the ramp'],
+  [/building is too tall/, 'Blocked by a tall building'], [/building is in the way/, 'Blocked by a building: go higher'],
+  [/another highway is there/, 'Another highway in the way'], [/metro line is already here/, 'Another line in the way'],
+  [/metro station's lift/, 'A station lift is in the way'], [/metro is in the way/, 'The metro is in the way'],
+  [/highway's ramp/, 'A highway ramp is in the way'], [/sky highway is in the way/, 'A highway is in the way'],
+  [/station's lift|lift has no room|room here for the/, 'No room for the station lift'], [/lift down to the street/, 'No room for the lift'],
+  [/stays a station/, 'Go straight on from the end station'], [/straight track/, 'Stations need straight track'],
+  [/too close to another station/, 'Too close to another station'], [/come into the first station from behind/, 'Close the loop from behind the station'],
+  [/needs a second station/, 'Add a second station first'], [/^finished/, 'Already finished'],
+  [/next plot first/, 'Add the next piece first'], [/out of range/, 'Too high or too low'],
+];
+function whyShort(why){ if (!why) return ''; if (/^finished/.test(why) && typeof TOUCH !== 'undefined' && TOUCH.on) return 'Finished: hold the drop-off to reopen'; for (const [re, s] of WHY_SHORT) if (re.test(why)) return s; const w = why.split(':')[0]; return w[0].toUpperCase() + w.slice(1); }
 // highway mode's line under the bar: only what's wrong, when something is (the Instructions panel has the rest)
-function hwHintText(why){ return why || ''; }
+function hwHintText(why){ return whyShort(why); }
 let hwLastPt = null;
 // (the mouse picks as a finger does too, owner Nov 3: the air in front of the road, at its height, is the next piece: see mtHover)
 function hwHover(cx, cy, touch){ hwLastPt = { x: cx, y: cy, touch }; const t = hwTargetAt(hwPickTouch(cx, cy)); hwShowGhost(t);
-  const el = $('modeHint'), why = hwHintText(t && !t.ok && t.type !== 'none' ? t.why : ''); el.textContent = why; el.hidden = !why; }
+  const el = $('modeHint'), why = hwHintText(t && !t.ok && t.type !== 'none' ? t.why : ''); el.textContent = why; el.hidden = !why; el.classList.toggle('bad', !!why); }
 // With a mouse, a click (or a drag of track) the rules refuse says why, beside the pointer, for a moment (owner, Nov 4): the reason was only in the hint
 // line at the bottom, and a refused click looked like nothing happening. (A finger has its own prompts: transit-touch.js)
 const transitWhy = (() => { let el = null, tm = 0;
   return (why, x, y) => {
     if (!why || (typeof TOUCH !== 'undefined' && TOUCH.on)) return;
     if (!el){ el = document.createElement('div'); el.className = 'twhy'; el.setAttribute('role', 'status'); document.body.appendChild(el); }
-    el.textContent = why.charAt(0).toUpperCase() + why.slice(1); el.style.left = Math.round(x) + 'px'; el.style.top = Math.round(y) + 'px'; el.hidden = false;
+    el.textContent = whyShort(why); el.style.left = Math.round(x) + 'px'; el.style.top = Math.round(y) + 'px'; el.hidden = false;
     clearTimeout(tm); tm = setTimeout(() => { el.hidden = true; }, 2800);
   };
 })();
@@ -877,6 +893,6 @@ function setHwMode(on, quiet){
   else { hwGhost.g.visible = false; hwHighlight(null); }
   const b = document.getElementById('hwBtn'); if (b){ b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); }
   const bar = document.getElementById('hwbar'); if (bar) bar.hidden = !on;
-  $('modeHint').hidden = on; if (on) $('modeHint').textContent = '';
+  $('modeHint').hidden = on; $('modeHint').classList.remove('bad'); if (on) $('modeHint').textContent = '';
   else if (!quiet) selectZone(S.zone);
 }

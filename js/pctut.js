@@ -60,7 +60,10 @@ const PCTUT = (() => {
 
   /* ---------- the first time in a city ---------- */
   const pieces = () => { let n = 0; for (const c of cells.values()) n += c.sections.length; return n; };
-  const MAIN = { key: KEY, st, name: 'OPERATOR NOTE', end: 'Tutorial complete. Keep building: more buildings and megastructures unlock as your city grows. All controls are under Hover for controls.', beats: [
+  const walls = () => { let n = 0; for (const c of cells.values()) if (c.wall && !c.mega) n += 1 + (c.wall.n || 0); return n; };   // (each tier counts: stacking one higher is a wall too)
+  const gates = () => { let n = 0; for (const c of cells.values()) if (c.wall && c.wall.gate) n++; return n; };
+  const MAIN = { key: KEY, st, name: 'OPERATOR NOTE', end: 'Tutorial complete. Keep building: more buildings and megastructures unlock as your city grows. All controls are under Hover for controls. To replay this tutorial, open Game Settings and scroll down.', beats: [
+    { id: 'zoom', say: 'Scroll the mouse wheel to zoom in and out (or press + and \u2212)', ghost: 'up', arm: () => { const z = zoomT; return () => Math.abs(zoomT - z) > .3; } },
     { id: 'tile', say: 'Click the sky beside the platform to add a tile', ghost: 'tap', arm: () => { let ok = false; const f = () => { ok = true; }; addEventListener('nt:tile', f, { once: true }); return () => ok; } },
     // (a click on an empty tile cycles its surface only with no zone picked: with one picked it builds, so the beat is passed over)
     { id: 'surface', say: 'Click a tile to cycle its surface', ghost: 'tap', skipIf: () => !!S.zone, arm: () => { let ok = false; const f = () => { ok = true; }; addEventListener('nt:surface', f, { once: true }); return () => ok || !!S.zone; } },
@@ -72,8 +75,19 @@ const PCTUT = (() => {
     { id: 'side', say: 'You can build on the side of buildings too: click a building\'s wall', ghost: 'tap', arm: () => { let ok = false; const f = () => { ok = true; }; addEventListener('nt:side', f, { once: true }); return () => ok; } },
     { id: 'floor', say: 'With a zone picked, point at a tile or roof and press Space to build a single floor', ghost: 'tap', arm: () => { const n = pieces(); return () => pieces() > n; } },
     // (tap Shift: the height pick, moving the mouse up or down; a click builds there. Done once a pick has been made and something built)
-    { id: 'shift', say: 'Tap Shift and move the mouse up or down to start a building higher, then click to build it', ghost: 'drag',
+    { id: 'shift', say: 'Point at a tile or a building\'s rooftop, tap Shift and move the mouse up or down to start a building higher, then click to build it', ghost: 'drag',
       arm: () => { let was = false, e0 = 0; return () => { if (typeof HL !== 'undefined' && HL){ was = true; e0 = SC_EDITS; } return was && !HL && SC_EDITS > e0; }; } },   // (SC_EDITS: any edit, world.js; a pick can make a scaffold, a pod or a section)
+    // deleting (owner, Nov 4): one piece with a right-click (the top of a building comes off), a whole area in delete mode
+    { id: 'remove', say: 'Right-click a building to remove its top piece', ghost: 'tap', arm: () => { const n = pieces(); return () => pieces() < n; } },
+    { id: 'restore', say: 'Changed your mind? Click Restore beside the pointer to bring it back', ghost: 'tap', skipIf: () => !document.querySelector('.pcrestore:not([hidden])'),
+      arm: () => { let ok = false; addEventListener('nt:restore', () => { ok = true; }, { once: true }); return () => ok || !document.querySelector('.pcrestore:not([hidden])'); } },   // (its six seconds run out: on)
+    { id: 'erase', say: 'Press X (or the \u2715 button) for delete mode: drag to select an area, click inside it to delete it, then X again to leave', ghost: 'drag',
+      arm: () => { let was = false; return () => { if (typeof delMode !== 'undefined' && delMode) was = true; return was && !delMode; }; } },
+    // walls and gates (owner, Nov 4): the Perimeter button under each zone card, a wall, a gate, and back to building
+    { id: 'perim', say: 'For walls, click Perimeter under a zone card', ghost: 'tap', arm: () => () => typeof PERIM !== 'undefined' && !!PERIM },
+    { id: 'wall', say: 'Click an empty tile or the open sky to raise a wall. Click a wall\'s top to stack it higher', ghost: 'tap', arm: () => { const n = walls(); return () => walls() > n; } },
+    { id: 'gate', say: 'Click a wall\'s face to turn it into a gate (click again to switch it back). A gate can\'t go where another wall blocks it', ghost: 'tap', arm: () => { const g = gates(); return () => gates() !== g; } },
+    { id: 'perimoff', say: 'Click Perimeter again (or pick a zone card) to go back to building', ghost: 'tap', arm: () => () => typeof PERIM === 'undefined' || !PERIM },
   ] };
 
   /* ---------- the transit modes, the first time each is turned on ---------- */

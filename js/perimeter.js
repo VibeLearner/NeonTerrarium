@@ -257,8 +257,10 @@ function buildPerimeter(c){
 let PERIM = null;   // the zone picked for Perimeter (one of the thin buttons under the zone buttons), or null
 const wallNbrs = c => SIDES4.map(([a, b]) => cells.get(ckey(c.i + a, c.j + b))).filter(n => n && n.wall && !n.mega);
 const wallFree = c => !!c && !c.mega && !c.lift && !c.sections.length && !c.wall;
-const perimFlash = msg => { const h = document.getElementById('modeHint'); if (!h) return; h.textContent = msg; clearTimeout(perimFlash.t); perimFlash.t = setTimeout(() => { if (PERIM) perimHint(); }, 3000); };
-function perimHint(){ const h = document.getElementById('modeHint'); if (h && PERIM) h.textContent = 'Perimeter (' + WALL_ZONES[PERIM] + '): click an empty plot or open sky to raise a wall · click a wall\'s face to switch wall and gate · click its top to stack it higher · right-click takes the top off'; }
+// (a refusal: red, white words (owner, Nov 4), then back to the mode's line)
+const perimFlash = msg => { const h = document.getElementById('modeHint'); if (!h) return; h.textContent = msg; h.classList.add('bad'); h.hidden = false; clearTimeout(perimFlash.t); perimFlash.t = setTimeout(() => { h.classList.remove('bad'); if (PERIM) perimHint(); }, 3000); };
+// (with a mouse the standing line is gone (owner, Nov 4): it sat over the city all the time; the PC tutorial teaches the mode. A finger still gets its first words)
+function perimHint(){ const h = document.getElementById('modeHint'); if (h && PERIM) h.classList.remove('bad'); if (h && PERIM && !(typeof TOUCH !== 'undefined' && TOUCH.on)){ h.textContent = ''; return; } if (h && PERIM) h.textContent = 'Perimeter (' + WALL_ZONES[PERIM] + '): click an empty plot or open sky to raise a wall · click a wall\'s face to switch wall and gate · click its top to stack it higher · right-click takes the top off'; }
 // a click in Perimeter mode: what it would do
 function perimTarget(pk){
   if (!pk) return null;
@@ -293,8 +295,8 @@ function addWall(c, i, j, zone){
 function stackWall(c){
   stageFinishAll();
   const top = wallTopOf(c);
-  if (top + WALL_TIER > CURB + MAX_HEIGHT + 1.5){ perimFlash('That wall is as tall as walls go.'); return null; }
-  if (c.wallCap !== undefined && top + WALL_TIER > c.wallCap - .05){ perimFlash('A highway or the metro runs over this wall: it can\'t go higher.'); return null; }
+  if (top + WALL_TIER > CURB + MAX_HEIGHT + 1.5){ perimFlash('This wall can\'t go any higher.'); return null; }
+  if (c.wallCap !== undefined && top + WALL_TIER > c.wallCap - .05){ perimFlash('A highway or metro is above: can\'t go higher.'); return null; }
   finishAnimsOn(c); holdRegion(c);
   const old = { view: c.view, data: c.data }; c.view = null; c.data = null;
   c.wall.n = (c.wall.n || 0) + 1;
@@ -305,7 +307,7 @@ function stackWall(c){
 function toggleGate(c){
   stageFinishAll();
   wallPrep(c);
-  if (!wallGateable(c)){ perimFlash('Gates go in straight runs of wall, not at corners or joins.'); return null; }
+  if (!wallGateable(c)){ perimFlash('Gates can\'t be built where another wall is blocking it.'); return null; }
   finishAnimsOn(c); holdRegion(c);
   const old = { view: c.view, data: c.data }; c.view = null; c.data = null;
   c.wall.gate = !c.wall.gate;

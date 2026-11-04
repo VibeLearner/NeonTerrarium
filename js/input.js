@@ -402,7 +402,7 @@ function endPtr0(e){
       delSel = null; showAreaSel(null);
     }
     if (act.kind === 'right' && !act.moved && delMode){ delSel = null; showAreaSel(null); }
-    else if (act.kind === 'right' && !act.moved){ if (hwMode) hwRightClick(e.clientX, e.clientY); else if (mtMode) mtRightClick(e.clientX, e.clientY); else if (megaPick) selectMega(null); else removeAt(pickAt(e.clientX, e.clientY)); }   // right-click while placing: put it down (highways are only cut in highway mode)
+    else if (act.kind === 'right' && !act.moved){ if (hwMode) hwRightClick(e.clientX, e.clientY); else if (mtMode) mtRightClick(e.clientX, e.clientY); else if (megaPick) selectMega(null); else { const pk = pickAt(e.clientX, e.clientY), snap = RESTORE.snap(pk); removeAt(pk); if (snap){ RESTORE.offer(snap, e.clientX, e.clientY); tEmit('remove'); } } }   // (a removal: a Restore button by the pointer for a few seconds, as a finger's hold-to-remove has: owner, Nov 4)   // right-click while placing: put it down (highways are only cut in highway mode)
     if (act.kind === 'sky' && act.moved && act.tdraw){ tdStep(e.clientX, e.clientY, 12); if (hwMode) hwHover(e.clientX, e.clientY); else if (mtMode) mtHover(e.clientX, e.clientY); }
     if (act.kind === 'sky' && !act.moved){ if (hwMode) hwClick(e.clientX, e.clientY); else if (mtMode) mtClick(e.clientX, e.clientY); else if (megaPick) placeMegaHere(e.clientX, e.clientY); else { act.done = new Set(); paintAt(e.clientX, e.clientY); } }
     if (act.kind === 'dtap' && !(typeof LOADP !== 'undefined' && LOADP.on)){
@@ -523,6 +523,9 @@ function selectZone(z){
   if (S.zone && mtMode) setMtMode(false, true);
   document.querySelectorAll('.zone[data-zone]').forEach(b => { const on = b.dataset.zone === S.zone; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
   if (megaPick || delMode || hwMode || mtMode) return;
+  // (with a mouse, no standing line (owner, Nov 4): it sat over the city all the time; the PC tutorial teaches all of it. A finger's line is kept (touch.js fades it))
+  $('modeHint').classList.remove('bad');
+  if (!(typeof TOUCH !== 'undefined' && TOUCH.on)){ $('modeHint').textContent = ''; return; }
   $('modeHint').textContent = S.zone ? `Zone ${ZONES[S.zone].key}: click to build · click a roof to stack a section` + ' · click a wall to hang a side building · Space adds one floor · tap Shift to pick a height' + (S.paint ? ' · drag to paint' : '') : 'Click the sky to grow the platform · pick a zone to build';
 }
 document.querySelectorAll('.zone[data-zone]').forEach(b => b.addEventListener('click', () => selectZone(b.dataset.zone)));
@@ -594,7 +597,7 @@ function selectMega(kind, quiet){
   document.querySelectorAll('.bitem').forEach(b => { const on = b.dataset.kind === megaPick; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
   hover.visible = hoverFill.visible = hoverStrip.visible = false;
   if (megaPick){ const t = MEGA_TYPES[megaPick];
-    $('modeHint').textContent = `Placing: ${t.name} · click to build` + (t.w !== t.h ? ' · R turns it' : '') + ' · right-click or Esc to stop';
+    $('modeHint').classList.remove('bad'); $('modeHint').textContent = `Placing: ${t.name} · click to build` + (t.w !== t.h ? ' · R turns it' : '') + ' · right-click or Esc to stop';
     if (ptrLast) showMegaGhost(megaPick, groundCellAt(ptrLast.x, ptrLast.y), megaTurn); }
   else { showMegaGhost(null); if (!quiet) selectZone(S.zone); }
 }
@@ -679,6 +682,7 @@ function setDelMode(on, quiet){
   if (on){ if (S.zone) selectZone(null); if (megaPick) selectMega(null, true); if (hwMode) setHwMode(false, true); if (mtMode) setMtMode(false, true); hover.visible = hoverFill.visible = hoverStrip.visible = false; showMegaGhost(null); }
   document.body.classList.toggle('deleting', on);
   $('delBtn').classList.toggle('on', on); $('delBtn').setAttribute('aria-pressed', on);
+  $('modeHint').classList.remove('bad');
   if (on) $('modeHint').textContent = typeof TOUCH !== 'undefined' && TOUCH.on ? 'Erase: drag to select, tap inside to clear it · two fingers to move' : 'Delete mode: drag to select an area · click inside it to delete · click outside to clear · X to go back to building';
   if (typeof TUI !== 'undefined') TUI.eraseChip(on);
   else if (!quiet) selectZone(S.zone ? S.zone : null);

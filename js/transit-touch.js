@@ -20,21 +20,8 @@ const TT = (() => {
   const say = s => { if (s && typeof TUI !== 'undefined' && TUI.toast) TUI.toast(s); };
   const buzz = ms => { if (typeof TUI !== 'undefined' && TUI.buzz) TUI.buzz(ms); };
   const aimTip = (x, y) => { if (typeof TUI !== 'undefined' && TUI.aimTip) TUI.aimTip(x, y); };
-  // the rules' reasons (highway.js hwTileWhy, metro.js mtTileWhy and the rest), cut down to a few words for a prompt
-  const SHORT = [
-    [/off the map/, 'Edge of the world'], [/megastructure/, 'Blocked by a megastructure'],
-    [/sky ramp would hit a building/, 'No room for the ramp: a building'], [/sky ramp/, 'No room for the ramp'],
-    [/building is too tall/, 'Blocked by a tall building'], [/building is in the way/, 'Blocked by a building: go higher'],
-    [/another highway is there/, 'Another highway in the way'], [/metro line is already here/, 'Another line in the way'],
-    [/metro station's lift/, 'A station lift is in the way'], [/metro is in the way/, 'The metro is in the way'],
-    [/highway's ramp/, 'A highway ramp is in the way'], [/sky highway is in the way/, 'A highway is in the way'],
-    [/station's lift|lift has no room|room here for the/, 'No room for the station lift'], [/lift down to the street/, 'No room for the lift'],
-    [/stays a station/, 'Go straight on from the end station'], [/straight track/, 'Stations need straight track'],
-    [/too close to another station/, 'Too close to another station'], [/come into the first station from behind/, 'Close the loop from behind the station'],
-    [/needs a second station/, 'Add a second station first'], [/^finished/, 'Finished: hold the drop-off to reopen'],
-    [/next plot first/, 'Add the next piece first'], [/out of range/, 'Too high or too low'],
-  ];
-  const short = why => { if (!why) return ''; if (why === NOTILE) return why; for (const [re, s] of SHORT) if (re.test(why)) return s; const w = why.split(':')[0]; return w[0].toUpperCase() + w.slice(1); };
+  // the rules' reasons, cut down to a few words (whyShort: highway.js, shared with the mouse)
+  const short = why => !why ? '' : why === NOTILE ? why : whyShort(why);
 
   /* ---------- picking and targets ---------- */
   const pickAt = (hw, x, y) => hw ? hwPickTouch(x, y) : mtPickTouch(x, y);

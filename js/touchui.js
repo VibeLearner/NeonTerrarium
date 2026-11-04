@@ -34,22 +34,39 @@ const RESTORE = (() => {
     } catch (e){ console.warn('restore', e); return false; }
   }
 
-  // the mouse's Restore button (owner, Nov 4: a finger had one, a right-click had none): beside the pointer where the piece came off, for six seconds.
-  //  Another right-click moves it on to that removal
+  // the mouse's Restore button (owner, Nov 4: a finger had one, a right-click had none): just above "Hover for controls" and "City settings", for three
+  //  seconds, or until something else is built (owner, Nov 4). Another right-click moves it on to that removal
   let btn = null, held = null, tm = 0;
-  function offer(s, x, y){
+  const hide = () => { if (btn) btn.hidden = true; held = null; clearTimeout(tm); };
+  function place(){
+    const row = document.querySelector('.zonebar .ctlwrap.hint'); if (!row) return;
+    let top = row.getBoundingClientRect().top;
+    for (const id of ['modeHint', 'tiltChip']){ const e = document.getElementById(id); if (e && !e.hidden && e.offsetHeight) top = Math.min(top, e.getBoundingClientRect().top); }
+    const r = row.getBoundingClientRect(), cb = document.getElementById('puCityBtn'), q = cb && cb.offsetWidth ? cb.getBoundingClientRect() : r;   // (centered over both: Hover for controls and City settings)
+    btn.style.left = Math.round((Math.min(r.left, q.left) + Math.max(r.right, q.right))/2) + 'px'; btn.style.top = Math.round(top - 8) + 'px';
+  }
+  function offer(s){
     if (typeof TOUCH !== 'undefined' && TOUCH.on) return;
     if (!btn){ btn = document.createElement('button'); btn.type = 'button'; btn.className = 'pcrestore'; btn.textContent = '\u21BA Restore'; btn.hidden = true; document.body.appendChild(btn);
       btn.addEventListener('pointerdown', e => e.stopPropagation());
-      btn.addEventListener('click', () => { const v = held; btn.hidden = true; held = null; clearTimeout(tm); if (v && put(v)) dispatchEvent(new CustomEvent('nt:restore')); }); }
-    held = s; btn.hidden = false;
-    btn.style.left = Math.round(Math.min(innerWidth - 110, x + 14)) + 'px'; btn.style.top = Math.round(Math.max(8, y - 44)) + 'px';
-    clearTimeout(tm); tm = setTimeout(() => { btn.hidden = true; held = null; }, 6000);
+      btn.addEventListener('click', () => { const v = held; hide(); if (v && put(v)) dispatchEvent(new CustomEvent('nt:restore')); }); }
+    held = s; btn.hidden = false; place();
+    clearTimeout(tm); tm = setTimeout(hide, 3000);
   }
+  // something else built: the chance to undo the removal is over (a finger's chip too: TUI below)
+  //  (every way of building goes through one of these: a click or tap (applyTarget, which walls go through too), a picked height (hlBuild), Space's floor
+  //  (unitAt), a megastructure (placeFromMenu), a piece of highway or metro (hwApply, mtApply). Each is wrapped once everything has loaded)
+  const over = () => { hide(); if (typeof TUI !== 'undefined' && TUI.hideRestore) TUI.hideRestore(); };
+  addEventListener('DOMContentLoaded', () => {
+    for (const name of ['applyTarget', 'hlBuild', 'unitAt', 'placeFromMenu', 'hwApply', 'mtApply']){
+      const f = self[name]; if (typeof f !== 'function' || f._restoreWrapped) continue;
+      const w = function(){ const r = f.apply(this, arguments); if (r) over(); else if (name === 'hlBuild') over(); return r; }; w._restoreWrapped = true; self[name] = w;
+    }
+  });
   return { snap, put, offer };
 })();
 const TUI = (() => {
-  const U = { buzz(){}, ring(){}, snapCell(){ return null; }, offerRestore(){}, megaTap(){ return false; }, eraseChip(){}, aimTip(){}, toast(){} };
+  const U = { buzz(){}, ring(){}, snapCell(){ return null; }, offerRestore(){}, hideRestore(){}, megaTap(){ return false; }, eraseChip(){}, aimTip(){}, toast(){} };
   if (typeof TOUCH === 'undefined' || !TOUCH.on) return U;
   const $ = id => document.getElementById(id);
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
@@ -82,7 +99,8 @@ const TUI = (() => {
     const w = pr && pr.width ? pr.width : r.width, h = pr && pr.height ? pr.height : 15;
     chip.style.left = Math.round(r.left + (r.width - w)/2) + 'px'; chip.style.width = Math.round(w) + 'px'; chip.style.height = Math.round(h) + 'px';
     const top = col ? col.getBoundingClientRect().top : r.top; chip.style.bottom = Math.round(innerHeight - top + (document.documentElement.classList.contains('tport') ? 18 : 8)) + 'px'; };   // (upright: clear of the zone deck's peeking edges)
-  U.offerRestore = snap => { chipSnap = snap; chip.hidden = false; placeChip(); clearTimeout(chipT); chipT = setTimeout(() => { chip.hidden = true; chipSnap = null; }, 5000); };
+  U.offerRestore = snap => { chipSnap = snap; chip.hidden = false; placeChip(); clearTimeout(chipT); chipT = setTimeout(() => { chip.hidden = true; chipSnap = null; }, 3000); };   // (three seconds, or until something else is built: owner, Nov 4)
+  U.hideRestore = () => { chip.hidden = true; chipSnap = null; clearTimeout(chipT); };
   chip.addEventListener('click', () => { const s = chipSnap; chip.hidden = true; chipSnap = null; clearTimeout(chipT); if (s && RESTORE.put(s)){ U.buzz(12); dispatchEvent(new CustomEvent('nt:restore')); } });
 
   /* ---------- megastructures: the holo-tags ---------- */

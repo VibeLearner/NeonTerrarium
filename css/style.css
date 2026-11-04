@@ -86,6 +86,12 @@ input[type=range]{width:100%;accent-color:var(--cyan);margin:0}
 .zone:hover{filter:none}
 .rot{align-self:center;width:38px;height:38px;padding:0;font-size:18px;line-height:1;color:var(--ink);background:rgba(10,16,32,.88);border:1px solid var(--line);border-radius:0;clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)}
 .rot:hover{border-color:var(--cyan);color:var(--cyan)}
+/* (with a mouse (owner, Nov 4): no turn buttons (Q and E and dragging the sky turn the view), and the zone cards sit centered under "Hover for controls":
+   the delete button and Scan pod hang off to the right of the cards instead of pushing them left) */
+html:not(.touch) .rot:not(.del){display:none}
+html:not(.touch) .zones{position:relative;flex-wrap:nowrap}
+html:not(.touch) .zones > #delBtn{position:absolute;left:calc(100% + 10px);top:50%;transform:translateY(-50%)}
+html:not(.touch) .zones > #furnBtn{position:absolute;left:calc(100% + 58px);top:50%;transform:translateY(-50%);white-space:nowrap}
 .zone.on{filter:none}
 /* the selected zone, clearly (owner, Oct 30): a thicker border at full strength, the card lit from inside in its colour, and it lifts and grows a
    little. (A glow outside the card is cut off by its corner clip.) translate and scale, not transform: touch.js moves the card with transform */
@@ -833,7 +839,7 @@ html:not(.touch) .pctip:not([hidden]){display:block;position:fixed;left:50%;top:
   background:rgba(168,18,36,.95);border:1px solid #ff6a78;text-shadow:0 1px 1px rgba(0,0,0,.45);pointer-events:none;white-space:normal}
 .twhy[hidden]{display:none}
 /* the mouse's Restore button, by the pointer after a right-click removal (touchui.js RESTORE.offer) */
-.pcrestore{position:fixed;z-index:160;padding:5px 11px;font:600 13px/1 'Chakra Petch',sans-serif;letter-spacing:.04em;color:#ffd9a0;background:rgba(14,10,4,.92);
+.pcrestore{position:fixed;z-index:160;transform:translate(-50%,-100%);padding:5px 11px;font:600 13px/1 'Chakra Petch',sans-serif;letter-spacing:.04em;color:#ffd9a0;background:rgba(14,10,4,.92);
   border:1px solid #ffb347;box-shadow:0 0 10px rgba(255,179,71,.35);cursor:pointer}
 .pcrestore:hover{background:rgba(60,38,8,.95);color:#fff}
 .pcrestore[hidden]{display:none}

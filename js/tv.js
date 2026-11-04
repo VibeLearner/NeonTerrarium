@@ -86,7 +86,7 @@ const TV = (() => {
   function release(){ // (only the game's own view: asking an unused canvas for a context would make it a new one)
     for (const c of document.querySelectorAll('canvas#view')){ let gl = null; try { gl = c.getContext('webgl2') || c.getContext('webgl'); } catch (e){}
     const x = gl && gl.getExtension && gl.getExtension('WEBGL_lose_context'); if (x) try { x.loseContext(); } catch (e){} } }
-  T.go = (url) => T.off(() => { release(); location.href = url + (url.includes('?') ? '&' : '?') + 'tv=1'; });
+  T.go = (url) => T.off(() => { release(); const h = url.indexOf('#'), u = h < 0 ? url : url.slice(0, h), hash = h < 0 ? '' : url.slice(h); location.href = u + (u.includes('?') ? '&' : '?') + 'tv=1' + hash; });   // (?tv=1 goes before a #link such as #plan)
   // a page restored from that cache (the back button) has no graphics left: load it fresh
   addEventListener('pageshow', e => { if (e.persisted) location.reload(); });
   return T;

@@ -35,8 +35,8 @@ if (NT_PLAN){
 addEventListener('hashchange', () => { if (/(^#|[,&])plan\b/.test(location.hash) !== NT_PLAN) location.reload(); });
 // which game mode is running, for the few places that ask (economy.js or placement.js; null in the sandbox)
 function NT_MODE(){ return typeof ECON !== 'undefined' && ECON.on ? ECON : typeof PLAN !== 'undefined' && PLAN.on ? PLAN : null; }
-// the title screen shows on every load, unless a city switch just asked to go straight in
-(() => {
+// the title screen shows on every load, unless a city switch just asked to go straight in (the coast page has none)
+if (!/coast\.html$/.test(location.pathname)) (() => {
   let skip = false; try { skip = sessionStorage.getItem('neonTerrarium.skipTitle') === '1'; sessionStorage.removeItem('neonTerrarium.skipTitle'); } catch (e) {}
   if (/[?&](notitle|tv=1)\b/.test(location.search) || navigator.webdriver) skip = true;   // (tests and the tools/ harnesses go straight in, and so does a return from the coast)
   if (/[?&]title\b/.test(location.search)) skip = false;   // (?title: show it anyway, for looking at it under a test browser)

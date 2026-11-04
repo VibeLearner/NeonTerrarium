@@ -99,8 +99,8 @@ const SLOTS = (() => {
   };
   SL.create = async (name, mode) => {
     await checkpoint();
-    const rec = { id: newId(), name: (name || '').trim().slice(0, 40) || 'New city', created: Date.now(), updated: Date.now(), meta: { day: 1, residents: 0, plots: 0, mode: mode === 'economy' ? 'economy' : 'sandbox' }, data: {} };
-    if (mode === 'economy' && typeof ECON !== 'undefined') rec.data['neonIsland.economy'] = JSON.stringify(ECON.freshState());   // (an Economy city: economy.js; Sandbox has no such key)
+    const rec = { id: newId(), name: (name || '').trim().slice(0, 40) || 'New city', created: Date.now(), updated: Date.now(), meta: { day: 1, residents: 0, plots: 0, mode: NT_PLAN ? 'plan' : mode === 'economy' ? 'economy' : 'sandbox' }, data: {} };
+    if (!NT_PLAN && mode === 'economy' && typeof ECON !== 'undefined') rec.data['neonIsland.economy'] = JSON.stringify(ECON.freshState());   // (an Economy city: economy.js; Sandbox has no such key)
     await putRec(rec);
     swapIn(rec);
   };
@@ -131,7 +131,10 @@ const SLOTS = (() => {
   SL.importFile = async file => {
     const f = JSON.parse(await file.text());
     if (!f || f.format !== 'neon-terrarium-city' || !f.data || typeof f.data !== 'object') throw new Error('That file isn\'t a Neon Terrarium city.');
-    const data = {}; for (const [k, v] of Object.entries(f.data)) if (NT_isCityKey(k) && typeof v === 'string') data[k] = v;
+    // (a Planner city opens only on the Planner's link, and a sandbox or Economy city only off it: nothing converts)
+    const isPlan = typeof f.data['neonIsland.plan'] === 'string' || (f.meta && f.meta.mode === 'plan');
+    if (isPlan !== NT_PLAN) throw new Error(isPlan ? 'That\'s a Planner city: open it from the Planner (#plan).' : 'That city isn\'t a Planner city: open it from the main game.');
+    const data = {}; for (const [k, v] of Object.entries(f.data)) if (NT_isCityKey(k) && typeof v === 'string' && k !== (NT_PLAN ? 'neonIsland.economy' : 'neonIsland.plan')) data[k] = v;
     const rec = { id: newId(), name: String(f.name || 'Imported city').slice(0, 40), created: f.created || Date.now(), updated: Date.now(), meta: f.meta || {}, thumb: typeof f.thumb === 'string' && f.thumb.startsWith('data:image/') ? f.thumb : null, data };
     await putRec(rec); SL.rev++;
     if (SL.cloudUser) push(rec).catch(() => {});

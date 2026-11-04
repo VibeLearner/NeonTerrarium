@@ -10,7 +10,9 @@ things go. Design doc: the owner's Claude doc "Neon Terrarium: Placement Puzzle 
 - `js/saveguard.js`: on the `#plan` link every city key, the save slots' bookkeeping and the computer tutorial's progress are stored as
   `'plan:' + key`, so Planner cities and sandbox cities never meet (nothing converts either way). `NT_PLAN`, `NT_NS`, `NT_nsKey()`.
   Changing the hash between the two reloads. `NT_MODE()` returns the running mode (ECON, PLAN or null) for the hooks below.
-- `js/slots.js`: the Planner's cities are their own list (IndexedDB `neonTerrarium.slots.plan`); no cloud on that link.
+- `coast.html` loads saveguard.js too, and the trip there and back keeps the `#plan` link (`TV.go` puts `?tv=1` before the hash), so a
+  Planner city's coast is its own.
+- `js/slots.js`: the Planner's cities are their own list (IndexedDB `neonTerrarium.slots.plan`); no cloud on that link. An imported file opens only on its own side (a Planner file on `#plan`, any other off it).
 - Hooks that now ask `NT_MODE()` instead of `ECON`: `input.js` (mega click, tap info, Buildings menu text, transit), `world.js`
   (`isDarkPlot`), `overseer.js` (the coast stays sealed until Sovereign).
 - A new megastructure, the **Air Scrubber** (`scrubber`, 2 x 2, repeatable), is added to `MEGA_TYPES` by placement.js (built on the page,
@@ -58,4 +60,3 @@ just-in-time tips. Tutorial: seven short beats, no dimming; touch waits for the 
 - Patrol and drone route editing at the Precinct desk (patrols use the officers' own routes; drones are modeled as coverage).
 - Person cam dispatch, the reserve officer, known faces.
 - Relay Pylons as buildings (the broadcast simply widens at Nightfall), Dome reputation feeding catchment, shape bonuses (courtyards).
-- The coast page doesn't load saveguard.js yet, so a Planner city's coast is the shared one.

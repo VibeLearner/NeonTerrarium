@@ -465,7 +465,7 @@ const OVERSEER = (() => {
     try { localStorage.setItem(ACCESS_KEY, String(safe(() => STORY.day() + 1, 1))); } catch (e) {}
     const say = root.querySelector('.say'); if (say) say.innerHTML = 'Accessing<span class="cur"></span>';
     const acc = root.querySelector('.acc'); if (acc) acc.textContent = 'ACCESSING';
-    setTimeout(() => { if (typeof TV !== 'undefined') TV.go('coast.html'); else location.href = 'coast.html'; }, 350);
+    setTimeout(() => { if (typeof TV !== 'undefined') TV.go('coast.html' + location.hash); else location.href = 'coast.html' + location.hash; }, 350);
   }
   // a double click on the Data Spire: the pointer's ray against each spire's whole height (the plot's own pick box stops at its plinth)
   const _r = new THREE.Raycaster(), _n = new THREE.Vector2(), _b = new THREE.Box3(), _h = new THREE.Vector3();

@@ -522,7 +522,9 @@ function endPtr0(e){
       if ((hwMode || mtMode) && tt && typeof TT !== 'undefined' && TT.tap(e.clientX, e.clientY)){ /* (handled there) */ }
       else if (hwMode) hwClick(e.clientX, e.clientY, tt); else if (mtMode) mtClick(e.clientX, e.clientY, tt); else if (megaPick) placeMegaHere(e.clientX, e.clientY);
       else { const pk = !S.zone && typeof TUI !== 'undefined' ? pickAt(e.clientX, e.clientY) : null;   // (no zone picked: a tap on a megastructure shows its button, or its card)
-        if (pk && pk.c && pk.c.mega && megas.has(pk.c.mega)){ if (!(NT_MODE() && NT_MODE().megaClick && NT_MODE().megaClick(megas.get(pk.c.mega)))) TUI.megaTap(megas.get(pk.c.mega), e.clientX, e.clientY); } else { act.done = new Set(); paintAt(e.clientX, e.clientY); } } }
+        if (pk && pk.c && pk.c.mega && megas.has(pk.c.mega)){ if (!(NT_MODE() && NT_MODE().megaClick && NT_MODE().megaClick(megas.get(pk.c.mega)))) TUI.megaTap(megas.get(pk.c.mega), e.clientX, e.clientY); }
+        else if (pk && pk.c && !pk.c.mega && pk.c.sections.length && !delMode && NT_MODE() && NT_MODE().tapInfo(pk)){ /* (economy and Planner modes: a tap on a building says how it's doing) */ }
+        else { act.done = new Set(); paintAt(e.clientX, e.clientY); } } }
   }
   ptrs.delete(e.pointerId);
   if (!ptrs.size){ dragging = false; act = null; }

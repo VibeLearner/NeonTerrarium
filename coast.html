@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Neon Terrarium: the coast</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<script src="js/tv.js?v=2026-10-16p"></script>
+<script src="js/saveguard.js?v=2026-11-05pl2"></script>   <!-- (on the Planner's link, #plan, the coast's saves are the Planner city's own) -->
+<script src="js/tv.js?v=2026-11-05pl2"></script>
 <script>
   // A device whose main pointer is a finger gets html.touch (and tport upright, tland sideways), before anything is drawn,
   // as js/touch.js does for the sky city. A mouse and keyboard see none of it. (coast.js keeps it up to date.)
@@ -265,7 +266,7 @@
 <script src="js/coastmusic.js?v=2026-10-30t"></script>
 <script>
   // back up to the sky city: the television switches off, and the city comes on
-  document.getElementById('exitg').addEventListener('click', () => { if (typeof TV !== 'undefined') TV.go('index.html'); else location.href = 'index.html'; });
+  document.getElementById('exitg').addEventListener('click', () => { if (typeof TV !== 'undefined') TV.go('index.html' + location.hash); else location.href = 'index.html' + location.hash; });
   if (typeof TV !== 'undefined') TV.ready = () => !!(window.COAST && COAST.state && COAST.state.built > 0);
 </script>
 </body>

@@ -98,6 +98,8 @@ const PLAN = (() => {
   }
   MEGA_TYPES.scrubber = { name: 'Air Scrubber', need: { any: 99999 }, odds: 1e9, w: 2, h: 2, maxLevels: 1, colour: '#5affa8', build: buildAirScrubber };
   MEGA_OVER.scrubber = .2;
+  // (mega.js read the saved unlocks before this type existed, so it dropped the scrubber's: put it back, or it would "unlock" again on every load)
+  try { if (JSON.parse(localStorage.getItem(MEGA_UNLOCK_KEY) || '[]').includes('scrubber')) megaUnlockedKinds.add('scrubber'); } catch (e) {}
 
   /* ---------- reading the city ---------- */
   const keyOf = c => c.i + ',' + c.j;
@@ -135,7 +137,7 @@ const PLAN = (() => {
     if (typeof GRIDPANEL === 'undefined' || !GRIDPANEL.el) return;
     const q = id => { const e = GRIDPANEL.el.querySelector('#' + id); return e ? parseFloat(e.value) : NaN; };
     const bpm = q('g-bpmSlider'), hz = q('g-warmthFilterSlider'), rv = q('g-spaceReverbSlider');
-    const fz = GRIDPANEL.el.querySelector('#g-freezeStatusText'), frozen = fz && /ON/.test(fz.textContent) && !/OFF/.test(fz.textContent) ? 1 : 0;
+    const fz = GRIDPANEL.el.querySelector('#g-freezeStatusText'), frozen = fz && /ACTIVE/.test(fz.textContent) ? 1 : 0;
     const k = Math.min(1, dt/30), cl = v => Math.max(-1, Math.min(1, v));
     if (isFinite(bpm)) SONG.tempo += (cl((82 - bpm)/25) - SONG.tempo)*k;           // slower than the default: positive
     if (isFinite(hz)) SONG.bright += (cl((hz - 2500)/2000) - SONG.bright)*k;     // a brighter filter: positive
@@ -422,12 +424,12 @@ const PLAN = (() => {
       if (st.tier < 3 || !LAST){ cr.spots.length = 0; return; }
       if (!cr.since) cr.since = now();
       const cov = (i, j) => LAST.coverAt(i, j);
-      const T = targets(); if (!T.length) return;
+      const T = targets();   // (no targets left: nothing new forms, but the old ones still fade)
       const mins = (now() - cr.since)/60e3;
       const cap = Math.min(5, 1 + Math.floor(mins/3), 1 + Math.floor(T.length/12));
       // the first case: one hotspot, 25 seconds after police arrive; then more as the city goes on
       const want = cr.n === 0 ? (now() - cr.since > 25e3 ? 1 : 0) : cap;
-      if (cr.spots.length < want && Math.random() < (cr.n === 0 ? 1 : dt/45)){
+      if (T.length && cr.spots.length < want && Math.random() < (cr.n === 0 ? 1 : dt/45)){
         let best = null, bs = -1; for (const t of T){ if (cr.spots.some(s => cheb(s.i, s.j, t.i, t.j) < 4)) continue; const sc = t.w*(1 - cov(t.i, t.j))*(.7 + Math.random()*.6); if (sc > bs){ bs = sc; best = t; } }
         if (best && bs > .25){ cr.spots.push({ i: best.i, j: best.j, heat: .35, h0: .35, p: 0, trail: [], id: ++cr.n }); E.emit('crime', { first: cr.n === 1 }); }
       }
@@ -517,9 +519,11 @@ const PLAN = (() => {
   });
   for (const nm of ['addLift', 'addFloatPod', 'addPodDown', 'addBelowUp']) wrap(nm, function (orig, c, a, b, d){
     const zone = nm === 'addLift' || nm === 'addFloatPod' ? b : a, z = zoneNow(zone); if (zoneLocked(z)) return null;
+    const have = c && (c.sections.length || (c.below && c.below.length)) ? zoneOf(c) : null;
+    if (have && have !== z && !(have === 'K' && z === 'I')){ say(ZNAME[have] + ': only the same kind stacks on it'); return null; }
     ledgerMark(); const r = orig(c, a, b, d); if (r) E.emit('build', { c, z }); return r;
   });
-  for (const nm of ['removeSection', 'removePlatform', 'removeBelow', 'removePodSection', 'removeArea', 'removeMega', 'removeMegaTier', 'perimApply', 'removeWallTier', 'turnMega', 'addMegaTier', 'hwRemove', 'mtRemove']) wrap(nm, function (orig, ...a){ ledgerMark(); const r = orig(...a); E.emit('remove', {}); if (nm.includes('Mega')) try { renderBmenu(); } catch (e) {} return r; });
+  for (const nm of ['removeSection', 'removePlatform', 'removeBelow', 'removePodSection', 'removeArea', 'removeMega', 'removeMegaTier', 'perimApply', 'removeWallTier', 'turnMega', 'addMegaTier', 'hwRemove', 'mtRemove', 'hwCutAt', 'mtCutAt']) wrap(nm, function (orig, ...a){ ledgerMark(); const r = orig(...a); E.emit('remove', {}); if (nm.includes('Mega')) try { renderBmenu(); } catch (e) {} return r; });
   // megastructures: at their tier; one each, apart from cores, police and scrubbers
   E.megaGate = kind => {
     const t = KIND_TIER[kind];
@@ -533,6 +537,8 @@ const PLAN = (() => {
     if (m){ E.emit('mega', { m, kind }); save(); try { renderBmenu(); } catch (e) {} }
     return m;
   });
+  // Clear island: a fresh start, so a new starter core, and the old city's hotspots, refits and choices go with it
+  wrap('clearIsland', function (orig, ...a){ const r = orig(...a); st.fresh = true; st.crime.spots.length = 0; st.refit = {}; st.forks = {}; booted = false; BASE = null; REV++; save(); return r; });
   wrap('maybeSpawnMegas', function (){ /* nothing arrives on its own here: the tiers open things, the player places them */ });
   wrap('mtApply', function (orig, t){ if (t && t.ok && st.tier < 2){ say('The metro opens at ' + TIERS[2].name); return false; } ledgerMark(); return orig(t); });
   wrap('hwApply', function (orig, t){ if (t && t.ok && st.tier < 7){ say('Sky highways open at ' + TIERS[7].name); return false; } ledgerMark(); return orig(t); });
@@ -865,8 +871,8 @@ const PLAN = (() => {
     beams.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(N*3), 3);
     if (typeof scene !== 'undefined') scene.add(beams);
     const m4 = new THREE.Matrix4(), qi = new THREE.Quaternion(), p_ = new THREE.Vector3(), s_ = new THREE.Vector3(), green = new THREE.Color(0x6ff0a8), red = new THREE.Color(0xff5a6e);
-    let key = '', res = null, shownAt = 0;
-    function clear(){ pend = null; clearTimeout(pendT); beams.count = 0; beams.visible = false; chipEl.hidden = true; key = ''; res = null; if (lensTemp){ lensTemp = null; lensSync(); VIEW.draw(); } }
+    let key = '', res = null, shownAt = 0, pvLens = false;   // (pvLens: the lens on now is the preview's own, so clearing the preview may turn it off; the tutorial's stays)
+    function clear(){ pend = null; clearTimeout(pendT); beams.count = 0; beams.visible = false; chipEl.hidden = true; key = ''; res = null; if (pvLens){ pvLens = false; if (lensTemp){ lensTemp = null; lensSync(); VIEW.draw(); } } }
     // what the city would be with one more thing: a building (a new one or a level on one) or a megastructure
     function trial(add){
       const snap = snapshot();
@@ -887,7 +893,7 @@ const PLAN = (() => {
       { key = k; const after = trial(add); res = diff(LAST, after); res.after = after; shownAt = performance.now();
         // its lens comes on while it's held (industry and scrubbers: Air; police: Safety; a club or a scrubber's noise: Noise)
         const lt = add.mega === 'police' || add.mega === 'lidar' ? 'safety' : add.mega === 'scrubber' || add.z === 'I' || add.mega === 'foundry' || add.mega === 'greenhouse' ? 'air' : add.mega === 'club' || add.mega === 'logistics' ? 'noise' : add.mega === 'emitter' ? 'power' : null;
-        const ok = lt && st.tier >= LENSES.find(l => l.id === lt).at ? lt : null; if (ok !== lensTemp && !lens){ lensTemp = ok; lensSync(); VIEW.draw(); }
+        const ok = lt && st.tier >= LENSES.find(l => l.id === lt).at ? lt : null; if (ok !== lensTemp && !lens){ lensTemp = ok; pvLens = true; lensSync(); VIEW.draw(); }
         // a beam over each home it changes
         let n = 0;
         for (const r of Object.values(res.by)) for (const h of r.homes){ if (n >= N || !h || !h.b) continue; const c = h.b.c || cells.get(h.k); if (!c) continue;
@@ -938,7 +944,7 @@ const PLAN = (() => {
   function hideCard(){ cardEl.hidden = true; cardFor = null; cardPinned = false; }
   function homeCard(c, x, y){
     const b = B.get(keyOf(c)), h = b && b.h; if (!h) return false;
-    const w = worstOf(h), ppl = Math.round(b.occ/h.floors*(h.people || 0));
+    const w = isHome(h.z) ? worstOf(h) : null, ppl = Math.round(b.occ/h.floors*(h.people || 0));
     let html = `<div class="t"><b>${ZNAME[h.z]}</b><span>${h.floors} level${h.floors > 1 ? 's' : ''}</span></div>`;
     if (isHome(h.z)){
       html += `<div class="t"><span>${fmt(ppl)} of ${fmt(h.people)} residents</span></div>`;
@@ -955,7 +961,7 @@ const PLAN = (() => {
     E.emit('card', c);
     return true;
   }
-  E.tapInfo = pk => { const c = pk && pk.c && !pk.c.mega ? pk.c : null; if (!c) return false; return homeCard(c); };
+  E.tapInfo = pk => { const c = pk && pk.c && !pk.c.mega ? pk.c : null; if (!c || !homeCard(c)) return false; cardPinned = true; return true; };   // (a tap pins it: the next tap elsewhere closes it)
   // with a mouse: rest the pointer on a building with nothing picked
   let hovT = 0, hovC = null;
   if (!TOUCHY) addEventListener('pointermove', e => {
@@ -982,7 +988,7 @@ const PLAN = (() => {
     if (typeof GRIDPANEL === 'undefined' || !GRIDPANEL.el) return;
     const sl = (id, v) => { const e = GRIDPANEL.el.querySelector('#' + id); if (!e || v === undefined) return; e.value = v; e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); };
     sl('g-bpmSlider', p.set.bpm ?? 82); sl('g-warmthFilterSlider', p.set.hz ?? 2500); sl('g-spaceReverbSlider', p.set.rv ?? .84);
-    const fz = GRIDPANEL.el.querySelector('#g-freezeStatusText'), frozen = fz && /ON/.test(fz.textContent) && !/OFF/.test(fz.textContent);
+    const fz = GRIDPANEL.el.querySelector('#g-freezeStatusText'), frozen = fz && /ACTIVE/.test(fz.textContent);
     if (!!p.set.freeze !== !!frozen){ const b = GRIDPANEL.el.querySelector('#g-freezeSwitch'); if (b) b.click(); }
     st.preset = p.id; save();
   }

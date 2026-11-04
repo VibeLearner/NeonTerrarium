@@ -855,7 +855,7 @@ function hwHintText(why){ return why || ''; }
 let hwLastPt = null;
 // (the mouse picks as a finger does too, owner Nov 3: the air in front of the road, at its height, is the next piece: see mtHover)
 function hwHover(cx, cy, touch){ hwLastPt = { x: cx, y: cy, touch }; const t = hwTargetAt(hwPickTouch(cx, cy)); hwShowGhost(t);
-  const el = $('modeHint'), why = hwHintText(t && !t.ok && t.type !== 'none' ? t.why : ''); el.textContent = why; el.hidden = !why; }
+  const el = $('modeHint'), why = hwHintText(t && !t.ok && t.type !== 'none' ? t.why : ''); el.textContent = why; el.hidden = !why; el.classList.toggle('bad', !!why); }
 // With a mouse, a click (or a drag of track) the rules refuse says why, beside the pointer, for a moment (owner, Nov 4): the reason was only in the hint
 // line at the bottom, and a refused click looked like nothing happening. (A finger has its own prompts: transit-touch.js)
 const transitWhy = (() => { let el = null, tm = 0;
@@ -877,6 +877,6 @@ function setHwMode(on, quiet){
   else { hwGhost.g.visible = false; hwHighlight(null); }
   const b = document.getElementById('hwBtn'); if (b){ b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); }
   const bar = document.getElementById('hwbar'); if (bar) bar.hidden = !on;
-  $('modeHint').hidden = on; if (on) $('modeHint').textContent = '';
+  $('modeHint').hidden = on; $('modeHint').classList.remove('bad'); if (on) $('modeHint').textContent = '';
   else if (!quiet) selectZone(S.zone);
 }

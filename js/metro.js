@@ -878,7 +878,7 @@ let mtLastPt = null;
 function mtHover(cx, cy, touch){ mtLastPt = { x: cx, y: cy, touch }; const t = mtTargetAt(mtPickTouch(cx, cy)); mtShowGhost(t);
   const say = !t ? '' : !t.ok ? t.why : t.type === 'loop' ? 'click to close the loop: the train will go round and round'
     : t.type === 'join' ? 'click to join the two lines into one' + (t.lost ? ' (a station right beside another becomes plain track)' : '') : t.note || '';
-  const el = $('modeHint'); el.textContent = say || ''; el.hidden = !say; }
+  const el = $('modeHint'); el.textContent = say || ''; el.hidden = !say; el.classList.toggle('bad', !!say && !!t && !t.ok); }
 function mtClick(cx, cy, touch){ const t = mtTargetAt(mtPickTouch(cx, cy)); if (mtApply(t)) mtHover(cx, cy, touch); else if (t && !t.ok) transitWhy(t.why, cx, cy); }   // (refused: why, beside the pointer, highway.js transitWhy)   // (touch: a tap, see mtPickTouch)
 function mtRightClick(cx, cy){ const pk = mtPick(cx, cy); if (pk && pk.kind === 'mtTile'){ mtCutAt(pk.l, pk.k); mtHover(cx, cy); } }
 function setMtMode(on, quiet){
@@ -886,7 +886,7 @@ function setMtMode(on, quiet){
   if (on){ if (hwMode) setHwMode(false, true); if (S.zone) selectZone(null); if (delMode) setDelMode(false, true); if (megaPick) selectMega(null, true); hover.visible = hoverFill.visible = hoverStrip.visible = false; showMegaGhost(null); }
   else { hwGhost.g.visible = false; mtHighlight(null); }
   const b = document.getElementById('mtBtn'); if (b){ b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); }
-  $('modeHint').hidden = on; if (on) $('modeHint').textContent = '';
+  $('modeHint').hidden = on; $('modeHint').classList.remove('bad'); if (on) $('modeHint').textContent = '';
   else if (!quiet) selectZone(S.zone);
 }
 

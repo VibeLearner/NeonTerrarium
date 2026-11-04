@@ -140,8 +140,9 @@ function hwTargetAt(pk){
 }
 
 /* ---------- making changes ---------- */
+let HW_BATCH = false;   // (as MT_BATCH, metro.js)
 function hwCommit(h, touched){
-  hwReindex();
+  hwReindex(); if (HW_BATCH) return;
   if (h) hwBuildView(h);
   hwClearCars(h);
   const list = [...new Set(touched.map(([i, j]) => cells.get(ckey(i, j))).filter(Boolean))];
@@ -160,7 +161,7 @@ function hwApply(t){
     const h = t.h, e = h.tiles[h.tiles.length - 1];
     h.done = true; h.side = t.side; hwActive = h; hwCommit(h, [[e.i, e.j], [Math.round(hwLiftSpot(h, h.side).sx/LOT), Math.round(hwLiftSpot(h, h.side).sz/LOT)]]);
   } else return false;
-  sfx.play('place'); return true;
+  if (!HW_BATCH) sfx.play('place'); return true;
 }
 // right-click a highway plot: the drop-off goes first (the line stays, open again); anywhere else it's cut back to
 // before that plot (the whole thing, from its entry)
@@ -866,7 +867,7 @@ const WHY_SHORT = [
   [/another highway is there/, 'Another highway in the way'], [/metro line is already here/, 'Another line in the way'],
   [/metro station's lift/, 'A station lift is in the way'], [/metro is in the way/, 'The metro is in the way'],
   [/highway's ramp/, 'A highway ramp is in the way'], [/sky highway is in the way/, 'A highway is in the way'],
-  [/station's lift|lift has no room|room here for the/, 'No room for the station lift'], [/lift down to the street/, 'No room for the lift'],
+  [/station's lift|lift has no room|room here for the/, 'No room for the lift: the station needs a tile under it, clear on one side'], [/lift down to the street/, 'No room for the lift'],
   [/stays a station/, 'Go straight on from the end station'], [/straight track/, 'Stations need straight track'],
   [/too close to another station/, 'Too close to another station'], [/come into the first station from behind/, 'Close the loop from behind the station'],
   [/needs a second station/, 'Add a second station first'], [/^finished/, 'Already finished'],

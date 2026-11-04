@@ -233,8 +233,11 @@ function mtPlotSig(){
   }
   return m;
 }
+// (MT_BATCH: a planned run of track (input.js tpConfirm) laid piece by piece with only the index kept up; the views and plots made once, at the end:
+//  each piece's commit rebuilt the whole line and its plots, a stall of a frame or more a piece, owner Nov 4)
+let MT_BATCH = false;
 function mtCommit(l, touched){
-  mtReindex();
+  mtReindex(); if (MT_BATCH) return;
   if (l){ mtSides(l); mtBuildView(l); mtResetTrain(l); }
   const sig = mtPlotSig();
   let keys;
@@ -274,7 +277,7 @@ function mtApply(t){
     const l = t.l, before = mtTouched(l);
     l.st = t.type === 'stop' ? [...l.st, t.k] : l.st.filter(k => k !== t.k); mtActive = l; mtCommit(l, before);
   } else return false;
-  sfx.play('place'); return true;
+  if (!MT_BATCH) sfx.play('place'); return true;
 }
 // right-click a metro plot: its first plot alone goes (the next plot is the first station now, and the line can be carried on from there either way); its
 // last plot alone goes; from anywhere in the middle, that plot and the rest of the line beyond it go (the last station included), and what's left is open

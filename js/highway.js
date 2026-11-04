@@ -145,7 +145,7 @@ function hwCommit(h, touched){
   hwReindex(); if (HW_BATCH) return;
   if (h) hwBuildView(h);
   hwClearCars(h);
-  const list = [...new Set(touched.map(([i, j]) => cells.get(ckey(i, j))).filter(Boolean))];
+  const list = [...new Set([...touched.map(([i, j]) => cells.get(ckey(i, j))).filter(Boolean), ...(typeof trSync === 'function' ? trSync(touched) : [])])];
   refresh(list);   // the pillars and the lift shaft stand on the plots (see hwFeet), so the walking paths go round them
   SC_DIRTY.unknown = true; shadowDirty = true;
 }
@@ -200,7 +200,7 @@ function hwDropLiftless(){
     if (!lost(L.sx, L.sz) && !lost(L.stand.x, L.stand.z)) continue;
     const e = h.tiles[h.tiles.length - 1]; h.done = false; hwCommit(h, [[e.i, e.j], [Math.round(L.sx/LOT), Math.round(L.sz/LOT)], [Math.round(L.stand.x/LOT), Math.round(L.stand.z/LOT)]]); }
 }
-function hwClearAll(){ for (const h of highways){ hwDropView(h); hwClearCars(h); } highways = []; hwActive = null; hwReindex(); }
+function hwClearAll(){ for (const h of highways){ hwDropView(h); hwClearCars(h); } highways = []; hwActive = null; hwReindex(); if (typeof MT_SIG !== 'undefined') MT_SIG = null; }
 function hwSetLanes(n){
   hwLanesPick = n;
   const h = hwActive && highways.includes(hwActive) ? hwActive : null;

@@ -224,27 +224,37 @@ function mtLoopTarget(l){
 function mtTouched(l){ const out = l.tiles.map(t => [t.i, t.j]); for (const k of mtStops(l)){ const c = mtLiftCell(l, k); if (c) out.push(c); } return out; }
 // what the metro puts on each plot (see mtFeet, mtKeepOut): its pillars, where they stand and which way they face, and the lift shafts, as one string per plot.
 // An edit rebuilds only the plots whose string changed: laying a line used to rebuild every plot under it on every click
-let MT_SIG = null;   // (as the plots were last built; null: not known, after loading or an edit made without mtCommit, so the next commit rebuilds all it is given)
+let MT_SIG = null;   // (as the plots were last built; null: not known, after loading, so the next commit rebuilds all it is given)
+// (the highways' part too (owner, Nov 4): a plot is built with the pillars and lift shafts of every line over it, so any change to what a line puts on a plot, metro or
+//  highway, from any edit, finds that plot here and it is built again at once. A plot left with a deleted station's lift in it showed the lift in its full detail and not
+//  in its stand-in, which is made from the lines as they are now: the lift flashed in and out as the camera moved)
 function mtPlotSig(){
   const m = new Map(), add = (q, v) => m.set(q, (m.get(q) || '') + v + ';'), f = v => v.toFixed(3);
   for (const l of metros){
     l.tiles.forEach((t, k) => { const c = hwCenter(l, k, .5); add(ckey(t.i, t.j), 'p' + f(c.x) + ',' + f(c.z) + ',' + f(c.tx) + ',' + f(c.tz)); });
     for (const k of mtStops(l)){ const s = l.sides && l.sides[k]; if (!s) continue; const L = mtLiftSpot(l, k, s); add(ckey(Math.round(L.sx/LOT), Math.round(L.sz/LOT)), 's' + f(L.sx) + ',' + f(L.sz) + ',' + L.dx + ',' + L.dz); }
   }
+  if (typeof highways !== 'undefined') for (const h of highways){
+    h.tiles.forEach((t, k) => { const c = hwCenter(h, k, .5); add(ckey(t.i, t.j), 'h' + f(c.x) + ',' + f(c.z) + ',' + f(c.tx) + ',' + f(c.tz) + ',' + f(hwHeight(h, k, .5)) + ',' + t.L + ',' + h.lanes); });
+    if (h.done && h.tiles.length >= 2){ const L = hwLiftSpot(h, h.side); add(ckey(Math.round(L.sx/LOT), Math.round(L.sz/LOT)), 'd' + f(L.sx) + ',' + f(L.sz) + ',' + L.dx + ',' + L.dz + ',' + h.tiles[h.tiles.length - 1].L); }
+  }
   return m;
 }
 // (MT_BATCH: a planned run of track (input.js tpConfirm) laid piece by piece with only the index kept up; the views and plots made once, at the end:
 //  each piece's commit rebuilt the whole line and its plots, a stall of a frame or more a piece, owner Nov 4)
 let MT_BATCH = false;
+// the plots whose lines changed since they were last built (or, not known yet, the ones given), and the record brought up to date
+function trSync(touched){
+  const sig = mtPlotSig(); let keys;
+  if (MT_SIG){ keys = new Set(); for (const [q, v] of sig) if (MT_SIG.get(q) !== v) keys.add(q); for (const q of MT_SIG.keys()) if (!sig.has(q)) keys.add(q); }
+  else keys = new Set((touched || []).map(([i, j]) => ckey(i, j)));
+  MT_SIG = sig;
+  return [...keys].map(q => cells.get(q)).filter(c => c && !c.mega);
+}
 function mtCommit(l, touched){
   mtReindex(); if (MT_BATCH) return;
   if (l){ mtSides(l); mtBuildView(l); mtResetTrain(l); }
-  const sig = mtPlotSig();
-  let keys;
-  if (MT_SIG){ keys = new Set(); for (const [q, v] of sig) if (MT_SIG.get(q) !== v) keys.add(q); for (const q of MT_SIG.keys()) if (!sig.has(q)) keys.add(q); }
-  else keys = new Set(touched.concat(l ? mtTouched(l) : []).map(([i, j]) => ckey(i, j)));
-  MT_SIG = sig;
-  const list = [...keys].map(q => cells.get(q)).filter(Boolean);
+  const list = trSync(touched.concat(l ? mtTouched(l) : []));
   refresh(list);   // its pillars and lift shafts stand on the plots (see mtFeet), so the walking paths go round them
   SC_DIRTY.unknown = true; shadowDirty = true;
 }
@@ -292,14 +302,14 @@ function mtCutAt(l, k, quiet){
   else { tiles = l.tiles.slice(0, k); keys.delete(mtTileKey(l.tiles[k - 1])); }   // (cut in the middle: the plot before the cut is the open end now, no station there yet)
   if (l.loop) keys.delete(mtTileKey(l.tiles[(k - 1 + n) % n]));   // (an opened loop: the plot before the cut is its open end)
   mtReshape(l, tiles, keys, sides); mtActive = l;
-  if (quiet){ MT_SIG = null; mtReindex(); mtSides(l); mtBuildView(l); mtResetTrain(l); } else { mtCommit(l, touched); sfx.play('remove'); }
+  if (quiet){ mtReindex(); mtSides(l); mtBuildView(l); mtResetTrain(l); } else { mtCommit(l, touched); sfx.play('remove'); }
   return touched;
 }
 function mtRemove(l, quiet){
   const touched = mtTouched(l);
   metros = metros.filter(q => q !== l); if (mtActive === l) mtActive = null;
   mtDropView(l); l.train = null;
-  if (!quiet){ mtCommit(null, touched); sfx.play('remove'); } else { MT_SIG = null; mtReindex(); }
+  if (!quiet){ mtCommit(null, touched); sfx.play('remove'); } else mtReindex();   // (quiet: the caller rebuilds the plots, trSync)
   return touched;
 }
 // delete mode: a line's plots in the block go, and with them any station whose lift shaft stands in the block (in the middle of the line, it becomes plain
@@ -329,7 +339,6 @@ function mtRemoveArea(r){
     });
     if (mtActive && !metros.includes(mtActive)) mtActive = null;
   }
-  if (out.length) MT_SIG = null;
   mtReindex();
   return out;
 }

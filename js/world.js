@@ -2769,6 +2769,7 @@ function removeArea(r){
   for (const c of gone) for (const [a, b] of SIDES4){ const n = cells.get(ckey(c.i + a, c.j + b)); if (n) touched.add(n); }
   const lineCells = new Set();
   for (const [i, j] of lines){ const n = cells.get(ckey(i, j)); if (n && !n.mega){ touched.add(n); lineCells.add(n); } }   // (the plots the lines stood on, outside the block: their pillars and lifts go)
+  if (typeof trSync === 'function') for (const n of trSync(lines)){ touched.add(n); lineCells.add(n); }   // (and any other plot whose lines changed: metro.js trSync)
   if (gone.length) areaAgentsLeave(inR);
   if (gone.length || lines.length){
     if (lines.length){ SC_DIRTY.unknown = true; shadowDirty = true; }

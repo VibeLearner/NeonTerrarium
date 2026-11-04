@@ -61,6 +61,7 @@ const PCTUT = (() => {
   /* ---------- the first time in a city ---------- */
   const pieces = () => { let n = 0; for (const c of cells.values()) n += c.sections.length; return n; };
   const MAIN = { key: KEY, st, name: 'OPERATOR NOTE', end: 'Tutorial complete. Keep building: more buildings and megastructures unlock as your city grows. All controls are under Hover for controls.', beats: [
+    { id: 'zoom', say: 'Scroll the mouse wheel to zoom in and out (or press + and \u2212)', ghost: 'up', arm: () => { const z = zoomT; return () => Math.abs(zoomT - z) > .3; } },
     { id: 'tile', say: 'Click the sky beside the platform to add a tile', ghost: 'tap', arm: () => { let ok = false; const f = () => { ok = true; }; addEventListener('nt:tile', f, { once: true }); return () => ok; } },
     // (a click on an empty tile cycles its surface only with no zone picked: with one picked it builds, so the beat is passed over)
     { id: 'surface', say: 'Click a tile to cycle its surface', ghost: 'tap', skipIf: () => !!S.zone, arm: () => { let ok = false; const f = () => { ok = true; }; addEventListener('nt:surface', f, { once: true }); return () => ok || !!S.zone; } },
@@ -74,6 +75,10 @@ const PCTUT = (() => {
     // (tap Shift: the height pick, moving the mouse up or down; a click builds there. Done once a pick has been made and something built)
     { id: 'shift', say: 'Tap Shift and move the mouse up or down to start a building higher, then click to build it', ghost: 'drag',
       arm: () => { let was = false, e0 = 0; return () => { if (typeof HL !== 'undefined' && HL){ was = true; e0 = SC_EDITS; } return was && !HL && SC_EDITS > e0; }; } },   // (SC_EDITS: any edit, world.js; a pick can make a scaffold, a pod or a section)
+    // deleting (owner, Nov 4): one piece with a right-click (the top of a building comes off), a whole area in delete mode
+    { id: 'remove', say: 'Right-click a building to remove its top piece', ghost: 'tap', arm: () => { const n = pieces(); return () => pieces() < n; } },
+    { id: 'erase', say: 'Press X (or the \u2715 button) for delete mode: drag to select an area, click inside it to delete it, then X again to leave', ghost: 'drag',
+      arm: () => { let was = false; return () => { if (typeof delMode !== 'undefined' && delMode) was = true; return was && !delMode; }; } },
   ] };
 
   /* ---------- the transit modes, the first time each is turned on ---------- */

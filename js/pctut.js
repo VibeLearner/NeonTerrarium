@@ -63,33 +63,33 @@ const PCTUT = (() => {
   const wallPlots = () => { let n = 0; for (const c of cells.values()) if (c.wall && !c.mega) n++; return n; }, tiers = () => { let n = 0; for (const c of cells.values()) if (c.wall && !c.mega) n += c.wall.n || 0; return n; };
   const gates = () => { let n = 0; for (const c of cells.values()) if (c.wall && c.wall.gate) n++; return n; };
   const MAIN = { key: KEY, st, name: 'OPERATOR NOTE', end: 'Tutorial complete. Keep building: more buildings and megastructures unlock as your city grows. All controls are under Hover for controls. To replay this tutorial, open Game Settings and scroll down.', beats: [
-    { id: 'zoom', say: 'Scroll the mouse wheel to zoom in and out (or press + and \u2212)', ghost: 'up', arm: () => { const z = zoomT; return () => Math.abs(zoomT - z) > .3; } },
-    { id: 'tile', say: 'Click the sky beside the platform to add a tile', ghost: 'tap', arm: () => { let ok = false; const f = () => { ok = true; }; addEventListener('nt:tile', f, { once: true }); return () => ok; } },
+    { id: 'zoom', say: 'Scroll the mouse wheel to zoom in and out (or press + and \u2212).', ghost: 'up', arm: () => { const z = zoomT; return () => Math.abs(zoomT - z) > .3; } },
+    { id: 'tile', say: 'Click the sky beside the platform to add a tile.', ghost: 'tap', arm: () => { let ok = false; const f = () => { ok = true; }; addEventListener('nt:tile', f, { once: true }); return () => ok; } },
     // (a click on an empty tile cycles its surface only with no zone picked: with one picked it builds, so the beat is passed over)
-    { id: 'surface', say: 'Click a tile to cycle its surface', ghost: 'tap', skipIf: () => !!S.zone, arm: () => { let ok = false; const f = () => { ok = true; }; addEventListener('nt:surface', f, { once: true }); return () => ok || !!S.zone; } },
+    { id: 'surface', say: 'Click a tile to cycle its surface.', ghost: 'tap', skipIf: () => !!S.zone, arm: () => { let ok = false; const f = () => { ok = true; }; addEventListener('nt:surface', f, { once: true }); return () => ok || !!S.zone; } },
     // (with no zone picked, Space puts the view in tilt mode, W and S tilting it; Space again goes back. Done once it's been on and is off again)
-    { id: 'tilt', say: 'With no zone picked, press Space, then drag the mouse up or down to change the view\'s angle (W and S work too). Space again goes back', ghost: 'up', skipIf: () => !!S.zone,
+    { id: 'tilt', say: 'With no zone picked, press Space, then drag the mouse up or down to change the view\'s angle (W and S work too). Space again goes back.', ghost: 'up', skipIf: () => !!S.zone,
       arm: () => { let was = false; return () => { if (typeof tiltMode !== 'undefined' && tiltMode) was = true; return (was && !tiltMode) || !!S.zone; }; } },
-    { id: 'zone', say: 'Pick a zone card below to choose what to build', ghost: 'tap', arm: () => () => !!S.zone },
-    { id: 'build', say: 'Click a tile to place a building', ghost: 'tap', arm: () => { const n = built(); return () => built() > n; } },
-    { id: 'side', say: 'You can build on the side of buildings too: click a building\'s wall', ghost: 'tap', arm: () => { let ok = false; const f = () => { ok = true; }; addEventListener('nt:side', f, { once: true }); return () => ok; } },
-    { id: 'floor', say: 'With a zone picked, point at a tile or roof and press Space to build a single floor', ghost: 'tap', arm: () => { const n = pieces(); return () => pieces() > n; } },
+    { id: 'zone', say: 'Pick a zone card below to choose what to build.', ghost: 'tap', arm: () => () => !!S.zone },
+    { id: 'build', say: 'Click a tile to place a building.', ghost: 'tap', arm: () => { const n = built(); return () => built() > n; } },
+    { id: 'side', say: 'You can build on the side of buildings too: click a building\'s wall.', ghost: 'tap', arm: () => { let ok = false; const f = () => { ok = true; }; addEventListener('nt:side', f, { once: true }); return () => ok; } },
+    { id: 'floor', say: 'With a zone picked, point at a tile or roof and press Space to build a single floor.', ghost: 'tap', arm: () => { const n = pieces(); return () => pieces() > n; } },
     // (tap Shift: the height pick, moving the mouse up or down; a click builds there. Done once a pick has been made and something built)
-    { id: 'shift', say: 'Point at a tile or a building\'s rooftop, tap Shift and move the mouse up or down to start a building higher, then click to build it', ghost: 'drag',
+    { id: 'shift', say: 'Point at a tile or a building\'s rooftop, tap Shift, and move the mouse up or down to start a building higher. Then click to build it.', ghost: 'drag',
       arm: () => { let was = false, e0 = 0; return () => { if (typeof HL !== 'undefined' && HL){ was = true; e0 = SC_EDITS; } return was && !HL && SC_EDITS > e0; }; } },   // (SC_EDITS: any edit, world.js; a pick can make a scaffold, a pod or a section)
     // deleting (owner, Nov 4): one piece with a right-click (the top of a building comes off), a whole area in delete mode
-    { id: 'remove', say: 'Right-click a building to remove its top piece', ghost: 'tap', arm: () => { const n = pieces(); let ok = false; addEventListener('nt:remove', () => { ok = true; }, { once: true }); return () => ok || pieces() < n; } },
-    { id: 'restore', say: 'Changed your mind? Click Restore beside the pointer to bring it back', ghost: 'tap', skipIf: () => !document.querySelector('.pcrestore:not([hidden])'),
+    { id: 'remove', say: 'Right-click a building to remove its top piece.', ghost: 'tap', arm: () => { const n = pieces(); let ok = false; addEventListener('nt:remove', () => { ok = true; }, { once: true }); return () => ok || pieces() < n; } },
+    { id: 'restore', say: 'Changed your mind? Click Restore beside the pointer to bring it back.', ghost: 'tap', skipIf: () => !document.querySelector('.pcrestore:not([hidden])'),
       arm: () => { let ok = false; addEventListener('nt:restore', () => { ok = true; }, { once: true }); return () => ok || !document.querySelector('.pcrestore:not([hidden])'); } },   // (its six seconds run out: on)
-    { id: 'erase', say: 'Press X (or the \u2715 button) for delete mode, drag to select an area, then click inside it to delete it', ghost: 'drag',
+    { id: 'erase', say: 'Press X (or the \u2715 button) for delete mode, drag to select an area, then click inside it to delete it.', ghost: 'drag',
       arm: () => { let ok = false; addEventListener('nt:erase', () => { ok = true; }, { once: true }); return () => ok; } },
-    { id: 'erasex', say: 'Press X again to leave delete mode', ghost: 'tap', skipIf: () => typeof delMode === 'undefined' || !delMode, arm: () => () => typeof delMode === 'undefined' || !delMode },
+    { id: 'erasex', say: 'Press X again to leave delete mode.', ghost: 'tap', skipIf: () => typeof delMode === 'undefined' || !delMode, arm: () => () => typeof delMode === 'undefined' || !delMode },
     // walls and gates (owner, Nov 4): the Perimeter button under each zone card, a wall, a gate, and back to building
-    { id: 'perim', say: 'For walls, click Perimeter under a zone card', ghost: 'tap', arm: () => () => typeof PERIM !== 'undefined' && !!PERIM },
-    { id: 'wall', say: 'Click an empty tile or the open sky to place a wall', ghost: 'tap', arm: () => { const n = wallPlots(); return () => wallPlots() > n; } },
-    { id: 'stack', say: 'Click the top of a wall to stack it higher', ghost: 'tap', arm: () => { const n = tiers(); return () => tiers() > n; } },
-    { id: 'gate', say: 'Click a wall\'s face to turn it into a gate (click again to switch it back). A gate can\'t go where another wall blocks it', ghost: 'tap', arm: () => { const g = gates(); return () => gates() !== g; } },
-    { id: 'perimoff', say: 'Click Perimeter again (or pick a zone card) to go back to building', ghost: 'tap', arm: () => () => typeof PERIM === 'undefined' || !PERIM },
+    { id: 'perim', say: 'For walls, click Perimeter under a zone card.', ghost: 'tap', arm: () => () => typeof PERIM !== 'undefined' && !!PERIM },
+    { id: 'wall', say: 'Click an empty tile or the open sky to place a wall.', ghost: 'tap', arm: () => { const n = wallPlots(); return () => wallPlots() > n; } },
+    { id: 'stack', say: 'Click the top of a wall to stack it higher.', ghost: 'tap', arm: () => { const n = tiers(); return () => tiers() > n; } },
+    { id: 'gate', say: 'Click a wall\'s face to turn it into a gate (click again to switch it back). A gate can\'t go where another wall blocks it.', ghost: 'tap', arm: () => { const g = gates(); return () => gates() !== g; } },
+    { id: 'perimoff', say: 'Click Perimeter again (or pick a zone card) to go back to building.', ghost: 'tap', arm: () => () => typeof PERIM === 'undefined' || !PERIM },
   ] };
 
   /* ---------- the transit modes, the first time each is turned on ---------- */
@@ -97,16 +97,16 @@ const PCTUT = (() => {
   const doneOf = a => a.filter(l => l.done).length;
   const HW = { key: 'neonIsland.tutPCHw', name: 'SKY HIGHWAY', mode: () => typeof hwMode !== 'undefined' && hwMode,
     end: 'Right-click a piece to cut the road back. Every control is under Instructions.', beats: [
-    { id: 'start', say: 'Click a plot to start a highway', ghost: 'tap', arm: () => { const n = highways.length; return () => highways.length > n; } },
-    { id: 'height', say: 'Press [ or ] to set the height of the next piece', ghost: 'tap', arm: () => { const L = hwLevel; return () => hwLevel !== L; } },
-    { id: 'extend', say: 'Point at the end of the road and tap Shift. Move the mouse to plan the route, click to build it. Right-click cancels', ghost: 'tap', arm: () => { const n = tilesOf(hwOpen()); return () => tilesOf(hwOpen()) > n; } },
-    { id: 'finish', say: 'Click the last piece to add the drop-off', ghost: 'tap', arm: () => { const n = doneOf(highways); return () => doneOf(highways) > n; } },
+    { id: 'start', say: 'Click a plot to start a highway.', ghost: 'tap', arm: () => { const n = highways.length; return () => highways.length > n; } },
+    { id: 'height', say: 'Press [ or ] to set the height of the next piece.', ghost: 'tap', arm: () => { const L = hwLevel; return () => hwLevel !== L; } },
+    { id: 'extend', say: 'Point at the end of the road and tap Shift. Move the mouse to plan the route, then click to build it. Right-click cancels.', ghost: 'tap', arm: () => { const n = tilesOf(hwOpen()); return () => tilesOf(hwOpen()) > n; } },
+    { id: 'finish', say: 'Click the last piece to add the drop-off.', ghost: 'tap', arm: () => { const n = doneOf(highways); return () => doneOf(highways) > n; } },
   ] };
   const MT = { key: 'neonIsland.tutPCMt', name: 'METRO', mode: () => typeof mtMode !== 'undefined' && mtMode,
     end: 'Click a straight piece to add a station. Right-click a piece to cut the line back.', beats: [
-    { id: 'start', say: 'Click a plot to place the first station', ghost: 'tap', arm: () => { const n = metros.length; return () => metros.length > n; } },
-    { id: 'extend', say: 'Point at the station at either end of the line and tap Shift. Move the mouse to plan the track, click to build it. Right-click cancels', ghost: 'tap', arm: () => { const n = tilesOf(metros); return () => tilesOf(metros) > n; } },
-    { id: 'finish', say: 'Click the last piece to finish it with a station', ghost: 'tap', arm: () => { const n = doneOf(metros); return () => doneOf(metros) > n; } },
+    { id: 'start', say: 'Click a plot to place the first station.', ghost: 'tap', arm: () => { const n = metros.length; return () => metros.length > n; } },
+    { id: 'extend', say: 'Point at the station at either end of the line and tap Shift. Move the mouse to plan the track, then click to build it. Right-click cancels.', ghost: 'tap', arm: () => { const n = tilesOf(metros); return () => tilesOf(metros) > n; } },
+    { id: 'finish', say: 'Click the last piece to finish it with a station.', ghost: 'tap', arm: () => { const n = doneOf(metros); return () => doneOf(metros) > n; } },
   ] };
   for (const r of [HW, MT]) r.st = load(r.key, st.existing ? { done: true, beats: {}, existing: true } : { done: false, beats: {} });
 

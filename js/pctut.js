@@ -65,7 +65,7 @@ const PCTUT = (() => {
     // (a click on an empty tile cycles its surface only with no zone picked: with one picked it builds, so the beat is passed over)
     { id: 'surface', say: 'Click a tile to cycle its surface', ghost: 'tap', skipIf: () => !!S.zone, arm: () => { let ok = false; const f = () => { ok = true; }; addEventListener('nt:surface', f, { once: true }); return () => ok || !!S.zone; } },
     // (with no zone picked, Space puts the view in tilt mode, W and S tilting it; Space again goes back. Done once it's been on and is off again)
-    { id: 'tilt', say: 'With no zone picked, press Space to change the view\'s angle (W and S tilt it), then Space again to go back', ghost: 'tap', skipIf: () => !!S.zone,
+    { id: 'tilt', say: 'With no zone picked, press Space, then drag the mouse up or down to change the view\'s angle (W and S work too). Space again goes back', ghost: 'up', skipIf: () => !!S.zone,
       arm: () => { let was = false; return () => { if (typeof tiltMode !== 'undefined' && tiltMode) was = true; return (was && !tiltMode) || !!S.zone; }; } },
     { id: 'zone', say: 'Pick a zone card below to choose what to build', ghost: 'tap', arm: () => () => !!S.zone },
     { id: 'build', say: 'Click a tile to place a building', ghost: 'tap', arm: () => { const n = built(); return () => built() > n; } },

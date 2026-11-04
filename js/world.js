@@ -3297,9 +3297,10 @@ function applyTarget(t){
   if (t.type === 'onto' && t.c.lift){ return zone ? addBelowUp(t.c, zone) : null; }
   if (t.type === 'side'){ if (!zone) return null; const c = t.c || addPlatform(t.i, t.j, null); if (c) finishAnimsOn(c);
     // residential: a single home on brackets off the wall (the other zones keep their scaffolds for now)
-    if (c && c.lift && c.lift.v === 2) return addFloatPod(c, t.y, zone);
     const opt = t.from ? { d: [t.i - t.from.i, t.j - t.from.j], mf: 1 } : {};   // (a single pod on brackets, every zone)
-    return c ? addLift(c, t.y, zone, opt) : null; }
+    const r = c && c.lift && c.lift.v === 2 ? addFloatPod(c, t.y, zone) : c ? addLift(c, t.y, zone, opt) : null;
+    if (r && typeof tEmit === 'function') tEmit('side');   // (nt:side: the tutorials, pctut.js and tutorial.js)
+    return r; }
   if (!zone && t.type === 'onto' && !t.c.mega && !t.c.sections.length){ cycleGreen(t.c); if (typeof tEmit === 'function') tEmit('surface'); return t.c; }   // no zone picked: an empty plot's greenery cycles
   if (!zone || t.c.mega) return null;
   addSection(t.c, zone, t.after !== undefined ? { after: t.after } : {}); return t.c;

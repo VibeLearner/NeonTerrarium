@@ -265,7 +265,7 @@ function tdStep(cx, cy, max){
     const st = Math.abs(di) >= Math.abs(dj) ? [Math.sign(di), 0] : [0, Math.sign(dj)];
     const pk = { kind: hwMode ? 'hwGround' : 'mtGround', i: e.i + st[0], j: e.j + st[1], d: 0 };
     const t = hwMode ? hwTargetAt(pk) : mtTargetAt(pk);
-    if (!t || t.type !== 'extend' || !t.ok || (t.h || t.l) !== l || !(hwMode ? hwApply(t) : mtApply(t))) break;
+    if (!t || t.type !== 'extend' || !t.ok || (t.h || t.l) !== l || !(hwMode ? hwApply(t) : mtApply(t))){ if (t && !t.ok && act && !act.whySaid){ act.whySaid = true; transitWhy(t.why, cx, cy); } break; }   // (the drawing stops: why, once a drag)
     tEmit('tdraw');
   }
 }

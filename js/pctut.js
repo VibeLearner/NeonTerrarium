@@ -79,7 +79,7 @@ const PCTUT = (() => {
       arm: () => { let was = false, e0 = 0; return () => { if (typeof HL !== 'undefined' && HL){ was = true; e0 = SC_EDITS; } return was && !HL && SC_EDITS > e0; }; } },   // (SC_EDITS: any edit, world.js; a pick can make a scaffold, a pod or a section)
     // deleting (owner, Nov 4): one piece with a right-click (the top of a building comes off), a whole area in delete mode
     { id: 'remove', say: 'Right-click a building to remove its top piece.', ghost: 'tap', arm: () => { const n = pieces(); let ok = false; addEventListener('nt:remove', () => { ok = true; }, { once: true }); return () => ok || pieces() < n; } },
-    { id: 'restore', say: 'Changed your mind? Click Restore beside the pointer to bring it back.', ghost: 'tap', skipIf: () => !document.querySelector('.pcrestore:not([hidden])'),
+    { id: 'restore', say: 'Changed your mind? Click Restore, just above Hover for controls, to bring it back.', ghost: 'tap', skipIf: () => !document.querySelector('.pcrestore:not([hidden])'),
       arm: () => { let ok = false; addEventListener('nt:restore', () => { ok = true; }, { once: true }); return () => ok || !document.querySelector('.pcrestore:not([hidden])'); } },   // (its six seconds run out: on)
     { id: 'erase', say: 'Press X (or the \u2715 button) for delete mode, drag to select an area, then click inside it to delete it.', ghost: 'drag',
       arm: () => { let ok = false; addEventListener('nt:erase', () => { ok = true; }, { once: true }); return () => ok; } },

@@ -73,7 +73,7 @@ function touchPan(dx, dy){
 const pmidX = () => { const [a,b] = [...ptrs.values()]; return (a.x + b.x)/2; };
 function paintAt(x, y){
   const pk0 = pickAt(x, y);
-  if (!S.zone && pk0 && pk0.c && pk0.c.mega && typeof ECON !== 'undefined' && ECON.on && ECON.megaClick && megas.has(pk0.c.mega) && ECON.megaClick(megas.get(pk0.c.mega))) return;   // (economy: a click on an Emitter Core shows its reach, or fixes it)
+  if (!S.zone && pk0 && pk0.c && pk0.c.mega && NT_MODE() && NT_MODE().megaClick && megas.has(pk0.c.mega) && NT_MODE().megaClick(megas.get(pk0.c.mega))) return;   // (economy: a click on an Emitter Core shows its reach, or fixes it; Planner: tuning a core, a station or the Grid)
   const t = targetOf(pk0); if (!t) return;
   // (by its plot: one that exists, or the plot a new piece makes on open sky: a building's, a side building's, and a Perimeter wall's, which made its tile
   //  with it but has no plot yet. A wall on open sky used to read the plot it didn't have, throw, and build nothing, Nov 3)
@@ -196,7 +196,7 @@ function touchAimAt(x, y){
 function aimClear(){ if (!AIM) return; AIM = null; hover.visible = hoverFill.visible = hoverStrip.visible = false; if (typeof TUI !== 'undefined' && TUI.aimTip) TUI.aimTip(null); }
 setInterval(() => { if (AIM && (performance.now() - AIM.at > 8000 || AIM.cam !== camSig() || !S.zone)) aimClear(); }, 200);
 function freshBuild(x, y){
-  if (!S.zone && !hwMode && !mtMode && !megaPick && !delMode && typeof ECON !== 'undefined' && ECON.on){ const pk = pickAt(x, y); if (pk && pk.c && !pk.c.mega && pk.c.sections.length && ECON.tapInfo(pk)) return; }   // (economy mode: a tap on a building with no zone picked says how it's doing)
+  if (!S.zone && !hwMode && !mtMode && !megaPick && !delMode && NT_MODE()){ const pk = pickAt(x, y); if (pk && pk.c && !pk.c.mega && pk.c.sections.length && NT_MODE().tapInfo(pk)) return; }   // (economy and Planner modes: a tap on a building with no zone picked says how it's doing)
   { const pk = typeof TUI !== 'undefined' ? pickAt(x, y) : null; if (pk && pk.c && pk.c.mega && megas.has(pk.c.mega) && TUI.megaTap(megas.get(pk.c.mega), x, y)) return; }
   if (S.zone && !hwMode && !mtMode && !megaPick && !delMode){
     const a = touchAimAt(x, y); if (!a){ aimClear(); return; }
@@ -522,7 +522,7 @@ function endPtr0(e){
       if ((hwMode || mtMode) && tt && typeof TT !== 'undefined' && TT.tap(e.clientX, e.clientY)){ /* (handled there) */ }
       else if (hwMode) hwClick(e.clientX, e.clientY, tt); else if (mtMode) mtClick(e.clientX, e.clientY, tt); else if (megaPick) placeMegaHere(e.clientX, e.clientY);
       else { const pk = !S.zone && typeof TUI !== 'undefined' ? pickAt(e.clientX, e.clientY) : null;   // (no zone picked: a tap on a megastructure shows its button, or its card)
-        if (pk && pk.c && pk.c.mega && megas.has(pk.c.mega)){ if (!(typeof ECON !== 'undefined' && ECON.on && ECON.megaClick && ECON.megaClick(megas.get(pk.c.mega)))) TUI.megaTap(megas.get(pk.c.mega), e.clientX, e.clientY); } else { act.done = new Set(); paintAt(e.clientX, e.clientY); } } }
+        if (pk && pk.c && pk.c.mega && megas.has(pk.c.mega)){ if (!(NT_MODE() && NT_MODE().megaClick && NT_MODE().megaClick(megas.get(pk.c.mega)))) TUI.megaTap(megas.get(pk.c.mega), e.clientX, e.clientY); } else { act.done = new Set(); paintAt(e.clientX, e.clientY); } } }
   }
   ptrs.delete(e.pointerId);
   if (!ptrs.size){ dragging = false; act = null; }
@@ -719,7 +719,7 @@ function setBmenuOpen(open){
 function renderBmenu(){
   const any = megaUnlockedKinds.size > 0;
   $('bmenu').hidden = !any; $('tmenu').hidden = !hwUnlocked();
-  if (typeof ECON !== 'undefined' && ECON.on){ const hw = ECON.transit('hw'); $('hwBtn').hidden = !hw; $('hwHelpBtn').hidden = !hw; }   // (economy mode: sky highways at Incorporated)
+  if (NT_MODE()){ const hw = NT_MODE().transit('hw'); $('hwBtn').hidden = !hw; $('hwHelpBtn').hidden = !hw; }   // (economy mode: sky highways at Incorporated; Planner: at Skyline)
   if (!any) return;
   const list = $('bmenuList'); list.textContent = '';
   for (const kind of Object.keys(MEGA_TYPES).filter(k => megaUnlockedKinds.has(k))){   // only what has arrived: the rest stay a surprise
@@ -729,7 +729,7 @@ function renderBmenu(){
     const n = megasOfKind(kind).length;
     b.innerHTML = `<i class="sw"></i><b></b><small></small>`;
     b.querySelector('b').textContent = open ? t.name : 'Locked';
-    const et = typeof ECON !== 'undefined' && ECON.on ? ECON.menuText(kind) : null;   // (economy mode: its price, or that it stands)
+    const et = NT_MODE() ? NT_MODE().menuText(kind) : null;   // (economy mode: its price, or that it stands; Planner: what it does)
     b.querySelector('small').textContent = et || (open ? `${t.w} × ${t.h} plots` + (n ? ` · ${n} built` : '') : 'Arrives with ' + megaNeedText(kind));
     if (open) b.addEventListener('click', () => selectMega(kind)); else { b.disabled = true; b.title = 'Arrives on its own with ' + megaNeedText(kind); }
     list.appendChild(b);
@@ -750,17 +750,17 @@ function unlockNote(kind){
   const first = megaUnlockedKinds.size === 1;
   let txt = MEGA_TYPES[kind].name.toUpperCase() + ' UNLOCKED' + (UNLOCK_TIP[kind] ? '\n' + UNLOCK_TIP[kind] : '') + (first ? '\nDouble tap a megastructure to turn it.' : '');
   TUI.toast(txt, 6500);
-  if (megaUnlockedKinds.size === 4 && !(typeof ECON !== 'undefined' && ECON.on)) setTimeout(() => TUI.toast('TRANSIT UNLOCKED\nTap Transit to build sky highways and the metro.', 5000), 6800);
+  if (megaUnlockedKinds.size === 4 && !NT_MODE()) setTimeout(() => TUI.toast('TRANSIT UNLOCKED\nTap Transit to build sky highways and the metro.', 5000), 6800);
 }
 function onMegaUnlock(kind){
   renderBmenu(); if (!document.getElementById('bmenuList')) return;
   const tch = typeof TOUCH !== 'undefined' && TOUCH.on;   // (touch: the button pulses, the list doesn't open: on a phone it covered a third of the city and took the next tap)
   if (!tch) setBmenuOpen(true); $('bmenuHead').classList.add('fresh');
-  if (megaUnlockedKinds.size === 4 && !(typeof ECON !== 'undefined' && ECON.on)){ if (!tch) setTmenuOpen(true); $('tmenuHead').classList.add('fresh'); }   // the fourth: sky highways arrive (economy mode: by classification instead)
+  if (megaUnlockedKinds.size === 4 && !NT_MODE()){ if (!tch) setTmenuOpen(true); $('tmenuHead').classList.add('fresh'); }   // the fourth: sky highways arrive (economy mode: by classification instead)
   try { unlockNote(kind); } catch (e) {}
 }
 // Transport (under Buildings): arrives with the fourth megastructure, or at once in a city that already has highways
-const hwUnlocked = () => (typeof ECON !== 'undefined' && ECON.on) ? ECON.transit('mt') : (megaUnlockedKinds.size >= 4 || highways.length > 0 || metros.length > 0);   // (economy mode: the metro at Zoned, economy.js)
+const hwUnlocked = () => NT_MODE() ? NT_MODE().transit('mt') : (megaUnlockedKinds.size >= 4 || highways.length > 0 || metros.length > 0);   // (economy mode: the metro at Zoned, economy.js)
 const TMENU_OPEN_KEY = (typeof TOUCH !== 'undefined' && TOUCH.on ? 'touch:' : '') + 'neonIsland.tmenuOpen';
 function setTmenuOpen(open){
   $('tmenuHead').setAttribute('aria-expanded', open); $('tmenuList').hidden = !open;

@@ -13,15 +13,15 @@ const SLOTS = (() => {
   const CHECK_MS = 5*60*1000;
   const ls = window.localStorage;
   const lsGet = k => { try { return ls.getItem(k); } catch (e) { return null; } };
-  const lsSet = (k, v) => { try { NT_RAW.set.call(ls, k, v); } catch (e) {} };   // (the raw writes: never dropped by the lock)
-  const lsDel = k => { try { NT_RAW.remove.call(ls, k); } catch (e) {} };
+  const lsSet = (k, v) => { try { NT_RAW.set.call(ls, NT_nsKey(k), v); } catch (e) {} };   // (the raw writes: never dropped by the lock; on the Planner's link under its own names, saveguard.js)
+  const lsDel = k => { try { NT_RAW.remove.call(ls, NT_nsKey(k)); } catch (e) {} };
   const newId = () => 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const NAME_OK = /^[a-z0-9_-]{2,32}$/;
 
   /* ---------- the store ---------- */
   let dbP = null;
   const db = () => dbP || (dbP = new Promise((res, rej) => {
-    const r = indexedDB.open('neonTerrarium.slots', 1);
+    const r = indexedDB.open('neonTerrarium.slots' + (NT_PLAN ? '.plan' : ''), 1);   // (the Planner's cities are a list of their own)
     r.onupgradeneeded = () => r.result.createObjectStore('slots', { keyPath: 'id' });
     r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
   }));
@@ -35,7 +35,8 @@ const SLOTS = (() => {
   const allRecs = () => tx('readonly', st => st.getAll());
 
   /* ---------- the city being played ---------- */
-  function cityKeysNow(){ const out = []; for (let i = 0; i < ls.length; i++){ const k = ls.key(i); if (NT_isCityKey(k)) out.push(k); } return out; }
+  // (on the Planner's link the keys are stored as 'plan:' + the key, saveguard.js: listed here by the key itself, which the reads and writes map back)
+  function cityKeysNow(){ const out = []; for (let i = 0; i < ls.length; i++){ let k = ls.key(i); if (NT_NS){ if (!k || !k.startsWith(NT_NS)) continue; k = k.slice(NT_NS.length); } if (NT_isCityKey(k)) out.push(k); } return out; }
   function snapshot(){ const d = {}; for (const k of cityKeysNow()){ const v = lsGet(k); if (v !== null) d[k] = v; } return d; }
   // the systems that only save on the way out are asked to save now (stories, cases, the ledger, the transmission log)
   function flush(){ try { if (typeof save === 'function') save(); } catch (e) {} try { dispatchEvent(new Event('beforeunload')); dispatchEvent(new Event('pagehide')); } catch (e) {} }
@@ -44,7 +45,7 @@ const SLOTS = (() => {
     try { day = STORY.day() + 1; } catch (e) {}
     try { for (const p of people.values()) if (!p.visitor && !p.gone) residents++; } catch (e) {}
     try { plots = cells.size; } catch (e) {}
-    const mode = typeof ECON !== 'undefined' && ECON.on ? 'economy' : 'sandbox';
+    const mode = typeof ECON !== 'undefined' && ECON.on ? 'economy' : NT_PLAN ? 'plan' : 'sandbox';
     return { day, residents, plots, mode };
   }
   // a small picture of the city, read from the frame the game has just drawn (the next one, so it's whole)
@@ -176,6 +177,7 @@ const SLOTS = (() => {
     SL.rev++;
   };
   SL.setUser = async name => {
+    if (NT_PLAN) throw new Error('Planner cities stay in this browser.');
     const u = String(name || '').trim().toLowerCase();
     if (u && !NAME_OK.test(u)) throw new Error('Use 2 to 32 letters, numbers, - or _.');
     SL.cloudUser = u || null; if (u) lsSet(USER_KEY, u); else lsDel(USER_KEY);
@@ -185,7 +187,7 @@ const SLOTS = (() => {
 
   /* ---------- start ---------- */
   SL.ready = (async () => {
-    SL.cloudUser = lsGet(USER_KEY) || null;
+    SL.cloudUser = NT_PLAN ? null : lsGet(USER_KEY) || null;   // (the Planner's cities stay in this browser)
     let id = lsGet(ACTIVE_KEY);
     try {
       if (!id || !(await getRec(id))){   // (the first time: the city already here becomes the first slot)

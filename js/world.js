@@ -1752,7 +1752,7 @@ function steamVent(c){
 
 // About one building in seventy stands on a dark street: almost no light, and what's left flickers (see DARK in core.js)
 // (economy mode, economy.js: a building with no power has its lights off, and one not yet full has the floors above its residents unlit)
-const isDarkPlot = c => { if (typeof ECON !== 'undefined' && ECON.on){ const d = ECON.dark(c); if (d !== null) return d; } return !!c.sections.length && !c.mega && hash('dark', c.i, c.j) % 70 === 0; };
+const isDarkPlot = c => { const md = typeof NT_MODE === 'function' ? NT_MODE() : null; if (md){ const d = md.dark(c); if (d !== null) return d; } return !!c.sections.length && !c.mega && hash('dark', c.i, c.j) % 70 === 0; };
 /* ---------- rebuilding ---------- */
 // Pieces are batched in regions of REG x REG grid cells; an edit only re-batches the regions it touched.
 const REG = 5, regions = new Map(), dirtyRegions = new Set();

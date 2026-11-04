@@ -275,23 +275,24 @@ function tdStep(cx, cy, max){
 // why); a right-click, Esc or Shift again lets the plan go. Where the plan can't go on, its last plot shows red and the reason is on the hint line.
 let TP = null;   // { l, hw, path: [{ i, j, L, ok }], why }
 const TP_MAX = 40;
+// (drawn as the track pieces themselves, see-through, as the one-piece outline a click would build is (hwShowGhost): owner Nov 4, the plot squares read
+//  as a grid, not as track)
 const tpGfx = (() => {
-  const blue = new THREE.MeshBasicMaterial({ color: 0x39b4ff, transparent: true, opacity: .95, depthTest: false, depthWrite: false });
-  const red = new THREE.MeshBasicMaterial({ color: 0xff4a5a, transparent: true, opacity: .95, depthTest: false, depthWrite: false });
-  const blueF = new THREE.MeshBasicMaterial({ color: 0x39b4ff, transparent: true, opacity: .2, depthTest: false, depthWrite: false });
-  const redF = new THREE.MeshBasicMaterial({ color: 0xff4a5a, transparent: true, opacity: .2, depthTest: false, depthWrite: false });
-  const box = new THREE.BoxGeometry(1, 1, 1), pool = [];
-  const make = () => { const g = new THREE.Group(), f = new THREE.Mesh(box, blueF), bars = [0, 1, 2, 3].map(() => new THREE.Mesh(box, blue));
-    f.renderOrder = 997; g.add(f); for (const b of bars){ b.renderOrder = 999; g.add(b); }
-    g.traverse(o => o.layers.set(1)); g.visible = false; scene.add(g); return { g, f, bars }; };
-  function show(path, hw){
-    const s = LOT*.86, t = .07;
+  const mk = (col, op) => new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: op, depthTest: false, depthWrite: false });
+  const ln = col => new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: .95, depthTest: false });
+  const okF = mk(0x38e8e0, .32), okL = ln(0x38e8e0), badF = mk(0xff3a4a, .32), badL = ln(0xff3a4a);
+  const box = new THREE.BoxGeometry(1, 1, 1), edges = new THREE.EdgesGeometry(box), pool = [];
+  const make = () => { const g = new THREE.Group(), f = new THREE.Mesh(box, okF), e = new THREE.LineSegments(edges, okL);
+    for (const o of [f, e]){ o.layers.set(1); o.renderOrder = 999; g.add(o); } g.visible = false; scene.add(g); return { g, f, e }; };
+  // path: the planned plots; from: the plot the run starts from; l: the line (its width)
+  function show(path, hw, from, l){
+    const w = hw ? hwWidth(l) : MT_W + .1, th = hw ? .3 : MT_DECK + MT_GIRD;
     for (let n = 0; n < Math.max(path.length, pool.length); n++){
       if (n >= path.length){ pool[n].g.visible = false; continue; }
-      const q = pool[n] || (pool[n] = make()), p = path[n], y = hw ? hwY(p.L) : MT_Y;
-      q.g.position.set(p.i*LOT, y, p.j*LOT); q.g.visible = true;
-      q.f.material = p.ok ? blueF : redF; q.f.scale.set(s, .04, s);
-      q.bars.forEach((b, k) => { b.material = p.ok ? blue : red; const along = k < 2; b.scale.set(along ? s + t : t, t, along ? t : s + t); b.position.set(along ? 0 : (k === 2 ? -1 : 1)*s/2, 0, along ? (k === 0 ? -1 : 1)*s/2 : 0); });
+      const q = pool[n] || (pool[n] = make()), a = n ? path[n - 1] : from, b = path[n];
+      const y = hw ? (hwY(a.L) + hwY(b.L))/2 : MT_Y;
+      q.g.position.set((a.i + b.i)*LOT/2, y - th/2, (a.j + b.j)*LOT/2); q.g.rotation.y = Math.atan2(b.i - a.i, b.j - a.j); q.g.scale.set(w, th, LOT);
+      q.f.material = b.ok ? okF : badF; q.e.material = b.ok ? okL : badL; q.g.visible = true;
     }
   }
   return { show, hide(){ for (const q of pool) q.g.visible = false; } };
@@ -346,19 +347,25 @@ function tpUpdate(cx, cy){
   if (!(TP.hw ? hwMode && highways.includes(l) && !l.done : mtMode && metros.includes(l) && !l.loop)){ tpStop(); return; }
   const to = tdPlotAt(cx, cy, TP.hw ? hwY(hwLevel) : MT_Y); if (!to) return;
   const r = tpCheck(l, tpRoute(l, to, TP.first)); TP.path = r.path; TP.why = r.why;
-  tpGfx.show(r.path, TP.hw);
+  const n = l.tiles.length, from = TP.first ? l.tiles[0] : l.tiles[n - 1];
+  tpGfx.show(r.path, TP.hw, TP.hw ? from : { i: from.i, j: from.j, L: 0 }, l);
   const h = $('modeHint'), say = r.why ? whyShort(r.why) : ''; h.textContent = say; h.hidden = !say; h.classList.toggle('bad', !!say);
 }
 function tpConfirm(cx, cy){
   if (!TP) return;
   const l = TP.l, hw = TP.hw, want = TP.first ? ['prepend'] : ['extend', 'reopen'], todo = TP.path.filter(p => p.ok); let built = 0;
-  for (const p of todo){
-    const t = hw ? hwTargetAt({ kind: 'hwGround', i: p.i, j: p.j, d: 0 }) : mtTargetAt({ kind: 'mtGround', i: p.i, j: p.j, d: 0 });
-    if (!t || !t.ok || (t.h || t.l) !== l || !want.includes(t.type) || !(hw ? hwApply(t) : mtApply(t))){ if (t && !t.ok) transitWhy(t.why, cx, cy); break; }
-    built++;
-  }
-  if (!built && TP.why) transitWhy(TP.why, cx, cy);
-  if (built) tEmit('tdraw');
+  // (laid as one: each piece by the usual rules, the line's look and the plots under it made once at the end)
+  const before = hw ? l.tiles.map(t => [t.i, t.j]) : mtTouched(l);
+  if (hw) HW_BATCH = true; else MT_BATCH = true;
+  try {
+    for (const p of todo){
+      const t = hw ? hwTargetAt({ kind: 'hwGround', i: p.i, j: p.j, d: 0 }) : mtTargetAt({ kind: 'mtGround', i: p.i, j: p.j, d: 0 });
+      if (!t || !t.ok || (t.h || t.l) !== l || !want.includes(t.type) || !(hw ? hwApply(t) : mtApply(t))){ if (t && !t.ok) transitWhy(t.why, cx, cy); break; }
+      built++;
+    }
+  } finally { HW_BATCH = false; MT_BATCH = false; }
+  if (built){ if (hw) hwCommit(l, before.concat(l.tiles.map(t => [t.i, t.j]))); else mtCommit(l, before); sfx.play('place'); tEmit('tdraw'); }
+  else if (TP.why) transitWhy(TP.why, cx, cy);
   tpStop();
 }
 canvas.addEventListener('contextmenu', e => e.preventDefault());

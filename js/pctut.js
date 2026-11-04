@@ -105,7 +105,7 @@ const PCTUT = (() => {
   const MT = { key: 'neonIsland.tutPCMt', name: 'METRO', mode: () => typeof mtMode !== 'undefined' && mtMode,
     end: 'Click a straight piece to add a station. Right-click a piece to cut the line back.', beats: [
     { id: 'start', say: 'Click a plot to place the first station', ghost: 'tap', arm: () => { const n = metros.length; return () => metros.length > n; } },
-    { id: 'extend', say: 'Point at the end station and tap Shift. Move the mouse to plan the track (blue), click to build it. Right-click cancels', ghost: 'tap', arm: () => { const n = tilesOf(metros); return () => tilesOf(metros) > n; } },
+    { id: 'extend', say: 'Point at the station at either end of the line and tap Shift. Move the mouse to plan the track (blue), click to build it. Right-click cancels', ghost: 'tap', arm: () => { const n = tilesOf(metros); return () => tilesOf(metros) > n; } },
     { id: 'finish', say: 'Click the last piece to finish it with a station', ghost: 'tap', arm: () => { const n = doneOf(metros); return () => doneOf(metros) > n; } },
   ] };
   for (const r of [HW, MT]) r.st = load(r.key, st.existing ? { done: true, beats: {}, existing: true } : { done: false, beats: {} });

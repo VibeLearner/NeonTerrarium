@@ -296,26 +296,28 @@ const tpGfx = (() => {
   }
   return { show, hide(){ for (const q of pool) q.g.visible = false; } };
 })();
-// the line whose open end is under the pointer (or a metro's finished end station: the line carries on from it)
+// the line whose end is under the pointer: { l, first }. A highway's open end; a metro line's last plot (its finished end station too: the line carries
+// on from it), or its first station (owner, Nov 4: built from the side of a station as a click there does: the line carries on that way, the new
+// plot its first station, turned to face it, where there's room for the lift)
 function tpLineAt(cx, cy){
   const ends = pk => { if (!pk) return null;
-    if (pk.kind === 'hwTile'){ const h = pk.h; return !h.done && pk.k === h.tiles.length - 1 ? h : null; }
-    if (pk.kind === 'mtTile'){ const l = pk.l; return !l.loop && pk.k === l.tiles.length - 1 ? l : null; }
+    if (pk.kind === 'hwTile'){ const h = pk.h; return !h.done && pk.k === h.tiles.length - 1 ? { l: h, first: false } : null; }
+    if (pk.kind === 'mtTile'){ const l = pk.l, n = l.tiles.length; if (l.loop) return null; return pk.k === n - 1 ? { l, first: false } : pk.k === 0 ? { l, first: true } : null; }
     return null; };
   return hwMode ? ends(hwPick(cx, cy, true)) || ends(hwPickTouch(cx, cy)) : mtMode ? ends(mtPick(cx, cy)) || ends(mtPickTouch(cx, cy)) : null;
 }
 function tpStart(){
   if (!ptrLast || !(hwMode || mtMode)) return;
-  const l = tpLineAt(ptrLast.x, ptrLast.y);
+  const at = tpLineAt(ptrLast.x, ptrLast.y), l = at && at.l;
   if (!l){ transitWhy(hwMode ? 'point at the open end of a road first, then tap Shift' : 'point at the end of a line first, then tap Shift', ptrLast.x, ptrLast.y); return; }
-  TP = { l, hw: hwMode, path: [], why: '' };
+  TP = { l, first: at.first, hw: hwMode, path: [], why: '' };
   if (hwMode){ hwActive = l; hwShowGhost(null); } else { mtActive = l; mtShowGhost(null); }
   tpUpdate(ptrLast.x, ptrLast.y); tEmit('plan');
 }
 function tpStop(){ TP = null; tpGfx.hide(); const h = $('modeHint'); h.textContent = ''; h.classList.remove('bad'); if (ptrLast){ if (hwMode) hwHover(ptrLast.x, ptrLast.y); else if (mtMode) mtHover(ptrLast.x, ptrLast.y); } }
 // the plots from the line's end to (to): along the way the line already runs first, then one turn
-function tpRoute(l, to){
-  const n = l.tiles.length, e = l.tiles[n - 1], pv = l.tiles[n - 2], di = to.i - e.i, dj = to.j - e.j, out = [];
+function tpRoute(l, to, first){
+  const n = l.tiles.length, e = first ? l.tiles[0] : l.tiles[n - 1], pv = first ? l.tiles[1] : l.tiles[n - 2], di = to.i - e.i, dj = to.j - e.j, out = [];
   let iFirst = Math.abs(di) >= Math.abs(dj);
   if (pv){ const ai = e.i - pv.i, aj = e.j - pv.j; iFirst = ai ? Math.sign(di) !== -ai || !di : !(dj && Math.sign(dj) !== -aj); }
   let i = e.i, j = e.j;
@@ -325,14 +327,15 @@ function tpRoute(l, to){
 }
 // each plot checked as a click on it would be, with the plan's plots before it laid for the moment and then taken back (nothing built)
 function tpCheck(l, route){
-  const hw = TP.hw, keep = l.tiles.slice(), done = l.done, path = []; let why = '';
+  const hw = TP.hw, first = TP.first, want = first ? ['prepend'] : ['extend', 'reopen'], keep = l.tiles.slice(), done = l.done, path = []; let why = '';
   try {
     for (const p of route){
       if (l.tiles.some(t => t.i === p.i && t.j === p.j && (!hw || Math.abs(t.L - hwLevel) < 2))){ why = hw ? 'the road can\'t cross itself at this height' : 'the track can\'t cross itself'; path.push({ ...p, L: hwLevel, ok: false }); break; }
       const t = hw ? hwTargetAt({ kind: 'hwGround', i: p.i, j: p.j, d: 0 }) : mtTargetAt({ kind: 'mtGround', i: p.i, j: p.j, d: 0 });
-      const ok = !!t && t.ok && (t.h || t.l) === l && (t.type === 'extend' || t.type === 'reopen');
+      const ok = !!t && t.ok && (t.h || t.l) === l && want.includes(t.type);
       if (!ok){ why = t && t.why ? t.why : ''; path.push({ ...p, L: t && t.L !== undefined ? t.L : hwLevel, ok: false }); break; }
-      path.push({ ...p, L: t.L, ok: true }); l.tiles.push(hw ? { i: p.i, j: p.j, L: t.L } : { i: p.i, j: p.j }); l.done = false;
+      path.push({ ...p, L: t.L, ok: true });
+      if (first) l.tiles.unshift({ i: p.i, j: p.j }); else { l.tiles.push(hw ? { i: p.i, j: p.j, L: t.L } : { i: p.i, j: p.j }); l.done = false; }
     }
   } finally { l.tiles = keep; l.done = done; }
   return { path, why };
@@ -342,16 +345,16 @@ function tpUpdate(cx, cy){
   const l = TP.l;
   if (!(TP.hw ? hwMode && highways.includes(l) && !l.done : mtMode && metros.includes(l) && !l.loop)){ tpStop(); return; }
   const to = tdPlotAt(cx, cy, TP.hw ? hwY(hwLevel) : MT_Y); if (!to) return;
-  const r = tpCheck(l, tpRoute(l, to)); TP.path = r.path; TP.why = r.why;
+  const r = tpCheck(l, tpRoute(l, to, TP.first)); TP.path = r.path; TP.why = r.why;
   tpGfx.show(r.path, TP.hw);
   const h = $('modeHint'), say = r.why ? whyShort(r.why) : ''; h.textContent = say; h.hidden = !say; h.classList.toggle('bad', !!say);
 }
 function tpConfirm(cx, cy){
   if (!TP) return;
-  const l = TP.l, hw = TP.hw, todo = TP.path.filter(p => p.ok); let built = 0;
+  const l = TP.l, hw = TP.hw, want = TP.first ? ['prepend'] : ['extend', 'reopen'], todo = TP.path.filter(p => p.ok); let built = 0;
   for (const p of todo){
     const t = hw ? hwTargetAt({ kind: 'hwGround', i: p.i, j: p.j, d: 0 }) : mtTargetAt({ kind: 'mtGround', i: p.i, j: p.j, d: 0 });
-    if (!t || !t.ok || (t.h || t.l) !== l || !(t.type === 'extend' || t.type === 'reopen') || !(hw ? hwApply(t) : mtApply(t))){ if (t && !t.ok) transitWhy(t.why, cx, cy); break; }
+    if (!t || !t.ok || (t.h || t.l) !== l || !want.includes(t.type) || !(hw ? hwApply(t) : mtApply(t))){ if (t && !t.ok) transitWhy(t.why, cx, cy); break; }
     built++;
   }
   if (!built && TP.why) transitWhy(TP.why, cx, cy);

@@ -2574,7 +2574,12 @@ function removePlatform(c){
   finishAnimsOn(c); solidDrop(c);   // (out of its block's merge at once: see removeArea)
   const old = { view: c.view, data: c.data }; c.view = null; c.data = null;
   cells.delete(ckey(c.i, c.j)); dirtyRegions.add(regKey(c.i, c.j));
-  refresh(SIDES4.map(([a,b]) => cells.get(ckey(c.i+a, c.j+b))));
+  // (a sky highway or metro over the plot is cut there, as delete mode cuts it (removeArea): a right-click on the bare plot left them standing on nothing)
+  const r = { i0: c.i, i1: c.i, j0: c.j, j1: c.j }, lines = [...(typeof hwRemoveArea === 'function' ? hwRemoveArea(r) : []), ...(typeof mtRemoveArea === 'function' ? mtRemoveArea(r) : [])];
+  const near = new Set(SIDES4.map(([a,b]) => cells.get(ckey(c.i+a, c.j+b))).filter(Boolean));
+  for (const [i, j] of lines){ const n = cells.get(ckey(i, j)); if (n && !n.mega) near.add(n); }
+  if (lines.length){ SC_DIRTY.unknown = true; shadowDirty = true; }
+  refresh([...near]);
   startAnim(c, 'remove', PLAT_BOTTOM, CURB + 1.4, null, LOT, old);
 }
 const MAX_SECTIONS = 4, MAX_HEIGHT = 24;
@@ -2763,11 +2768,14 @@ function removeArea(r){
     startAnim(c, 'remove', PLAT_BOTTOM, top + 1.4, zone, LOT, old);
   }
   for (const c of gone) for (const [a, b] of SIDES4){ const n = cells.get(ckey(c.i + a, c.j + b)); if (n) touched.add(n); }
-  for (const [i, j] of lines){ const n = cells.get(ckey(i, j)); if (n && !n.mega) touched.add(n); }   // (the plots the lines stood on, outside the block: their pillars and lifts go)
+  const lineCells = new Set();
+  for (const [i, j] of lines){ const n = cells.get(ckey(i, j)); if (n && !n.mega){ touched.add(n); lineCells.add(n); } }   // (the plots the lines stood on, outside the block: their pillars and lifts go)
   if (gone.length) areaAgentsLeave(inR);
   if (gone.length || lines.length){
     if (lines.length){ SC_DIRTY.unknown = true; shadowDirty = true; }
-    if (STAGE_ON() && !SYNC_NOW() && RW.usable() && touched.size){ refresh([]); stageRefresh([...touched]); }   // (the removed plots' blocks now; the plots round them by the worker)
+    // (the plots under what's left of a cut line are made here and now, as laying track does (mtCommit): through the worker, a station left at the cut
+    //  came without its lift, and the cut-off end kept its old one, until something else rebuilt that plot: owner, Nov 4)
+    if (STAGE_ON() && !SYNC_NOW() && RW.usable() && touched.size){ refresh([...lineCells]); const rest = [...touched].filter(n => !lineCells.has(n)); if (rest.length) stageRefresh(rest); }   // (the removed plots' blocks now; the plots round them by the worker)
     else refresh([...touched]);
     save(); sfx.play('remove');
   }

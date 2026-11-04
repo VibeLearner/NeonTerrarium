@@ -359,7 +359,8 @@ function pointerMove(e){
   if (act.kind === 'npc'){ if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 5){ act.moved = true; if (e.pointerType === 'touch'){ act.kind = 'touch'; touchPan(e.clientX - act.x, e.clientY - act.y); } else act.kind = 'sky'; } return; }
   if (act.kind === 'sky' && act.tdraw){ if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 5) act.moved = true; if (act.moved) tdStep(e.clientX, e.clientY, 2); return; }
   if (act.kind === 'sky'){ if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 5) act.moved = true; if (act.moved){ yawT -= dx*.008; tilt(); hover.visible = hoverFill.visible = hoverStrip.visible = false; if (megaPick) showMegaGhost(null); } return; }
-  if (act.kind === 'right'){ if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 5) act.moved = true; if (act.moved){ yawT -= dx*.008; tilt(); } return; }
+  if (act.kind === 'right'){ if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 9) act.moved = true;   // (a right-click that wobbles a little is still a click: a trackpad's two-finger press often moves a few pixels, owner Nov 4)
+ if (act.moved){ yawT -= dx*.008; tilt(); } return; }
   if (act.kind === 'fresh2'){   // the building just made, pressed again and dragged: it goes, and the height pick takes its place
     if (!act.started && Math.abs(e.clientY - act.sy) > 12){ act.started = true; if (freshUndo(act.f)){ ptrLast = { x: act.x, y: act.y }; hlStart(); } }
     if (act.started && HL) hlMove(act.x, e.clientY);
@@ -398,11 +399,11 @@ function endPtr0(e){
     if (act.kind === 'npc' && !act.moved){ const who = MON.pick(e.clientX, e.clientY, true); if (who) MON.open(who); else if (!touchMegaTap(e)){ act.done = new Set(); paintAt(e.clientX, e.clientY); } }   // (the exact test now; nobody there after all: a click on the city)
     if (act.kind === 'del' && !act.moved){   // a click: inside the selection deletes it, anywhere else clears it
       const c = groundCellAt(e.clientX, e.clientY);
-      if (delSel && c && c.i >= delSel.i0 && c.i <= delSel.i1 && c.j >= delSel.j0 && c.j <= delSel.j1) removeArea(delSel);
+      if (delSel && c && c.i >= delSel.i0 && c.i <= delSel.i1 && c.j >= delSel.j0 && c.j <= delSel.j1){ removeArea(delSel); tEmit('erase'); }
       delSel = null; showAreaSel(null);
     }
     if (act.kind === 'right' && !act.moved && delMode){ delSel = null; showAreaSel(null); }
-    else if (act.kind === 'right' && !act.moved){ if (hwMode) hwRightClick(e.clientX, e.clientY); else if (mtMode) mtRightClick(e.clientX, e.clientY); else if (megaPick) selectMega(null); else { const pk = pickAt(e.clientX, e.clientY), snap = RESTORE.snap(pk); removeAt(pk); if (snap){ RESTORE.offer(snap, e.clientX, e.clientY); tEmit('remove'); } } }   // (a removal: a Restore button by the pointer for a few seconds, as a finger's hold-to-remove has: owner, Nov 4)   // right-click while placing: put it down (highways are only cut in highway mode)
+    else if (act.kind === 'right' && !act.moved){ if (hwMode) hwRightClick(e.clientX, e.clientY); else if (mtMode) mtRightClick(e.clientX, e.clientY); else if (megaPick) selectMega(null); else { const pk = pickAt(e.clientX, e.clientY), snap = RESTORE.snap(pk); removeAt(pk); if (snap) RESTORE.offer(snap, e.clientX, e.clientY); if (pk && pk.kind !== 'sky') tEmit('remove'); } }   // (a removal: a Restore button by the pointer for a few seconds, as a finger's hold-to-remove has: owner, Nov 4)   // right-click while placing: put it down (highways are only cut in highway mode)
     if (act.kind === 'sky' && act.moved && act.tdraw){ tdStep(e.clientX, e.clientY, 12); if (hwMode) hwHover(e.clientX, e.clientY); else if (mtMode) mtHover(e.clientX, e.clientY); }
     if (act.kind === 'sky' && !act.moved){ if (hwMode) hwClick(e.clientX, e.clientY); else if (mtMode) mtClick(e.clientX, e.clientY); else if (megaPick) placeMegaHere(e.clientX, e.clientY); else { act.done = new Set(); paintAt(e.clientX, e.clientY); } }
     if (act.kind === 'dtap' && !(typeof LOADP !== 'undefined' && LOADP.on)){

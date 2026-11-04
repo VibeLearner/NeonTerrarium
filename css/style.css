@@ -824,3 +824,7 @@ html:not(.touch) .pctut .g-tap i:first-child{animation:ttTap 1.2s ease-out infin
 html:not(.touch) .pctut .g-drag i:first-child{animation:ttDrag 1.6s ease-in-out infinite}
 html:not(.touch) .pctip:not([hidden]){display:block;position:fixed;left:50%;top:calc(58px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:140;max-width:min(460px,calc(100vw - 32px));
   padding:9px 13px;font:500 14px/1.4 'Chakra Petch',sans-serif;color:#ffe2b8;background:rgba(18,10,4,.92);border:1px solid rgba(255,179,71,.6);pointer-events:none;text-align:center}
+/* why a metro or highway piece can't go there, beside the pointer, for a moment (highway.js transitWhy; computers only) */
+.twhy{position:fixed;z-index:160;transform:translate(14px,-34px);max-width:280px;padding:5px 9px;font:500 13px/1.35 'Chakra Petch',sans-serif;color:#ffd9de;
+  background:rgba(32,8,14,.92);border:1px solid #ff4a5a;pointer-events:none;white-space:normal}
+.twhy[hidden]{display:none}

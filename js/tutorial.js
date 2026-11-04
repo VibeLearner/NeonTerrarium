@@ -31,6 +31,7 @@ const TUT = (() => {
     { id: 'build', say: 'Tap a tile to place a building', at: center, ghost: 'tap', ev: 'build', need: () => !!S.zone, pre: 'Select a zone first' },
     { id: 'trim', say: 'Double-tap a tile to build a single floor', at: atFresh, ghost: 'tap2', ev: 'trim' },
     { id: 'resize', say: 'Double-tap and drag up to set the height', at: atFresh, ghost: 'up', ev: 'resize' },
+    { id: 'side', say: 'You can build on the side of buildings too: tap a building\'s wall', at: center, ghost: 'tap', ev: 'side', need: () => !!S.zone, pre: 'Select a zone first' },
     { id: 'remove', say: 'Press and hold a building to remove it', at: center, ghost: 'hold', ev: 'remove' },
     { id: 'restore', say: 'Tap Restore to undo the removal', at: () => rectOf(document.querySelector('.trestore:not([hidden])')) || center(), ghost: 'tap', ev: 'restore', skipIf: () => !document.querySelector('.trestore:not([hidden])') },
     { id: 'tilt', say: 'Drag two fingers up or down to tilt', at: center, ghost: 'two', ev: 'tilt' },

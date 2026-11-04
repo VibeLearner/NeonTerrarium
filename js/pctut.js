@@ -69,6 +69,7 @@ const PCTUT = (() => {
       arm: () => { let was = false; return () => { if (typeof tiltMode !== 'undefined' && tiltMode) was = true; return (was && !tiltMode) || !!S.zone; }; } },
     { id: 'zone', say: 'Pick a zone card below to choose what to build', ghost: 'tap', arm: () => () => !!S.zone },
     { id: 'build', say: 'Click a tile to place a building', ghost: 'tap', arm: () => { const n = built(); return () => built() > n; } },
+    { id: 'side', say: 'You can build on the side of buildings too: click a building\'s wall', ghost: 'tap', arm: () => { let ok = false; const f = () => { ok = true; }; addEventListener('nt:side', f, { once: true }); return () => ok; } },
     { id: 'floor', say: 'With a zone picked, point at a tile or roof and press Space to build a single floor', ghost: 'tap', arm: () => { const n = pieces(); return () => pieces() > n; } },
     // (tap Shift: the height pick, moving the mouse up or down; a click builds there. Done once a pick has been made and something built)
     { id: 'shift', say: 'Tap Shift and move the mouse up or down to start a building higher, then click to build it', ghost: 'drag',

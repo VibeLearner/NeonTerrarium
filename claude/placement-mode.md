@@ -29,7 +29,7 @@ things go. Design doc: the owner's Claude doc "Neon Terrarium: Placement Puzzle 
 - Comfort: 0.7 x the average + 0.3 x the lowest of Air, Quiet, Safety, Ease, Life (luxury weighs Quiet, Air and Life more and Ease much less).
   Air, Quiet, Safety and Life count from the start; Ease (feeling watched) opens with police at Patrolled and fades in over 20 minutes.
 - Tall buildings (three levels or more) shade haze for the 3 plots behind them; past that it carries on. The tower breathes part of what it stops
-  (`BLK`, 0.35 of it added to its own haze), so its residents get unhappy. Noise is soaked up by tall buildings anywhere along the way.
+  (`BLK`: half the most it stops from any one plot), so its residents get unhappy. Noise is soaked up by tall buildings anywhere along the way.
 - Shops: a second level draws 0.75 of a first level's visitors, each level above that 0.45 (`P.shopTall`). Taller shops are louder (0.2 + 0.3 per
   extra level, by day) and reach 2 plots from three levels up, never as far as haze (3).
 - Thriving home: powered and connected, support 0.8+, every open dial 0.7+.

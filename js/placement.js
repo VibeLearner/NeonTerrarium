@@ -21,6 +21,8 @@ const PLAN = (() => {
   let st = null; try { st = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { st = null; }
   function freshState(){ return { v: 1, tier: 0, fresh: true, occ: {}, best: {}, forks: {}, tut: { step: 0, done: false }, hints: {}, intro: {}, dialAt: {}, wind: Math.random()*Math.PI*2, crime: { spots: [], since: 0, n: 0, firstAt: 0 }, peak: { res: 0, thr: 0 }, corp: false, firstZ: {} }; }
   st = Object.assign(freshState(), st || {});
+  // (a city from before Quiet and Safety counted from the start: they fade in, as a newly opened comfort does)
+  if (!st.fresh){ if (!st.dialAt.quiet && st.tier < 2) st.dialAt.quiet = Date.now(); if (!st.dialAt.safety && st.tier < 3) st.dialAt.safety = Date.now(); }
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} };
   addEventListener('pagehide', save); addEventListener('beforeunload', save);
 
@@ -171,10 +173,10 @@ const PLAN = (() => {
     const box = (s, r) => [Math.max(i0, Math.round(s.i) - r), Math.min(i1, Math.round(s.i) + (s.w || 1) - 1 + r), Math.max(j0, Math.round(s.j) - r), Math.min(j1, Math.round(s.j) + (s.h || 1) - 1 + r)];
     const dTo = (s, a, b) => { const si = Math.round(s.i), sj = Math.round(s.j); return Math.max(Math.max(si - a, 0, a - (si + (s.w || 1) - 1)), Math.max(sj - b, 0, b - (sj + (s.h || 1) - 1))); };
     const fall = (s, d) => d > s.r ? 0 : s.s*(1 - d/(s.r + 1));
-    const blockH = F();
-    for (const b of snap.blds) if (inG(b.i, b.j)) blockH[id(b.i, b.j)] = b.h;
-    for (const m of snap.ms) for (let a = 0; a < m.w; a++) for (let q = 0; q < m.h; q++) if (inG(m.i + a, m.j + q)) blockH[id(m.i + a, m.j + q)] = m.top;
-    const TALL = CURB + 6*FH + .5;   // (three levels or more: a level is three floors)
+    // tall: three levels or more (a megastructure by its height)
+    const TALLB = new Uint8Array(NN);
+    for (const b of snap.blds) if (b.floors >= 3 && inG(b.i, b.j)) TALLB[id(b.i, b.j)] = 1;
+    for (const m of snap.ms) if (m.top > CURB + 6*FH + .5) for (let a = 0; a < m.w; a++) for (let q = 0; q < m.h; q++) if (inG(m.i + a, m.j + q)) TALLB[id(m.i + a, m.j + q)] = 1;
     // cores: their reach, drained by the scrubbers nearest each (each one less than the last, never below half)
     const cores = snap.ms.filter(m => m.kind === 'emitter').map(m => ({ ...m, reach: fk(m.id) === 'wide' ? P.coreWide : P.coreReach, drained: 0, nS: 0 }));
     for (const s of snap.ms) if (s.kind === 'scrubber'){ let best = null, bd = Infinity; for (const c of cores){ const d = megaD(s.i, s.j, c); if (d < bd){ bd = d; best = c; } } if (best){ const f = fk(s.id); best.drained += P.scrubDrain*(f === 'turbo' ? 1.5 : f === 'quiet' ? .7 : 1)*Math.pow(.5, best.nS++); } }
@@ -212,7 +214,7 @@ const PLAN = (() => {
           for (let q = 1; q < steps && q <= P.shadow; q++){ const x = Math.round(a + (si - a)*q/steps), y = Math.round(b + (sj - b)*q/steps);
             if (x >= x0 && x <= x1 && y >= y0 && y <= y1) break;
             if (o && x >= o.i && x < o.i + (o.w || 1) && y >= o.j && y < o.j + (o.h || 1)) break;
-            const kk = (x - i0)*NJ + (y - j0); if (blockH[kk] > TALL){ BLK[kk] += v*.7; v *= .3; break; } } }
+            const kk = (x - i0)*NJ + (y - j0); if (TALLB[kk]){ BLK[kk] = Math.max(BLK[kk], v*.7); v *= .3; break; } } }
         POL[k] += v; }); };
     const clean = s => paint(s, (k, v) => top3(C1, C2, C3, k, v));
     const watch = s => paint(s, (k, v) => { WAT[k] += v; });
@@ -221,7 +223,7 @@ const PLAN = (() => {
     const noise = s => { const si = Math.round(s.i + ((s.w || 1) - 1)/2), sj = Math.round(s.j + ((s.h || 1) - 1)/2);
       if (!s.track && s.s > .3) SRC.noise.push({ i: s.i, j: s.j, w: s.w || 1, h: s.h || 1, s: s.s, k: s.k });
       paint(s, (k, v, a, b, d, x0, x1, y0, y1) => {
-        if (d >= 2){ const steps = Math.max(Math.abs(si - a), Math.abs(sj - b)); for (let q = 1; q < steps; q++){ const x = Math.round(a + (si - a)*q/steps), y = Math.round(b + (sj - b)*q/steps); if (x >= x0 && x <= x1 && y >= y0 && y <= y1) continue; if (blockH[(x - i0)*NJ + (y - j0)] > TALL){ v *= .45; break; } } }
+        if (d >= 2){ const steps = Math.max(Math.abs(si - a), Math.abs(sj - b)); for (let q = 1; q < steps; q++){ const x = Math.round(a + (si - a)*q/steps), y = Math.round(b + (sj - b)*q/steps); if (x >= x0 && x <= x1 && y >= y0 && y <= y1) continue; if (TALLB[(x - i0)*NJ + (y - j0)]){ v *= .45; break; } } }
         if (s.track){ if (v > TRK[k]) TRK[k] = v; } else NOI[k] += v; }); };
     // jobs and things to do: who offers how much, within what reach
     const jobsS = [], lifeS = [];
@@ -264,7 +266,7 @@ const PLAN = (() => {
     for (const d of snap.drops){ noise({ i: d.i, j: d.j, r: 2, s: 1.8 }); lifeS.push({ i: d.i, j: d.j, r: 4, cap: 150 }); }
     for (const w of snap.walls){ watch({ i: w.i, j: w.j, r: 2, s: .14 }); eye({ i: w.i, j: w.j, r: 1, s: .35 }); }
     const patrol = opt.patrol || PATROL;
-    const polAt = (i, j) => { if (!inG(i, j)) return 0; const k = id(i, j); return Math.max(0, POL[k] + .35*BLK[k] - (C1[k] + .5*C2[k] + .25*C3[k])); };   // (BLK: a tall building breathes part of the haze it stops)
+    const polAt = (i, j) => { if (!inG(i, j)) return 0; const k = id(i, j); return Math.max(0, POL[k] + .5*BLK[k] - (C1[k] + .5*C2[k] + .25*C3[k])); };   // (BLK: a tall building breathes part of the haze it stops)
     const noiseAt = (i, j) => { if (!inG(i, j)) return 0; const k = id(i, j); return NOI[k] + TRK[k]; };
     const watchAt = (i, j) => inG(i, j) ? WAT[id(i, j)] : 0;
     const coverAt = (i, j) => { const k = inG(i, j) ? id(i, j) : -1; const e = k < 0 ? 0 : E1[k] + .5*E2[k] + .25*E3[k]; return Math.min(1, e + Math.min(.7, (patrol.get(i + ',' + j) || 0)/12)); };
@@ -439,12 +441,13 @@ const PLAN = (() => {
     function homes(){
       const out = [];
       for (const b of B.values()){ const h = b.h; if (!h || !isHome(h.z) || b.occ <= 0 || h.unhappy === undefined) continue;
-        out.push({ i: b.c.i, j: b.c.j, ppl: b.occ/h.floors*h.people, u: h.unhappy, u2: h.unhappy + .5*h.crimeLoss }); }
+        out.push({ i: b.c.i, j: b.c.j, ppl: b.occ/h.floors*h.people, u: h.unhappy, u2: h.unhappy + .5*.65*h.crimeLoss }); }   // (.65: comfort's share of unhappiness)
       return out;
     }
     // how bad it is round a plot: unhappy people near (for a new hotspot), and the mood that feeds one already there
     const clusterAt = (H, i, j) => { let w = 0; for (const x of H) if (cheb(i, j, x.i, x.j) <= R && x.u > .3) w += x.ppl*(x.u - .3); return w; };
-    const moodAt = (H, i, j) => { let w = 0, s = 0; for (const x of H){ const d = cheb(i, j, x.i, x.j); if (d > R) continue; const k = x.ppl*(1 - d/(R + 1)); w += k; s += k*x.u2; } return w > 0 ? s/w : 0; };
+    // (mood: with half of crime's own effect; cause: without it. A hotspot grows only while both are over the line, so fixing the cause ends it)
+    const moodAt = (H, i, j) => { let w = 0, s = 0, s0 = 0; for (const x of H){ const d = cheb(i, j, x.i, x.j); if (d > R) continue; const k = x.ppl*(1 - d/(R + 1)); w += k; s += k*x.u2; s0 += k*x.u; } return w > 0 ? { m: s/w, c: s0/w } : { m: 0, c: 0 }; };
     function best(H, near, avoid){
       let bst = null, bs = 0;
       for (const x of H){ if (x.u < .3) continue; if (near && (cheb(near.i, near.j, x.i, x.j) < 2 || cheb(near.i, near.j, x.i, x.j) > 6)) continue;
@@ -463,8 +466,8 @@ const PLAN = (() => {
       // a new hotspot: never while the first lessons are on, and at most one every half a minute or so
       const calm = !st.tut.done || now() - cr.since < 90e3;
       if (!calm && cr.spots.length < cap && Math.random() < dt/30){ const t = best(H); if (t && t.sc >= FORM){ cr.spots.push({ i: t.i, j: t.j, heat: .3, h0: .3, p: 0, trail: [], id: ++cr.n }); E.emit('crime', { first: cr.n === 1, i: t.i, j: t.j }); } }
-      for (let q = cr.spots.length - 1; q >= 0; q--){ const s = cr.spots[q], c = cov(s.i, s.j), mood = moodAt(H, s.i, s.j);
-        s.mood = mood;
+      for (let q = cr.spots.length - 1; q >= 0; q--){ const s = cr.spots[q], c = cov(s.i, s.j), md = moodAt(H, s.i, s.j), mood = md.c > GROW - .05 ? md.m : Math.min(md.m, GROW - .05);
+        s.mood = mood; s.cause = md.c;
         if (c >= .4){ s.p += dt; s.heat = Math.max(0, s.heat - dt*.002); }
         else { s.p = Math.max(0, s.p - dt*.5); s.heat = clamp01(s.heat + dt*(mood > GROW ? .006*(mood - GROW)/.1 : -(.004 + .01*(GROW - mood)))); }
         s.h0 = Math.max(s.h0, s.heat);
@@ -786,7 +789,7 @@ const PLAN = (() => {
       let n = 0;
       for (const it of list || []){ if (n >= N) break; cc.set(it.col);
         if (it.m){ const m = it.m; p_.set(m.x, ((m.top || CURB + 6) + CURB)/2, m.z); s_.set(m.w*LOT - .5, Math.max(1, (m.top || CURB + 6) - CURB), m.h*LOT - .5); }
-        else { const c = it.c, y0 = c.lift ? c.lift.y : CURB, y1 = Math.max(y0 + .6, c.height || CURB + 3); p_.set(c.x, (y0 + y1)/2, c.z); s_.set(SIDE + .16, y1 - y0 + .1, SIDE + .16); }
+        else { const c = it.c, y0 = c.lift && !(c.below && c.below.length) ? c.lift.y : CURB, y1 = Math.max(y0 + .6, c.height || CURB + 3); p_.set(c.x, (y0 + y1)/2, c.z); s_.set(SIDE + .16, y1 - y0 + .1, SIDE + .16); }
         m4.compose(p_, qi, s_); mesh.setMatrixAt(n, m4); aCol.setXYZ(n, cc.r, cc.g, cc.b); aPulse.setX(n, it.pulse ? 1 + (n % 7) : 0); n++; }
       mesh.count = n; mesh.instanceMatrix.needsUpdate = true; aCol.needsUpdate = true; aPulse.needsUpdate = true; mesh.visible = n > 0;
     }
@@ -812,14 +815,14 @@ const PLAN = (() => {
         if (uv.x < 0. || uv.y < 0. || uv.x > 1. || uv.y > 1.) discard;
         vec4 f = texture2D(tF, uv);
         if (uMode < .5){
-          float p = f.r*4.; vec2 bin = floor((vW.xz - uWind*uT*.5)/(uLOT*.2)); float q = p*(.8 + .4*hash(bin));
+          float p = f.r*4., lw = max(fwidth(p*2.), 1e-3); vec2 bin = floor((vW.xz - uWind*uT*.5)/(uLOT*.2)); float q = p*(.8 + .4*hash(bin));
           if (q < .2) discard;
-          vec3 c = ramp(q); float x = q*2., d = min(fract(x), 1. - fract(x)), lw = max(fwidth(x), 1e-3);
+          vec3 c = ramp(q); float x = q*2., d = min(fract(x), 1. - fract(x));
           c = mix(c, min(c*1.6 + .12, vec3(1.)), (1. - smoothstep(0., lw*1.6, d))*.55);
           gl_FragColor = vec4(c, smoothstep(.2, .55, q)*.8);
         } else {
-          float nz = f.g*4.; if (nz < .3) discard;
-          float x = nz*2.2 + uT*.8, d = min(fract(x), 1. - fract(x)), lw = max(fwidth(x), 1e-3);
+          float nz = f.g*4., x = nz*2.2 + uT*.8, lw = max(fwidth(x), 1e-3); if (nz < .3) discard;
+          float d = min(fract(x), 1. - fract(x));
           float ln = 1. - smoothstep(0., lw*1.5, d), gl = exp(-d/(lw*5.))*.5;
           vec3 base = mix(vec3(.16, .08, .38), vec3(.45, .2, .95), smoothstep(.3, 3., nz)), lc = mix(vec3(.62, .5, 1.), vec3(1., .31, .84), smoothstep(.8, 2.6, nz));
           gl_FragColor = vec4(base*.6 + lc*(ln + gl), smoothstep(.3, .9, nz)*(.3 + .62*max(ln, gl)));
@@ -847,7 +850,7 @@ const PLAN = (() => {
     const m4 = new THREE.Matrix4(), qf = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI/2, 0, 0)), pp = new THREE.Vector3(), ss = new THREE.Vector3(), cc = new THREE.Color();
     (function run(){ requestAnimationFrame(run); if (!plane.visible && !spots.visible) return; const t = performance.now()/1000; fmat.uniforms.uT.value = t;
       if (!spots.visible) return;
-      for (let n = 0; n < spotList.length; n++){ const o = spotList[n], k = (t*.6 + o.ph) % 1; pp.set(o.x, CURB + .16, o.z); ss.setScalar(o.r*(.8 + .55*k)); m4.compose(pp, qf, ss); spots.setMatrixAt(n, m4); cc.set(o.col).multiplyScalar(1.15 - .8*k); spots.setColorAt(n, cc); }
+      for (let n = 0; n < spots.count; n++){ const o = spotList[n], k = (t*.6 + o.ph) % 1; pp.set(o.x, CURB + .16, o.z); ss.setScalar(o.r*(.8 + .55*k)); m4.compose(pp, qf, ss); spots.setMatrixAt(n, m4); cc.set(o.col).multiplyScalar(1.15 - .8*k); spots.setColorAt(n, cc); }
       spots.instanceMatrix.needsUpdate = true; spots.instanceColor.needsUpdate = true; })();
     // safety keeps its tiles: watched over, feeling watched, crime
     const tileMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: .34, depthTest: false, depthWrite: false });
@@ -875,7 +878,7 @@ const PLAN = (() => {
       const id = lensTemp || lens;
       plane.visible = false; spots.visible = false; tiles.visible = false;
       if (!id || !LAST){ leg.hidden = true; ARROWS.show(false); if (!THR.on()) TINT.clear(); return; }
-      if (THR.on()) THR.close();
+      if (lens && THR.on()) THR.close();   // (a view the player opened replaces the panel; the preview's own view only shows its field under it)
       const tint = [];
       if (id === 'air' || id === 'noise'){
         if (field()){ fmat.uniforms.uMode.value = id === 'air' ? 0 : 1; const [wx, wz] = wind(); fmat.uniforms.uWind.value.set(wx, wz); plane.visible = true; }
@@ -886,7 +889,7 @@ const PLAN = (() => {
         safetyTiles(); tint.push(...homeTints('safety'));
         leg.innerHTML = LENSES[2].keys.filter((k, q) => q !== 1 || tierOK(3)).map(([c_, t]) => `<span><i style="background:${c_}"></i>${t}</span>`).join('') + homesKey;
       }
-      TINT.set(tint);
+      if (!THR.on()) TINT.set(tint);
       leg.hidden = false; ARROWS.show(id === 'air');
     }
     setInterval(() => { if (lens || lensTemp) draw(); }, 1200);
@@ -925,13 +928,14 @@ const PLAN = (() => {
         vec3 cy = vec3(.22, .91, .88), pk = vec3(1., .31, .64), am = vec3(1., .72, .3), lc = mix(cy, am, edge*.75);
         vec3 c = (lc*(pl*.95 + sl*.32 + .08)*trail + pk*front*(.3 + .7*max(pl, sl)) + mix(cy, am, edge)*bnd)*uA;
         gl_FragColor = vec4(c, 1.); }`;
-    const geo = new THREE.PlaneGeometry(1, 1), live = [];
+    const geo = new THREE.PlaneGeometry(1, 1), live = [], pool = [];   // (pool: finished waves' materials, kept so their program is never thrown away and compiled again)
     let ghost = null, ghostAt = 0, clickN = 0;
     function fire(m, opt = {}){
       if (typeof scene === 'undefined' || live.length > 10 || !m) return;
       const reach = m.reachNow !== undefined ? m.reachNow : P.coreReach, rOut = Math.floor(reach), rIn = Math.floor(reach - P.edge);
       const cx = (m.i + (m.w - 1)/2)*LOT, cz = (m.j + (m.h - 1)/2)*LOT, R = rOut*LOT;
-      const mat = overlayMat(FS, { uC: { value: new THREE.Vector2(cx, cz) }, uH: { value: new THREE.Vector2(m.w*LOT/2, m.h*LOT/2) }, uR: { value: R }, uE: { value: (rOut - rIn)*LOT }, uProg: { value: 0 }, uEnd: { value: 0 }, uA: { value: opt.big ? 1 : .8 }, uLOT: { value: LOT } }, true);
+      const mat = pool.pop() || overlayMat(FS, { uC: { value: new THREE.Vector2() }, uH: { value: new THREE.Vector2() }, uR: { value: 0 }, uE: { value: 0 }, uProg: { value: 0 }, uEnd: { value: 0 }, uA: { value: 1 }, uLOT: { value: LOT } }, true);
+      { const u = mat.uniforms; u.uC.value.set(cx, cz); u.uH.value.set(m.w*LOT/2, m.h*LOT/2); u.uR.value = R; u.uE.value = (rOut - rIn)*LOT; u.uProg.value = 0; u.uEnd.value = 0; u.uA.value = opt.big ? 1 : .8; }
       const mesh = onLayer(new THREE.Mesh(geo, mat), 992); mesh.rotation.x = -Math.PI/2; const span = 2*(R + LOT) + Math.max(m.w, m.h)*LOT; mesh.scale.set(span, span, 1); mesh.position.set(cx, CURB + .13, cz);
       live.push({ mesh, mat, t0: performance.now(), dur: 1300 + reach*80, hold: opt.ghost ? 500 : 1300 });
       if (live.length === 1) requestAnimationFrame(tick);
@@ -939,7 +943,7 @@ const PLAN = (() => {
     function tick(){ const t = performance.now();
       for (let i = live.length - 1; i >= 0; i--){ const w = live[i], e = t - w.t0, k = Math.min(1, e/w.dur), u = w.mat.uniforms;
         u.uProg.value = 1 - Math.pow(1 - k, 1.6); const after = Math.max(0, e - w.dur*.85); u.uEnd.value = Math.min(1, after/250)*Math.max(0, 1 - Math.max(0, e - w.dur)/w.hold);
-        if (e > w.dur + w.hold){ scene.remove(w.mesh); w.mat.dispose(); live.splice(i, 1); } }
+        if (e > w.dur + w.hold){ scene.remove(w.mesh); pool.push(w.mat); live.splice(i, 1); } }
       if (live.length) requestAnimationFrame(tick); }
     // every so often from each core; more often while something is held to place
     const nextAt = new Map();
@@ -963,7 +967,7 @@ const PLAN = (() => {
     const box = el('div', 'pl-thr'); box.hidden = true; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', 'Thriving homes'); document.body.appendChild(box);
     let sel = 'all', open = false, key = '';
     const RQ = () => [
-      { id: 'all', name: 'Thriving', test: h => h.thriving, say: 'Homes that pass every check below' },
+      { id: 'all', name: 'Thriving', test: h => h.thriving && ((B.get(h.k) || {}).occ || 0) >= h.fill*h.floors*.9, say: 'Every check below, and moved in' },
       { id: 'need', name: 'Power', test: h => h.need === 1, say: 'Full power, and joined to the city' },
       { id: 'work', name: 'Work', test: h => h.support >= .8, say: '80% of its workers have a job in reach' },
       ...DIALS.filter(dialOn).map(d => ({ id: d, name: DNAME[d], test: h => h.eff[d] === null || h.eff[d] >= .7, say: { air: 'Clean enough air', quiet: 'Quiet enough to sleep', safety: 'No crime close by', ease: 'Doesn\'t feel watched', life: 'Things to do in reach' }[d] + ' (70% or more)' })),
@@ -977,7 +981,7 @@ const PLAN = (() => {
         html += `<button type="button" data-r="${r.id}" aria-pressed="${r.id === sel}"><span>${esc(r.name)}</span><b>${n} / ${hs.length}</b><i><u style="width:${(100*f).toFixed(0)}%"></u></i></button>`; }
       html += `</div><div class="k"><i style="background:${GRADE.good}"></i>passes <i style="background:${GRADE.bad}"></i>doesn't</div>`;
       if (html !== key){ key = html; box.innerHTML = html; }
-      TINT.set(hs.map(h => ({ c: h.b.c, col: cur.test(h) ? (sel === 'all' ? '#ffd24a' : GRADE.good) : GRADE.bad })));
+      TINT.set(hs.map(h => ({ c: h.b.c, col: cur.test(h) ? GRADE.good : GRADE.bad })));
     }
     box.addEventListener('click', e => {
       if (e.target.closest('.x')){ close(); return; }
@@ -1033,7 +1037,7 @@ const PLAN = (() => {
     let ci = 0, cj = 0, n = 0; for (const c of cells.values()){ ci += c.i; cj += c.j; n++; } ci /= n || 1; cj /= n || 1;
     const di = i - ci, dj = j - cj; if (Math.hypot(di, dj) < 3) return 'Downtown';
     // (on the screen's terms: north is away from the camera at its usual angle)
-    const a = Math.atan2(dj, di), sec = ['East', 'South-east', 'South', 'South-west', 'West', 'North-west', 'North', 'North-east'][((Math.round(a/(Math.PI/4)) % 8) + 8) % 8];
+    const a = Math.atan2(dj, di), sec = ['East', 'Southeast', 'South', 'Southwest', 'West', 'Northwest', 'North', 'Northeast'][((Math.round(a/(Math.PI/4)) % 8) + 8) % 8];
     return sec + ' blocks';
   }
   function topComplaint(){
@@ -1223,7 +1227,7 @@ const PLAN = (() => {
   function buildingAt(x, y){
     const r = viewRect(); ndc_.set(((x - r.left)/r.width)*2 - 1, -((y - r.top)/r.height)*2 + 1); ray_.setFromCamera(ndc_, cam);
     let best = null, bt = Infinity;
-    for (const b of B.values()){ const c = b.c, y0 = c.lift ? c.lift.y - .2 : CURB - .1, y1 = Math.max(y0 + .6, c.height || CURB + 3);
+    for (const b of B.values()){ const c = b.c, y0 = c.lift && !(c.below && c.below.length) ? c.lift.y - .2 : CURB - .1, y1 = Math.max(y0 + .6, c.height || CURB + 3);
       bx_.min.set(c.x - SIDE/2, y0, c.z - SIDE/2); bx_.max.set(c.x + SIDE/2, y1, c.z + SIDE/2);
       if (ray_.ray.intersectBox(bx_, hit_)){ const t = hit_.distanceToSquared(ray_.ray.origin); if (t < bt){ bt = t; best = c; } } }
     return best;

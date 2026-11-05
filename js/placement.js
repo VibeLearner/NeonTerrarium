@@ -698,8 +698,9 @@ const PLAN = (() => {
   .pl-note .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 11px; flex-wrap: wrap; } .pl-note .n { color: var(--p-dim); font-size: 11px; font-variant-numeric: tabular-nums; }
   .pl-note .bt { display: flex; gap: 4px; margin-left: auto; } .pl-note button { all: unset; box-sizing: border-box; cursor: pointer; font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--p-dim); padding: 7px 10px; white-space: nowrap; } .pl-note button:hover { color: #fff; }
   .pl-note button.go { color: #0c0b12; background: var(--p-acc); }
-  .pl-note.anch::after { content: ''; position: absolute; left: var(--ax, 50%); top: 100%; margin-left: -8px; border: 8px solid transparent; border-top-color: rgba(143,232,216,.6); }
-  .pl-note.anch.below::after { top: auto; bottom: 100%; border-top-color: transparent; border-bottom-color: rgba(143,232,216,.6); }
+  .pl-lead { position: fixed; z-index: 6; height: 2px; transform-origin: 0 50%; background: linear-gradient(90deg, rgba(143,232,216,.85), rgba(143,232,216,.25)); pointer-events: none; }
+  .pl-lead::after { content: ''; position: absolute; right: -6px; top: -4px; width: 10px; height: 10px; border-radius: 50%; background: #8fe8d8; box-shadow: 0 0 10px #8fe8d8; }
+  .pl-lead[hidden] { display: none; } html.plan.title-on .pl-lead { display: none; }
   .pl-note.done { animation: plDone .45s ease-out; } @keyframes plDone { 0% { box-shadow: 0 0 0 6px rgba(111,240,168,.25); } 100% { box-shadow: none; } }
   .pl-pulse { animation: plPulse 1.2s ease-in-out infinite !important; position: relative; z-index: 5; }
   @keyframes plPulse { 0%, 100% { box-shadow: 0 0 0 1px rgba(143,232,216,.9); } 50% { box-shadow: 0 0 0 1px rgba(143,232,216,.9), 0 0 16px 4px rgba(143,232,216,.45); } }
@@ -734,7 +735,7 @@ const PLAN = (() => {
   .pl-card .nt { margin-top: 8px; display: grid; gap: 3px; font-size: 11px; } .pl-card .nt .bad { color: var(--p-bad); } .pl-card .nt .mid { color: var(--p-dim); }
   .pl-legend .gr { gap: 8px; } .pl-legend .gr b { width: 92px; height: 8px; display: inline-block; }
   .pl-legend i.src { width: 11px; height: 11px; border-radius: 50%; background: radial-gradient(circle, #fff 0 25%, var(--c) 45%, transparent 72%); box-shadow: 0 0 6px var(--c); }
-  .pl-legend .hk { gap: 3px; } .pl-legend .hk i { width: 9px; height: 9px; } .pl-legend .hk i:last-of-type { margin-right: 5px; }
+  .pl-legend .hk { gap: 4px; } .pl-legend .hk i { width: 10px; height: 10px; border-radius: 50%; box-shadow: 0 0 0 2px #0b0a12; margin-left: 4px; }
   .pl-thr { position: fixed; z-index: 5; left: calc(max(16px, env(safe-area-inset-left,0px)) + 222px); top: calc(40px + env(safe-area-inset-top,0px)); width: 260px; box-sizing: border-box;
     font: 12px/1.35 'JetBrains Mono', monospace; color: var(--p-txt); background: rgba(11,10,18,.95); border: 1px solid var(--p-line); padding: 10px 12px 12px; }
   .pl-thr[hidden] { display: none; } .pl-thr .t { display: flex; justify-content: space-between; align-items: baseline; } .pl-thr .t b { font-size: 13px; }
@@ -848,7 +849,7 @@ const PLAN = (() => {
         void main(){ vC = aCol; vP = aPulse; vUv = uv; vN = normal; mat4 im = instanceMatrix; vS = vec3(length(im[0].xyz), length(im[1].xyz), length(im[2].xyz)); gl_Position = projectionMatrix*viewMatrix*modelMatrix*im*vec4(position, 1.); }`,
       fragmentShader: `uniform float uT; varying vec3 vC; varying float vP; varying vec2 vUv; varying vec3 vN; varying vec3 vS;
         void main(){ vec2 sz = abs(vN.y) > .5 ? vS.xz : abs(vN.x) > .5 ? vS.zy : vS.xy; vec2 dm = min(vUv, 1. - vUv)*sz; float d = min(dm.x, dm.y);
-          float ln = 1. - smoothstep(.03, .1, d), gl = exp(-d/.22)*.45, fill = abs(vN.y) > .5 ? .2 : .1;
+          float ln = 1. - smoothstep(.06, .16, d), gl = exp(-d/.3)*.5, fill = abs(vN.y) > .5 ? .35 : .2;
           float k = vP > .5 ? .55 + .45*sin(uT*5. + vP) : 1.;
           gl_FragColor = vec4(vC*(ln + gl + fill)*k, 1.); }` });
     const mesh = new THREE.InstancedMesh(ig, mat, N); mesh.count = 0; onLayer(mesh, 994); mesh.visible = false;
@@ -864,6 +865,34 @@ const PLAN = (() => {
       mesh.count = n; mesh.instanceMatrix.needsUpdate = true; aCol.needsUpdate = true; aPulse.needsUpdate = true; mesh.visible = n > 0;
     }
     return { set, clear(){ mesh.count = 0; mesh.visible = false; } };
+  })();
+  /* ---------- a pin over a building: a round badge, dark-rimmed so it reads over any color under it (fine, so-so, poor, a source) ---------- */
+  const PINS = (() => {
+    const mk = (fill, draw) => { const cv = document.createElement('canvas'); cv.width = cv.height = 96; const g = cv.getContext('2d');
+      g.beginPath(); g.arc(48, 44, 34, 0, Math.PI*2); g.fillStyle = '#0b0a12'; g.fill(); g.beginPath(); g.arc(48, 44, 28, 0, Math.PI*2); g.fillStyle = fill; g.fill();
+      g.beginPath(); g.moveTo(36, 74); g.lineTo(48, 92); g.lineTo(60, 74); g.closePath(); g.fillStyle = '#0b0a12'; g.fill();
+      g.strokeStyle = '#0b0a12'; g.fillStyle = '#0b0a12'; g.lineWidth = 8; g.lineCap = 'round'; g.lineJoin = 'round'; draw(g);
+      const t = new THREE.CanvasTexture(cv); return t; };
+    const TEX = {
+      good: mk('#4dff9a', g => { g.beginPath(); g.moveTo(34, 45); g.lineTo(44, 55); g.lineTo(62, 34); g.stroke(); }),
+      mid: mk('#ffc24a', g => { g.beginPath(); g.moveTo(48, 28); g.lineTo(48, 48); g.stroke(); g.beginPath(); g.arc(48, 59, 4.5, 0, Math.PI*2); g.fill(); }),
+      bad: mk('#ff4a5a', g => { g.beginPath(); g.moveTo(37, 33); g.lineTo(59, 55); g.moveTo(59, 33); g.lineTo(37, 55); g.stroke(); }),
+      air: mk('#ffffff', g => { g.lineWidth = 6; for (const y of [34, 45, 56]){ g.beginPath(); g.moveTo(31, y); g.bezierCurveTo(38, y - 6, 44, y + 6, 50, y); g.bezierCurveTo(56, y - 6, 60, y + 4, 65, y); g.stroke(); } }),
+      noise: mk('#ffffff', g => { g.beginPath(); g.moveTo(30, 38); g.lineTo(38, 38); g.lineTo(48, 29); g.lineTo(48, 59); g.lineTo(38, 50); g.lineTo(30, 50); g.closePath(); g.fill(); g.lineWidth = 5; g.beginPath(); g.arc(50, 44, 10, -.8, .8); g.stroke(); g.beginPath(); g.arc(50, 44, 17, -.8, .8); g.stroke(); }),
+    };
+    const pool = [], live = [];
+    const get = () => { const sp = pool.pop() || onLayer(new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthTest: false, depthWrite: false })), 1001); sp.center.set(.5, 0); sp.visible = true; return sp; };
+    (function run(){ requestAnimationFrame(run); if (!live.length) return; const t = performance.now()/1000;
+      for (const sp of live) if (sp.userData.src) sp.scale.setScalar(sp.userData.s*(1 + .12*Math.sin(t*5 + sp.userData.ph))); })();
+    // list: [{ c (a plot) or m (a megastructure), kind: good | mid | bad | air | noise }]
+    function set(list){
+      while (live.length){ const sp = live.pop(); sp.visible = false; pool.push(sp); }
+      for (const it of list || []){ if (live.length >= 400) break; const sp = get(); sp.material.map = TEX[it.kind]; sp.material.needsUpdate = true;
+        let x, y, z, sz; if (it.m){ x = it.m.x; z = it.m.z; y = (it.m.top || CURB + 6) + .6; sz = 2.6; } else { const c = it.c; x = c.x; z = c.z; y = Math.max(CURB + 1, c.height || CURB + 3) + .5; sz = 1.9; }
+        const src = it.kind === 'air' || it.kind === 'noise'; if (src) sz *= 1.25;
+        sp.position.set(x, y, z); sp.scale.setScalar(sz); sp.userData = { src, s: sz, ph: (x + z)*.37 }; live.push(sp); }
+    }
+    return { set, clear(){ set([]); } };
   })();
   // how a home is doing on one measure: good, so-so, poor
   const GRADE = { good: '#4dff9a', mid: '#ffc24a', bad: '#ff4a5a' };
@@ -932,34 +961,37 @@ const PLAN = (() => {
         if (!col) continue; cc.set(col); pp.set(c.i*LOT, CURB + .08, c.j*LOT); ss.set(LOT*.94, LOT*.94, 1); m4.compose(pp, qf, ss); tiles.setMatrixAt(n, m4); tiles.setColorAt(n, cc); n++; }
       tiles.count = n; tiles.instanceMatrix.needsUpdate = true; tiles.instanceColor.needsUpdate = true; tiles.visible = n > 0; }
     const tierOK = t => st.tier >= t;
-    const homeTints = d => { const out = []; for (const b of B.values()){ const h = b.h; if (!h || !isHome(h.z) || !h.eff || h.eff[d] === null || h.eff[d] === undefined) continue; out.push({ c: b.c, col: grade(h.eff[d]) }); } return out; };
+    const pinOf = v => v >= .7 ? 'good' : v >= .4 ? 'mid' : 'bad';
+    let pins = [];
+    const homeTints = d => { const out = []; for (const b of B.values()){ const h = b.h; if (!h || !isHome(h.z) || !h.eff || h.eff[d] === null || h.eff[d] === undefined) continue; out.push({ c: b.c, col: grade(h.eff[d]) }); pins.push({ c: b.c, kind: pinOf(h.eff[d]) }); } return out; };
     const AIR_HOT = '#ffa060', NOISE_HOT = '#ff4fd8';
     function sources(list, col, tint){
       spotList = [];
       for (const s of list){ const m = typeof megas !== 'undefined' && s.k && megas.get(s.k); const x = (s.i + (s.w - 1)/2)*LOT, z = (s.j + (s.h - 1)/2)*LOT;
         spotList.push({ x, z, r: LOT*(1.1 + .55*Math.min(3, s.s))*Math.max(1, Math.max(s.w, s.h)*.7), col, ph: (Math.abs(s.i*7 + s.j*13) % 10)/10 });
-        if (m) tint.push({ m, col: AIR_HOT === col ? '#ff6a3d' : '#ff4fd8', pulse: true });
-        else if (s.k){ const b = B.get(s.k); if (b) tint.push({ c: b.c, col: AIR_HOT === col ? '#ff6a3d' : '#ff4fd8', pulse: true }); } }
+        const pk = AIR_HOT === col ? 'air' : 'noise';
+        if (m){ tint.push({ m, col: '#ffffff', pulse: true }); pins.push({ m, kind: pk }); }
+        else if (s.k){ const b = B.get(s.k); if (b && !isHome(b.z)){ tint.push({ c: b.c, col: '#ffffff', pulse: true }); pins.push({ c: b.c, kind: pk }); } } }
       spots.count = Math.min(NS, spotList.length); spots.visible = spots.count > 0;
     }
     const GRAD_AIR = 'linear-gradient(90deg,#0f3a6b,#1a8cb8,#3dc757,#f5db3d,#fa8524,#eb2924,#d633db,#fff)', GRAD_NOISE = 'linear-gradient(90deg,#2a1462,#7333f2,#a07dff,#ff4fd6)';
-    const homesKey = `<span class="hk"><i style="background:${GRADE.good}"></i><i style="background:${GRADE.mid}"></i><i style="background:${GRADE.bad}"></i>homes: fine · so-so · poor</span>`;
+    const homesKey = `<span class="hk"><i style="background:${GRADE.good}"></i>fine <i style="background:${GRADE.mid}"></i>so-so <i style="background:${GRADE.bad}"></i>poor</span>`;
     function draw(){
       const id = lensTemp || lens;
       plane.visible = false; spots.visible = false; tiles.visible = false;
-      if (!id || !LAST){ leg.hidden = true; ARROWS.show(false); if (!THR.on()) TINT.clear(); return; }
+      if (!id || !LAST){ leg.hidden = true; ARROWS.show(false); if (!THR.on()){ TINT.clear(); PINS.clear(); } return; }
       if (lens && THR.on()) THR.close();   // (a view the player opened replaces the panel; the preview's own view only shows its field under it)
-      const tint = [];
+      const tint = []; pins = [];
       if (id === 'air' || id === 'noise'){
         if (field()){ fmat.uniforms.uMode.value = id === 'air' ? 0 : 1; const [wx, wz] = wind(); fmat.uniforms.uWind.value.set(wx, wz); plane.visible = true; }
         tint.push(...homeTints(id === 'air' ? 'air' : 'quiet'));
         sources(LAST.src ? (id === 'air' ? LAST.src.air : LAST.src.noise) : [], id === 'air' ? AIR_HOT : NOISE_HOT, tint);
-        leg.innerHTML = `<span class="gr"><b style="background:${id === 'air' ? GRAD_AIR : GRAD_NOISE}"></b>${id === 'air' ? 'pollution: light → heavy' : 'noise: quiet → loud'}</span><span><i class="src" style="--c:${id === 'air' ? '#ff6a3d' : '#ff4fd8'}"></i>source</span>${homesKey}` + (id === 'air' ? '<span>wind ➜ drifts it</span>' : '');
+        leg.innerHTML = `<span class="gr"><b style="background:${id === 'air' ? GRAD_AIR : GRAD_NOISE}"></b>${id === 'air' ? 'pollution: light → heavy' : 'noise: quiet → loud'}</span><span><i class="src" style="--c:#fff"></i>source</span>${homesKey}` + (id === 'air' ? '<span>wind ➜ drifts it</span>' : '');
       } else if (id === 'safety'){
         safetyTiles(); tint.push(...homeTints('safety'));
         leg.innerHTML = LENSES[2].keys.filter((k, q) => q !== 1 || tierOK(3)).map(([c_, t]) => `<span><i style="background:${c_}"></i>${t}</span>`).join('') + homesKey;
       }
-      if (!THR.on()) TINT.set(tint);
+      if (!THR.on()){ TINT.set(tint); PINS.set(pins); }
       leg.hidden = false; ARROWS.show(id === 'air');
     }
     setInterval(() => { if (lens || lensTemp) draw(); }, 1200);
@@ -1043,7 +1075,7 @@ const PLAN = (() => {
         html += `<button type="button" data-r="${r.id}" aria-pressed="${r.id === sel}"><span>${esc(r.name)}</span><b>${n} / ${hs.length}</b><i><u style="width:${(100*f).toFixed(0)}%"></u></i></button>`; }
       html += `</div><div class="k"><i style="background:${GRADE.good}"></i>passes <i style="background:${GRADE.bad}"></i>doesn't</div>`;
       if (html !== key){ key = html; box.innerHTML = html; }
-      TINT.set(hs.map(h => ({ c: h.b.c, col: cur.test(h) ? GRADE.good : GRADE.bad })));
+      TINT.set(hs.map(h => ({ c: h.b.c, col: cur.test(h) ? GRADE.good : GRADE.bad }))); PINS.set(hs.map(h => ({ c: h.b.c, kind: cur.test(h) ? 'good' : 'bad' })));
     }
     box.addEventListener('click', e => {
       if (e.target.closest('.x')){ close(); return; }
@@ -1051,7 +1083,7 @@ const PLAN = (() => {
       const r = e.target.closest('[data-r]'); if (r){ sel = r.dataset.r; draw(); E.emit('thrPick', sel); }
     });
     setInterval(draw, 1200);
-    function close(){ if (!open) return; open = false; box.hidden = true; key = ''; TINT.clear(); }
+    function close(){ if (!open) return; open = false; box.hidden = true; key = ''; TINT.clear(); PINS.clear(); }
     return { on: () => open, close, open(){ if (open){ close(); return; } open = true; if (lens){ lens = null; lensSync(); VIEW.draw(); } box.hidden = false; draw(); E.emit('thrOpen'); } };
   })();
   // the hotspots, always there faintly at night once police exist, bright in the Safety lens
@@ -1537,15 +1569,31 @@ const PLAN = (() => {
      as cards to read. */
   const MARK = (() => {
     const cv = document.createElement('canvas'); cv.width = cv.height = 128; const g = cv.getContext('2d');
-    g.strokeStyle = 'rgba(255,255,255,1)'; g.lineWidth = 6; g.strokeRect(10, 10, 108, 108); g.globalAlpha = .18; g.fillStyle = '#fff'; g.fillRect(10, 10, 108, 108);
-    g.globalAlpha = .5; g.lineWidth = 14; g.strokeStyle = 'rgba(255,255,255,.35)'; g.strokeRect(10, 10, 108, 108);
-    const tex = new THREE.CanvasTexture(cv), ms = [];
-    for (let k = 0; k < 3; k++){ const m = onLayer(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: tex, color: 0x8fe8d8, transparent: true, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending })), 999); m.rotation.x = -Math.PI/2; m.visible = false; ms.push(m); }
+    g.strokeStyle = 'rgba(255,255,255,1)'; g.lineWidth = 7; g.strokeRect(10, 10, 108, 108); g.globalAlpha = .22; g.fillStyle = '#fff'; g.fillRect(10, 10, 108, 108);
+    const tex = new THREE.CanvasTexture(cv);
+    const bcv = document.createElement('canvas'); bcv.width = 32; bcv.height = 128; const bg = bcv.getContext('2d'), gr = bg.createLinearGradient(0, 128, 0, 0);
+    gr.addColorStop(0, 'rgba(255,255,255,.9)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); bg.fillStyle = gr; bg.fillRect(0, 0, 32, 128);
+    const btex = new THREE.CanvasTexture(bcv);
+    const ccv = document.createElement('canvas'); ccv.width = ccv.height = 64; const cg = ccv.getContext('2d');
+    cg.lineJoin = 'round'; cg.lineCap = 'round'; cg.beginPath(); cg.moveTo(12, 18); cg.lineTo(32, 42); cg.lineTo(52, 18);
+    cg.strokeStyle = '#061214'; cg.lineWidth = 16; cg.stroke(); cg.strokeStyle = '#9ff7ea'; cg.lineWidth = 9; cg.stroke();
+    const ctex = new THREE.CanvasTexture(ccv), sets = [];
+    for (let k = 0; k < 3; k++){
+      const tile = onLayer(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: tex, color: 0x8fe8d8, transparent: true, depthTest: true, depthWrite: false, blending: THREE.AdditiveBlending })), 999); tile.rotation.x = -Math.PI/2;
+      const beam = onLayer(new THREE.Sprite(new THREE.SpriteMaterial({ map: btex, color: 0x8fe8d8, transparent: true, depthTest: true, depthWrite: false, blending: THREE.AdditiveBlending })), 999); beam.center.set(.5, 0);
+      const chev = onLayer(new THREE.Sprite(new THREE.SpriteMaterial({ map: ctex, transparent: true, depthTest: false, depthWrite: false })), 1000); chev.center.set(.5, 0);
+      sets.push({ tile, beam, chev });
+    }
     let list = [];
+    const show = (o, v) => { o.tile.visible = o.beam.visible = o.chev.visible = v; };
+    sets.forEach(o => show(o, false));
     (function run(){ requestAnimationFrame(run); if (!list.length) return; const t = performance.now()/1000;
-      list.forEach((p, k) => { const m = ms[k], c = cells.get(p.i + ',' + p.j), y = c && c.sections.length ? (c.height || CURB) + .15 : CURB + .2, s_ = LOT*(.92 + .06*Math.sin(t*4));
-        m.position.set(p.i*LOT, y, p.j*LOT); m.scale.set(s_, s_, 1); m.material.opacity = .65 + .35*Math.sin(t*4); }); })();
-    return { set(ps){ list = (ps || []).slice(0, ms.length); ms.forEach((m, k) => m.visible = k < list.length); } };
+      list.forEach((p, k) => { const o = sets[k], c = cells.get(p.i + ',' + p.j), top = c && c.sections.length ? (c.height || CURB) : CURB, x = p.i*LOT, z = p.j*LOT, pu = .5 + .5*Math.sin(t*4);
+        o.tile.position.set(x, top + .16, z); o.tile.scale.set(LOT*.94, LOT*.94, 1); o.tile.material.opacity = .6 + .4*pu;
+        o.beam.position.set(x, top + .1, z); o.beam.scale.set(LOT*.55, 9, 1); o.beam.material.opacity = .35 + .2*pu;
+        o.chev.position.set(x, top + 9.4 + .8*Math.sin(t*3), z); o.chev.scale.set(2.2, 2.2, 1); }); })();
+    return { set(ps){ list = (ps || []).slice(0, sets.length); sets.forEach((o, k) => show(o, k < list.length)); },
+      top(p){ const c = cells.get(p.i + ',' + p.j); return (c && c.sections.length ? (c.height || CURB) : CURB) + 10.6; } };
   })();
 
   const TUTE = (() => {
@@ -1664,6 +1712,39 @@ const PLAN = (() => {
       for (const k of b.mark){ const z = zoneAt(pt(k)); if (!z) continue; if (b.zone ? z !== ZW[b.zone] : b.noZone && (k === 'W1' || k === 'W2')) return z; }
       return null;
     }
+    // the note sits beside what it's about: a glowing tile (or the core) in the city, or a button; a thin line points the way. Off on a touch
+    // screen, where it keeps its place at the bottom
+    const lead = el('div', 'pl-lead'); lead.hidden = true; document.body.appendChild(lead);
+    let at = null;
+    function anchor(){
+      const b = beats[U.k]; if (!b || mode !== 'guided' || TOUCHY) return null;
+      const t = phase === 'do' ? (b.target ? b.target() : null) : null; if (t) return { el: t };
+      if (b.mark){ const p = pt(b.mark[0]); return { w: [p.i*LOT, MARK.top(p) - 9.6, p.j*LOT] }; }
+      if (b.focus){ const ps = b.focus(), m = core(); if (m) return { w: [m.x, (m.top || CURB + 6) + .5, m.z] }; }
+      if (b.target){ const e = b.target(); if (e) return { el: e }; }
+      return null;
+    }
+    function place(){
+      const s_ = noteEl.style;
+      const free = () => { if (at){ at = null; s_.left = s_.top = s_.right = s_.bottom = s_.transform = ''; noteEl.classList.remove('anch'); } lead.hidden = true; };
+      if (!noteTut || noteEl.hidden) return free();
+      const a = anchor(); let px = null, py = null, side = 'x';
+      if (a && a.el){ const r = a.el.getBoundingClientRect(); if (r.width){ px = r.left + r.width/2; py = r.top < innerHeight/2 ? r.bottom : r.top; side = 'y'; } }
+      else if (a && a.w){ const p = screenOf(a.w[0], a.w[1], a.w[2]); if (p && p[0] > 0 && p[0] < innerWidth && p[1] > 0 && p[1] < innerHeight){ px = p[0]; py = p[1]; } }
+      if (px === null) return free();
+      const w = noteEl.offsetWidth || 330, h = noteEl.offsetHeight || 120, gap = 56;
+      let x, y;
+      if (side === 'y'){ x = px - w/2; y = py < innerHeight/2 ? py + 18 : py - h - 18; }
+      else { x = px + gap; if (x + w > innerWidth - 12) x = px - gap - w; y = py - h/2; }
+      x = Math.max(12, Math.min(innerWidth - w - 12, x)); y = Math.max(60, Math.min(innerHeight - h - 130, y));
+      if (!at) at = { x, y }; else { at.x += (x - at.x)*.2; at.y += (y - at.y)*.2; }
+      noteEl.classList.add('anch'); s_.left = Math.round(at.x) + 'px'; s_.top = Math.round(at.y) + 'px'; s_.right = s_.bottom = 'auto'; s_.transform = 'none';
+      // the line: from the note's nearest edge to the point
+      const ex = px < at.x ? at.x : px > at.x + w ? at.x + w : px, ey = py < at.y ? at.y : py > at.y + h ? at.y + h : py, dx = px - ex, dy = py - ey, L = Math.hypot(dx, dy);
+      if (L < 8){ lead.hidden = true; return; }
+      lead.hidden = false; lead.style.left = ex + 'px'; lead.style.top = ey + 'px'; lead.style.width = (L - 6) + 'px'; lead.style.transform = `rotate(${Math.atan2(dy, dx)}rad)`;
+    }
+    (function placeLoop(){ requestAnimationFrame(placeLoop); try { place(); } catch (e) {} })();
     function refresh(){
       const b = beats[U.k]; if (!b || noteEl.hidden) return;
       const t = phase === 'do' && mode === 'guided' ? (b.target ? b.target() : b.zone && !(typeof S !== 'undefined' && S.zone === b.zone) ? zoneBtn(b.zone)() : null) : null;

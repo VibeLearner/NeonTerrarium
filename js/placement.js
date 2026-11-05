@@ -607,6 +607,11 @@ const PLAN = (() => {
   });
   // Clear island: a fresh start, so a new starter core, and the old city's hotspots, refits and choices go with it
   wrap('clearIsland', function (orig, ...a){ const r = orig(...a); if (!st.tut.done){ st.tut = { step: 0, done: false, v: 2 }; setTimeout(() => { try { TUTE.restart(); } catch (e) {} }, 0); } st.fresh = true; st.crime.spots.length = 0; st.refit = {}; st.forks = {}; booted = false; BASE = null; REV++; save(); return r; });
+  // always night, as in Economy: only the picture (sky, glows, window lights) is worked out as if it were this hour; the clock, people's days and
+  // the stories run on as usual. The simulation never reads the hour, so nothing in the puzzle changes
+  const NIGHT_HOUR = 23;
+  wrap('phaseName', function (){ return 'Night'; });
+  wrap('applyTime', function (orig){ if (typeof S === 'undefined') return orig(); const h = S.hour; S.hour = NIGHT_HOUR; try { return orig(); } finally { S.hour = h; } });
   wrap('fieldPlan', function (){ return []; });   // (no force-field dome over the cores here: their reach is the grid wave)
   wrap('maybeSpawnMegas', function (){ /* nothing arrives on its own here: the tiers open things, the player places them */ });
   wrap('mtApply', function (orig, t){ if (t && t.ok && st.tier < 2){ say('The metro opens at ' + TIERS[2].name); return false; } ledgerMark(); return orig(t); });
@@ -649,6 +654,7 @@ const PLAN = (() => {
   html.plan { --p-bg: rgba(11,10,18,.9); --p-line: rgba(255,255,255,.12); --p-txt: #ece4d6; --p-dim: #958ea3; --p-acc: #8fe8d8; --p-warm: #ffb347; --p-good: #6ff0a8; --p-bad: #ff7a8a; }
   html.plan #modeHint { display: none !important; }
   html.plan .tmode { display: none !important; }
+  html.plan #hour, html.plan #presets, html.plan label.tog:has(#cycle) { display: none !important; }   /* (always night here: the time controls would change nothing you can see) */
   html.plan-nolux .zone[data-zone="high"], html.plan-nolux [data-perim="high"] { display: none !important; }
   html.plan-noperim .perim { display: none !important; }
   .pl-goal { position: fixed; z-index: 4; left: max(16px, env(safe-area-inset-left,0px)); top: calc(40px + env(safe-area-inset-top,0px)); width: 214px; box-sizing: border-box;

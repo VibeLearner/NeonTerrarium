@@ -56,6 +56,8 @@ Unlocks in `TIERS[].opens`. Tiers, once reached, are kept; counts are smoothed o
 
 ## Interface
 
+- Always night (as in Economy): `applyTime` is worked out at 23:00 and the time controls are hidden; the clock, people and stories run on, and
+  the simulation never reads the hour. The title room is lit for night too (title.js `econNight`, now any mode).
 - Planner hides the force-field dome over cores (`fieldPlan` returns nothing). Power has no view: each core sends a hologram grid wave (cyan lines, a pink front, the furnish pod's colors) over its whole reach, water
   included, when it's clicked, looping under a core being placed, and from every core when a goal is reached (never on its own). The last two
   plots of a reach, at 80% power, are amber. The core's card shows its load and its tuning; a refit takes 20 s and counts down.

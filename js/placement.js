@@ -28,10 +28,12 @@ const PLAN = (() => {
   const P = {
     ppl: { R: 24, L: 9 }, work: .5,                       // residents per level; the share of them who need a job
     jobs: { I: 30, C: 10, K: 14 },                         // jobs per level
-    shop: 60,                                              // residents a commercial level serves
+    shop: 70,                                              // residents a commercial building's first level serves
     walk: 8, shopWalk: 5, stationR: 2, stationJobR: 3,     // reach, in plots (Chebyshev)
     coreReach: 9, coreWide: 12, edge: 2, scrubDrain: 1.1,  // a core's reach; the last 2 plots flicker (80%); each scrubber on a core drains about a plot, less each time, never below half
     floorSupport: .3,
+    shadow: 3, crimeR: 3,                                  // a tall building shades haze for this many plots behind it; crime reaches as far
+    shopTall: [.75, .45],                                  // the second commercial level draws this share of the first's visitors, each one above that the second number
     dialFadeMs: 20*60e3,                                   // a new dial fades in over twenty minutes (time to answer it before it bites)
     fillUp: .07, fillDown: .05, fillStep: .012,            // moving in and out, per second
     smooth: 20,                                            // seconds: the counts the tiers read are smoothed this much
@@ -39,23 +41,23 @@ const PLAN = (() => {
   // the tiers: supported residents and thriving homes. Each opens tools; dials and lenses open with the thing that makes them
   const TIERS = [
     { name: 'Unlisted', res: 0, thr: 0 },
-    { name: 'Settled', res: 150, thr: 4, opens: ['scrubber', 'square', 'wirenest'] },
-    { name: 'Connected', res: 400, thr: 10, opens: ['metro', 'market', 'foundry'], dial: 'quiet' },
-    { name: 'Patrolled', res: 750, thr: 20, opens: ['police', 'bathhouse'], dial: 'safety' },
+    { name: 'Settled', res: 150, thr: 4, opens: ['radio', 'scrubber', 'square', 'wirenest'] },
+    { name: 'Connected', res: 400, thr: 10, opens: ['metro', 'market', 'foundry'] },
+    { name: 'Patrolled', res: 750, thr: 20, opens: ['police', 'bathhouse'], dial: 'ease' },
     { name: 'Nightfall', res: 1100, thr: 32, opens: ['club', 'pylons'] },
     { name: 'Secured', res: 1450, thr: 45, opens: ['perimeter', 'drones', 'lidar'] },
     { name: 'Uptown', res: 1850, thr: 60, opens: ['luxury', 'corps', 'greenhouse'] },
     { name: 'Skyline', res: 2400, thr: 80, opens: ['highway', 'mall', 'pagoda', 'logistics'] },
     { name: 'Sovereign', res: 3000, thr: 100, opens: ['spire', 'coast'] },
   ];
-  const START_KINDS = ['emitter', 'radio'];
+  const START_KINDS = ['emitter'];   // (the Grid opens at Settled, with a note of its own)
   const KIND_TIER = {}; TIERS.forEach((t, q) => (t.opens || []).forEach(k => { KIND_TIER[k] = q; })); for (const k of START_KINDS) KIND_TIER[k] = 0;
   const REPEAT = new Set(['emitter', 'police', 'scrubber']);   // as many as you like; every other megastructure is one per city
   const OPEN_NAME = { metro: 'Metro', pylons: 'Wider broadcast', perimeter: 'Perimeters', drones: 'Police drones', luxury: 'Luxury homes', corps: 'Corps', highway: 'Sky highways', coast: 'The coast' };
   // what each dial is and how it's said
   const DIALS = ['air', 'quiet', 'safety', 'ease', 'life'];
   const DNAME = { air: 'Air', quiet: 'Quiet', safety: 'Safety', ease: 'Ease', life: 'Life', work: 'Work' };
-  const dialTier = d => d === 'quiet' ? 2 : d === 'safety' || d === 'ease' ? 3 : 0;
+  const dialTier = d => d === 'ease' ? 3 : 0;   // (Air, Quiet, Safety and Life from the start; Ease, the watched feeling, with police)
   const dialOn = d => st.tier >= dialTier(d);
   const ZONEK = { low: 'R', mid: 'C', high: 'L', ind: 'I' };
   const ZNAME = { R: 'Home', L: 'Luxury home', C: 'Shop', I: 'Industry', K: 'Corps' };
@@ -172,7 +174,7 @@ const PLAN = (() => {
     const blockH = F();
     for (const b of snap.blds) if (inG(b.i, b.j)) blockH[id(b.i, b.j)] = b.h;
     for (const m of snap.ms) for (let a = 0; a < m.w; a++) for (let q = 0; q < m.h; q++) if (inG(m.i + a, m.j + q)) blockH[id(m.i + a, m.j + q)] = m.top;
-    const TALL = CURB + 3*FH + .5;
+    const TALL = CURB + 6*FH + .5;   // (three levels or more: a level is three floors)
     // cores: their reach, drained by the scrubbers nearest each (each one less than the last, never below half)
     const cores = snap.ms.filter(m => m.kind === 'emitter').map(m => ({ ...m, reach: fk(m.id) === 'wide' ? P.coreWide : P.coreReach, drained: 0, nS: 0 }));
     for (const s of snap.ms) if (s.kind === 'scrubber'){ let best = null, bd = Infinity; for (const c of cores){ const d = megaD(s.i, s.j, c); if (d < bd){ bd = d; best = c; } } if (best){ const f = fk(s.id); best.drained += P.scrubDrain*(f === 'turbo' ? 1.5 : f === 'quiet' ? .7 : 1)*Math.pow(.5, best.nS++); } }
@@ -200,12 +202,24 @@ const PLAN = (() => {
     const paint = (s, f) => { const [a0, a1, b0, b1] = box(s, s.r), x0 = Math.round(s.i), x1 = x0 + (s.w || 1) - 1, y0 = Math.round(s.j), y1 = y0 + (s.h || 1) - 1, R1 = s.r + 1;
       for (let a = a0; a <= a1; a++){ const da = a < x0 ? x0 - a : a > x1 ? a - x1 : 0, row = (a - i0)*NJ - j0;
         for (let b = b0; b <= b1; b++){ const db = b < y0 ? y0 - b : b > y1 ? b - y1 : 0, d = da > db ? da : db; if (d > s.r) continue; f(row + b, s.s*(1 - d/R1), a, b, d, x0, x1, y0, y1); } } };
-    const pol = s => paint(s, (k, v) => { POL[k] += v; });
+    // haze: a tall building (three levels or more) on the way shades the plots up to P.shadow behind it, and breathes part of what it stops
+    // itself (BLK); past that, the haze goes on as if nothing were there. The source's own building never shades its own haze.
+    const BLK = F(), SRC = { air: [], noise: [] };
+    const pol = s => { const si = Math.round(s.i + ((s.w || 1) - 1)/2), sj = Math.round(s.j + ((s.h || 1) - 1)/2), o = s.o;
+      if (o) SRC.air.push({ i: o.i, j: o.j, w: o.w || 1, h: o.h || 1, s: s.s, k: o.k });
+      paint(s, (k, v, a, b, d, x0, x1, y0, y1) => {
+        if (d >= 1){ const steps = Math.max(Math.abs(si - a), Math.abs(sj - b));
+          for (let q = 1; q < steps && q <= P.shadow; q++){ const x = Math.round(a + (si - a)*q/steps), y = Math.round(b + (sj - b)*q/steps);
+            if (x >= x0 && x <= x1 && y >= y0 && y <= y1) break;
+            if (o && x >= o.i && x < o.i + (o.w || 1) && y >= o.j && y < o.j + (o.h || 1)) break;
+            const kk = (x - i0)*NJ + (y - j0); if (blockH[kk] > TALL){ BLK[kk] += v*.7; v *= .3; break; } } }
+        POL[k] += v; }); };
     const clean = s => paint(s, (k, v) => top3(C1, C2, C3, k, v));
     const watch = s => paint(s, (k, v) => { WAT[k] += v; });
     const eye = s => paint(s, (k, v) => top3(E1, E2, E3, k, v));
-    // noise: anything tall (three floors or more) between the source and a plot two or more away soaks up more than half of it
+    // noise: anything tall (three levels or more) between the source and a plot two or more away soaks up more than half of it
     const noise = s => { const si = Math.round(s.i + ((s.w || 1) - 1)/2), sj = Math.round(s.j + ((s.h || 1) - 1)/2);
+      if (!s.track && s.s > .3) SRC.noise.push({ i: s.i, j: s.j, w: s.w || 1, h: s.h || 1, s: s.s, k: s.k });
       paint(s, (k, v, a, b, d, x0, x1, y0, y1) => {
         if (d >= 2){ const steps = Math.max(Math.abs(si - a), Math.abs(sj - b)); for (let q = 1; q < steps; q++){ const x = Math.round(a + (si - a)*q/steps), y = Math.round(b + (sj - b)*q/steps); if (x >= x0 && x <= x1 && y >= y0 && y <= y1) continue; if (blockH[(x - i0)*NJ + (y - j0)] > TALL){ v *= .45; break; } } }
         if (s.track){ if (v > TRK[k]) TRK[k] = v; } else NOI[k] += v; }); };
@@ -215,12 +229,12 @@ const PLAN = (() => {
     for (const b of snap.blds){
       if (b.z === 'I' || b.z === 'K'){
         jobsS.push({ i: b.i, j: b.j, r: P.walk, cap: b.floors*(b.z === 'K' ? P.jobs.K : P.jobs.I), lux: b.z === 'K', k: b.k, z: b.z });
-        if (b.z === 'I'){ const fd = foundries.some(f => megaD(b.i, b.j, f) <= 5) ? .6 : 1; pol({ i: b.i + wx, j: b.j + wz, r: 3, s: (1.5 + .35*(b.floors - 1))*fd }); noise({ i: b.i, j: b.j, r: 2, s: 1.6 + .4*(b.floors - 1) }); }
-        else noise({ i: b.i, j: b.j, r: 1, s: .6 });
+        if (b.z === 'I'){ const fd = foundries.some(f => megaD(b.i, b.j, f) <= 5) ? .6 : 1; pol({ i: b.i + wx, j: b.j + wz, r: 3, s: (1.5 + .35*(b.floors - 1))*fd, o: { i: b.i, j: b.j, k: b.k } }); noise({ i: b.i, j: b.j, r: 2, s: 1.6 + .4*(b.floors - 1), k: b.k }); }
+        else noise({ i: b.i, j: b.j, r: 1, s: .6, k: b.k });
       } else if (b.z === 'C'){
         jobsS.push({ i: b.i, j: b.j, r: P.walk, cap: b.floors*P.jobs.C, k: b.k, z: b.z });
-        lifeS.push({ i: b.i, j: b.j, r: P.shopWalk, cap: b.floors*P.shop, k: b.k });
-        noise({ i: b.i, j: b.j, r: 1, s: .2*day }); eye({ i: b.i, j: b.j, r: 1, s: .15 });
+        lifeS.push({ i: b.i, j: b.j, r: P.shopWalk, cap: P.shop*(1 + P.shopTall[0]*Math.min(1, b.floors - 1) + P.shopTall[1]*Math.max(0, b.floors - 2)), k: b.k });   // (a tall shop: fewer visitors per level)
+        noise({ i: b.i, j: b.j, r: b.floors >= 3 ? 2 : 1, s: (.2 + .3*(b.floors - 1))*day, k: b.k }); eye({ i: b.i, j: b.j, r: 1, s: .15 });   // (and louder, never as far as haze)
       }
     }
     const megaJobs = { market: 40, foundry: 80, logistics: 60, greenhouse: 30, mall: 25, club: 20, square: 12, pagoda: 20, wirenest: 6, spire: 6, police: 4, emitter: 4, bathhouse: 6, lidar: 4 };
@@ -229,8 +243,8 @@ const PLAN = (() => {
       const lv = m.levels || 1, J = megaJobs[m.kind];
       if (J) jobsS.push({ ...m, r: P.walk + 1, cap: J*(m.kind === 'mall' ? lv : 1), lux: m.kind === 'pagoda' || m.kind === 'spire' });
       switch (m.kind){
-        case 'emitter': { const f = fk(m.id); pol({ ...m, i: m.i + wx, j: m.j + wz, r: 2, s: 2.2*(f === 'clean' ? .5 : f === 'wide' ? 1.15 : 1) }); break; }
-        case 'foundry': pol({ ...m, i: m.i + wx, j: m.j + wz, r: 5, s: 3 }); noise({ ...m, r: 3, s: 3.2 }); break;
+        case 'emitter': { const f = fk(m.id); pol({ ...m, i: m.i + wx, j: m.j + wz, r: 2, s: 2.2*(f === 'clean' ? .5 : f === 'wide' ? 1.15 : 1), o: { i: m.i, j: m.j, w: m.w, h: m.h, k: m.id } }); break; }
+        case 'foundry': pol({ ...m, i: m.i + wx, j: m.j + wz, r: 5, s: 3, o: { i: m.i, j: m.j, w: m.w, h: m.h, k: m.id } }); noise({ ...m, r: 3, s: 3.2, k: m.id }); break;
         case 'scrubber': { const f = fk(m.id); clean({ ...m, r: f === 'turbo' ? 4 : f === 'quiet' ? 2 : 3, s: 2.6 }); noise({ ...m, r: 2, s: f === 'quiet' ? 1.1 : 2.2 }); break; }
         case 'greenhouse': clean({ ...m, r: 5, s: 1.6 }); lifeS.push({ ...m, r: 5, cap: 80 }); break;
         case 'square': lifeS.push({ ...m, r: 6, cap: 300, square: true }); noise({ ...m, r: 2, s: 1.0*day }); eye({ ...m, r: 3, s: .25 }); break;
@@ -250,7 +264,7 @@ const PLAN = (() => {
     for (const d of snap.drops){ noise({ i: d.i, j: d.j, r: 2, s: 1.8 }); lifeS.push({ i: d.i, j: d.j, r: 4, cap: 150 }); }
     for (const w of snap.walls){ watch({ i: w.i, j: w.j, r: 2, s: .14 }); eye({ i: w.i, j: w.j, r: 1, s: .35 }); }
     const patrol = opt.patrol || PATROL;
-    const polAt = (i, j) => { if (!inG(i, j)) return 0; const k = id(i, j); return Math.max(0, POL[k] - (C1[k] + .5*C2[k] + .25*C3[k])); };
+    const polAt = (i, j) => { if (!inG(i, j)) return 0; const k = id(i, j); return Math.max(0, POL[k] + .35*BLK[k] - (C1[k] + .5*C2[k] + .25*C3[k])); };   // (BLK: a tall building breathes part of the haze it stops)
     const noiseAt = (i, j) => { if (!inG(i, j)) return 0; const k = id(i, j); return NOI[k] + TRK[k]; };
     const watchAt = (i, j) => inG(i, j) ? WAT[id(i, j)] : 0;
     const coverAt = (i, j) => { const k = inG(i, j) ? id(i, j) : -1; const e = k < 0 ? 0 : E1[k] + .5*E2[k] + .25*E3[k]; return Math.min(1, e + Math.min(.7, (patrol.get(i + ',' + j) || 0)/12)); };
@@ -299,7 +313,7 @@ const PLAN = (() => {
     const jobK = new Map(), lifeK = new Map(); for (const s of jobsS) if (s.k) jobK.set(s.k, s); for (const s of lifeS) if (s.k) lifeK.set(s.k, s);
     for (const b of snap.blds){
       const pw = inG(b.i, b.j) ? PWR[id(b.i, b.j)] : 0, edge = pw === 1;
-      const h = { b, k: b.k, z: b.z, floors: b.floors, isolated: !REACH[id(b.i, b.j)], powered: pw > 0, edge };
+      const h = { b, k: b.k, z: b.z, floors: b.floors, isolated: !REACH[id(b.i, b.j)], powered: pw > 0, edge, shade: inG(b.i, b.j) ? BLK[id(b.i, b.j)] : 0 };
       h.need = !h.powered || h.isolated ? 0 : edge ? .8 : 1;
       H.push(h);
       if (!isHome(b.z)){
@@ -328,25 +342,31 @@ const PLAN = (() => {
       h.rent = rent;
     }
     const powerAt = (i, j) => inG(i, j) ? PWR[id(i, j)] : 0;
-    return finish({ H, byK: new Map(H.map(h => [h.k, h])), cores, ms: performance.now() - T0, polAt, noiseAt, watchAt, coverAt, powerAt }, opt);
+    return finish({ H, byK: new Map(H.map(h => [h.k, h])), cores, ms: performance.now() - T0, polAt, noiseAt, watchAt, coverAt, powerAt, src: SRC, field: { i0, j0, NI, NJ } }, opt);
   }
   // the quick part, every second: crime on the corners, the Grid's song, dials fading in, comfort and fill (the maps above are made only after an edit)
   function finish(base, opt = {}){
     const tier = opt.tier ?? st.tier, spots = opt.spots || st.crime.spots, push = songPush();
-    const crimeAt = (i, j) => { let x = 0; for (const s of spots){ const d = cheb(i, j, s.i, s.j); if (d <= 3) x += s.heat*(1 - d/4); } return x; };
+    const crimeAt = (i, j) => { let x = 0; for (const s of spots){ const d = cheb(i, j, s.i, s.j); if (d <= P.crimeR) x += s.heat*(1 - d/(P.crimeR + 1)); } return x; };
     let counted = 0, people = 0, thr = 0;
     for (const h of base.H){ if (!isHome(h.z)) continue; const b = h.b;
-      h.dials = { ...h.base, safety: clamp01(1 - crimeAt(b.i, b.j)) };
+      h.crime = clamp01(crimeAt(b.i, b.j)); h.dials = { ...h.base, safety: 1 - h.crime };
       // the Grid: within its broadcast, the song lifts a third of what's missing of a dial, or costs a little
       if (h.grid) for (const d in push){ const v = push[d]; if (v > 0) h.dials[d] += (1 - h.dials[d])*v/3; else h.dials[d] *= 1 + .1*v; }
       if (h.pagoda) for (const d of DIALS) h.dials[d] = Math.min(1, h.dials[d] + .08);
       // dials not open yet count as fine; a dial just opened fades in
-      let sum = 0, n = 0, lo = 1;
       const wts = h.z === 'L' ? { air: 1.3, quiet: 1.3, life: 1.3, safety: 1, ease: .3 } : { air: 1, quiet: 1, life: 1, safety: 1, ease: 1 };
+      const comfortOf = (dl, out) => { let sum = 0, n = 0, lo = 1;
+        for (const d of DIALS){ if (tier < dialTier(d)){ if (out) out[d] = null; continue; }
+          const f = opt.fade === false ? 1 : fadeOf(d), v = 1 - f*(1 - clamp01(dl[d])); if (out) out[d] = v; sum += v*wts[d]; n += wts[d]; if (v < lo) lo = v; }
+        return n ? .7*sum/n + .3*lo : 1; };
       h.eff = {};
-      for (const d of DIALS){ if (!(d === 'quiet' ? tier >= 2 : d === 'safety' || d === 'ease' ? tier >= 3 : true)){ h.eff[d] = null; continue; }
-        const f = opt.fade === false ? 1 : fadeOf(d), v = 1 - f*(1 - clamp01(h.dials[d])); h.eff[d] = v; sum += v*wts[d]; n += wts[d]; if (v < lo) lo = v; }
-      h.comfort = n ? .7*sum/n + .3*lo : 1;
+      h.comfort = comfortOf(h.dials, h.eff);
+      // unhappy: what bothers the people living there before any crime (a poor place to live, or no work), and what crime adds on top
+      const crimeHit = h.crime;
+      h.comfort0 = crimeHit > 0 ? comfortOf({ ...h.dials, safety: Math.min(1, h.dials.safety + crimeHit) }, null) : h.comfort;
+      h.unhappy = clamp01(1 - (.65*h.comfort0 + .35*Math.min(1, h.support/.8)));
+      h.crimeLoss = Math.max(0, h.comfort0 - h.comfort);
       h.fill = h.need*Math.max(P.floorSupport, h.support)*(.4 + .6*h.comfort)*h.rent;
       h.countShare = h.support/Math.max(P.floorSupport, h.support);   // (of those who live there, the share with work: only they count toward the tiers)
       h.target = h.fill*h.people;
@@ -408,44 +428,60 @@ const PLAN = (() => {
     while (st.tier < TIERS.length - 1){ const t = TIERS[st.tier + 1]; if (SM.res + .5 < t.res || Math.floor(SM.thr + .5) < t.thr) break; st.tier++; onTier(st.tier, live); }
   }
 
-  /* ---------- crime: a few hotspots that form where streets are busy at night and nobody watches, and drift from the police ---------- */
+  /* ---------- crime: unhappy homes breed it, it spreads, and it makes the homes round it unhappy too ----------
+     A hotspot forms where enough unhappy people live close together (a poor place to live, or no work). It grows while what bothers them is still
+     there, and adds to their unhappiness, so left alone it gets worse and spreads to the next unhappy block. Fix the cause and it fades: its growth
+     counts only half of what crime itself adds, so crime alone can't keep itself alive. Police (from Patrolled) push it away, a third weaker each move;
+     busy lit streets and walls watch too. It reaches P.crimeR plots, the same as a tall building's haze shadow. */
   const CRIME = (() => {
-    const C = {};
-    // where crime could happen: shops and the places people go at night
-    function targets(){
+    const C = {}, R = P.crimeR, GROW = .38;
+    // the people in each home now, and how unhappy they are
+    function homes(){
       const out = [];
-      for (const b of B.values()) if (b.z === 'C' && b.lit > 0) out.push({ i: b.c.i, j: b.c.j, w: 1 + b.floors*.2 });
-      for (const k of ['club', 'market', 'mall', 'square']) for (const m of megaList(k)) out.push({ i: m.i + (m.w >> 1), j: m.j + (m.h >> 1), w: 2.5 });
+      for (const b of B.values()){ const h = b.h; if (!h || !isHome(h.z) || b.occ <= 0 || h.unhappy === undefined) continue;
+        out.push({ i: b.c.i, j: b.c.j, ppl: b.occ/h.floors*h.people, u: h.unhappy, u2: h.unhappy + .5*h.crimeLoss }); }
       return out;
     }
+    // how bad it is round a plot: unhappy people near (for a new hotspot), and the mood that feeds one already there
+    const clusterAt = (H, i, j) => { let w = 0; for (const x of H) if (cheb(i, j, x.i, x.j) <= R && x.u > .3) w += x.ppl*(x.u - .3); return w; };
+    const moodAt = (H, i, j) => { let w = 0, s = 0; for (const x of H){ const d = cheb(i, j, x.i, x.j); if (d > R) continue; const k = x.ppl*(1 - d/(R + 1)); w += k; s += k*x.u2; } return w > 0 ? s/w : 0; };
+    function best(H, near, avoid){
+      let bst = null, bs = 0;
+      for (const x of H){ if (x.u < .3) continue; if (near && (cheb(near.i, near.j, x.i, x.j) < 2 || cheb(near.i, near.j, x.i, x.j) > 6)) continue;
+        if (st.crime.spots.some(s => cheb(s.i, s.j, x.i, x.j) < (avoid || 4))) continue;
+        const sc = clusterAt(H, x.i, x.j)*(1 - (LAST ? LAST.coverAt(x.i, x.j) : 0)); if (sc > bs){ bs = sc; bst = x; } }
+      return bst ? { i: bst.i, j: bst.j, sc: bs } : null;
+    }
     const wallBetween = (a, b) => { const steps = Math.max(Math.abs(a.i - b.i), Math.abs(a.j - b.j)); for (let q = 1; q < steps; q++){ const c = cells.get(Math.round(a.i + (b.i - a.i)*q/steps) + ',' + Math.round(a.j + (b.j - a.j)*q/steps)); if (c && c.wall && !c.mega) return true; } return false; };
+    const FORM = 25;   // (about three homes of unhappy people, more than half of them very unhappy)
     C.tick = dt => {
       const cr = st.crime;
-      if (st.tier < 3 || !LAST){ cr.spots.length = 0; return; }
+      if (!LAST || !booted){ return; }
       if (!cr.since) cr.since = now();
-      const cov = (i, j) => LAST.coverAt(i, j);
-      const T = targets();   // (no targets left: nothing new forms, but the old ones still fade)
-      const mins = (now() - cr.since)/60e3;
-      const cap = Math.min(5, 1 + Math.floor(mins/3), 1 + Math.floor(T.length/12));
-      // the first case: one hotspot, 25 seconds after police arrive; then more as the city goes on
-      const want = cr.n === 0 ? (now() - cr.since > 25e3 ? 1 : 0) : cap;
-      if (T.length && cr.spots.length < want && Math.random() < (cr.n === 0 ? 1 : dt/45)){
-        let best = null, bs = -1; for (const t of T){ if (cr.spots.some(s => cheb(s.i, s.j, t.i, t.j) < 4)) continue; const sc = t.w*(1 - cov(t.i, t.j))*(.7 + Math.random()*.6); if (sc > bs){ bs = sc; best = t; } }
-        if (best && bs > .25){ cr.spots.push({ i: best.i, j: best.j, heat: .35, h0: .35, p: 0, trail: [], id: ++cr.n }); E.emit('crime', { first: cr.n === 1 }); }
-      }
-      for (let q = cr.spots.length - 1; q >= 0; q--){ const s = cr.spots[q], c = cov(s.i, s.j);
-        if (c >= .4){ s.p += dt; s.heat = Math.max(0, s.heat - dt*.002); } else { s.p = Math.max(0, s.p - dt*.5); s.heat = Math.min(1, s.heat + dt*.0015); s.h0 = Math.max(s.h0, s.heat); }
-        if (s.p > 60){   // pressured for a minute: it drifts to the nearest poorly watched spot with something to target, a third weaker
+      const H = homes(), cov = (i, j) => LAST.coverAt(i, j);
+      const cap = 2 + st.tier;
+      // a new hotspot: never while the first lessons are on, and at most one every half a minute or so
+      const calm = !st.tut.done || now() - cr.since < 90e3;
+      if (!calm && cr.spots.length < cap && Math.random() < dt/30){ const t = best(H); if (t && t.sc >= FORM){ cr.spots.push({ i: t.i, j: t.j, heat: .3, h0: .3, p: 0, trail: [], id: ++cr.n }); E.emit('crime', { first: cr.n === 1, i: t.i, j: t.j }); } }
+      for (let q = cr.spots.length - 1; q >= 0; q--){ const s = cr.spots[q], c = cov(s.i, s.j), mood = moodAt(H, s.i, s.j);
+        s.mood = mood;
+        if (c >= .4){ s.p += dt; s.heat = Math.max(0, s.heat - dt*.002); }
+        else { s.p = Math.max(0, s.p - dt*.5); s.heat = clamp01(s.heat + dt*(mood > GROW ? .006*(mood - GROW)/.1 : -(.004 + .01*(GROW - mood)))); }
+        s.h0 = Math.max(s.h0, s.heat);
+        // left to burn, it spreads to the next unhappy block
+        if (s.heat > .75 && c < .4 && cr.spots.length < cap && Math.random() < dt/50){ const t = best(H, s, 3); if (t && t.sc >= FORM*.5){ cr.spots.push({ i: t.i, j: t.j, heat: .3, h0: .3, p: 0, trail: [], id: ++cr.n }); E.emit('crimeSpread', { from: s, i: t.i, j: t.j }); } }
+        if (s.p > 60){   // pressured for a minute: it drifts to the nearest unwatched unhappy homes, a third weaker
           s.p = 0; let to = null, bd = Infinity;
-          for (const t of T){ const d = cheb(s.i, s.j, t.i, t.j); if (d < 1 || d > 7 || s.trail.some(x => x.i === t.i && x.j === t.j) || cov(t.i, t.j) >= .35 || cr.spots.some(o => o !== s && cheb(o.i, o.j, t.i, t.j) < 3) || wallBetween(s, t)) continue; if (d < bd){ bd = d; to = t; } }
+          for (const x of H){ if (x.u < .3) continue; const d = cheb(s.i, s.j, x.i, x.j); if (d < 1 || d > 7 || s.trail.some(y => y.i === x.i && y.j === x.j) || cov(x.i, x.j) >= .35 || cr.spots.some(o => o !== s && cheb(o.i, o.j, x.i, x.j) < 3) || wallBetween(s, x)) continue; if (d < bd){ bd = d; to = x; } }
           s.heat *= .67; s.trail.push({ i: s.i, j: s.j }); if (s.trail.length > 4) s.trail.shift();
           if (to){ s.i = to.i; s.j = to.j; E.emit('crimeMove', s); } else s.heat *= .5;
         }
-        if (s.heat < s.h0*.33 || s.heat < .06){ cr.spots.splice(q, 1); E.emit('crimeGone', s); }
+        if (s.heat < .06 || (s.heat < s.h0*.25 && mood < GROW)){ cr.spots.splice(q, 1); E.emit('crimeGone', s); }
       }
     };
     // where the next one would form (the LIDAR Array shows it)
-    C.forecast = () => { if (!LAST || st.tier < 3) return null; const T = targets(); let best = null, bs = -1; for (const t of T){ if (st.crime.spots.some(s => cheb(s.i, s.j, t.i, t.j) < 4)) continue; const sc = t.w*(1 - LAST.coverAt(t.i, t.j)); if (sc > bs){ bs = sc; best = t; } } return bs > .25 ? best : null; };
+    C.forecast = () => { if (!LAST) return null; const t = best(homes()); return t && t.sc >= FORM*.6 ? t : null; };
+    C.risk = (i, j) => clusterAt(homes(), i, j)/FORM;
     return C;
   })();
 
@@ -482,7 +518,7 @@ const PLAN = (() => {
   /* ---------- tiers ---------- */
   function unlockFor(t){
     for (let q = 0; q <= t; q++){ const ks = q === 0 ? START_KINDS : TIERS[q].opens || []; for (const k of ks) if (MEGA_TYPES[k] && typeof unlockMegaKind === 'function') unlockMegaKind(k); }
-    for (let q = 1; q <= t; q++){ const d = TIERS[q].dial; if (d){ const ds = d === 'safety' ? ['safety', 'ease'] : [d]; for (const x of ds) if (!st.dialAt[x]) st.dialAt[x] = now(); } }
+    for (let q = 1; q <= t; q++){ const d = TIERS[q].dial; if (d && !st.dialAt[d]) st.dialAt[d] = now(); }
     document.documentElement.classList.toggle('plan-nolux', t < 6);
     document.documentElement.classList.toggle('plan-noperim', t < 5);
     if (typeof renderBmenu === 'function') try { renderBmenu(); } catch (e) {}
@@ -505,9 +541,10 @@ const PLAN = (() => {
   const zoneNow = zone => ZONEK[zone] === 'I' && st.corp && st.tier >= 6 ? 'K' : ZONEK[zone];
   function zoneLocked(z){ if ((z === 'L' || z === 'K') && st.tier < 6){ say((z === 'L' ? 'Luxury' : 'Corps') + ' opens at ' + TIERS[6].name); return true; } return false; }
   const markCorp = (c, z) => { if (z !== 'K') return; for (const s of c.sections) if (s.zone === 'ind') s.corp = 1; if (c.below) for (const s of c.below) if (s.zone === 'ind') s.corp = 1; };
+  let tilesN = 0;
   wrap('addPlatform', function (orig, i, j, zone){
     if (zone){ const z = zoneNow(zone); if (zoneLocked(z)) return null; ledgerMark(); const c = orig(i, j, zone); if (c){ markCorp(c, z); if (z === 'K') refresh([c]); E.emit('build', { c, z, fresh: true }); } return c; }
-    ledgerMark(); const c = orig(i, j, zone); if (c) E.emit('tile', { c }); return c;
+    ledgerMark(); const c = orig(i, j, zone); if (c){ tilesN++; E.emit('tile', { c }); } return c;
   });
   wrap('addSection', function (orig, c, zone, opt = {}){
     const fresh = !c.sections.length, z = zoneNow(zone), have = zoneOf(c);
@@ -644,6 +681,26 @@ const PLAN = (() => {
   .pl-legend[hidden] { display: none; } .pl-legend span { display: flex; gap: 6px; align-items: center; } .pl-legend i { width: 11px; height: 11px; display: inline-block; }
   .pl-corp { position: fixed; z-index: 4; left: 50%; transform: translateX(-50%); bottom: calc(118px + env(safe-area-inset-bottom,0px)); display: flex; font: 11px/1 'JetBrains Mono', monospace; border: 1px solid rgba(232,224,58,.5); background: rgba(11,10,18,.92); }
   .pl-corp[hidden] { display: none; } .pl-corp button { all: unset; cursor: pointer; padding: 8px 13px; color: var(--p-dim); letter-spacing: .12em; text-transform: uppercase; } .pl-corp button[aria-pressed="true"] { color: #0c0b12; background: #e8e03a; }
+  .pl-goal .r.thr { cursor: pointer; margin-left: -4px; margin-right: -4px; padding: 2px 4px 3px; } .pl-goal .r.thr:hover, .pl-goal .r.thr:focus-visible { background: rgba(255,255,255,.06); outline: none; }
+  .pl-card .d .bar { position: relative; } .pl-card .d .bar u { position: absolute; top: -2px; bottom: -2px; width: 1px; background: rgba(255,255,255,.35); }
+  .pl-card .d .mid { color: #ffc24a; } .pl-card .d .bar.mid i { background: #c99a3a; }
+  .pl-card .nt { margin-top: 8px; display: grid; gap: 3px; font-size: 11px; } .pl-card .nt .bad { color: var(--p-bad); } .pl-card .nt .mid { color: var(--p-dim); }
+  .pl-legend .gr { gap: 8px; } .pl-legend .gr b { width: 92px; height: 8px; display: inline-block; }
+  .pl-legend i.src { width: 11px; height: 11px; border-radius: 50%; background: radial-gradient(circle, #fff 0 25%, var(--c) 45%, transparent 72%); box-shadow: 0 0 6px var(--c); }
+  .pl-legend .hk { gap: 3px; } .pl-legend .hk i { width: 9px; height: 9px; } .pl-legend .hk i:last-of-type { margin-right: 5px; }
+  .pl-thr { position: fixed; z-index: 5; left: calc(max(16px, env(safe-area-inset-left,0px)) + 222px); top: calc(40px + env(safe-area-inset-top,0px)); width: 260px; box-sizing: border-box;
+    font: 12px/1.35 'JetBrains Mono', monospace; color: var(--p-txt); background: rgba(11,10,18,.95); border: 1px solid var(--p-line); padding: 10px 12px 12px; }
+  .pl-thr[hidden] { display: none; } .pl-thr .t { display: flex; justify-content: space-between; align-items: baseline; } .pl-thr .t b { font-size: 13px; }
+  .pl-thr button { all: unset; cursor: pointer; } .pl-thr .x { color: var(--p-dim); } .pl-thr .x:hover { color: #fff; }
+  .pl-thr .nav { display: flex; align-items: center; gap: 8px; margin: 9px 0 8px; } .pl-thr .nav > div { flex: 1; text-align: center; } .pl-thr .nav b { display: block; font-size: 15px; color: #fff; letter-spacing: .06em; }
+  .pl-thr .nav small { color: var(--p-dim); font-size: 10.5px; } .pl-thr .nav button { font-size: 18px; color: var(--p-acc); padding: 2px 8px; border: 1px solid var(--p-line); } .pl-thr .nav button:hover { border-color: var(--p-acc); }
+  .pl-thr .rows { display: grid; gap: 2px; } .pl-thr .rows button { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; padding: 5px 7px; border-left: 2px solid transparent; }
+  .pl-thr .rows button span { color: var(--p-dim); } .pl-thr .rows button b { font-weight: 500; font-variant-numeric: tabular-nums; } .pl-thr .rows button i { grid-column: 1 / -1; height: 3px; background: rgba(255,74,90,.45); }
+  .pl-thr .rows button i u { display: block; height: 100%; background: #4dff9a; } .pl-thr .rows button:hover { background: rgba(255,255,255,.05); }
+  .pl-thr .rows button[aria-pressed="true"] { border-left-color: var(--p-acc); background: rgba(143,232,216,.08); } .pl-thr .rows button[aria-pressed="true"] span { color: #fff; }
+  .pl-thr .k { display: flex; gap: 6px; align-items: center; margin-top: 9px; color: var(--p-dim); font-size: 10.5px; } .pl-thr .k i { width: 9px; height: 9px; display: inline-block; } .pl-thr .k i:last-of-type { margin-left: 8px; }
+  html.touch .pl-thr { left: 50%; top: auto; bottom: calc(150px + env(safe-area-inset-bottom,0px)); transform: translateX(-50%); width: min(320px, calc(100vw - 24px)); }
+  html.plan.title-on .pl-thr { display: none; }
   html.plan .gdeck { top: calc(var(--pl-goal-b, 160px) + 10px); }
   html.plan:not(.gdeck-on) .bmenu { top: calc(var(--pl-goal-b, 160px) + 12px); }
   html.touch .pl-goal { top: calc(54px + env(safe-area-inset-top,0px)); left: max(12px, env(safe-area-inset-left,0px)); width: 176px; padding: 8px 10px; }
@@ -669,74 +726,176 @@ const PLAN = (() => {
   function goal(){
     const r = E.r || { res: 0, thr: 0 }, done = st.tier >= TIERS.length - 1, nt = TIERS[Math.min(st.tier + 1, TIERS.length - 1)];
     let html;
-    if (done) html = `<div class="k"><span>${esc(TIERS[st.tier].name)}</span><button type="button" data-help aria-label="Replay the tutorial">?</button></div><div class="n">${fmt(r.res)} residents</div><div class="r"><div><span>Thriving homes</span><b>${Math.floor(r.thr + .5)}</b></div></div>`;
+    if (done) html = `<div class="k"><span>${esc(TIERS[st.tier].name)}</span><button type="button" data-help aria-label="Replay the tutorial">?</button></div><div class="n">${fmt(r.res)} residents</div><div class="r thr" data-thr role="button" tabindex="0"><div><span>Thriving homes ›</span><b>${Math.floor(r.thr + .5)}</b></div></div>`;
     else {
       const a = Math.min(1, r.res/nt.res), b = Math.min(1, (r.thr + .5 | 0)/nt.thr);
       html = `<div class="k"><span>Next</span><button type="button" data-help aria-label="Replay the tutorial">?</button></div><div class="n">${esc(nt.name)}</div>` +
         `<div class="r ${a >= 1 ? 'ok' : ''}"><div><span>Residents</span><b>${fmt(Math.min(r.res, nt.res))} / ${fmt(nt.res)}</b></div><div class="bar"><i style="width:${(100*a).toFixed(1)}%"></i></div></div>` +
-        `<div class="r ${b >= 1 ? 'ok' : ''}"><div><span>Thriving homes</span><b>${Math.min(nt.thr, r.thr + .5 | 0)} / ${nt.thr}</b></div><div class="bar"><i style="width:${(100*b).toFixed(1)}%"></i></div></div>`;
+        `<div class="r thr ${b >= 1 ? 'ok' : ''}" data-thr role="button" tabindex="0" title="See what each home is missing"><div><span>Thriving homes ›</span><b>${Math.min(nt.thr, r.thr + .5 | 0)} / ${nt.thr}</b></div><div class="bar"><i style="width:${(100*b).toFixed(1)}%"></i></div></div>`;
     }
     if (html !== goalKey){ goalKey = html; goalEl.innerHTML = html; }
     stackLeft();
   }
-  goalEl.addEventListener('click', e => { if (e.target.closest('[data-help]')) TUTE.replay(); });
+  goalEl.addEventListener('click', e => { if (e.target.closest('[data-help]')) TUTE.replay(); else if (e.target.closest('[data-thr]')) THR.open(); });
+  goalEl.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('[data-thr]')){ e.preventDefault(); THR.open(); } });
   let stackT = 0;
   function stackLeft(){ cancelAnimationFrame(stackT); stackT = requestAnimationFrame(() => { const de = document.documentElement, r = goalEl.getBoundingClientRect(); if (r.height){ const b = Math.ceil(r.bottom) + 'px'; if (de.style.getPropertyValue('--pl-goal-b') !== b) de.style.setProperty('--pl-goal-b', b); } }); }
 
-  // the lenses: one view at a time, each opening with the thing that makes it
+  // the views: one at a time (V cycles). Power has no view: each core sends a wave over its reach instead (WAVE, below)
   const LENSES = [
-    { id: 'power', name: 'Power', c: '#8fc4ff', at: 0, keys: [['#8fc4ff', 'Powered'], ['#3d5f99', 'Edge'], ['#3a3446', 'None']] },
-    { id: 'air', name: 'Air', c: '#c9c26a', at: 0, keys: [['#5fbf5a', 'Clean'], ['#c9a03a', 'Hazy'], ['#c4553a', 'Thick']] },
-    { id: 'noise', name: 'Noise', c: '#ffb066', at: 2, keys: [['#e8d36a', 'Murmur'], ['#ff9a3a', 'Loud'], ['#ff4a4a', 'Very loud']] },
-    { id: 'safety', name: 'Safety', c: '#7fb4ff', at: 3, keys: [['#4f8fff', 'Covered'], ['#b06aff', 'Watched'], ['#ff3a4a', 'Crime']] },
+    { id: 'air', name: 'Air', c: '#e8d84a', at: 0 },
+    { id: 'noise', name: 'Noise', c: '#c77dff', at: 0 },
+    { id: 'safety', name: 'Safety', c: '#7fb4ff', at: 0, keys: [['#4f8fff', 'Watched over'], ['#b06aff', 'Feels watched'], ['#ff3a4a', 'Crime']] },
   ];
-  const lensEl = el('div', 'pl-lens'); lensEl.setAttribute('role', 'group'); lensEl.setAttribute('aria-label', 'Lenses'); document.body.appendChild(lensEl);
-  let lens = null, lensTemp = null, lensSeen = {};
+  const lensEl = el('div', 'pl-lens'); lensEl.setAttribute('role', 'group'); lensEl.setAttribute('aria-label', 'Views'); document.body.appendChild(lensEl);
+  let lens = null, lensTemp = null;
   function lensSync(){
-    const html = LENSES.filter(l => st.tier >= l.at).map(l => `<button type="button" data-l="${l.id}" style="--c:${l.c}" aria-pressed="${(lensTemp || lens) === l.id}" title="${l.name} lens (V cycles)"><i></i>${l.name}</button>`).join('');
+    const html = LENSES.filter(l => st.tier >= l.at).map(l => `<button type="button" data-l="${l.id}" style="--c:${l.c}" aria-pressed="${(lensTemp || lens) === l.id}" title="${l.name} view (V cycles)"><i></i>${l.name}</button>`).join('');
     if (lensEl.innerHTML !== html){ const prev = new Set([...lensEl.querySelectorAll('button')].map(b => b.dataset.l)); lensEl.innerHTML = html; lensEl.querySelectorAll('button').forEach(b => { if (prev.size && !prev.has(b.dataset.l)) b.classList.add('fresh'); }); }
     else lensEl.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String((lensTemp || lens) === b.dataset.l)));
   }
   lensEl.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; b.classList.remove('fresh'); setLens(lens === b.dataset.l ? null : b.dataset.l); E.emit('lens', lens); });
-  function setLens(id){ lens = id; lensSync(); VIEW.draw(); }
+  function setLens(id){ lens = id; if (id) THR.close(); lensSync(); VIEW.draw(); }
   addEventListener('keydown', e => { if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
     if ((e.key === 'v' || e.key === 'V') && !e.metaKey && !e.ctrlKey && !e.altKey){ const ls = [null, ...LENSES.filter(l => st.tier >= l.at).map(l => l.id)]; setLens(ls[(ls.indexOf(lens) + 1) % ls.length]); E.emit('lens', lens); }
-    if (e.key === 'Escape'){ if (lens) setLens(null); hideCard(); } });
+    if (e.key === 'Escape'){ if (lens) setLens(null); THR.close(); hideCard(); } });
 
-  /* ---------- the lens view: each plot tinted on the ground, the crime hotspots as slow red rings ---------- */
-  const VIEW = (() => {
-    const tileMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: .34, depthTest: false, depthWrite: false });
-    const MAXT = 3000, tiles = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), tileMat, MAXT); tiles.count = 0; tiles.frustumCulled = false; tiles.layers.set(1); tiles.renderOrder = 995;
-    tiles.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAXT*3), 3);
-    if (typeof scene !== 'undefined') scene.add(tiles);
-    const leg = el('div', 'pl-legend'); leg.hidden = true; document.body.appendChild(leg);
-    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI/2, 0, 0)), pp = new THREE.Vector3(), ss = new THREE.Vector3(), cc = new THREE.Color();
-    function colorAt(id, c){
-      const R_ = LAST; if (!R_) return null; const L_ = LENSES.find(l => l.id === id).keys;
-      if (id === 'power'){ let best = null; for (const m of R_.cores){ const d = megaD(c.i, c.j, m); if (d <= m.reachNow){ best = d > m.reachNow - P.edge ? 1 : 0; if (best === 0) break; } } return best === null ? L_[2][0] : L_[best][0]; }
-      if (id === 'air'){ const p = R_.polAt(c.i, c.j); return p < .3 ? null : p < 1.2 ? L_[1][0] : L_[2][0]; }
-      if (id === 'noise'){ const n = R_.noiseAt(c.i, c.j, CURB); return n < 1 ? null : n < 2.5 ? L_[0][0] : n < 4 ? L_[1][0] : L_[2][0]; }
-      if (id === 'safety'){ if (R_.crimeAt(c.i, c.j) > .25) return L_[2][0]; const w = R_.watchAt(c.i, c.j); if (w > .35) return L_[1][0]; return R_.coverAt(c.i, c.j) > .45 ? L_[0][0] : null; }
-      return null;
+  const VSW = `varying vec3 vW; void main(){ vec4 w = modelMatrix*vec4(position, 1.); vW = w.xyz; gl_Position = projectionMatrix*viewMatrix*w; }`;
+  // (layer 1 is drawn after the cached city with its depth put back, so these sit in the scene: buildings hide the ground under them)
+  const overlayMat = (fs, uni, add) => { const m = new THREE.ShaderMaterial({ uniforms: uni, vertexShader: VSW, fragmentShader: fs, transparent: true, depthTest: true, depthWrite: false, blending: add ? THREE.AdditiveBlending : THREE.NormalBlending }); m.extensions = { derivatives: true }; return m; };
+  const onLayer = (o, order) => { o.layers.set(1); o.renderOrder = order; o.frustumCulled = false; if (typeof scene !== 'undefined') scene.add(o); return o; };
+
+  /* ---------- a building lit in a color: thin bright edges, a faint fill (the furnish hologram's look), for the views and the thriving check ---------- */
+  const TINT = (() => {
+    const N = 1600, ig = new THREE.BoxGeometry(1, 1, 1);
+    const aCol = new THREE.InstancedBufferAttribute(new Float32Array(N*3), 3), aPulse = new THREE.InstancedBufferAttribute(new Float32Array(N), 1);
+    ig.setAttribute('aCol', aCol); ig.setAttribute('aPulse', aPulse);
+    const mat = new THREE.ShaderMaterial({ uniforms: { uT: { value: 0 } }, transparent: true, depthTest: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      vertexShader: `attribute vec3 aCol; attribute float aPulse; varying vec3 vC; varying float vP; varying vec2 vUv; varying vec3 vN; varying vec3 vS;
+        void main(){ vC = aCol; vP = aPulse; vUv = uv; vN = normal; mat4 im = instanceMatrix; vS = vec3(length(im[0].xyz), length(im[1].xyz), length(im[2].xyz)); gl_Position = projectionMatrix*viewMatrix*modelMatrix*im*vec4(position, 1.); }`,
+      fragmentShader: `uniform float uT; varying vec3 vC; varying float vP; varying vec2 vUv; varying vec3 vN; varying vec3 vS;
+        void main(){ vec2 sz = abs(vN.y) > .5 ? vS.xz : abs(vN.x) > .5 ? vS.zy : vS.xy; vec2 dm = min(vUv, 1. - vUv)*sz; float d = min(dm.x, dm.y);
+          float ln = 1. - smoothstep(.03, .1, d), gl = exp(-d/.22)*.45, fill = abs(vN.y) > .5 ? .2 : .1;
+          float k = vP > .5 ? .55 + .45*sin(uT*5. + vP) : 1.;
+          gl_FragColor = vec4(vC*(ln + gl + fill)*k, 1.); }` });
+    const mesh = new THREE.InstancedMesh(ig, mat, N); mesh.count = 0; onLayer(mesh, 994); mesh.visible = false;
+    const m4 = new THREE.Matrix4(), qi = new THREE.Quaternion(), p_ = new THREE.Vector3(), s_ = new THREE.Vector3(), cc = new THREE.Color();
+    (function run(){ requestAnimationFrame(run); if (mesh.visible) mat.uniforms.uT.value = performance.now()/1000; })();
+    // list: [{ c (a plot) or m (a megastructure), col, pulse }]
+    function set(list){
+      let n = 0;
+      for (const it of list || []){ if (n >= N) break; cc.set(it.col);
+        if (it.m){ const m = it.m; p_.set(m.x, ((m.top || CURB + 6) + CURB)/2, m.z); s_.set(m.w*LOT - .5, Math.max(1, (m.top || CURB + 6) - CURB), m.h*LOT - .5); }
+        else { const c = it.c, y0 = c.lift ? c.lift.y : CURB, y1 = Math.max(y0 + .6, c.height || CURB + 3); p_.set(c.x, (y0 + y1)/2, c.z); s_.set(SIDE + .16, y1 - y0 + .1, SIDE + .16); }
+        m4.compose(p_, qi, s_); mesh.setMatrixAt(n, m4); aCol.setXYZ(n, cc.r, cc.g, cc.b); aPulse.setX(n, it.pulse ? 1 + (n % 7) : 0); n++; }
+      mesh.count = n; mesh.instanceMatrix.needsUpdate = true; aCol.needsUpdate = true; aPulse.needsUpdate = true; mesh.visible = n > 0;
     }
+    return { set, clear(){ mesh.count = 0; mesh.visible = false; } };
+  })();
+  // how a home is doing on one measure: good, so-so, poor
+  const GRADE = { good: '#4dff9a', mid: '#ffc24a', bad: '#ff4a5a' };
+  const grade = v => v >= .7 ? GRADE.good : v >= .4 ? GRADE.mid : GRADE.bad;
+
+  /* ---------- the views ----------
+     Air: the haze as a weather radar paints rain, cool where it's light, hot where it's thick, in coarse grains that drift with the wind; its sources
+     glow and pulse. Noise: violet rings spreading out from each loud place, brighter and pinker where it's loud. Homes are lit by how they're doing. */
+  const VIEW = (() => {
+    const leg = el('div', 'pl-legend'); leg.hidden = true; document.body.appendChild(leg);
+    // the field: one plane over the city, a small texture of haze (red) and noise (green) per plot, colored in the shader
+    const FS = `uniform sampler2D tF; uniform float uMode; uniform float uT; uniform vec4 uG; uniform float uLOT; uniform vec2 uWind; varying vec3 vW;
+      float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7)))*43758.5453); }
+      vec3 ramp(float p){ vec3 c = vec3(.06, .22, .42);
+        c = mix(c, vec3(.1, .55, .72), smoothstep(.25, .5, p)); c = mix(c, vec3(.24, .78, .34), smoothstep(.5, .85, p)); c = mix(c, vec3(.96, .86, .24), smoothstep(.85, 1.2, p));
+        c = mix(c, vec3(.98, .52, .14), smoothstep(1.2, 1.6, p)); c = mix(c, vec3(.92, .16, .14), smoothstep(1.6, 2., p)); c = mix(c, vec3(.84, .2, .86), smoothstep(2., 2.5, p)); return mix(c, vec3(1.), smoothstep(2.6, 3.2, p)); }
+      void main(){
+        vec2 uv = vec2((vW.x/uLOT - uG.x + .5)/uG.z, (vW.z/uLOT - uG.y + .5)/uG.w);
+        if (uv.x < 0. || uv.y < 0. || uv.x > 1. || uv.y > 1.) discard;
+        vec4 f = texture2D(tF, uv);
+        if (uMode < .5){
+          float p = f.r*4.; vec2 bin = floor((vW.xz - uWind*uT*.5)/(uLOT*.2)); float q = p*(.8 + .4*hash(bin));
+          if (q < .2) discard;
+          vec3 c = ramp(q); float x = q*2., d = min(fract(x), 1. - fract(x)), lw = max(fwidth(x), 1e-3);
+          c = mix(c, min(c*1.6 + .12, vec3(1.)), (1. - smoothstep(0., lw*1.6, d))*.55);
+          gl_FragColor = vec4(c, smoothstep(.2, .55, q)*.8);
+        } else {
+          float nz = f.g*4.; if (nz < .3) discard;
+          float x = nz*2.2 + uT*.8, d = min(fract(x), 1. - fract(x)), lw = max(fwidth(x), 1e-3);
+          float ln = 1. - smoothstep(0., lw*1.5, d), gl = exp(-d/(lw*5.))*.5;
+          vec3 base = mix(vec3(.16, .08, .38), vec3(.45, .2, .95), smoothstep(.3, 3., nz)), lc = mix(vec3(.62, .5, 1.), vec3(1., .31, .84), smoothstep(.8, 2.6, nz));
+          gl_FragColor = vec4(base*.6 + lc*(ln + gl), smoothstep(.3, .9, nz)*(.3 + .62*max(ln, gl)));
+        } }`;
+    const fmat = overlayMat(FS, { tF: { value: null }, uMode: { value: 0 }, uT: { value: 0 }, uG: { value: new THREE.Vector4() }, uLOT: { value: LOT }, uWind: { value: new THREE.Vector2() } }, false);
+    const plane = onLayer(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), fmat), 993); plane.rotation.x = -Math.PI/2; plane.visible = false;
+    let tex = null, texFor = null;
+    function field(){
+      const base = BASE; if (!base || !base.field) return false; if (texFor === base && tex) return true;
+      const { i0, j0, NI, NJ } = base.field, data = new Uint8Array(NI*NJ*4);
+      for (let a = 0; a < NI; a++) for (let b = 0; b < NJ; b++){ const o = (b*NI + a)*4; data[o] = Math.min(255, base.polAt(i0 + a, j0 + b)/4*255); data[o + 1] = Math.min(255, base.noiseAt(i0 + a, j0 + b)/4*255); data[o + 3] = 255; }
+      if (tex) tex.dispose();
+      tex = new THREE.DataTexture(data, NI, NJ, THREE.RGBAFormat); tex.magFilter = tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false; tex.needsUpdate = true; texFor = base;
+      fmat.uniforms.tF.value = tex; fmat.uniforms.uG.value.set(i0, j0, NI, NJ);
+      plane.scale.set(NI*LOT, NJ*LOT, 1); plane.position.set((i0 + (NI - 1)/2)*LOT, CURB + .12, (j0 + (NJ - 1)/2)*LOT);
+      return true;
+    }
+    // the sources: a glow on the ground under each, pulsing with its strength
+    const glowC = (() => { const cv = document.createElement('canvas'); cv.width = cv.height = 128; const g = cv.getContext('2d'), r = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+      r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(.18, 'rgba(255,255,255,.85)'); r.addColorStop(.45, 'rgba(255,255,255,.25)'); r.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = r; g.fillRect(0, 0, 128, 128);
+      g.strokeStyle = 'rgba(255,255,255,.9)'; g.lineWidth = 3; g.beginPath(); g.arc(64, 64, 52, 0, Math.PI*2); g.stroke(); return new THREE.CanvasTexture(cv); })();
+    const NS = 300, spots = onLayer(new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: glowC, transparent: true, depthTest: true, depthWrite: false, blending: THREE.AdditiveBlending }), NS), 996);
+    spots.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(NS*3), 3); spots.count = 0; spots.visible = false;
+    let spotList = [];
+    const m4 = new THREE.Matrix4(), qf = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI/2, 0, 0)), pp = new THREE.Vector3(), ss = new THREE.Vector3(), cc = new THREE.Color();
+    (function run(){ requestAnimationFrame(run); if (!plane.visible && !spots.visible) return; const t = performance.now()/1000; fmat.uniforms.uT.value = t;
+      if (!spots.visible) return;
+      for (let n = 0; n < spotList.length; n++){ const o = spotList[n], k = (t*.6 + o.ph) % 1; pp.set(o.x, CURB + .16, o.z); ss.setScalar(o.r*(.8 + .55*k)); m4.compose(pp, qf, ss); spots.setMatrixAt(n, m4); cc.set(o.col).multiplyScalar(1.15 - .8*k); spots.setColorAt(n, cc); }
+      spots.instanceMatrix.needsUpdate = true; spots.instanceColor.needsUpdate = true; })();
+    // safety keeps its tiles: watched over, feeling watched, crime
+    const tileMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: .34, depthTest: false, depthWrite: false });
+    const MAXT = 3000, tiles = onLayer(new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), tileMat, MAXT), 995); tiles.count = 0;
+    tiles.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAXT*3), 3);
+    function safetyTiles(){ const R_ = LAST, L_ = LENSES[2].keys; let n = 0;
+      for (const c of cells.values()){ if (n >= MAXT) break; if (c.mega) continue; let col = null;
+        if (R_.crimeAt(c.i, c.j) > .25) col = L_[2][0]; else if (tierOK(3) && R_.watchAt(c.i, c.j) > .35) col = L_[1][0]; else if (R_.coverAt(c.i, c.j) > .45) col = L_[0][0];
+        if (!col) continue; cc.set(col); pp.set(c.i*LOT, CURB + .08, c.j*LOT); ss.set(LOT*.94, LOT*.94, 1); m4.compose(pp, qf, ss); tiles.setMatrixAt(n, m4); tiles.setColorAt(n, cc); n++; }
+      tiles.count = n; tiles.instanceMatrix.needsUpdate = true; tiles.instanceColor.needsUpdate = true; tiles.visible = n > 0; }
+    const tierOK = t => st.tier >= t;
+    const homeTints = d => { const out = []; for (const b of B.values()){ const h = b.h; if (!h || !isHome(h.z) || !h.eff || h.eff[d] === null || h.eff[d] === undefined) continue; out.push({ c: b.c, col: grade(h.eff[d]) }); } return out; };
+    const AIR_HOT = '#ffa060', NOISE_HOT = '#ff4fd8';
+    function sources(list, col, tint){
+      spotList = [];
+      for (const s of list){ const m = typeof megas !== 'undefined' && s.k && megas.get(s.k); const x = (s.i + (s.w - 1)/2)*LOT, z = (s.j + (s.h - 1)/2)*LOT;
+        spotList.push({ x, z, r: LOT*(1.1 + .55*Math.min(3, s.s))*Math.max(1, Math.max(s.w, s.h)*.7), col, ph: (Math.abs(s.i*7 + s.j*13) % 10)/10 });
+        if (m) tint.push({ m, col: AIR_HOT === col ? '#ff6a3d' : '#ff4fd8', pulse: true });
+        else if (s.k){ const b = B.get(s.k); if (b) tint.push({ c: b.c, col: AIR_HOT === col ? '#ff6a3d' : '#ff4fd8', pulse: true }); } }
+      spots.count = Math.min(NS, spotList.length); spots.visible = spots.count > 0;
+    }
+    const GRAD_AIR = 'linear-gradient(90deg,#0f3a6b,#1a8cb8,#3dc757,#f5db3d,#fa8524,#eb2924,#d633db,#fff)', GRAD_NOISE = 'linear-gradient(90deg,#2a1462,#7333f2,#a07dff,#ff4fd6)';
+    const homesKey = `<span class="hk"><i style="background:${GRADE.good}"></i><i style="background:${GRADE.mid}"></i><i style="background:${GRADE.bad}"></i>homes: fine · so-so · poor</span>`;
     function draw(){
       const id = lensTemp || lens;
-      if (!id || !LAST){ tiles.visible = false; leg.hidden = true; ARROWS.show(false); return; }
-      let n = 0;
-      for (const c of cells.values()){ if (n >= MAXT) break; if (c.mega) continue; const col = colorAt(id, c); if (!col) continue;
-        cc.set(col); pp.set(c.i*LOT, CURB + .08, c.j*LOT); ss.set(LOT*.94, LOT*.94, 1); m4.compose(pp, q, ss); tiles.setMatrixAt(n, m4); tiles.setColorAt(n, cc); n++; }
-      tiles.count = n; tiles.instanceMatrix.needsUpdate = true; tiles.instanceColor.needsUpdate = true; tiles.visible = n > 0;
-      const l = LENSES.find(x => x.id === id);
-      leg.innerHTML = l.keys.map(([c_, t]) => `<span><i style="background:${c_}"></i>${t}</span>`).join('') + (id === 'air' ? '<span>wind drifts the haze</span>' : '');
+      plane.visible = false; spots.visible = false; tiles.visible = false;
+      if (!id || !LAST){ leg.hidden = true; ARROWS.show(false); if (!THR.on()) TINT.clear(); return; }
+      if (THR.on()) THR.close();
+      const tint = [];
+      if (id === 'air' || id === 'noise'){
+        if (field()){ fmat.uniforms.uMode.value = id === 'air' ? 0 : 1; const [wx, wz] = wind(); fmat.uniforms.uWind.value.set(wx, wz); plane.visible = true; }
+        tint.push(...homeTints(id === 'air' ? 'air' : 'quiet'));
+        sources(LAST.src ? (id === 'air' ? LAST.src.air : LAST.src.noise) : [], id === 'air' ? AIR_HOT : NOISE_HOT, tint);
+        leg.innerHTML = `<span class="gr"><b style="background:${id === 'air' ? GRAD_AIR : GRAD_NOISE}"></b>${id === 'air' ? 'haze: light → thick' : 'noise: murmur → loud'}</span><span><i class="src" style="--c:${id === 'air' ? '#ff6a3d' : '#ff4fd8'}"></i>source</span>${homesKey}` + (id === 'air' ? '<span>wind ➜ drifts it</span>' : '');
+      } else if (id === 'safety'){
+        safetyTiles(); tint.push(...homeTints('safety'));
+        leg.innerHTML = LENSES[2].keys.filter((k, q) => q !== 1 || tierOK(3)).map(([c_, t]) => `<span><i style="background:${c_}"></i>${t}</span>`).join('') + homesKey;
+      }
+      TINT.set(tint);
       leg.hidden = false; ARROWS.show(id === 'air');
     }
     setInterval(() => { if (lens || lensTemp) draw(); }, 1200);
     return { draw };
   })();
-  // the wind, in the Air lens: a few soft chevrons drifting over the ground the way the haze leans
+  // the wind, in the Air view: a few soft chevrons drifting over the ground the way the haze leans
   const ARROWS = (() => {
     const cv = document.createElement('canvas'); cv.width = 64; cv.height = 64; const g = cv.getContext('2d'); g.strokeStyle = '#fff'; g.lineWidth = 7; g.lineCap = 'round'; g.beginPath(); g.moveTo(18, 14); g.lineTo(42, 32); g.lineTo(18, 50); g.stroke();
-    const mat = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, opacity: .35, depthTest: false, depthWrite: false, color: 0xe8e6a0 });
+    const mat = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, opacity: .45, depthTest: false, depthWrite: false, color: 0xffffff });
     const N = 24, mesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1.4, 1.4), mat, N); mesh.frustumCulled = false; mesh.layers.set(1); mesh.renderOrder = 996; mesh.visible = false;
     if (typeof scene !== 'undefined') scene.add(mesh);
     const m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), p_ = new THREE.Vector3(), s_ = new THREE.Vector3(1, 1, 1);
@@ -748,6 +907,86 @@ const PLAN = (() => {
         p_.set(x, CURB + .15, z); m4.compose(p_, qq, s_); mesh.setMatrixAt(k, m4); }
       mesh.instanceMatrix.needsUpdate = true; })();
     return { show(v){ on = v; mesh.visible = v; } };
+  })();
+
+  /* ---------- a core's reach: a hologram grid that sweeps out over the ground (and the water) as far as its power goes ----------
+     Every so often from each core (more often while something is held to place), at once when a core is clicked, and looping under a core being
+     placed. The last plots of a reach, where power flickers, are amber. The furnish pod's hologram colors: cyan lines, a pink front. */
+  const WAVE = (() => {
+    const FS = `uniform vec2 uC; uniform vec2 uH; uniform float uR; uniform float uE; uniform float uProg; uniform float uEnd; uniform float uA; uniform float uLOT; varying vec3 vW;
+      void main(){
+        vec2 q = max(abs(vW.xz - uC) - uH, 0.); float dd = max(q.x, q.y);
+        if (dd > uR + uLOT*.05) discard;
+        float tr = uProg*(uR + uLOT) - dd, aa = max(length(fwidth(vW.xz)), 1e-3);
+        vec2 g = vW.xz/uLOT + .5, gd = min(fract(g), 1. - fract(g))*uLOT; float pl = 1. - smoothstep(aa*.6, aa*2.2, min(gd.x, gd.y));
+        vec2 g4 = g*4., sd = min(fract(g4), 1. - fract(g4))*uLOT*.25; float sl = 1. - smoothstep(aa*.5, aa*1.6, min(sd.x, sd.y));
+        float trail = tr >= 0. ? exp(-tr/(uLOT*2.4)) : 0., front = exp(-tr*tr/(uLOT*uLOT*.16));
+        float bnd = (1. - smoothstep(aa, aa*3. + uLOT*.06, abs(dd - uR)))*uEnd, edge = smoothstep(uR - uE - .02, uR - uE + .02, dd);
+        vec3 cy = vec3(.22, .91, .88), pk = vec3(1., .31, .64), am = vec3(1., .72, .3), lc = mix(cy, am, edge*.75);
+        vec3 c = (lc*(pl*.95 + sl*.32 + .08)*trail + pk*front*(.3 + .7*max(pl, sl)) + mix(cy, am, edge)*bnd)*uA;
+        gl_FragColor = vec4(c, 1.); }`;
+    const geo = new THREE.PlaneGeometry(1, 1), live = [];
+    let ghost = null, ghostAt = 0, clickN = 0;
+    function fire(m, opt = {}){
+      if (typeof scene === 'undefined' || live.length > 10 || !m) return;
+      const reach = m.reachNow !== undefined ? m.reachNow : P.coreReach, rOut = Math.floor(reach), rIn = Math.floor(reach - P.edge);
+      const cx = (m.i + (m.w - 1)/2)*LOT, cz = (m.j + (m.h - 1)/2)*LOT, R = rOut*LOT;
+      const mat = overlayMat(FS, { uC: { value: new THREE.Vector2(cx, cz) }, uH: { value: new THREE.Vector2(m.w*LOT/2, m.h*LOT/2) }, uR: { value: R }, uE: { value: (rOut - rIn)*LOT }, uProg: { value: 0 }, uEnd: { value: 0 }, uA: { value: opt.big ? 1 : .8 }, uLOT: { value: LOT } }, true);
+      const mesh = onLayer(new THREE.Mesh(geo, mat), 992); mesh.rotation.x = -Math.PI/2; const span = 2*(R + LOT) + Math.max(m.w, m.h)*LOT; mesh.scale.set(span, span, 1); mesh.position.set(cx, CURB + .13, cz);
+      live.push({ mesh, mat, t0: performance.now(), dur: 1300 + reach*80, hold: opt.ghost ? 500 : 1300 });
+      if (live.length === 1) requestAnimationFrame(tick);
+    }
+    function tick(){ const t = performance.now();
+      for (let i = live.length - 1; i >= 0; i--){ const w = live[i], e = t - w.t0, k = Math.min(1, e/w.dur), u = w.mat.uniforms;
+        u.uProg.value = 1 - Math.pow(1 - k, 1.6); const after = Math.max(0, e - w.dur*.85); u.uEnd.value = Math.min(1, after/250)*Math.max(0, 1 - Math.max(0, e - w.dur)/w.hold);
+        if (e > w.dur + w.hold){ scene.remove(w.mesh); w.mat.dispose(); live.splice(i, 1); } }
+      if (live.length) requestAnimationFrame(tick); }
+    // every so often from each core; more often while something is held to place
+    const nextAt = new Map();
+    setInterval(() => {
+      if (!LAST || !booted || document.hidden || (typeof TITLE !== 'undefined' && TITLE.on) || (typeof LOADP !== 'undefined' && LOADP.on)) return;
+      const t = now(), held = (typeof S !== 'undefined' && S.zone) || (typeof megaPick !== 'undefined' && megaPick);
+      if (ghost && t - ghostAt > 2600){ ghostAt = t; fire(ghost, { ghost: true }); }
+      LAST.cores.forEach((c, q) => { let at = nextAt.get(c.id); if (at === undefined){ at = t + 1500 + q*700; nextAt.set(c.id, at); }
+        if (t >= at){ fire(c); nextAt.set(c.id, t + (held ? 7000 : 16000) + q*300); } });
+    }, 400);
+    return {
+      fire, clicks: () => clickN,
+      click(m){ const c = LAST && LAST.cores.find(x => x.id === m.id); fire(c || { ...m, reachNow: P.coreReach }, { big: true }); nextAt.set(m.id, now() + 9000); clickN++; E.emit('coreWave', m); },
+      ghost(b){ const k = b ? b.i + ',' + b.j : ''; if (k === (ghost ? ghost.i + ',' + ghost.j : '')) return; ghost = b ? { i: b.i, j: b.j, w: b.w, h: b.h, reachNow: P.coreReach } : null; if (ghost){ ghostAt = now(); fire(ghost, { ghost: true }); } },
+      all(big){ if (LAST) LAST.cores.forEach(c => fire(c, { big })); },
+    };
+  })();
+
+  /* ---------- thriving homes, one requirement at a time: the panel lists each with how many homes pass it, and the city lights them (green passes, red doesn't) ---------- */
+  const THR = (() => {
+    const box = el('div', 'pl-thr'); box.hidden = true; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', 'Thriving homes'); document.body.appendChild(box);
+    let sel = 'all', open = false, key = '';
+    const RQ = () => [
+      { id: 'all', name: 'Thriving', test: h => h.thriving, say: 'Homes that pass every check below' },
+      { id: 'need', name: 'Power', test: h => h.need === 1, say: 'Full power, and joined to the city' },
+      { id: 'work', name: 'Work', test: h => h.support >= .8, say: '80% of its workers have a job in reach' },
+      ...DIALS.filter(dialOn).map(d => ({ id: d, name: DNAME[d], test: h => h.eff[d] === null || h.eff[d] >= .7, say: { air: 'Clean enough air', quiet: 'Quiet enough to sleep', safety: 'No crime close by', ease: 'Doesn\'t feel watched', life: 'Things to do in reach' }[d] + ' (70% or more)' })),
+    ];
+    function draw(){
+      if (!open || !LAST) return;
+      const hs = LAST.H.filter(h => isHome(h.z)), rq = RQ(); if (!rq.some(r => r.id === sel)) sel = 'all';
+      const cur = rq.find(r => r.id === sel);
+      let html = `<div class="t"><b>Thriving homes</b><button type="button" class="x" aria-label="Close">✕</button></div><div class="nav"><button type="button" data-step="-1" aria-label="Previous">‹</button><div><b>${esc(cur.name)}</b><small>${esc(cur.say)}</small></div><button type="button" data-step="1" aria-label="Next">›</button></div><div class="rows">`;
+      for (const r of rq){ const n = hs.filter(r.test).length, f = hs.length ? n/hs.length : 0;
+        html += `<button type="button" data-r="${r.id}" aria-pressed="${r.id === sel}"><span>${esc(r.name)}</span><b>${n} / ${hs.length}</b><i><u style="width:${(100*f).toFixed(0)}%"></u></i></button>`; }
+      html += `</div><div class="k"><i style="background:${GRADE.good}"></i>passes <i style="background:${GRADE.bad}"></i>doesn't</div>`;
+      if (html !== key){ key = html; box.innerHTML = html; }
+      TINT.set(hs.map(h => ({ c: h.b.c, col: cur.test(h) ? (sel === 'all' ? '#ffd24a' : GRADE.good) : GRADE.bad })));
+    }
+    box.addEventListener('click', e => {
+      if (e.target.closest('.x')){ close(); return; }
+      const st_ = e.target.closest('[data-step]'); if (st_){ const rq = RQ(), q = rq.findIndex(r => r.id === sel); sel = rq[(q + +st_.dataset.step + rq.length) % rq.length].id; draw(); E.emit('thrPick', sel); return; }
+      const r = e.target.closest('[data-r]'); if (r){ sel = r.dataset.r; draw(); E.emit('thrPick', sel); }
+    });
+    setInterval(draw, 1200);
+    function close(){ if (!open) return; open = false; box.hidden = true; key = ''; TINT.clear(); }
+    return { on: () => open, close, open(){ if (open){ close(); return; } open = true; if (lens){ lens = null; lensSync(); VIEW.draw(); } box.hidden = false; draw(); E.emit('thrOpen'); } };
   })();
   // the hotspots, always there faintly at night once police exist, bright in the Safety lens
   const HOT = (() => {
@@ -774,9 +1013,9 @@ const PLAN = (() => {
 
   // the city's voice: the single biggest complaint right now, where, and what would help
   const voiceEl = el('button', 'pl-voice'); voiceEl.type = 'button'; voiceEl.hidden = true; document.body.appendChild(voiceEl);
-  const LENS_OF = { air: 'air', quiet: 'noise', safety: 'safety', ease: 'safety', power: 'power' };
+  const LENS_OF = { air: 'air', quiet: 'noise', safety: 'safety', ease: 'safety' };
   const PROB = {
-    power: ['outside every core\'s glow', 'place a core nearby'], isolated: ['cut off from the city', 'connect it with ground'], work: ['no work within reach', 'industry or shops nearby, or a metro stop'],
+    power: ['outside every core\'s reach', 'build inside a core\'s wave, or add a core'], isolated: ['cut off from the city', 'connect it with ground'], work: ['no work within reach', 'industry or shops nearby, or a metro stop'],
     air: ['hazy air', 'keep homes upwind of industry, or add a scrubber'], quiet: ['too loud to sleep', 'a tall building in between soaks it up'], safety: ['crime on the corner', 'police nearby, or busier lit streets'],
     ease: ['feels watched', 'fewer police here, or a Bath House'], life: ['nothing to do nearby', 'shops or a square within reach'],
   };
@@ -806,7 +1045,7 @@ const PLAN = (() => {
   }
   function voiceTick(){
     if (--voiceT > 0) return; voiceT = 15;
-    if (!st.tut.done && (TUTE.k || 0) < 4){ voiceEl.hidden = true; return; }
+    if (!st.tut.done){ voiceEl.hidden = true; return; }
     const v = topComplaint(); voice = v;
     if (!v){ voiceEl.hidden = true; return; }
     const [p, fix] = PROB[v.k];
@@ -814,7 +1053,9 @@ const PLAN = (() => {
     voiceEl.title = 'Show me'; voiceEl.hidden = false;
     if (!st.hints.voice && st.tut.done){ st.hints.voice = 1; save(); }
   }
-  voiceEl.addEventListener('click', () => { if (!voice) return; try { camGoal.set(voice.i*LOT, camGoal.y, voice.j*LOT); } catch (e) {} const l = LENS_OF[voice.k]; if (l && st.tier >= LENSES.find(x => x.id === l).at){ setLens(l); } E.emit('voice', voice); });
+  voiceEl.addEventListener('click', () => { if (!voice) return; try { camGoal.set(voice.i*LOT, camGoal.y, voice.j*LOT); } catch (e) {}
+    if (voice.k === 'power'){ let bst = null, bd = Infinity; for (const m of megaList('emitter')){ const d = megaD(Math.round(voice.i), Math.round(voice.j), m); if (d < bd){ bd = d; bst = m; } } if (bst) WAVE.click(bst); }
+    const l = LENS_OF[voice.k]; if (l && st.tier >= LENSES.find(x => x.id === l).at){ setLens(l); } E.emit('voice', voice); });
 
   // the ledger: after an edit, one line on what it changed, and for whom
   const ledgerEl = el('div', 'pl-ledger'); ledgerEl.setAttribute('role', 'status'); document.body.appendChild(ledgerEl);
@@ -892,7 +1133,7 @@ const PLAN = (() => {
       if (!LAST) return;
       { key = k; const after = trial(add); res = diff(LAST, after); res.after = after; shownAt = performance.now();
         // its lens comes on while it's held (industry and scrubbers: Air; police: Safety; a club or a scrubber's noise: Noise)
-        const lt = add.mega === 'police' || add.mega === 'lidar' ? 'safety' : add.mega === 'scrubber' || add.z === 'I' || add.mega === 'foundry' || add.mega === 'greenhouse' ? 'air' : add.mega === 'club' || add.mega === 'logistics' ? 'noise' : add.mega === 'emitter' ? 'power' : null;
+        const lt = add.mega === 'police' || add.mega === 'lidar' ? 'safety' : add.mega === 'scrubber' || add.z === 'I' || add.mega === 'foundry' || add.mega === 'greenhouse' ? 'air' : add.mega === 'club' || add.mega === 'logistics' || add.z === 'C' ? 'noise' : null;
         const ok = lt && st.tier >= LENSES.find(l => l.id === lt).at ? lt : null; if (ok !== lensTemp && !lens){ lensTemp = ok; pvLens = true; lensSync(); VIEW.draw(); }
         // a beam over each home it changes
         let n = 0;
@@ -903,14 +1144,15 @@ const PLAN = (() => {
         const exact = built('spire'), t = res.tot, v = exact ? Math.round(t) : Math.round(t/5)*5;
         const up = t >= 1, dn = t <= -1, f = res.main && CAUSE[up ? 'up' : 'dn'][res.main];
         chipEl.className = 'pl-chip ' + (up ? 'up' : dn ? 'dn' : 'flat');
-        chipEl.innerHTML = (up || dn) ? `${exact ? '' : '≈ '}${up ? '+' : '−'}${fmt(Math.abs(v || (up ? 5 : 5)))}<small>${esc(f ? f(res.by[res.main].n) : '')}</small>` : `±0<small>no homes change</small>`;
+        chipEl.innerHTML = (up || dn) ? `${up ? '+' : '−'}${fmt(Math.abs(v || 5))} residents<small>${exact ? '' : 'about · '}${esc(f ? f(res.by[res.main].n) : '')}</small>` : `No change<small>no homes gain or lose people</small>`;
         E.emit('preview', res);
       }
       chipEl.hidden = false;
     }
-    return { show, clear, get shownFor(){ return res ? performance.now() - shownAt : 0; } };
+    return { show, clear, get shownFor(){ return res ? performance.now() - shownAt : 0; }, get lensOn(){ return pvLens; } };
   })();
   E.previewMs = () => PV.shownFor;
+  const pvLensOn = () => PV.lensOn;
   // a zone held over a plot (world.js showHover), a megastructure's footprint (showMegaGhost)
   let pvXY = [0, 0];
   addEventListener('pointermove', e => { pvXY = [e.clientX, e.clientY]; }, { passive: true });
@@ -929,48 +1171,78 @@ const PLAN = (() => {
   wrap('showMegaGhost', function (orig, kind, cell, turned){
     const r = orig(kind, cell, turned);
     try {
-      if (!kind || !cell){ PV.clear(); return r; }
+      if (!kind || !cell){ PV.clear(); WAVE.ghost(null); return r; }
       const blk = megaBlockAt(kind, cell.i, cell.j, turned);
+      WAVE.ghost(kind === 'emitter' && blk.ok ? blk : null);   // (a core being placed shows how far it would reach)
       if (!blk.ok){ PV.clear(); return r; }
       PV.show({ mega: kind, i: blk.i, j: blk.j, w: blk.w, h: blk.h }, pvXY[0], pvXY[1]);
     } catch (e) { console.warn('plan preview', e); }
     return r;
   });
-  setInterval(() => { if (!(typeof S !== 'undefined' && S.zone) && !(typeof megaPick !== 'undefined' && megaPick)) PV.clear(); }, 400);
+  setInterval(() => { const mp = typeof megaPick !== 'undefined' && megaPick; if (!mp) WAVE.ghost(null); if (!(typeof S !== 'undefined' && S.zone) && !mp) PV.clear(); }, 400);
 
   /* ---------- a home, up close: its dials, the lowest one, and what would help (hover with a mouse, a tap on a touch screen) ---------- */
   const cardEl = el('div', 'pl-card'); cardEl.hidden = true; cardEl.setAttribute('role', 'dialog'); document.body.appendChild(cardEl);
   let cardFor = null, cardPinned = false;
   function hideCard(){ cardEl.hidden = true; cardFor = null; cardPinned = false; }
+  let cardXY = [0, 0];
   function homeCard(c, x, y){
     const b = B.get(keyOf(c)), h = b && b.h; if (!h) return false;
-    const w = isHome(h.z) ? worstOf(h) : null, ppl = Math.round(b.occ/h.floors*(h.people || 0));
+    const home = isHome(h.z), w = home ? worstOf(h) : null, ppl = home ? Math.round(b.occ/h.floors*(h.people || 0)) : 0;
     let html = `<div class="t"><b>${ZNAME[h.z]}</b><span>${h.floors} level${h.floors > 1 ? 's' : ''}</span></div>`;
-    if (isHome(h.z)){
+    const notes = [];
+    if (home){
       html += `<div class="t"><span>${fmt(ppl)} of ${fmt(h.people)} residents</span></div>`;
       if (h.thriving) html += `<span class="tag">Thriving</span>`;
+      const pass = (d, v) => v >= (d === 'work' ? .8 : .7);
       const rows = [['work', h.support], ...DIALS.filter(d => h.eff[d] !== null).map(d => [d, h.eff[d]])];
-      html += `<div class="d">` + rows.map(([d, v]) => `<span class="${d === w ? 'lo' : ''}">${DNAME[d]}</span><div class="bar ${d === w ? 'lo' : ''}"><i style="width:${(100*clamp01(v)).toFixed(0)}%"></i></div>`).join('') + `</div>`;
+      html += `<div class="d">` + rows.map(([d, v]) => { const cls = d === w ? 'lo' : pass(d, v) ? '' : 'mid'; return `<span class="${cls}">${DNAME[d]}</span><div class="bar ${cls}"><i style="width:${(100*clamp01(v)).toFixed(0)}%"></i><u style="left:${d === 'work' ? 80 : 70}%"></u></div>`; }).join('') + `</div>`;
+      if (!h.powered) notes.push(['bad', 'No power: outside every core\'s wave']); else if (h.edge) notes.push(['mid', 'At the edge of a core\'s reach: 80% power']);
+      if (h.isolated) notes.push(['bad', 'Cut off: join it to the city with ground']);
+      if (h.crime > .12) notes.push(['bad', 'Crime nearby']);
+      if (h.unhappy >= .45 && ppl > 0) notes.push(['bad', 'Unhappy: may turn to crime']);
       html += w ? `<div class="fix">${esc(PROB[w][1][0].toUpperCase() + PROB[w][1].slice(1))}</div>` : `<div class="fix ok">Happy here</div>`;
     } else {
       html += `<div class="t"><span>${h.powered ? h.isolated ? 'Cut off' : Math.round(h.fill*100) + '% busy' : 'No power'}</span></div>`;
-      if (!h.powered || h.isolated) html += `<div class="fix">${esc(h.isolated ? PROB.isolated[1] : PROB.power[1])}</div>`;
+      if (!h.powered || h.isolated) notes.push(['bad', h.isolated ? PROB.isolated[1] : PROB.power[1]]);
+      if (h.z === 'I') notes.push(['mid', 'Gives work · breathes haze downwind']);
+      if (h.z === 'C') notes.push(['mid', h.floors >= 3 ? 'Tall shops are louder, and draw fewer visitors per level' : 'Gives work and things to do · a little noise']);
     }
-    cardEl.innerHTML = html; cardEl.hidden = false; cardFor = c;
-    if (!TOUCHY){ const r = cardEl.getBoundingClientRect(); cardEl.style.left = Math.min(innerWidth - r.width - 8, x + 18) + 'px'; cardEl.style.top = Math.max(8, Math.min(innerHeight - r.height - 8, y + 12)) + 'px'; }
+    if (h.shade > .2) notes.push(['mid', 'Shields the homes behind it from haze, and breathes some of it']);
+    if (notes.length) html += `<div class="nt">` + notes.map(([k, t]) => `<div class="${k}">${esc(t)}</div>`).join('') + `</div>`;
+    if (cardEl.innerHTML !== html) cardEl.innerHTML = html;
+    cardEl.hidden = false; cardFor = c;
+    if (!TOUCHY && x !== undefined){ cardXY = [x, y]; const r = cardEl.getBoundingClientRect(); cardEl.style.left = Math.min(innerWidth - r.width - 8, x + 18) + 'px'; cardEl.style.top = Math.max(8, Math.min(innerHeight - r.height - 8, y + 12)) + 'px'; }
     E.emit('card', c);
     return true;
   }
   E.tapInfo = pk => { const c = pk && pk.c && !pk.c.mega ? pk.c : null; if (!c || !homeCard(c)) return false; cardPinned = true; return true; };   // (a tap pins it: the next tap elsewhere closes it)
-  // with a mouse: rest the pointer on a building with nothing picked
-  let hovT = 0, hovC = null;
+  // with a mouse: rest the pointer on a building with nothing picked. A box test against the buildings (not the full pick, which reads every
+  // triangle), once a frame at most, so the card follows the pointer without a wait
+  const ray_ = new THREE.Raycaster(), ndc_ = new THREE.Vector2(), bx_ = new THREE.Box3(), hit_ = new THREE.Vector3();
+  function buildingAt(x, y){
+    const r = viewRect(); ndc_.set(((x - r.left)/r.width)*2 - 1, -((y - r.top)/r.height)*2 + 1); ray_.setFromCamera(ndc_, cam);
+    let best = null, bt = Infinity;
+    for (const b of B.values()){ const c = b.c, y0 = c.lift ? c.lift.y - .2 : CURB - .1, y1 = Math.max(y0 + .6, c.height || CURB + 3);
+      bx_.min.set(c.x - SIDE/2, y0, c.z - SIDE/2); bx_.max.set(c.x + SIDE/2, y1, c.z + SIDE/2);
+      if (ray_.ray.intersectBox(bx_, hit_)){ const t = hit_.distanceToSquared(ray_.ray.origin); if (t < bt){ bt = t; best = c; } } }
+    return best;
+  }
+  let hovT = 0, hovC = null, hovE = null, hovRaf = 0;
   if (!TOUCHY) addEventListener('pointermove', e => {
     if (cardPinned) return;
-    clearTimeout(hovT);
-    const busy = (typeof S !== 'undefined' && S.zone) || (typeof megaPick !== 'undefined' && megaPick) || (typeof delMode !== 'undefined' && delMode) || (typeof hwMode !== 'undefined' && (hwMode || mtMode)) || (typeof TITLE !== 'undefined' && TITLE.on);
-    if (busy || e.target !== (typeof canvas !== 'undefined' ? canvas : null)){ if (!cardEl.hidden && !cardEl.contains(e.target)) hideCard(); return; }
-    hovT = setTimeout(() => { try { const pk = pickAtSoft(e.clientX, e.clientY); const c = pk && pk.c && !pk.c.mega && pk.c.sections.length ? pk.c : null; if (c){ hovC = c; homeCard(c, e.clientX, e.clientY); } else hideCard(); } catch (err) {} }, 260);
+    hovE = e; if (hovRaf) return;
+    hovRaf = requestAnimationFrame(() => { hovRaf = 0; const ev = hovE; if (!ev) return;
+      const busy = (typeof S !== 'undefined' && S.zone) || (typeof megaPick !== 'undefined' && megaPick) || (typeof delMode !== 'undefined' && delMode) || (typeof hwMode !== 'undefined' && (hwMode || mtMode)) || (typeof TITLE !== 'undefined' && TITLE.on);
+      if (busy || ev.target !== (typeof canvas !== 'undefined' ? canvas : null)){ clearTimeout(hovT); hovC = null; if (!cardEl.hidden && !cardEl.contains(ev.target) && !cardFor?.kind) hideCard(); return; }
+      let c = null; try { c = buildingAt(ev.clientX, ev.clientY); } catch (err) {}
+      if (c && c === hovC){ if (!cardEl.hidden) homeCard(c, ev.clientX, ev.clientY); return; }
+      hovC = c; clearTimeout(hovT);
+      if (c) hovT = setTimeout(() => { if (hovC === c) homeCard(c, ev.clientX, ev.clientY); }, cardEl.hidden ? 70 : 0);
+      else hovT = setTimeout(() => { if (!hovC && !cardPinned) hideCard(); }, 120); });
   }, { passive: true });
+  // the card's numbers move with the city: refreshed while it's open on a building
+  setInterval(() => { if (!cardEl.hidden && cardFor && !cardFor.kind && cells.get(keyOf(cardFor)) === cardFor) homeCard(cardFor, TOUCHY ? undefined : cardXY[0], cardXY[1]); }, 1000);
 
   /* ---------- tuning: a core, a police station or a scrubber picks how it runs; the Grid picks its song ---------- */
   const FORKS = {
@@ -1002,6 +1274,7 @@ const PLAN = (() => {
     cardEl.innerHTML = html; cardEl.hidden = false; cardPinned = true; cardFor = m; cardAt(m);
   }
   function gridCard(m){
+    if (!st.hints.gridSong){ st.hints.gridSong = 1; save(); }
     const push = songPush();
     let html = `<div class="t"><b>Broadcast</b><button type="button" class="x" aria-label="Close">✕</button></div><div class="opts">`;
     for (const p of PRESETS){ const open = dialOn(p.dial) && (!p.at || st.tier >= p.at); if (!open) continue; html += `<button type="button" data-p="${p.id}" aria-pressed="${st.preset === p.id}"><b>${p.name}</b><small>${p.sub}</small></button>`; }
@@ -1024,6 +1297,7 @@ const PLAN = (() => {
   setInterval(() => { if (!st.refit) return; for (const id in st.refit){ const r = st.refit[id]; if (now() >= r.at){ st.forks[id] = r.v; delete st.refit[id]; ledgerMark(); save(); if (cardFor && cardFor.id === id) forkCard(cardFor); } } }, 1000);
   E.megaClick = m => {
     if (!m) return false;
+    if (m.kind === 'emitter'){ WAVE.click(m); const f = FORKS.emitter; if (st.tier >= f.tier) forkCard(m); return true; }   // (a click on a core: its wave, and its tuning once that's open)
     if (m.kind === 'radio' && st.tier >= 0){ gridCard(m); return true; }
     const f = FORKS[m.kind]; if (f && st.tier >= f.tier){ forkCard(m); return true; }
     return false;
@@ -1035,8 +1309,10 @@ const PLAN = (() => {
   const anyB = f => { for (const b of B.values()) if (f(b)) return true; return false; };
   const HINTS = {
     isolated: { say: 'That building is cut off.', sub: 'Nobody can reach it. Join it to the city with ground.', on: () => anyB(b => b.isolated) },
-    power: { say: 'Out of power.', sub: 'It sits outside every core\'s glow. Place a core nearer.', on: () => anyB(b => !b.isolated && !b.powered) },
+    power: { say: 'Out of power.', sub: 'It sits outside every core\'s wave. Click a core to see how far it reaches, or place another core.', on: () => anyB(b => !b.isolated && !b.powered) },
     work: { say: 'Homes need work within reach.', sub: 'Industry and shops give jobs. Only residents with work count toward the next goal.', on: () => anyB(b => isHome(b.z) && b.powered && !b.isolated && b.h.support < .4), wait: 25 },
+    shade: { say: 'That tower is shading haze.', sub: 'Homes behind it breathe easier, but its own residents breathe more of it. Unhappy, they may turn to crime.', on: () => anyB(b => isHome(b.z) && b.h.shade > .3 && b.occ > 0), wait: 6 },
+    gridSong: { say: 'Click the Grid to pick its song.', sub: 'Each song lifts one comfort and lowers another for homes nearby. The Acoustic Panel lets you shape your own.', on: () => built('radio') && !st.preset, wait: 15 },
   };
   let hintUntil = 0; const since = {};
   function hint(k){
@@ -1051,21 +1327,28 @@ const PLAN = (() => {
     if (st.tut.done && !celebrating && st.tier > 0 && !st.intro[st.tier] && !noteTut && now() > hintUntil){ st.intro[st.tier] = 1; save(); const t = INTRO[st.tier]; if (t){ showNote(t[0], t[1], t[2], 12000); if (t[3]) LENSES.forEach(l => { if (l.id === t[3]) { const b = lensEl.querySelector(`[data-l="${l.id}"]`); if (b) b.classList.add('fresh'); } }); } }
   }
   const INTRO = {
-    1: ['New: Air Scrubber, Town Square and Wire Nest.', 'Click a core to tune it. The Wire Nest lets the city tell you what it needs.', null],
-    2: ['Noise has arrived.', 'The metro carries people to far jobs, but its tracks are loud. Tall buildings in between soak up sound.', null, 'noise'],
-    3: ['Crime appears where busy streets go unwatched.', 'Police help. Too many, and people feel watched. Busy, lit streets help too.', null, 'safety'],
+    1: ['The Psycho-Acoustic Grid is open.', 'Place it from the Buildings menu. Its music lifts one comfort and lowers another for homes within 7 tiles. Cores can be tuned now too: click one.', null],
+    2: ['The metro is open.', 'It carries people to far jobs and shops. Tracks and stations are loud: keep homes a few tiles off.', null],
+    3: ['Police are open.', 'They push crime away. Too many near homes and people feel watched: a new comfort, Ease.', null, 'safety'],
     4: ['Nights matter now.', 'The Neon Dome brings life after dark, and noise. The Grid\'s broadcast reaches farther.', null],
     5: ['Perimeters and police drones.', 'Walls stop crime spreading, but ordinary homes inside feel boxed in. The LIDAR Array forecasts crime.', null],
     6: ['Luxury homes and corps.', 'Luxury wants quiet, clean air and corps jobs, and doesn\'t mind being watched. Corps push ordinary rents up.', null],
     7: ['Sky highways.', 'Drop-offs bring visitors and life to shops, and noise to homes nearby.', null],
     8: ['The Data Spire.', 'Its forecasts are exact. Through it, the coast.', null],
   };
-  function showNote(say_, sub, at, ms){
+  function showNote(say_, sub, at, ms, act){
     noteEl.className = 'pl-note'; noteEl.innerHTML = ''; const s1 = el('span', 'say'); s1.textContent = say_; const s2 = el('span', 'sub'); s2.textContent = sub;
     const row = el('div', 'row'), ok = el('button', 'go', 'Got it'); ok.type = 'button'; ok.onclick = () => { noteEl.hidden = true; hintUntil = now() + 4000; };
-    row.append(el('div', ''), (() => { const d = el('div', ''); d.append(ok); return d; })());
+    const bt = el('div', ''); if (act){ const a = el('button', '', act.label); a.type = 'button'; a.onclick = () => { noteEl.hidden = true; hintUntil = now() + 4000; act.fn(); }; bt.append(a); } bt.append(ok);
+    row.append(el('div', ''), bt);
     noteEl.append(s1, s2, row); noteEl.hidden = false; hintUntil = now() + ms; clearTimeout(noteT); noteT = setTimeout(() => { if (!noteTut) noteEl.hidden = true; }, ms);
   }
+
+  // the first crime: said once, with the way to see it
+  E.onEv('crime', d => { if (!d || !d.first || st.hints.crime) return; st.hints.crime = 1; save();
+    const go = () => { if (noteTut || celebrating){ setTimeout(go, 4000); return; }
+      showNote('Crime has started.', 'Unhappy homes nearby. Point at them to see why: fix that and it fades. Left alone, it spreads.', null, 15000, { label: 'Show me', fn: () => { try { camGoal.set(d.i*LOT, camGoal.y, d.j*LOT); } catch (e) {} setLens('safety'); } }); };
+    go(); });
 
   /* ---------- a new tier: a ring of light from every core, the lit homes flash in a wave, and what it opens ---------- */
   let celebrating = false;
@@ -1083,10 +1366,7 @@ const PLAN = (() => {
     try { if (typeof sfx !== 'undefined'){ sfx.play('megaArrive', { gain: .55, spread: 0 }); if (sfx.tone) [0, 4, 7, 12, 16].forEach((n, q) => sfx.tone(392*Math.pow(2, n/12), { gain: .12, at: .25 + q*.11, dur: q === 4 ? 1.4 : .6 })); } } catch (e) {}
     if (typeof scene === 'undefined') return;
     const cores = megaList('emitter');
-    for (const m of cores){ const ring = new THREE.Mesh(new THREE.RingGeometry(.92, 1, 96), new THREE.MeshBasicMaterial({ color: 0x8fe8d8, transparent: true, opacity: .9, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
-      ring.rotation.x = -Math.PI/2; ring.position.set(m.x, CURB + .3, m.z); ring.layers.set(1); ring.renderOrder = 999; ring.frustumCulled = false; scene.add(ring);
-      const t0 = performance.now(), R1 = (P.coreReach + 1)*LOT;
-      (function go(){ const k = Math.min(1, (performance.now() - t0)/1600), e = 1 - Math.pow(1 - k, 2); ring.scale.setScalar(.5 + R1*e); ring.material.opacity = .9*(1 - k); if (k < 1) requestAnimationFrame(go); else { scene.remove(ring); ring.geometry.dispose(); ring.material.dispose(); } })(); }
+    WAVE.all(true);
     const lit = [...B.values()].filter(b => b.lit > 0 && !b.isolated).map(b => ({ b, d: cores.length ? Math.min(...cores.map(m => Math.hypot(b.c.x - m.x, b.c.z - m.z))) : 0 })).sort((a, c) => a.d - c.d).slice(0, 60);
     for (const { b, d } of lit) setTimeout(() => pulseLevel(b.c, b.lit, b.z, true), 1600*Math.sqrt(Math.min(1, d/((P.coreReach + 1)*LOT))));
   }
@@ -1183,15 +1463,26 @@ const PLAN = (() => {
     const homeAt = f => () => { const b = homes().find(f || (() => true)); return b ? { w: [b.c.x, ((b.c.sectionTops && b.c.sectionTops[b.c.sectionTops.length - 1]) || b.c.height || CURB + 3) + .6, b.c.z] } : null; };
     const elAt = f => () => { const e = f(); return e ? { el: e } : null; };
     const nearCore = b => megaList('emitter').some(m => megaD(b.c.i, b.c.j, m) <= 2);
+    const lensBtn = id => () => lensEl.querySelector(`[data-l="${id}"]`);
+    const firstOf = z => () => { const b = [...B.values()].find(x => x.z === z); return b ? { w: [b.c.x, (b.c.height || CURB + 3) + .6, b.c.z] } : null; };
+    let cardN = 0; E.onEv('card', c => { const b = B.get(keyOf(c)); if (b && isHome(b.z)) cardN++; });
+    let thrN = 0; E.onEv('thrOpen', () => thrN++);
+    const T0 = { tiles: 0 };
     const beats = [
-      { say: 'This is your Emitter Core.', sub: 'Everything inside its glow has power.', next: true, at: coreAt, lens: 'power' },
-      { say: 'Place a home a short walk from the core.', sub: `Pick Residential, then ${tap} the ground.`, target: zoneBtn('low'), at: elAt(zoneBtn('low')), done: () => count('R') >= 1 },
-      { say: 'A little hazy that close.', sub: 'Homes like some distance from cores and industry.', next: true, at: homeAt(nearCore), skip: () => !homes().some(nearCore), lens: 'air' },
-      { say: 'Homes need work. Add industry nearby.', sub: 'Not right next door: industry brings haze.', target: zoneBtn('ind'), at: elAt(zoneBtn('ind')), done: () => count('I') >= 1 },
-      TOUCHY ? { say: 'Each build tells you what it changed.', sub: 'A short line appears at the top: who gained, and why.', next: true, at: elAt(() => document.querySelector('.pl-ledger')) }
-        : { say: 'Before you click, look.', sub: 'With a zone picked, hover over the city. Green marks homes it would help, red ones it would bother.', target: zoneBtn('low'), done: () => E.previewMs() > 1500, nextAfter: 25 },
-      { say: 'Add a shop so people have somewhere to go.', sub: 'Shops give work and life.', target: zoneBtn('mid'), at: elAt(zoneBtn('mid')), done: () => count('C') >= 1 },
-      { say: `Grow to ${TIERS[1].res} residents to unlock more.`, sub: `Only residents with work count. ${TOUCHY ? 'Tap' : 'Rest the pointer on'} any home to see what it needs.`, next: true, last: true, target: () => goalEl, at: elAt(() => goalEl) },
+      { say: 'This is your power core.', sub: `The grid wave shows how far its power reaches: build inside it. ${TOUCHY ? 'Tap' : 'Click'} the core any time to see the wave again.`, at: coreAt, done: () => WAVE.clicks() > 0, nextAfter: 8, onShow: () => WAVE.all(true) },
+      { say: 'Place a home inside the wave.', sub: `Pick Residential, then ${tap} the ground.`, target: zoneBtn('low'), at: elAt(zoneBtn('low')), done: () => count('R') >= 1 },
+      TOUCHY ? { say: 'After each build, the top line says what changed.', sub: 'How many residents the city gained or lost, and the main reason.', next: true, at: elAt(() => document.querySelector('.pl-ledger')) }
+        : { say: 'Read the tag before you build.', sub: 'With a zone picked, point at the ground. The tag says how many residents the city would gain (+) or lose (−) by building there, and why. Green and red beams mark the homes it changes.', target: zoneBtn('low'), done: () => E.previewMs() > 1800, nextAfter: 20 },
+      { say: `${TOUCHY ? 'Tap' : 'Point at'} a home to see what it needs.`, sub: (TOUCHY ? 'With no zone picked, tap a home. ' : 'With no zone picked (Esc), point at a home. ') + 'Each bar is one need; the line marks enough. The orange one holds it back most, and the note under it says what would help.', at: homeAt(), done: () => cardN > 0, nextAfter: 25 },
+      { say: 'Homes need work. Add industry.', sub: 'Industry gives jobs, but breathes out haze that drifts with the wind.', target: zoneBtn('ind'), at: elAt(zoneBtn('ind')), done: () => count('I') >= 1 },
+      { say: 'Open the Air view to see the haze.', sub: `Views show what you can't see. Switch with these buttons${TOUCHY ? '' : ', or press V'}.`, target: lensBtn('air'), at: elAt(lensBtn('air')), done: () => (lens || lensTemp) === 'air' && !pvLensOn(), nextAfter: 20 },
+      { say: 'Hot colors are thick haze.', sub: 'Pulsing rings mark where it comes from. Homes glow green, amber or red by how clean their air is.', next: true, at: firstOf('I') },
+      { say: 'Make distance with ground tiles.', sub: TOUCHY ? 'With no zone picked, tap the empty space beside the island to add a tile.' : 'With no zone picked (Esc), click the water beside the island to add a tile.', done: () => tilesN > T0.tiles, nextAfter: 25, onShow: () => { T0.tiles = tilesN; } },
+      { say: 'Farther is cleaner, but a longer walk.', sub: 'Away from industry: less haze and noise. But jobs and shops only reach so far, and the outer edge of a core\'s wave (amber) gives less power.', next: true },
+      { say: 'Tall buildings block haze.', sub: 'Three levels or more shield the homes up to 3 tiles behind them. But the people inside breathe what they block, and unhappy residents turn to crime.', next: true },
+      { say: 'Add a shop so people have things to do.', sub: 'Shops give work and things to do. Taller shops are louder and draw fewer visitors per level.', target: zoneBtn('mid'), at: elAt(zoneBtn('mid')), done: () => count('C') >= 1 },
+      { say: 'Now check the Noise view.', sub: 'Rings spread out from loud places, and the bright spots are the sources. Homes want quiet. Tall buildings soak up sound too.', target: lensBtn('noise'), at: elAt(lensBtn('noise')), done: () => (lens || lensTemp) === 'noise' && !pvLensOn(), nextAfter: 20 },
+      { say: `Next: ${TIERS[1].res} residents and ${TIERS[1].thr} thriving homes.`, sub: `Only residents with work count. ${TOUCHY ? 'Tap' : 'Click'} Thriving homes to see which homes miss what.`, target: () => goalEl.querySelector('[data-thr]'), at: elAt(() => goalEl), done: () => thrN > 0, next: true, last: true },
     ];
     const U = { k: st.tut.done ? beats.length : Math.min(st.tut.step || 0, beats.length) };
     let lit = null, shownAt = 0;
@@ -1208,6 +1499,7 @@ const PLAN = (() => {
       const row = el('div', 'row'), btns = el('div', ''); const skip = el('button', '', 'Skip'); skip.type = 'button'; skip.onclick = finish; btns.append(skip);
       if (b.next){ const go = el('button', 'go', b.last ? 'Got it' : 'Next'); go.type = 'button'; go.onclick = advance; btns.append(go); }
       row.append(prog, btns); noteEl.append(s1, s2, row); noteEl.hidden = false; shownAt = now();
+      if (b.onShow) try { b.onShow(); } catch (e) {}
       if (b.lens && !lens){ lensTemp = b.lens; lensSync(); VIEW.draw(); }
       refresh();
     }

@@ -22,7 +22,11 @@ things go. Design doc: the owner's Claude doc "Neon Terrarium: Placement Puzzle 
 
 - `fill = levels x needs x max(0.3, support) x (0.4 + 0.6 x comfort) x rent`. Only the supported share counts toward tiers
   (`counted = fill x people x support / max(0.3, support)`), so towers with no jobs glow but don't progress.
-- Needs: powered (inside a core's reach; the last 2 plots flicker at 80%), and reachable (not isolated).
+- Needs: powered and reachable (not isolated). Power: inside a core's reach (the last 2 plots at 80%) and within its load. Each core powers
+  `P.coreCap` (60); a level draws `P.draw` (home 1, shop and luxury 1.5, industry 2, corps 2.5) x (1 + 0.15 per extra level). Buildings nearest a
+  core are served first, each by the nearest core in reach with room; the rest go dark, and a dark building gives no jobs, shops or pollution.
+- Taller industry: 10% more jobs per extra level, pollution reaches 4 plots from four levels up, and its pollution passes over any building
+  shorter than it (only a blocker at least as tall, and three levels or more, shades it).
 - Support (jobs, 0 to 1) and Life (things to do) are shared out by capacity: each place's capacity over everyone in its reach, full pull close
   in and about half over the last few plots of its reach. Metro stops join everyone near a stop to everything near any stop. A Logistics
   Hub shuttles up to 300 workers to industry near it from homes within 12 plots.
@@ -52,10 +56,12 @@ Unlocks in `TIERS[].opens`. Tiers, once reached, are kept; counts are smoothed o
 
 ## Interface
 
-- Power has no view: each core sends a hologram grid wave (cyan lines, a pink front, the furnish pod's colors) over its whole reach, water
-  included, every 16 s (7 s while something is held to place), at once when the core is clicked, and looping under a core being placed. The
-  last two plots of a reach, at 80% power, are amber.
-- Views (V cycles): Air, a weather-radar field (blue, green, yellow, orange, red, magenta, white as haze thickens, grains drifting with the
+- Planner hides the force-field dome over cores (`fieldPlan` returns nothing). Power has no view: each core sends a hologram grid wave (cyan lines, a pink front, the furnish pod's colors) over its whole reach, water
+  included, when it's clicked, looping under a core being placed, and from every core when a goal is reached (never on its own). The last two
+  plots of a reach, at 80% power, are amber. The core's card shows its load and its tuning; a refit takes 20 s and counts down.
+- Names: needs are Jobs, Clean air, Quiet, Safety, Privacy, Things to do; the word is pollution, never haze. The goal card has a City
+  balance: residents living out of room, and jobs and things to do against what a full city would need (short, balanced, spare).
+- Views (V cycles; never switched on by placing something): Pollution, a weather-radar field (blue, green, yellow, orange, red, magenta, white as haze thickens, grains drifting with the
   wind); Noise, violet contour rings spreading out from loud places; Safety, tiles and hotspots. Sources glow and pulse; homes are lit green,
   amber or red by that measure (`TINT`: edge-lit boxes).
 - Thriving homes on the goal card opens a panel: each requirement with how many homes pass, cycled with the arrows; the city lights the homes
@@ -63,9 +69,12 @@ Unlocks in `TIERS[].opens`. Tiers, once reached, are kept; counts are smoothed o
 - Goal card, the city's voice (biggest complaint; click to go there), the ledger line after each edit, the preview tag while a zone or
   megastructure is held ("+12 residents", "about" until the Data Spire stands), the home card (hover with a quick box test, or tap), fork and
   broadcast cards, a tier celebration, one note per tier, just-in-time tips (tower shading, the Grid's song, the first crime with Show me).
-- Tutorial, thirteen short beats, most finished by doing the thing: the core wave (click it), a home, the preview tag (touch: the ledger
-  line), the home card, industry and haze, the Air view and how to read it, ground tiles for distance and its trade-off, tall buildings,
-  a shop and tall shops, the Noise view, the goal and the thriving panel. The Psycho-Acoustic Grid opens at Settled with its own note.
+- Tutorial (a new city): lays ground round the core (wind set toward +i), then fifteen steps on glowing tiles, each waiting for the player and
+  then saying what happened, with Next: click the core, a home (the preview tag), its card, industry, a home next to the industry (a mistake on
+  purpose: pollution and noise), the Pollution and Noise views, removing it, a shop, ground tiles, a home past the core's reach (no power),
+  tall buildings, the tutorial building the rest (3 homes, 2 industry, 2 shops: 3 of 3 thriving, 144 residents, one home short of Settled),
+  the balance bars, the goal and the thriving panel. On a city already built, replaying gives the same lessons as cards. The Grid opens at
+  Settled with its own note; one-time notes for a full core, tower shading, the Grid's song and the first crime.
 
 ## Console
 

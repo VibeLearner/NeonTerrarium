@@ -19,8 +19,9 @@ const PLAN = (() => {
   const KEY = 'neonIsland.plan';
   const TOUCHY = typeof TOUCH !== 'undefined' && TOUCH.on;
   let st = null; try { st = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { st = null; }
-  function freshState(){ return { v: 1, tier: 0, fresh: true, occ: {}, best: {}, forks: {}, tut: { step: 0, done: false }, hints: {}, intro: {}, dialAt: {}, wind: Math.random()*Math.PI*2, crime: { spots: [], since: 0, n: 0, firstAt: 0 }, peak: { res: 0, thr: 0 }, corp: false, firstZ: {} }; }
+  function freshState(){ return { v: 1, tier: 0, fresh: true, occ: {}, best: {}, forks: {}, tut: { step: 0, done: false, v: 2 }, hints: {}, intro: {}, dialAt: {}, wind: Math.random()*Math.PI*2, crime: { spots: [], since: 0, n: 0, firstAt: 0 }, peak: { res: 0, thr: 0 }, corp: false, firstZ: {} }; }
   st = Object.assign(freshState(), st || {});
+  if (!st.tut || !st.tut.v){ st.tut = { step: 0, done: !!(st.tut && st.tut.done), v: 2 }; }   // (a city from the first tutorial: its step numbers mean nothing now)
   // (a city from before Quiet and Safety counted from the start: they fade in, as a newly opened comfort does)
   if (!st.fresh){ if (!st.dialAt.quiet && st.tier < 2) st.dialAt.quiet = Date.now(); if (!st.dialAt.safety && st.tier < 3) st.dialAt.safety = Date.now(); }
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} };
@@ -175,7 +176,7 @@ const PLAN = (() => {
     const dTo = (s, a, b) => { const si = Math.round(s.i), sj = Math.round(s.j); return Math.max(Math.max(si - a, 0, a - (si + (s.w || 1) - 1)), Math.max(sj - b, 0, b - (sj + (s.h || 1) - 1))); };
     const fall = (s, d) => d > s.r ? 0 : s.s*(1 - d/(s.r + 1));
     // tall: three levels or more (a megastructure by its height)
-    const LV = new Uint8Array(NN), lvOfTop = t => Math.max(1, Math.round((t - CURB)/(3*FH)));   // (levels on each plot: a megastructure by its height)
+    const LV = new Uint8Array(NN), lvOfTop = t => Math.max(1, Math.floor((t - CURB - .5)/(3*FH)) + 1);   // (levels on each plot: a megastructure by its height)
     for (const b of snap.blds) if (inG(b.i, b.j)) LV[id(b.i, b.j)] = b.floors;
     for (const m of snap.ms){ const lv = lvOfTop(m.top); for (let a = 0; a < m.w; a++) for (let q = 0; q < m.h; q++) if (inG(m.i + a, m.j + q)) LV[id(m.i + a, m.j + q)] = Math.max(LV[id(m.i + a, m.j + q)], lv); }
     // cores: their reach, drained by the scrubbers nearest each (each one less than the last, never below half)
@@ -197,10 +198,16 @@ const PLAN = (() => {
       for (const q of CB){ const da = b.i < q.x0 ? q.x0 - b.i : b.i > q.x1 ? b.i - q.x1 : 0, db = b.j < q.y0 ? q.y0 - b.j : b.j > q.y1 ? b.j - q.y1 : 0, d = da > db ? da : db;
         if (d <= q.rr){ near.push(q.c, d); if (d < dn) dn = d; } }
       cand.push({ b, d: dn, g, w: drawOf(b), near }); }
-    cand.sort((x, y) => x.d - y.d || (x.b.k < y.b.k ? -1 : x.b.k > y.b.k ? 1 : 0));
-    for (const x of cand){ let best = null, bd = Infinity;
+    const byK = (x, y) => x.b.k < y.b.k ? -1 : x.b.k > y.b.k ? 1 : 0;
+    for (const c of cores) c.refused = 0;
+    // first, each core serves the buildings it's nearest to, closest first; then the ones it couldn't take try the other cores they're in reach of
+    const mine = new Map(cores.map(c => [c, []])), over = [];
+    for (const x of cand){ let bc = null, bd = Infinity; for (let q = 0; q < x.near.length; q += 2) if (x.near[q + 1] < bd){ bd = x.near[q + 1]; bc = x.near[q]; } if (bc) mine.get(bc).push({ x, d: bd }); }
+    for (const [c, L_] of mine){ L_.sort((a_, b_) => a_.d - b_.d || byK(a_.x, b_.x)); for (const { x } of L_){ if (c.cap - c.load >= x.w - 1e-6){ c.load += x.w; PW.set(x.b.k, { v: x.g, core: c.id, w: x.w }); } else { c.refused++; over.push(x); } } }
+    over.sort((x, y) => x.d - y.d || byK(x, y));
+    for (const x of over){ let best = null, bd = Infinity;
       for (let q = 0; q < x.near.length; q += 2){ const c = x.near[q], d = x.near[q + 1]; if (c.cap - c.load < x.w - 1e-6) continue; if (d < bd){ bd = d; best = c; } }
-      if (best){ best.load += x.w; PW.set(x.b.k, { v: x.g, core: best.id, w: x.w }); } else PW.set(x.b.k, { v: 0, why: 'load', w: x.w }); }
+      if (best){ best.load += x.w; PW.set(x.b.k, { v: x.g, core: best.id, w: x.w }); } else { const ids = []; for (let q = 0; q < x.near.length; q += 2){ x.near[q].refused++; ids.push(x.near[q].id); } PW.set(x.b.k, { v: 0, why: 'load', w: x.w, cores: ids }); } }
     const lit = b => { const v = PW.get(b.k); return !!(v && v.v); };
     // who can reach what: from megastructures and stations along connected ground (hopping two plots between buildings); cut off, nobody comes
     const PLOT = new Uint8Array(NN), OCC = new Uint8Array(NN), REACH = new Uint8Array(NN), queue = [];
@@ -293,7 +300,7 @@ const PLAN = (() => {
     const stopNear = (i, j) => snap.stops.some(t => cheb(i, j, t.i, t.j) <= P.stationR);
     const hubs = snap.ms.filter(m => m.kind === 'logistics');
     let WRst = 0, WLst = 0, PEOst = 0, Whub = 0;
-    for (const b of homesB){ if (!inG(b.i, b.j)) continue; const ppl = b.floors*P.ppl[b.z], w = ppl*P.work, k = id(b.i, b.j); (b.z === 'L' ? WL : WR)[k] += w; PEO[k] += ppl;
+    for (const b of homesB){ if (!inG(b.i, b.j) || !lit(b)) continue; const ppl = b.floors*P.ppl[b.z], w = ppl*P.work, k = id(b.i, b.j); (b.z === 'L' ? WL : WR)[k] += w; PEO[k] += ppl;
       b._st = stopNear(b.i, b.j); b._hub = hubs.some(m => megaD(b.i, b.j, m) <= 12);
       if (b._st){ if (b.z === 'L') WLst += w; else WRst += w; PEOst += ppl; } if (b._hub && b.z === 'R') Whub += w; }
     const sat = A => { const S_ = new Float64Array((NI + 1)*(NJ + 1)); for (let a = 0; a < NI; a++){ let row = 0; for (let b = 0; b < NJ; b++){ row += A[a*NJ + b]; S_[(a + 1)*(NJ + 1) + b + 1] = S_[a*(NJ + 1) + b + 1] + row; } } return S_; };
@@ -332,7 +339,7 @@ const PLAN = (() => {
     const jobK = new Map(), lifeK = new Map(); for (const s of jobsS) if (s.k) jobK.set(s.k, s); for (const s of lifeS) if (s.k) lifeK.set(s.k, s);
     for (const b of snap.blds){
       const pv = PW.get(b.k) || { v: 0, why: 'reach' }, pw = pv.v, edge = pw === 1;
-      const h = { b, k: b.k, z: b.z, floors: b.floors, isolated: !REACH[id(b.i, b.j)], powered: pw > 0, edge, overload: pv.why === 'load', draw: pv.w || drawOf(b), shade: inG(b.i, b.j) ? BLK[id(b.i, b.j)] : 0 };
+      const h = { b, k: b.k, z: b.z, floors: b.floors, isolated: !REACH[id(b.i, b.j)], powered: pw > 0, edge, overload: pv.why === 'load', overCores: pv.cores || null, draw: pv.w || drawOf(b), shade: inG(b.i, b.j) ? BLK[id(b.i, b.j)] : 0 };
       h.need = !h.powered || h.isolated ? 0 : edge ? .8 : 1;
       H.push(h);
       if (!isHome(b.z)){
@@ -599,7 +606,7 @@ const PLAN = (() => {
     return m;
   });
   // Clear island: a fresh start, so a new starter core, and the old city's hotspots, refits and choices go with it
-  wrap('clearIsland', function (orig, ...a){ const r = orig(...a); st.fresh = true; st.crime.spots.length = 0; st.refit = {}; st.forks = {}; booted = false; BASE = null; REV++; save(); return r; });
+  wrap('clearIsland', function (orig, ...a){ const r = orig(...a); if (!st.tut.done){ st.tut = { step: 0, done: false, v: 2 }; setTimeout(() => { try { TUTE.restart(); } catch (e) {} }, 0); } st.fresh = true; st.crime.spots.length = 0; st.refit = {}; st.forks = {}; booted = false; BASE = null; REV++; save(); return r; });
   wrap('fieldPlan', function (){ return []; });   // (no force-field dome over the cores here: their reach is the grid wave)
   wrap('maybeSpawnMegas', function (){ /* nothing arrives on its own here: the tiers open things, the player places them */ });
   wrap('mtApply', function (orig, t){ if (t && t.ok && st.tier < 2){ say('The metro opens at ' + TIERS[2].name); return false; } ledgerMark(); return orig(t); });
@@ -677,7 +684,7 @@ const PLAN = (() => {
   .pl-card .opts button[aria-pressed="true"] { border-color: var(--p-acc); background: rgba(143,232,216,.1); } .pl-card .opts button[disabled] { opacity: .45; cursor: default; }
   .pl-card .x { all: unset; cursor: pointer; color: var(--p-dim); padding: 0 2px; } .pl-card .x:hover { color: #fff; }
   .pl-card .load { margin-top: 9px; } .pl-card .load > div:first-child { display: flex; justify-content: space-between; } .pl-card .load span { color: var(--p-dim); font-size: 11px; } .pl-card .load b.bad { color: var(--p-bad); }
-  .pl-card .bar { height: 4px; background: rgba(255,255,255,.1); margin-top: 4px; } .pl-card .bar i { display: block; height: 100%; background: var(--p-acc); } .pl-card .bar.mid i { background: #ffc24a; } .pl-card .bar.bad i { background: var(--p-bad); }
+  .pl-card .load .bar, .pl-card .fix .bar { height: 4px; background: rgba(255,255,255,.1); margin-top: 4px; } .pl-card .bar i { display: block; height: 100%; background: var(--p-acc); } .pl-card .bar.mid i { background: #ffc24a; } .pl-card .bar.bad i { background: var(--p-bad); }
   .pl-card .load small { display: block; margin-top: 5px; color: var(--p-dim); font-size: 10.5px; } .pl-card .fix .bar { margin-top: 6px; }
   .pl-card .row { display: flex; gap: 6px; margin-top: 9px; } .pl-card .row button { all: unset; cursor: pointer; font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--p-acc); padding: 6px 0; }
   .pl-note { position: fixed; z-index: 7; width: min(330px, calc(100vw - 24px)); box-sizing: border-box; font: 14px/1.45 'JetBrains Mono', monospace; color: var(--p-txt); background: rgba(11,10,18,.96); border: 1px solid rgba(143,232,216,.4); border-left: 3px solid var(--p-acc); padding: 12px 14px; right: 18px; bottom: 150px; }
@@ -756,35 +763,45 @@ const PLAN = (() => {
   { const bd = el('div', 'pl-badge', 'Planner'); bd.setAttribute('aria-hidden', 'true'); document.body.appendChild(bd); }
   // the goal: the next tier, its two bars
   const goalEl = el('div', 'pl-goal'); goalEl.setAttribute('role', 'status'); goalEl.setAttribute('aria-label', 'Next goal'); document.body.appendChild(goalEl);
+  // (built once per shape; the numbers, bars and colors are then set in place, so a highlight on it keeps going and a click on it is never lost)
   let goalKey = '';
   function goal(){
     const r = E.r || { res: 0, thr: 0 }, done = st.tier >= TIERS.length - 1, nt = TIERS[Math.min(st.tier + 1, TIERS.length - 1)];
+    const V = {}, W = {}, C = {};
     let html;
-    if (done) html = `<div class="k"><span>${esc(TIERS[st.tier].name)}</span><button type="button" data-help aria-label="Replay the tutorial">?</button></div><div class="n">${fmt(r.res)} residents</div><div class="r thr" data-thr role="button" tabindex="0"><div><span>Thriving homes ›</span><b>${Math.floor(r.thr + .5)}</b></div></div>`;
+    if (done){ html = `<div class="k"><span>${esc(TIERS[st.tier].name)}</span><button type="button" data-help aria-label="Replay the tutorial">?</button></div><div class="n"><span data-v="res"></span> residents</div><div class="r thr" data-thr role="button" tabindex="0"><div><span>Thriving homes ›</span><b data-v="thr"></b></div></div>`;
+      V.res = fmt(r.res); V.thr = String(Math.floor(r.thr + .5)); }
     else {
       const a = Math.min(1, r.res/nt.res), b = Math.min(1, (r.thr + .5 | 0)/nt.thr);
       html = `<div class="k"><span>Next</span><button type="button" data-help aria-label="Replay the tutorial">?</button></div><div class="n">${esc(nt.name)}</div>` +
-        `<div class="r ${a >= 1 ? 'ok' : ''}"><div><span>Residents</span><b>${fmt(Math.min(r.res, nt.res))} / ${fmt(nt.res)}</b></div><div class="bar"><i style="width:${(100*a).toFixed(1)}%"></i></div></div>` +
-        `<div class="r thr ${b >= 1 ? 'ok' : ''}" data-thr role="button" tabindex="0" title="See what each home is missing"><div><span>Thriving homes ›</span><b>${Math.min(nt.thr, r.thr + .5 | 0)} / ${nt.thr}</b></div><div class="bar"><i style="width:${(100*b).toFixed(1)}%"></i></div></div>`;
+        `<div class="r" data-c="ra" title="Residents with jobs: only they count toward goals"><div><span>Residents with jobs</span><b data-v="res"></b></div><div class="bar"><i data-w="ra"></i></div></div>` +
+        `<div class="r thr" data-c="rb" data-thr role="button" tabindex="0" title="See what each home is missing"><div><span>Thriving homes ›</span><b data-v="thr"></b></div><div class="bar"><i data-w="rb"></i></div></div>`;
+      V.res = `${fmt(Math.min(r.res, nt.res))} / ${fmt(nt.res)}`; V.thr = `${Math.min(nt.thr, r.thr + .5 | 0)} / ${nt.thr}`;
+      W.ra = `width:${(100*a).toFixed(1)}%`; W.rb = `width:${(100*b).toFixed(1)}%`; C.ra = 'r' + (a >= 1 ? ' ok' : ''); C.rb = 'r thr' + (b >= 1 ? ' ok' : '');
     }
-    html += balanceHTML();
+    html += balance(V, W, C);
     if (html !== goalKey){ goalKey = html; goalEl.innerHTML = html; }
+    for (const e of goalEl.querySelectorAll('[data-v]')){ const v = V[e.dataset.v]; if (v !== undefined && e.textContent !== v) e.textContent = v; }
+    for (const e of goalEl.querySelectorAll('[data-w]')){ const v = W[e.dataset.w]; if (v !== undefined && e.getAttribute('style') !== v) e.setAttribute('style', v); }
+    for (const e of goalEl.querySelectorAll('[data-c]')){ const v = C[e.dataset.c]; if (v !== undefined && e.className !== v) e.className = v; }
     stackLeft();
   }
   // the city's balance: how full the homes are, and whether there are too few or too many jobs and things to do for the people the homes hold
-  function balanceHTML(){
+  function balance(V, W, C){
     if (!LAST || !LAST.tot) return '';
-    const t = LAST.tot, hs = LAST.H.filter(h => isHome(h.z)); if (!hs.length) return '';
+    const t = LAST.tot, hs = LAST.H.filter(h => isHome(h.z) && h.powered); if (!hs.length) return '';
     let liv = 0, room = 0; for (const h of hs){ const b = B.get(h.k); room += h.people; liv += b ? b.occ/h.floors*h.people : 0; }
-    const row = (name, need, have, unit, tip) => {
+    const row = (key, name, need, have, tip) => {
       const d = have - need, base = Math.max(1, need), f = Math.max(-1, Math.min(1, d/base)), ok = Math.abs(d) <= .1*base;
-      const word = !need && !have ? '–' : ok ? 'balanced' : d < 0 ? `short ${fmt(-d)}` : `${fmt(d)} spare`;
-      const cls = ok ? 'ok' : d < 0 ? 'lo' : 'hi';
-      return `<div class="bl ${cls}" title="${esc(tip)}"><div><span>${name}</span><b>${word}</b></div><div class="cb"><i style="${f < 0 ? `right:50%;width:${(50*-f).toFixed(1)}%` : `left:50%;width:${(50*f).toFixed(1)}%`}"></i></div></div>`; };
+      V[key] = !need && !have ? '–' : ok ? 'balanced' : d < 0 ? `short ${fmt(-d)}` : `${fmt(d)} spare`;
+      C[key] = 'bl ' + (ok ? 'ok' : d < 0 ? 'lo' : 'hi');
+      W[key] = f < 0 ? `right:50%;width:${(50*-f).toFixed(1)}%` : `left:50%;width:${(50*f).toFixed(1)}%`;
+      return `<div class="bl" data-c="${key}" title="${esc(tip)}"><div><span>${name}</span><b data-v="${key}"></b></div><div class="cb"><i data-w="${key}"></i></div></div>`; };
+    V.bh = `${fmt(liv)} / ${fmt(room)}`; W.bh = `width:${room ? (100*liv/room).toFixed(1) : 0}%`;
     return `<div class="bal" data-bal><div class="hd">City balance</div>` +
-      `<div class="bl res" title="Residents living here, out of the room your powered homes have"><div><span>Residents</span><b>${fmt(liv)} / ${fmt(room)}</b></div><div class="fb"><i style="width:${room ? (100*liv/room).toFixed(1) : 0}%"></i></div></div>` +
-      row('Jobs', t.workers, t.jobs, 'jobs', `${fmt(t.workers)} workers (half of a full city's residents) · ${fmt(t.jobs)} jobs. Short: build industry or shops. Spare: room for more homes.`) +
-      row('Things to do', t.people, t.life, '', `${fmt(t.people)} residents if every home were full · room for ${fmt(t.life)} at shops and squares. Short: build shops. Spare: room for more homes.`) + `</div>`;
+      `<div class="bl res" title="Everyone living in your powered homes, out of the room they have"><div><span>Homes filled</span><b data-v="bh"></b></div><div class="fb"><i data-w="bh"></i></div></div>` +
+      row('bj', 'Jobs', t.workers, t.jobs, 'Workers a full city would have (half its residents) against the jobs there are. Short: build industry or shops. Spare: room for more homes.') +
+      row('bt', 'Things to do', t.people, t.life, 'Residents a full city would have against room at shops and squares. Short: build shops. Spare: room for more homes.') + `</div>`;
   }
   goalEl.addEventListener('click', e => { if (e.target.closest('[data-help]')) TUTE.replay(); else if (e.target.closest('[data-thr]')) THR.open(); });
   goalEl.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('[data-thr]')){ e.preventDefault(); THR.open(); } });
@@ -1290,13 +1307,13 @@ const PLAN = (() => {
   const FORKS = {
     emitter: { tier: 1, a: ['wide', 'Wide', 'Reaches 12 tiles · a little more pollution'], b: ['clean', 'Clean', 'Half the pollution · 9 tiles'] },
     police: { tier: 3, a: ['beat', 'Beat', 'Patrols farther · thinner, less watched'], b: ['watch', 'Watch', 'Strong close by · more watched'] },
-    scrubber: { tier: 4, a: ['quiet', 'Quiet', 'Half the noise · smaller reach'], b: ['turbo', 'Turbo', 'Bigger reach · drains more power'] },
+    scrubber: { tier: 4, a: ['quiet', 'Quiet', 'Half the noise · smaller reach'], b: ['turbo', 'Turbo', 'Bigger reach · shrinks its core\'s reach more'] },
   };
   const PRESETS = [
-    { id: 'clean', name: 'Clean Hum', dial: 'air', sub: 'Air up · Ease down', set: { freeze: 1 } },
-    { id: 'lull', name: 'Lull', dial: 'quiet', sub: 'Quiet up · Life down', set: { bpm: 60, hz: 1600, freeze: 0 } },
+    { id: 'clean', name: 'Clean Hum', dial: 'air', sub: 'Clean air up · Privacy down', set: { freeze: 1 } },
+    { id: 'lull', name: 'Lull', dial: 'quiet', sub: 'Quiet up · Things to do down', set: { bpm: 60, hz: 1600, freeze: 0 } },
     { id: 'pulse', name: 'Night Pulse', dial: 'life', sub: 'Life up · Quiet down', set: { bpm: 112, hz: 4600, freeze: 0 }, at: 4 },
-    { id: 'open', name: 'Open Air', dial: 'ease', sub: 'Ease up · Safety down', set: { rv: 1, freeze: 0 } },
+    { id: 'open', name: 'Open Air', dial: 'ease', sub: 'Privacy up · Safety down', set: { rv: 1, freeze: 0 } },
   ];
   function applyPreset(p){
     if (typeof GRIDPANEL === 'undefined' || !GRIDPANEL.el) return;
@@ -1311,9 +1328,9 @@ const PLAN = (() => {
   function forkCard(m){
     const f = FORKS[m.kind], cur = st.forks[m.id], ref = st.refit && st.refit[m.id], open = f && st.tier >= f.tier;
     let html = `<div class="t"><b>${esc(m.kind === 'emitter' ? 'Power core' : MEGA_TYPES[m.kind].name)}</b><button type="button" class="x" aria-label="Close">✕</button></div>`;
-    if (m.kind === 'emitter'){ const c = LAST && LAST.cores.find(x => x.id === m.id), ld = c ? c.load : 0, cap = c ? c.cap : P.coreCap, fr = Math.min(1, ld/cap), full = fr > .97;
+    if (m.kind === 'emitter'){ const c = LAST && LAST.cores.find(x => x.id === m.id), ld = c ? c.load : 0, cap = c ? c.cap : P.coreCap, fr = Math.min(1, ld/cap), dark = LAST ? LAST.H.filter(h => h.overload && h.overCores && h.overCores.includes(m.id)).length : 0, full = fr > .97 || (c && c.refused > 0);
       html += `<div class="load"><div><span>Power used</span><b class="${full ? 'bad' : ''}">${ld.toFixed(0)} / ${cap}</b></div><div class="bar ${full ? 'bad' : fr > .8 ? 'mid' : ''}"><i style="width:${(100*fr).toFixed(0)}%"></i></div>` +
-        `<small>${full ? 'Full: the farthest buildings go dark. Add another core.' : `Reaches ${Math.floor(c ? c.reachNow : P.coreReach)} tiles · taller buildings use more`}</small></div>`; }
+        `<small>${full ? `Full${dark ? `: ${dark} building${dark > 1 ? 's' : ''} without power` : ''}. Add another core nearby.` : `Reaches ${Math.floor(c ? c.reachNow : P.coreReach)} tiles · taller buildings use more`}</small></div>`; }
     if (open){ html += `<div class="opts">`;
       for (const o of [f.a, f.b]) html += `<button type="button" data-f="${o[0]}" aria-pressed="${(ref ? ref.v : cur) === o[0]}" ${ref ? 'disabled' : ''}><b>${o[1]}</b><small>${o[2]}</small></button>`;
       html += `</div>`;
@@ -1362,7 +1379,7 @@ const PLAN = (() => {
   const anyB = f => { for (const b of B.values()) if (f(b)) return true; return false; };
   const HINTS = {
     isolated: { say: 'That building is cut off.', sub: 'Nobody can reach it. Join it to the city with ground.', on: () => anyB(b => b.isolated) },
-    power: { say: 'Out of power.', sub: 'It sits outside every core\'s wave. Click a core to see how far it reaches, or place another core.', on: () => anyB(b => !b.isolated && !b.powered) },
+    power: { say: 'Out of power.', sub: 'It sits outside every core\'s reach. Click a core to see how far its grid goes, or place another core.', on: () => anyB(b => !b.isolated && !b.powered && !(b.h && b.h.overload)) },
     work: { say: 'Homes need work within reach.', sub: 'Industry and shops give jobs. Only residents with work count toward the next goal.', on: () => anyB(b => isHome(b.z) && b.powered && !b.isolated && b.h.support < .4), wait: 25 },
     overload: { say: 'A core is full.', sub: 'The buildings farthest from it lost power, and any jobs or shops among them stopped too. Click the core to see its load, and add another core nearby.', on: () => anyB(b => b.h && b.h.overload) },
     shade: { say: 'That tower is blocking pollution.', sub: 'Homes behind it get cleaner air, but its own residents breathe more of it. Unhappy, they may turn to crime.', on: () => anyB(b => isHome(b.z) && b.h.shade > .3 && b.occ > 0), wait: 6 },
@@ -1383,7 +1400,7 @@ const PLAN = (() => {
   const INTRO = {
     1: ['The Psycho-Acoustic Grid is open.', 'Place it from the Buildings menu. Its music lifts one comfort and lowers another for homes within 7 tiles. Cores can be tuned now too: click one.', null],
     2: ['The metro is open.', 'It carries people to far jobs and shops. Tracks and stations are loud: keep homes a few tiles off.', null],
-    3: ['Police are open.', 'They push crime away. Too many near homes and people feel watched: a new comfort, Ease.', null, 'safety'],
+    3: ['Police are open.', 'They push crime away. Too many near homes and people lose their privacy: a new need, Privacy.', null, 'safety'],
     4: ['Nights matter now.', 'The Neon Dome brings life after dark, and noise. The Grid\'s broadcast reaches farther.', null],
     5: ['Perimeters and police drones.', 'Walls stop crime spreading, but ordinary homes inside feel boxed in. The LIDAR Array forecasts crime.', null],
     6: ['Luxury homes and corps.', 'Luxury wants quiet, clean air and corps jobs, and doesn\'t mind being watched. Corps push ordinary rents up.', null],
@@ -1567,7 +1584,7 @@ const PLAN = (() => {
       { say: 'Place a home on the glowing tile.', sub: TOUCHY ? 'Pick Residential, then tap the tile.' : 'Pick Residential and point at the tile before you click: the tag shows how many residents the city would gain (+) or lose (−) by building there.',
         mark: ['H1'], zone: 'low', done: () => zoneAt(pt('H1')) === 'R',
         res: res('It barely fills.', 'Nobody has a job nearby, and only residents with jobs count toward your goals.' + (TOUCHY ? ' The line at the top says what each build changed.' : '')) },
-      { say: `${TOUCHY ? 'Tap' : 'Point at'} the home to see what it needs.`, sub: TOUCHY ? 'With no zone picked, tap the home.' : 'Press Esc so no zone is picked, then rest the pointer on the home.', mark: ['H1'],
+      { say: `${TOUCHY ? 'Tap' : 'Point at'} the home to see what it needs.`, sub: TOUCHY ? 'Tap the home.' : 'Rest the pointer on the home.', mark: ['H1'], noZone: true,
         done: () => { const c = cellAt(pt('H1')); return c && cardOn === c && !cardEl.hidden && cardFor === c; },
         onDone: () => { cardPinned = true; cardEl.classList.remove('hov'); },
         res: res('Each bar is one need.', `The line marks enough. Jobs and Things to do are short: nothing is built nearby yet. The orange bar is the biggest problem, and the note under it says what would help. ${Tap} anywhere to close the card.`) },
@@ -1579,19 +1596,19 @@ const PLAN = (() => {
         res: res('Warm colors are heavy pollution.', 'The pulsing ring is where it comes from, and the arrows show the wind. Homes glow green (fine), amber or red. Taller industry blows its pollution over shorter buildings.') },
       { say: 'Now open the Noise view.', sub: 'The button next to Pollution.', target: lensBtn('noise'), done: () => lens === 'noise',
         res: res('Rings spread from loud buildings.', 'Industry is loud, and taller shops are louder. Noise doesn\'t reach as far as pollution, and a building three levels or taller in between soaks it up.') },
-      { say: 'Remove the struggling home.', sub: TOUCHY ? 'Press and hold it.' : 'Right-click it.', mark: ['HB'], onShow: () => setLens(null), done: () => !zoneAt(pt('HB')),
+      { say: 'Remove the struggling home.', sub: TOUCHY ? 'Press and hold it.' : 'Right-click it.', mark: ['HB'], noZone: true, onShow: () => setLens(null), done: () => !zoneAt(pt('HB')),
         res: res('Gone.', 'Moving things costs nothing: build, look, and move it if it doesn\'t work.') },
       { say: 'Place a shop on the glowing tile.', sub: 'Pick Commercial.', mark: ['S1'], zone: 'mid', done: () => zoneAt(pt('S1')) === 'C',
         res: res('Things to do.', 'Shops give homes within 5 tiles somewhere to go, and a few jobs. Taller shops hold more, but each level draws fewer people, and they get louder.') },
-      { say: 'Add ground on the glowing tiles.', sub: TOUCHY ? 'With no zone picked, tap each one.' : 'Press Esc so no zone is picked, then click each one.', mark: ['W1', 'W2'],
-        done: () => !!cellAt(pt('W1')) && !!cellAt(pt('W2')),
+      { say: 'Add ground on the glowing tiles.', sub: `With no zone picked, ${TOUCHY ? 'tap' : 'click'} each one. (${TOUCHY ? 'Tap a picked zone again' : 'Press Esc'} to put a zone down.)`, mark: ['W1', 'W2'], noZone: true,
+        done: () => !!cellAt(pt('W1')) && !!cellAt(pt('W2')) && !zoneAt(pt('W1')) && !zoneAt(pt('W2')),
         res: res('Ground spreads your city out.', 'Farther from industry is cleaner and quieter. But jobs reach 8 tiles, shops 5, and power only as far as a core\'s grid.') },
       { say: 'Place a home on the farthest tile.', sub: 'Another mistake, on purpose.', mark: ['W2'], zone: 'low', done: () => zoneAt(pt('W2')) === 'R',
         res: res('No power.', `It's outside the core's reach, so it stays dark. ${Tap} the core to see where its grid ends. A second core would power it, but every core makes some pollution.`) },
       { say: 'Tall buildings block pollution.', sub: 'A building three levels or taller shields the homes up to 3 tiles behind it. But the people inside breathe what they block, and unhappy residents turn to crime, which spreads to the homes around them.', next: true },
       { say: 'Let\'s finish your starter district.', sub: 'Watch: the dark home goes, and two more homes, more industry and a second shop go up.', onShow: () => { base.auto = false; autoBuild(() => { base.auto = true; }); }, done: () => base.auto === true, min: 1500,
         res: res('Your district is running.', `People are moving in. It's one home short of your first goal: that one is up to you. ${TOUCHY ? 'Tap' : 'Point at'} any building to see how it's doing.`) },
-      { say: 'This is your city\'s balance.', sub: 'Residents: how full your homes are. Jobs and Things to do: short means build more of it, spare means there\'s room for more homes.', target: () => goalEl.querySelector('[data-bal]'), next: true },
+      { say: 'This is your city\'s balance.', sub: 'Homes filled: how many live in your homes, out of the room they have. Jobs and Things to do: short means build more of it, spare means there\'s room for more homes.', target: () => goalEl.querySelector('[data-bal]'), next: true },
       { say: `Your goal: ${TIERS[1].res} residents and ${TIERS[1].thr} thriving homes.`, sub: `${Tap} Thriving homes to see which homes miss what.`, target: () => goalEl.querySelector('[data-thr]'), done: () => thrN > base.thr,
         res: res('Check one need at a time.', 'Use the arrows: homes that pass glow green, the rest red. Replay these lessons from the ? on the goal card.'), last: true },
     ];
@@ -1628,9 +1645,18 @@ const PLAN = (() => {
       if (mode === 'guided'){
         const ps = b.mark ? b.mark.map(pt) : b.focus ? b.focus() : null;
         if (b.mark) MARK.set(ps); if (ps && ps.length) focus(ps);
+        if (b.noZone && typeof S !== 'undefined' && S.zone && typeof selectZone === 'function') try { selectZone(null); } catch (e) {}
         if (b.onShow) try { b.onShow(); } catch (e) {}
       }
-      refresh();
+      wrongSaid = false; refresh();
+    }
+    // a marked tile holding the wrong kind of building (or a building where only ground was wanted): say so, and how to undo it
+    let wrongSaid = false;
+    const ZW = { low: 'R', mid: 'C', ind: 'I' }, ZN = { R: 'a home', C: 'a shop', I: 'industry', L: 'a luxury home', K: 'corps' };
+    function wrongOn(b){
+      if (!b.mark) return null;
+      for (const k of b.mark){ const z = zoneAt(pt(k)); if (!z) continue; if (b.zone ? z !== ZW[b.zone] : b.noZone && (k === 'W1' || k === 'W2')) return z; }
+      return null;
     }
     function refresh(){
       const b = beats[U.k]; if (!b || noteEl.hidden) return;
@@ -1639,10 +1665,13 @@ const PLAN = (() => {
     }
     function check(){
       const b = beats[U.k]; if (!b || noteEl.hidden || !noteTut || mode !== 'guided' || phase !== 'do' || b.next) { refresh(); return; }
+      const wz = wrongOn(b);
+      if (wz && !wrongSaid){ wrongSaid = true; render(b, b.say, `That tile has ${ZN[wz] || 'something else'} on it. ${TOUCHY ? 'Press and hold' : 'Right-click'} it to remove it, then try again.`, null); refresh(); return; }
+      if (!wz && wrongSaid){ wrongSaid = false; render(b, b.say, b.sub, null); }
       if (now() - shownAt < (b.min || 600) || !b.done || !b.done()){ refresh(); return; }
       phase = 'res'; unpulse(); MARK.set([]);
       if (b.onDone) try { b.onDone(); } catch (e) {}
-      noteEl.classList.add('done'); render(b, b.res.say, b.res.sub, b.last ? 'Got it' : 'Next');
+      render(b, b.res.say, b.res.sub, b.last ? 'Got it' : 'Next'); noteEl.classList.add('done');
     }
     function advance(){ if (U.k === beats.length - 1){ finish(); return; } U.k++; if (mode === 'guided'){ st.tut.step = U.k; save(); } show(); }
     function end(){ unpulse(); MARK.set([]); noteTut = false; noteEl.hidden = true; noteEl.className = 'pl-note'; if (mode === 'guided' || !st.tut.done){ st.tut.done = true; st.tut.step = GUIDED.length; save(); } beats = GUIDED; U.k = GUIDED.length; }
@@ -1655,12 +1684,13 @@ const PLAN = (() => {
       // a new city: the guided district. A city already built (from before this tutorial): the lessons to read
       if ((st.tut.step || 0) === 0 && anyBuilt()){ mode = 'lessons'; beats = LESSONS; U.k = 0; show(); return; }
       mode = 'guided'; beats = GUIDED; U.k = Math.min(st.tut.step || 0, GUIDED.length);
-      if (U.k === 0){ noteTut = true; render(null, 'Laying out your first district…', 'A little ground round your core.', null); noteEl.querySelector('.n').textContent = ''; layGround(() => setTimeout(show, 500)); }
+      if (U.k === 0){ noteTut = true; render(null, 'Laying out your first district…', 'A little ground around your core.', null); noteEl.querySelector('.n').textContent = ''; layGround(() => setTimeout(show, 500)); }
       else show();
     }
     function start(){ if (st.tut.done) return; if (!gestureDone() || !ready() || !booted || !core()) return setTimeout(start, 1500); setTimeout(begin, 1200); }
     U.start = start;
-    U.replay = () => { job = null; st.tut = { step: 0, done: false }; save(); if (anyBuilt()){ mode = 'lessons'; beats = LESSONS; U.k = 0; show(); } else begin(); };
+    U.restart = () => { job = null; unpulse(); MARK.set([]); noteTut = false; noteEl.hidden = true; beats = GUIDED; U.k = 0; start(); };
+    U.replay = () => { job = null; st.tut = { step: 0, done: false, v: 2 }; save(); if (anyBuilt()){ mode = 'lessons'; beats = LESSONS; U.k = 0; show(); } else begin(); };
     return U;
   })();
   setTimeout(() => TUTE.start(), 0);

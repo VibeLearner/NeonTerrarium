@@ -1307,6 +1307,7 @@ const PLAN = (() => {
     st.preset = p.id; save();
   }
   function cardAt(m){ const p = screenOf(m.x, (m.top || CURB + 5) + 1, m.z); if (!p || TOUCHY) return; const r = cardEl.getBoundingClientRect(); cardEl.style.left = Math.max(8, Math.min(innerWidth - r.width - 8, p[0] - r.width/2)) + 'px'; cardEl.style.top = Math.max(8, p[1] - r.height - 12) + 'px'; }
+  let forkKey = '';
   function forkCard(m){
     const f = FORKS[m.kind], cur = st.forks[m.id], ref = st.refit && st.refit[m.id], open = f && st.tier >= f.tier;
     let html = `<div class="t"><b>${esc(m.kind === 'emitter' ? 'Power core' : MEGA_TYPES[m.kind].name)}</b><button type="button" class="x" aria-label="Close">✕</button></div>`;
@@ -1319,7 +1320,8 @@ const PLAN = (() => {
       if (ref){ const left = Math.max(0, Math.ceil((ref.at - now())/1000)); html += `<div class="fix">Refitting to ${esc((f.a[0] === ref.v ? f.a : f.b)[1])}: ${left}s<div class="bar"><i style="width:${(100*(1 - left/P.refit)).toFixed(0)}%"></i></div></div>`; }
       else if (cur) html += `<div class="fix ok">Pick the other to switch (${P.refit}s)</div>`; }
     if (m.kind === 'police' && typeof PRECINCT !== 'undefined') html += `<div class="row"><button type="button" data-desk>Precinct desk</button></div>`;
-    cardEl.innerHTML = html; cardEl.hidden = false; cardPinned = true; cardEl.classList.remove('hov'); cardFor = m; cardAt(m);
+    const same = cardFor === m && !cardEl.hidden && forkKey === html;   // (redrawn only when something on it changed: a redraw under the pointer would swallow a click)
+    forkKey = html; if (!same) cardEl.innerHTML = html; cardEl.hidden = false; cardPinned = true; cardEl.classList.remove('hov'); cardFor = m; if (!same) cardAt(m);
   }
   function gridCard(m){
     if (!st.hints.gridSong){ st.hints.gridSong = 1; save(); }

@@ -536,6 +536,7 @@ GLIDE.hour = h => {
     const fwd = Math.abs(((base - G.last + 24) % 24) - SUN_STEP) < 1e-6, was = G.last; G.last = base;
     if (G.phase !== 'idle') G.abort('the next step came first');
     else if (fwd && G.mode !== 'snap' && G.can()) G.start(was);
+    else if (fwd && G.mode !== 'snap'){ G.log.push(new Date().toTimeString().slice(0, 8) + ' not started: the cache was ' + SC.state + (SC.why ? ' (' + SC.why + ')' : '') + ', zoom ' + zoom.toFixed(1)); if (G.log.length > 8) G.log.shift(); }
   }
   if (G.phase === 'prep'){ const x = G.h0 + SUN_STEP*G.k/(G.n + 1); return x >= 24 ? x - 24 : x; }
   return base;
@@ -557,16 +558,19 @@ GLIDE.swapped = job => {
   if (G.lastShk && scSame(job.shk, G.lastShk)) return;   // (the light drifting, the shadows the same: not a step of the glide)
   if (scCol(G.px) < job.ox || scCol(G.px) + W > job.ox + SC.w || scRow(G.py) < job.oy || scRow(G.py) + H > job.oy + SC.h){ G.abort('the view left the picture'); return; }
   glideKeep(job.rt, job.ox, job.oy, G.keys[G.k]); G.lastShk = job.shk.slice();
-  if (++G.k > G.n + 1){ G.phase = 'play'; G.t0 = performance.now(); }
-  else if (performance.now() - G.t0 > 25000 && !window.__GLIDE_NO_LIMIT) G.abort('too slow to draw');   // (at normal speed the next step is about 37 s away)
+  if (++G.k > G.n + 1){ G.phase = 'play'; G.t0 = performance.now();
+    // (on a slow frame rate the drawing can take a while: the glide is shortened to end before the next step comes, so it isn't cut off part way)
+    const left = ((G.h0 + 2*SUN_STEP - S.hour + 48) % 24)*150/Math.max(.01, (typeof FF !== 'undefined' && FF.clock) || 1);   // (real seconds to the next step: a game hour is 150 real seconds)
+    G.playDur = Math.max(2, Math.min(G.n ? G.dur : G.fadeDur, left - 1)); }
 };
-GLIDE.abort = why => { const G = GLIDE; G.phase = 'idle'; G.why = why; };
+GLIDE.log = [];   // (the last few glides let go and why: GLIDE.log in the console, and the overlay's line)
+GLIDE.abort = why => { const G = GLIDE; if (G.phase !== 'idle'){ G.log.push(new Date().toTimeString().slice(0, 8) + ' ' + why + ' (' + G.phase + ' ' + G.k + '/' + (G.n + 1) + ', zoom ' + zoom.toFixed(1) + ', ' + W + 'x' + H + ')'); if (G.log.length > 8) G.log.shift(); } G.phase = 'idle'; G.why = why; };
 // what the view shows: null (the cache as it is), or two pictures and how far between them
 GLIDE.show = () => {
   const G = GLIDE;
   if (G.phase === 'prep') return { a: G.keys[0], b: G.keys[0], f: 0 };
   if (G.phase !== 'play') return null;
-  const t = Math.max(0, Math.min(1, (performance.now() - G.t0)/(1000*(G.n ? G.dur : G.fadeDur))));
+  const t = Math.max(0, Math.min(1, (performance.now() - G.t0)/(1000*(G.playDur || (G.n ? G.dur : G.fadeDur)))));
   if (t >= 1){ G.phase = 'idle'; G.why = 'done'; return null; }
   if (!G.n) return { a: G.keys[0], b: G.keys[1], f: t*t*(3 - 2*t) };
   const x = t*(G.n + 1), i = Math.min(G.n, Math.floor(x));

@@ -26,6 +26,14 @@ things go. Design doc: the owner's Claude doc "Neon Terrarium: Placement Puzzle 
   `P.coreCap` (60); a building draws `P.draw` (home 1, shop and luxury 1.5, industry 2, corps 2.5) x n + 0.08(n-1)^2 + 0.02(n-1)^3 for n levels
   (1, 2.1, 3.5, 5.3, 7.6, 10.5, 14.2, 18.8 for 1 to 8: gentle at first, steep up high). Buildings nearest a
   core are served first, each by the nearest core in reach with room; the rest go dark, and a dark building gives no jobs, shops or pollution.
+- Power surges (ported from Economy, `SURGE`): the next comes 8 min after the last when every core is under 60% load, down to 3 min when one
+  is full, and hits a core picked by load cubed (checked: one core at 96% took 8 of 16 surges in an hour, one every 3.8 min). Yellow, orange,
+  red, 15 s each; click the core for the trace stabilizer (4 s inside the band). Left to red it shuts down (`st.cores[id].off`): it powers
+  nothing, though other cores with room in reach pick its buildings up. Crank it back (click fast); it then reaches 6 tiles for a minute.
+  Checked: a one-core city left alone fell from 555 residents to 10 in 90 s, kept its tier, and was back to 100% 3.5 min after the crank.
+  The tutorial has a practice surge that waits (`practice`); never during the tutorial otherwise; the first comes 4 min after it.
+  Console: `PLAN.surge.start(megas.get(id))`.
+- Wording: Industrial buildings and Commercial buildings, never "industry"; rules spelled out in full.
 - Industry, n levels, strength 1.5 + 0.35(n-1): a share stays close in (1 - 0.2(n-1), at least 0.3) as a cloud of radius 3, then 2 (two or three
   levels), then 1 (four or more); the rest rides the wind as a thin trail and comes down in a radius-2 patch 2n tiles downwind, over water
   too (build there later and it lands on you). A building at least as tall as the stack (and three levels or more) on the line catches 70% of

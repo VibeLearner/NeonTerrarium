@@ -19,7 +19,7 @@ const PLAN = (() => {
   const KEY = 'neonIsland.plan';
   const TOUCHY = typeof TOUCH !== 'undefined' && TOUCH.on;
   let st = null; try { st = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { st = null; }
-  function freshState(){ return { v: 1, tier: 0, fresh: true, occ: {}, best: {}, forks: {}, tut: { step: 0, done: false, v: 2 }, hints: {}, intro: {}, dialAt: {}, wind: Math.random()*Math.PI*2, crime: { spots: [], since: 0, n: 0, firstAt: 0 }, peak: { res: 0, thr: 0 }, corp: false, firstZ: {} }; }
+  function freshState(){ return { v: 1, tier: 0, fresh: true, occ: {}, best: {}, forks: {}, tut: { step: 0, done: false, v: 2 }, hints: {}, intro: {}, dialAt: {}, wind: Math.random()*Math.PI*2, crime: { spots: [], since: 0, n: 0, firstAt: 0 }, peak: { res: 0, thr: 0 }, corp: false, firstZ: {}, cores: {}, surgeAt: 0 }; }
   st = Object.assign(freshState(), st || {});
   if (!st.tut || !st.tut.v){ st.tut = { step: 0, done: !!(st.tut && st.tut.done), v: 2 }; }   // (a city from the first tutorial: its step numbers mean nothing now)
   // (a city from before Quiet and Safety counted from the start: they fade in, as a newly opened comfort does)
@@ -35,6 +35,9 @@ const PLAN = (() => {
     walk: 8, shopWalk: 5, stationR: 2, stationJobR: 3,     // reach, in plots (Chebyshev)
     coreReach: 9, coreWide: 12, edge: 2, scrubDrain: 1.1,
     coreCap: 60, draw: { R: 1, L: 1.5, C: 1.5, I: 2, K: 2.5 },   // a core powers this much; each level draws this, taller buildings a little more per level  // a core's reach; the last 2 plots flicker (80%); each scrubber on a core drains about a plot, less each time, never below half
+    // power surges: the next one comes 8 minutes after the last when every core is under 60% load, down to 3 when one is full, and picks the
+    // most loaded core; each stage (yellow, orange, red) lasts 15 s; a core that shuts down powers nothing until cranked, then reaches 6 for a minute
+    surgeGap: [480e3, 180e3], surgeFirst: 240e3, surgeStage: 15e3, coreReachLow: 6, lowMs: 60e3,
     floorSupport: .3, refit: 20,                            // seconds a megastructure takes to switch how it runs
     shadow: 3, crimeR: 3,                                  // a tall building shades haze for this many plots behind it; crime reaches as far
     shopTall: [.75, .45],                                  // the second commercial level draws this share of the first's visitors, each one above that the second number
@@ -64,7 +67,7 @@ const PLAN = (() => {
   const dialTier = d => d === 'ease' ? 3 : 0;   // (Air, Quiet, Safety and Life from the start; Ease, the watched feeling, with police)
   const dialOn = d => st.tier >= dialTier(d);
   const ZONEK = { low: 'R', mid: 'C', high: 'L', ind: 'I' };
-  const ZNAME = { R: 'Home', L: 'Luxury home', C: 'Shop', I: 'Industry', K: 'Corps' };
+  const ZNAME = { R: 'Home', L: 'Luxury home', C: 'Commercial building', I: 'Industrial building', K: 'Corps building' };
 
   /* ---------- the Air Scrubber: a new megastructure for this mode (2 x 2, repeatable) ---------- */
   M.scBody = toon(0x7c8786); M.scBody2 = toon(0x67716f); M.scBand = toon(0x434c4d); M.scGrill = toon(0x252b2c); M.scPad = toon(0x5d6564);
@@ -180,9 +183,10 @@ const PLAN = (() => {
     for (const b of snap.blds) if (inG(b.i, b.j)) LV[id(b.i, b.j)] = b.floors;
     for (const m of snap.ms){ const lv = lvOfTop(m.top); for (let a = 0; a < m.w; a++) for (let q = 0; q < m.h; q++) if (inG(m.i + a, m.j + q)) LV[id(m.i + a, m.j + q)] = Math.max(LV[id(m.i + a, m.j + q)], lv); }
     // cores: their reach, drained by the scrubbers nearest each (each one less than the last, never below half)
-    const cores = snap.ms.filter(m => m.kind === 'emitter').map(m => ({ ...m, reach: fk(m.id) === 'wide' ? P.coreWide : P.coreReach, drained: 0, nS: 0 }));
+    const CS = id => (st.cores && st.cores[id]) || null;   // (a core shut down by a surge powers nothing; one just cranked back up reaches less for a while)
+    const cores = snap.ms.filter(m => m.kind === 'emitter' && !(CS(m.id) && CS(m.id).off)).map(m => ({ ...m, reach: fk(m.id) === 'wide' ? P.coreWide : P.coreReach, drained: 0, nS: 0 }));
     for (const s of snap.ms) if (s.kind === 'scrubber'){ let best = null, bd = Infinity; for (const c of cores){ const d = megaD(s.i, s.j, c); if (d < bd){ bd = d; best = c; } } if (best){ const f = fk(s.id); best.drained += P.scrubDrain*(f === 'turbo' ? 1.5 : f === 'quiet' ? .7 : 1)*Math.pow(.5, best.nS++); } }
-    for (const c of cores) c.reachNow = Math.max(c.reach*.5, c.reach - c.drained);
+    for (const c of cores){ c.reachNow = Math.max(c.reach*.5, c.reach - c.drained); const cs = CS(c.id); if (cs && cs.lowUntil > Date.now()) c.reachNow = Math.min(c.reachNow, P.coreReachLow); }
     // power on the grid: 2 inside a core's reach, 1 at its edge (the last two plots flicker), 0 outside every core
     const PWR = new Uint8Array(NN);
     for (const c of cores){ const rIn = Math.floor(c.reachNow - P.edge), rOut = Math.floor(c.reachNow), [a0, a1, b0, b1] = box(c, rOut);
@@ -597,7 +601,7 @@ const PLAN = (() => {
   wrap('addSection', function (orig, c, zone, opt = {}){
     const fresh = !c.sections.length, z = zoneNow(zone), have = zoneOf(c);
     if (zoneLocked(z)) return;
-    if (have && have !== z && !(have === 'K' && z === 'I')){ say(ZNAME[have] + ': only the same kind stacks on it'); return; }
+    if (have && have !== z && !(have === 'K' && z === 'I')){ say(ZNAME[have] + ': only the same kind of building can be stacked on it'); return; }
     ledgerMark(); const n0 = c.sections.length, r = orig(c, zone, opt);
     if (c.sections.length > n0){ markCorp(c, have === 'K' ? 'K' : z); E.emit('build', { c, z, fresh }); }
     return r;
@@ -605,7 +609,7 @@ const PLAN = (() => {
   for (const nm of ['addLift', 'addFloatPod', 'addPodDown', 'addBelowUp']) wrap(nm, function (orig, c, a, b, d){
     const zone = nm === 'addLift' || nm === 'addFloatPod' ? b : a, z = zoneNow(zone); if (zoneLocked(z)) return null;
     const have = c && (c.sections.length || (c.below && c.below.length)) ? zoneOf(c) : null;
-    if (have && have !== z && !(have === 'K' && z === 'I')){ say(ZNAME[have] + ': only the same kind stacks on it'); return null; }
+    if (have && have !== z && !(have === 'K' && z === 'I')){ say(ZNAME[have] + ': only the same kind of building can be stacked on it'); return null; }
     ledgerMark(); const r = orig(c, a, b, d); if (r) E.emit('build', { c, z }); return r;
   });
   for (const nm of ['removeSection', 'removePlatform', 'removeBelow', 'removePodSection', 'removeArea', 'removeMega', 'removeMegaTier', 'perimApply', 'removeWallTier', 'turnMega', 'addMegaTier', 'hwRemove', 'mtRemove', 'hwCutAt', 'mtCutAt']) wrap(nm, function (orig, ...a){ ledgerMark(); const r = orig(...a); E.emit('remove', {}); if (nm.includes('Mega')) try { renderBmenu(); } catch (e) {} return r; });
@@ -638,7 +642,7 @@ const PLAN = (() => {
   const WHAT = { emitter: 'Powers up to 60 · some pollution', radio: 'Its music lifts one need, lowers another', scrubber: 'Removes pollution · noisy · shrinks a core\'s reach', square: 'Things to do nearby',
     wirenest: 'The city speaks up · crime map', market: 'Things to do and jobs · wants a station', foundry: 'Many jobs · heavy pollution and noise', police: 'Safety · less privacy',
     bathhouse: 'Homes nearby relax · loves waste heat', club: 'Things to do at night · loud after dark', lidar: 'Forecasts crime · no privacy nearby', greenhouse: 'Removes pollution, silent · big',
-    mall: 'Things to do and jobs · blocks noise', pagoda: 'Luxury fills easily · rents rise', logistics: 'Shuttles workers to industry', spire: 'Exact forecasts · the coast' };
+    mall: 'Things to do and jobs · blocks noise', pagoda: 'Luxury fills easily · rents rise', logistics: 'Carries workers to Industrial buildings', spire: 'Exact forecasts · the coast' };
   E.menuText = kind => { const t = KIND_TIER[kind]; if (t !== undefined && t > st.tier) return 'Opens at ' + TIERS[t].name; const n = megaList(kind).length; return (WHAT[kind] || '') + (REPEAT.has(kind) && n ? ' · ' + n + ' built' : !REPEAT.has(kind) && n ? ' · built' : ''); };
 
   /* ---------- the clock ---------- */
@@ -715,6 +719,22 @@ const PLAN = (() => {
   .pl-note .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 11px; flex-wrap: wrap; } .pl-note .n { color: var(--p-dim); font-size: 11px; font-variant-numeric: tabular-nums; }
   .pl-note .bt { display: flex; gap: 4px; margin-left: auto; } .pl-note button { all: unset; box-sizing: border-box; cursor: pointer; font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--p-dim); padding: 7px 10px; white-space: nowrap; } .pl-note button:hover { color: #fff; }
   .pl-note button.go { color: #0c0b12; background: var(--p-acc); }
+  .pl-mini { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: rgba(6,5,10,.72); } .pl-mini[hidden] { display: none; }
+  .pl-mini .box { background: #0d0a16; border: 1px solid rgba(56,232,224,.5); padding: 14px; font: 13px/1.4 'JetBrains Mono', monospace; color: #efe6d6; width: min(340px, calc(100vw - 32px)); box-sizing: border-box; }
+  .pl-mini canvas { display: block; width: 100%; aspect-ratio: 1/1.1; background: #07060c; touch-action: none; cursor: pointer; }
+  .pl-mini .top { display: flex; justify-content: space-between; margin-bottom: 8px; color: #38e8e0; letter-spacing: .14em; text-transform: uppercase; font-size: 11px; }
+  .pl-mini .foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 8px; color: #9a92aa; font-size: 11.5px; }
+  .pl-mini .how { margin: 0 0 8px; color: #b9b0c8; font-size: 12px; line-height: 1.45; }
+  .pl-mini .meter { height: 8px; background: rgba(255,255,255,.1); margin-top: 8px; } .pl-mini .meter i { display: block; height: 100%; width: 0; background: #5affa8; transition: width .1s; } .pl-mini .meter.big { height: 14px; }
+  .pl-mini .crankbtn { all: unset; cursor: pointer; display: grid; place-items: center; gap: 4px; margin: 10px auto; width: 150px; height: 150px; border-radius: 50%; border: 2px solid #7ab8ff; color: #cfe6ff; background: radial-gradient(#13203a, #07060c); box-shadow: 0 0 22px rgba(122,184,255,.35); user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+  .pl-mini .crankbtn span { font-size: 54px; line-height: 1; display: block; } .pl-mini .crankbtn b { font-size: 12px; letter-spacing: .3em; text-transform: uppercase; } .pl-mini .crankbtn:active { transform: scale(.96); }
+  .pl-mini button { all: unset; cursor: pointer; color: #38e8e0; letter-spacing: .14em; text-transform: uppercase; font-size: 11px; padding: 8px; white-space: nowrap; }
+  .pl-mark { position: fixed; z-index: 6; transform: translate(-50%, -100%); cursor: pointer; font: 600 13px/1.3 'JetBrains Mono', monospace; color: #fff; background: rgba(10,8,18,.92); border: 2px solid var(--sc, #ff3a3a); padding: 6px 10px 8px; text-align: center; white-space: nowrap; box-shadow: 0 0 16px var(--sc, #ff3a3a); }
+  .pl-mark b { display: block; font-size: 14px; letter-spacing: .14em; text-transform: uppercase; color: var(--sc, #ff3a3a); } .pl-mark span { font-size: 11.5px; color: #d8d0e4; }
+  .pl-mark i { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--sc); }
+  .pl-mark.s2 { animation: plBlink .5s steps(2) infinite; } @keyframes plBlink { 50% { box-shadow: 0 0 2px var(--sc); } }
+  .pl-mark.off { --sc: #8a8396; border-color: #ff5a6e; box-shadow: 0 0 14px rgba(255,90,110,.5); } .pl-mark.off b { color: #ff8a98; }
+  html.plan.title-on .pl-mark { display: none; }
   .pl-lead { position: fixed; z-index: 6; height: 2px; transform-origin: 0 50%; background: linear-gradient(90deg, rgba(143,232,216,.85), rgba(143,232,216,.25)); pointer-events: none; }
   .pl-lead::after { content: ''; position: absolute; right: -6px; top: -4px; width: 10px; height: 10px; border-radius: 50%; background: #8fe8d8; box-shadow: 0 0 10px #8fe8d8; }
   .pl-lead[hidden] { display: none; } html.plan.title-on .pl-lead { display: none; }
@@ -824,8 +844,8 @@ const PLAN = (() => {
     V.bh = `${fmt(liv)} / ${fmt(room)}`; W.bh = `width:${room ? (100*liv/room).toFixed(1) : 0}%`;
     return `<div class="bal" data-bal><div class="hd">City balance</div>` +
       `<div class="bl res" title="Everyone living in your powered homes, out of the room they have"><div><span>Homes filled</span><b data-v="bh"></b></div><div class="fb"><i data-w="bh"></i></div></div>` +
-      row('bj', 'Jobs', t.workers, t.jobs, 'Workers a full city would have (half its residents) against the jobs there are. Short: build industry or shops. Spare: room for more homes.') +
-      row('bt', 'Things to do', t.people, t.life, 'Residents a full city would have against room at shops and squares. Short: build shops. Spare: room for more homes.') + `</div>`;
+      row('bj', 'Jobs', t.workers, t.jobs, 'Workers a full city would have (half of its residents) compared with the jobs there are. Short: build more Industrial or Commercial buildings. Spare: there is room for more homes.') +
+      row('bt', 'Things to do', t.people, t.life, 'Residents a full city would have compared with the room at shops and squares. Short: build more Commercial buildings. Spare: there is room for more homes.') + `</div>`;
   }
   goalEl.addEventListener('click', e => { if (e.target.closest('[data-help]')) TUTE.replay(); else if (e.target.closest('[data-thr]')) THR.open(); });
   goalEl.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('[data-thr]')){ e.preventDefault(); THR.open(); } });
@@ -1131,8 +1151,8 @@ const PLAN = (() => {
   const LENS_OF = { air: 'air', quiet: 'noise', safety: 'safety', ease: 'safety' };
   const PROB = {
     power: ['no power: outside every core\'s reach', 'build inside a core\'s reach (click a core to see it), or add a core'], overload: ['no power: the core is fully loaded', 'add another core nearby'],
-    isolated: ['cut off from the city', 'connect it with ground'], work: ['no jobs within 8 tiles', 'industry or shops nearer, or a metro stop'],
-    air: ['pollution', 'move homes away from industry and cores, or add an Air Scrubber'], quiet: ['too much noise', 'move away from loud buildings, or put a tall building in between'],
+    isolated: ['cut off from the city', 'connect it with ground'], work: ['no jobs within 8 tiles', 'build an Industrial or Commercial building within 8 tiles, or a metro stop'],
+    air: ['pollution', 'move homes away from Industrial buildings and power cores, or add an Air Scrubber'], quiet: ['too much noise', 'move away from loud buildings, or put a tall building in between'],
     safety: ['crime nearby', 'make the homes nearby happier, or add police'], ease: ['too many police: no privacy', 'fewer police here, or a Bath House'], life: ['nothing to do within 5 tiles', 'add shops or a square nearby'],
   };
   let voice = null, voiceT = 0;
@@ -1318,11 +1338,11 @@ const PLAN = (() => {
     } else {
       html += `<div class="t"><span>${h.powered ? h.isolated ? 'Cut off' : Math.round(h.fill*100) + '% busy' : 'No power'}</span></div>`;
       if (!h.powered || h.isolated) notes.push(['bad', h.isolated ? PROB.isolated[1] : PROB[h.overload ? 'overload' : 'power'][1]]);
-      if (h.z === 'I') notes.push(['mid', h.floors >= 2 ? `More jobs per level · smaller cloud close in, but its smoke lands ${2*h.floors} tiles downwind, over anything shorter` : 'Gives jobs · pollution drifts downwind']);
-      if (h.z === 'C') notes.push(['mid', h.floors >= 2 ? 'Stacked: 3/4 the noise of the same shops spread out, but fewer visitors per level' : 'Gives jobs and things to do · a little noise']);
+      if (h.z === 'I') notes.push(['mid', h.floors >= 2 ? `More jobs for each level. Less pollution stays around it, but its smoke comes down ${2*h.floors} tiles downwind, passing over buildings shorter than ${h.floors} levels` : 'Gives jobs. Its pollution drifts downwind']);
+      if (h.z === 'C') notes.push(['mid', h.floors >= 2 ? 'Stacked: it makes 3/4 of the noise of the same shops spread out, but each level draws fewer visitors' : 'Gives jobs and things to do, and makes a little noise']);
     }
     notes.push(['mid', `Uses ${(+h.draw).toFixed(1)} power`]);
-    if (h.shade > .2) notes.push(['mid', 'Blocks pollution for the homes behind it, and breathes some of it']);
+    if (h.shade > .2) notes.push(['mid', `Blocks pollution for the homes up to 3 tiles behind it (from Industrial buildings up to ${h.floors} levels high), and its residents breathe some of it`]);
     if (notes.length) html += `<div class="nt">` + notes.map(([k, t]) => `<div class="${k}">${esc(t)}</div>`).join('') + `</div>`;
     if (cardEl.innerHTML !== html) cardEl.innerHTML = html;
     cardEl.hidden = false; cardFor = c; cardEl.classList.toggle('hov', !cardPinned);
@@ -1420,9 +1440,127 @@ const PLAN = (() => {
     if (st.refit) for (const id in st.refit){ const r = st.refit[id]; if (!r || !(r.at > 0) || now() >= r.at){ if (r && r.v) st.forks[id] = r.v; delete st.refit[id]; ledgerMark(); save(); } }
     if (cardFor && cardFor.kind && cardFor.kind !== 'radio' && !cardEl.hidden && cardPinned) forkCard(cardFor);   // (its load and any refit, live)
   }, 1000);
+  /* ---------- power surges: now and then a core surges, glowing yellow, then orange, then red. Click it and keep the trace inside the band to
+     stabilize it; at red it shuts down, and everything it powers goes dark until it's cranked back up (click fast), after which it reaches less
+     for a minute. Cores near full load surge more often, and the most loaded core is the one that surges ---------- */
+  const SURGE = (() => {
+    const COL = ['#ffe14a', '#ff9a2a', '#ff3a3a'];
+    const state = m => { st.cores = st.cores || {}; return st.cores[m.id] || (st.cores[m.id] = {}); };
+    const stage = cs => cs.surge ? Math.min(2, Math.floor((now() - cs.surge.t0)/P.surgeStage)) : -1;
+    const changed = () => { ledgerMark(); save(); };
+    const tone = (ns, base, gap, dur) => { try { if (typeof sfx !== 'undefined' && sfx.tone) ns.forEach((n, q) => sfx.tone(base*Math.pow(2, n/12), { gain: .1, at: q*gap, dur })); } catch (e) {} };
+    function start(m, opt = {}){ const cs = state(m); if (cs.off || cs.surge) return; cs.surge = { t0: now(), paused: !!opt.practice, practice: !!opt.practice }; save();
+      if (!opt.practice) say('Power surge! Click the glowing core to stabilize it'); tone([12, 12, 12], 880, .18, .12); }
+    function shutdown(m){ const cs = state(m); cs.surge = null; cs.off = true; changed(); say('A power core shut down: everything it powered is dark. Click it to crank it back up.');
+      try { if (typeof sfx !== 'undefined' && sfx.tone){ sfx.tone(220, { gain: .16, dur: .9, glide: 1.6 }); sfx.tone(110, { gain: .14, dur: 1.2, glide: 1.5 }); } } catch (e) {} }
+    let last = now();
+    setInterval(() => {
+      const t = now(), dms = t - last; last = t; if (!booted) return;
+      const cores = megaList('emitter');
+      for (const m of cores){ const cs = state(m);
+        if (cs.surge){ if (MINI.openFor === m.id || cs.surge.paused) cs.surge.t0 += dms; else if (t - cs.surge.t0 >= 3*P.surgeStage) shutdown(m); }
+        if (cs.lowUntil && t > cs.lowUntil){ cs.lowUntil = 0; changed(); } }   // (its full reach back)
+      // the next surge: only once the lessons are done, never two at once
+      if (!st.tut.done || !LAST || cores.some(m => state(m).surge || state(m).off)) return;
+      if (!st.surgeAt) st.surgeAt = t + P.surgeFirst;
+      if (t < st.surgeAt) return;
+      const live = LAST.cores.filter(c => megas.has(c.id)); if (!live.length) return;
+      const fr = c => Math.min(1, c.load/(c.cap || P.coreCap)), top = Math.max(...live.map(fr));
+      let pick = null, tot = 0; for (const c of live) tot += .05 + Math.pow(fr(c), 3); let r = Math.random()*tot; for (const c of live){ r -= .05 + Math.pow(fr(c), 3); if (r <= 0){ pick = c; break; } }
+      const k = Math.max(0, Math.min(1, (top - .6)/.4));
+      st.surgeAt = t + P.surgeGap[0] + (P.surgeGap[1] - P.surgeGap[0])*k;
+      const m = pick && megas.get(pick.id); if (m) start(m);
+      marks();
+    }, 1000);
+    // the label over a core in trouble, and its glow
+    const tags = new Map(), flares = new Map();
+    function marks(){
+      for (const m of megaList('emitter')){ const cs = state(m); let lb = tags.get(m.id);
+        if (!(cs.surge || cs.off)){ if (lb){ lb.remove(); tags.delete(m.id); } continue; }
+        if (!lb){ lb = el('div', 'pl-mark'); document.body.appendChild(lb); tags.set(m.id, lb); lb.addEventListener('click', () => E.megaClick(m)); }
+        if (cs.off){ lb.className = 'pl-mark off'; lb.innerHTML = '<b>Core offline</b><span>Click to crank it back up</span>'; }
+        else { const k = stage(cs), left = Math.max(0, 3*P.surgeStage - (now() - cs.surge.t0)); lb.className = 'pl-mark s' + k; lb.style.setProperty('--sc', COL[k]);
+          lb.innerHTML = `<b>Power surge</b><span>${cs.surge.paused ? 'Click the core to stabilize it' : `Click to stabilize · ${Math.ceil(left/1000)} s before it shuts down`}</span><i style="width:${100*left/(3*P.surgeStage)}%"></i>`; } }
+      for (const [id, lb] of tags) if (!megas.has(id)){ lb.remove(); tags.delete(id); }
+    }
+    setInterval(marks, 250);
+    (function loop(){ requestAnimationFrame(loop); const t = performance.now()/1000;
+      for (const [id, lb] of tags){ const m = megas.get(id); if (!m) continue; const p = screenOf(m.x, (m.roofH || m.top || CURB + 6) + 1.5, m.z); if (!p){ lb.style.display = 'none'; continue; } lb.style.display = ''; lb.style.left = p[0] + 'px'; lb.style.top = p[1] + 'px'; }
+      if (typeof megas === 'undefined') return;
+      for (const m of megaList('emitter')){ const cs = state(m); let f = flares.get(m.id);
+        if (!cs.surge){ if (f){ for (const o of [f.sp, f.ring]){ scene.remove(o); o.geometry && o.geometry.dispose(); o.material.dispose(); } flares.delete(m.id); } continue; }
+        if (!f){ const sp = onLayer(new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, transparent: true, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending })), 998);
+          const ring = onLayer(new THREE.Mesh(new THREE.RingGeometry(.9, 1, 64), new THREE.MeshBasicMaterial({ transparent: true, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide })), 998); ring.rotation.x = -Math.PI/2;
+          f = { sp, ring }; flares.set(m.id, f); }
+        const k = stage(cs), col = COL[k], fl = .75 + .25*Math.sin(t*(10 + k*8))*Math.sin(t*3.3), y = (m.roofH || m.top || CURB + 6)*.6;
+        f.sp.material.color.set(col); f.sp.position.set(m.x, y, m.z); f.sp.scale.setScalar(m.w*LOT*(1.1 + .25*k)*fl); f.sp.material.opacity = .65 + .35*fl;
+        const rp = (t*(.8 + k*.5)) % 1; f.ring.material.color.set(col); f.ring.position.set(m.x, CURB + .12, m.z); f.ring.scale.setScalar(m.w*LOT*(.6 + rp*1.6)); f.ring.material.opacity = (1 - rp)*.9; } })();
+
+    // the stabilizer: the trace sinks, a click, tap or Space lifts it; four seconds inside the band settles the core
+    const MINI = (() => {
+      const box = el('div', 'pl-mini'); box.hidden = true; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', 'Stabilize the power core');
+      box.innerHTML = `<div class="box"><div class="top"><span>Surge stabilizer</span><span data-hz>50.00 Hz</span></div><p class="how">Keep the line inside the blue band. Click, tap or press Space to lift it; it sinks on its own.</p><canvas width="300" height="300" aria-label="The power trace: keep it inside the band"></canvas>
+        <div class="meter"><i></i></div><div class="foot"><span data-st>Stable 0%</span><button type="button" data-x>Leave it</button></div></div>`;
+      document.body.appendChild(box);
+      const cv = box.querySelector('canvas'), g = cv.getContext('2d'), hz = box.querySelector('[data-hz]'), stEl = box.querySelector('[data-st]'), bar = box.querySelector('.meter i');
+      let on = false, id = null, y = .5, v = 0, t = 0, stab = 0, raf = 0, lastT = 0, trail = [];
+      const NEED = 4;
+      function open(coreId){ const m = megas.get(coreId); if (!m || !state(m).surge) return; id = coreId; api.openFor = id; on = true; box.hidden = false; y = .5; v = 0; t = 0; stab = 0; trail = []; lastT = performance.now(); raf = requestAnimationFrame(loop); E.emit('mini'); }
+      function close(){ on = false; box.hidden = true; cancelAnimationFrame(raf); api.openFor = null; save(); }
+      const lift = () => { if (on) v -= .55; };
+      cv.addEventListener('pointerdown', e => { e.preventDefault(); lift(); });
+      addEventListener('keydown', e => { if (!on) return; if (e.code === 'Space'){ e.preventDefault(); e.stopPropagation(); lift(); } if (e.key === 'Escape'){ e.stopPropagation(); close(); } }, true);
+      box.querySelector('[data-x]').addEventListener('click', close);
+      function loop(ts){
+        if (!on) return; raf = requestAnimationFrame(loop);
+        const dt = Math.min(.05, (ts - lastT)/1000); lastT = ts; t += dt;
+        const grav = .9 + t*.03, band = Math.max(.1, .26 - t*.006), mid = .5 + Math.sin(t*.9)*.14*Math.min(1, t/6);
+        v += grav*dt; v *= .985; y += v*dt; if (y < 0){ y = 0; v = 0; } if (y > 1){ y = 1; v = 0; }
+        const ok = Math.abs(y - mid) < band/2;
+        stab = Math.max(0, Math.min(NEED, stab + (ok ? dt : -dt*.35)));
+        trail.push(y); if (trail.length > 150) trail.shift();
+        const W = cv.width, H = cv.height;
+        g.fillStyle = '#07060c'; g.fillRect(0, 0, W, H);
+        g.fillStyle = 'rgba(122,184,255,.12)'; g.fillRect(0, (mid - band/2)*H, W, band*H);
+        g.strokeStyle = 'rgba(122,184,255,.6)'; g.strokeRect(.5, (mid - band/2)*H + .5, W - 1, band*H - 1);
+        g.strokeStyle = 'rgba(255,255,255,.06)'; for (let q = 1; q < 6; q++){ g.beginPath(); g.moveTo(0, q*H/6); g.lineTo(W, q*H/6); g.stroke(); }
+        g.strokeStyle = ok ? '#5affa8' : '#ff5a6e'; g.lineWidth = 2; g.beginPath(); trail.forEach((q, k) => { const x = W - (trail.length - k)*2; k ? g.lineTo(x, q*H) : g.moveTo(x, q*H); }); g.stroke();
+        g.fillStyle = ok ? '#5affa8' : '#ff5a6e'; g.beginPath(); g.arc(W - 2, y*H, 5, 0, Math.PI*2); g.fill();
+        hz.textContent = (50 + (mid - y)*4).toFixed(2) + ' Hz'; stEl.textContent = 'Stable ' + Math.round(100*stab/NEED) + '%'; bar.style.width = (100*stab/NEED) + '%';
+        const m = megas.get(id); if (!m || !state(m).surge){ close(); return; }
+        if (stab >= NEED){ state(m).surge = null; close(); marks(); save(); E.emit('stabilized', m);
+          say('Core stabilized'); floatText(m.x, (m.roofH || m.top || CURB + 6) + 1, m.z, 'Stabilized'); tone([0, 4, 7, 12], 523, .06, .4); WAVE.click(m); }
+      }
+      const api = { open, openFor: null };
+      return api;
+    })();
+    // a core that shut down: crank it. Each click, tap or Space press fills the bar, which drains on its own, so it takes a quick burst
+    const CRANK = (() => {
+      const box = el('div', 'pl-mini'); box.hidden = true; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', 'Restart the power core');
+      box.innerHTML = `<div class="box crank"><div class="top"><span>Restart the core</span><span data-pct>0%</span></div><p class="how">Click as fast as you can (or tap, or press Space) to spin it back up before the charge drains.</p>
+        <button type="button" class="crankbtn"><span data-rot>⟳</span><b>Crank</b></button><div class="meter big"><i></i></div><div class="foot"><span>Back on at 100%. For a minute after, it reaches ${P.coreReachLow} tiles.</span><button type="button" data-x>Later</button></div></div>`;
+      document.body.appendChild(box);
+      const pct = box.querySelector('[data-pct]'), rotEl = box.querySelector('[data-rot]'), bar = box.querySelector('.meter i');
+      let on = false, id = null, k = 0, raf = 0, lastT = 0, rot = 0;
+      const hit = () => { if (!on) return; k = Math.min(1, k + .065); rot += 40; if (k >= 1) return done(); try { if (typeof sfx !== 'undefined' && sfx.tone) sfx.tone(300 + k*700, { gain: .05, dur: .06, glide: .8 }); } catch (e) {} };
+      box.querySelector('.crankbtn').addEventListener('pointerdown', e => { e.preventDefault(); hit(); });
+      addEventListener('keydown', e => { if (!on) return; if (e.code === 'Space' || e.key === 'Enter'){ e.preventDefault(); e.stopPropagation(); if (!e.repeat) hit(); } if (e.key === 'Escape'){ e.stopPropagation(); close(); } }, true);
+      box.querySelector('[data-x]').addEventListener('click', () => close());
+      function open(coreId){ const m = megas.get(coreId); if (!m || !state(m).off) return; id = coreId; on = true; k = 0; box.hidden = false; lastT = performance.now(); raf = requestAnimationFrame(loop); }
+      function close(){ on = false; box.hidden = true; cancelAnimationFrame(raf); }
+      function loop(ts){ if (!on) return; raf = requestAnimationFrame(loop); const dt = Math.min(.05, (ts - lastT)/1000); lastT = ts; k = Math.max(0, k - dt*.16); rot += dt*k*900; bar.style.width = (k*100) + '%'; pct.textContent = Math.round(k*100) + '%'; rotEl.style.transform = `rotate(${rot}deg)`; }
+      function done(){ const m = megas.get(id); close(); if (!m) return; const cs = state(m); cs.off = false; cs.lowUntil = now() + P.lowMs; changed(); marks();
+        say(`Core back online. For a minute it reaches ${P.coreReachLow} tiles instead of its full reach.`); tone([0, 7, 12, 19], 262, .07, .5); WAVE.click(m); }
+      return { open };
+    })();
+    return { state, start, marks, stabilize: m => MINI.open(m.id), crank: m => CRANK.open(m.id), get openFor(){ return MINI.openFor; } };
+  })();
+
   E.megaClick = m => {
     if (!m) return false;
-    if (m.kind === 'emitter'){ WAVE.click(m); forkCard(m); return true; }   // (a click on a core: its reach as a wave, its load, and its tuning once that's open)
+    if (m.kind === 'emitter'){ const cs = SURGE.state(m);
+      if (cs.off){ SURGE.crank(m); return true; } if (cs.surge){ SURGE.stabilize(m); return true; }   // (a core in trouble: the fix it needs)
+      WAVE.click(m); forkCard(m); return true; }   // (a click on a core: its reach as a wave, its load, and its tuning once that's open)
     if (m.kind === 'radio' && st.tier >= 0){ gridCard(m); return true; }
     const f = FORKS[m.kind]; if (f && st.tier >= f.tier){ forkCard(m); return true; }
     return false;
@@ -1435,7 +1573,7 @@ const PLAN = (() => {
   const HINTS = {
     isolated: { say: 'That building is cut off.', sub: 'Nobody can reach it. Join it to the city with ground.', on: () => anyB(b => b.isolated) },
     power: { say: 'Out of power.', sub: 'It sits outside every core\'s reach. Click a core to see how far its grid goes, or place another core.', on: () => anyB(b => !b.isolated && !b.powered && !(b.h && b.h.overload)) },
-    work: { say: 'Homes need work within reach.', sub: 'Industry and shops give jobs. Only residents with work count toward the next goal.', on: () => anyB(b => isHome(b.z) && b.powered && !b.isolated && b.h.support < .4), wait: 25 },
+    work: { say: 'Homes need work within reach.', sub: 'Industrial and Commercial buildings give jobs. Only residents with jobs count toward the next goal.', on: () => anyB(b => isHome(b.z) && b.powered && !b.isolated && b.h.support < .4), wait: 25 },
     overload: { say: 'A core is full.', sub: 'The buildings farthest from it lost power, and any jobs or shops among them stopped too. Click the core to see its load, and add another core nearby.', on: () => anyB(b => b.h && b.h.overload) },
     shade: { say: 'That tower is blocking pollution.', sub: 'Homes behind it get cleaner air, but its own residents breathe more of it. Unhappy, they may turn to crime.', on: () => anyB(b => isHome(b.z) && b.h.shade > .3 && b.occ > 0), wait: 6 },
     gridSong: { say: 'Click the Grid to pick its song.', sub: 'Each song lifts one comfort and lowers another for homes nearby. The Acoustic Panel lets you shape your own.', on: () => built('radio') && !st.preset, wait: 15 },
@@ -1626,7 +1764,7 @@ const PLAN = (() => {
     const cellAt = p => cells.get(p.i + ',' + p.j);
     const zoneAt = p => { const c = cellAt(p); return c && !c.mega && c.sections.length ? zoneOf(c) : null; };
     const anyBuilt = () => { for (const c of cells.values()) if (!c.mega && c.sections.length) return true; return false; };
-    let base = {}, cardOn = null, thrN = 0; E.onEv('card', c => { cardOn = c; }); E.onEv('thrOpen', () => thrN++);
+    let base = {}, cardOn = null, thrN = 0, stabN = 0; E.onEv('card', c => { cardOn = c; }); E.onEv('thrOpen', () => thrN++); E.onEv('stabilized', () => stabN++);
     const focus = ps => { try { let x = 0, z = 0; for (const p of ps){ x += p.i*LOT; z += p.j*LOT; } camGoal.set(x/ps.length, camGoal.y, z/ps.length); } catch (e) {} };
     // laying the ground, and building the rest of the district: a few at a time, so it reads as being built
     let job = null;
@@ -1659,26 +1797,29 @@ const PLAN = (() => {
         done: () => { const c = cellAt(pt('H1')); return c && cardOn === c && !cardEl.hidden && cardFor === c; },
         onDone: () => { cardPinned = true; cardEl.classList.remove('hov'); },
         res: res('Each bar is one need.', `The line marks enough. Jobs and Things to do are short: nothing is built nearby yet. The orange bar is the biggest problem, and the note under it says what would help. ${Tap} anywhere to close the card.`) },
-      { say: 'Now place industry on the glowing tile.', sub: 'Pick Industrial.', mark: ['I1'], zone: 'ind', done: () => zoneAt(pt('I1')) === 'I',
-        res: res('The home fills up.', 'Industry gives jobs to homes within 8 tiles. It also makes pollution, and the wind carries it one way.') },
-      { say: 'Now a mistake, on purpose.', sub: 'Place a home right next to the industry, on the glowing tile.', mark: ['HB'], zone: 'low', done: () => zoneAt(pt('HB')) === 'R',
-        resCard: 'HB', res: res('It struggles.', 'Its card is open: Clean air and Quiet are low. Industry is polluting and loud up close. You can check any building like this with no zone picked.') },
+      { say: 'Now place an Industrial building on the glowing tile.', sub: 'Pick Industrial.', mark: ['I1'], zone: 'ind', done: () => zoneAt(pt('I1')) === 'I',
+        res: res('The home fills up.', 'Industrial buildings give jobs to homes within 8 tiles. They also make pollution, and the wind carries it in one direction.') },
+      { say: 'Now a mistake, on purpose.', sub: 'Place a home right next to the Industrial building, on the glowing tile.', mark: ['HB'], zone: 'low', done: () => zoneAt(pt('HB')) === 'R',
+        resCard: 'HB', res: res('It struggles.', 'Its card is open: Clean air and Quiet are low, because Industrial buildings make pollution and noise close to them. You can check any building like this when no zone is picked.') },
       { say: 'Open the Pollution view.', sub: `Views show what you can't see.${TOUCHY ? '' : ' Press V to cycle through them.'}`, target: lensBtn('air'), done: () => lens === 'air',
-        res: res('Warm colors are heavy pollution.', 'The white badge marks where it comes from, and the arrows show the wind. Stacking industry shrinks the cloud around it, but carries the smoke farther downwind before it lands.') },
+        res: res('Warm colors are heavy pollution.', 'The white badge marks where the pollution comes from, and the arrows show which way the wind blows. When you stack an Industrial building higher, less pollution stays around it, but its smoke is carried farther downwind before it comes down.') },
       { say: 'Now open the Noise view.', sub: 'The button next to Pollution.', target: lensBtn('noise'), done: () => lens === 'noise',
-        res: res('Rings spread from loud buildings.', 'Industry is loud up close, and louder as it stacks. A stacked shop makes 3/4 the noise of the same shops spread out. A building three levels or taller in between soaks noise up.') },
+        res: res('Rings spread from loud buildings.', 'Industrial buildings are loud close to them, and louder the higher they are stacked. A stacked Commercial building makes 3/4 of the noise that the same number of one-level shops would make spread out. A building three levels or taller standing in between blocks some of the noise.') },
       { say: 'Remove the struggling home.', sub: TOUCHY ? 'Press and hold it.' : 'Right-click it.', mark: ['HB'], noZone: true, onShow: () => setLens(null), done: () => !zoneAt(pt('HB')),
         res: res('Gone.', 'Moving things costs nothing: build, look, and move it if it doesn\'t work.') },
       { say: 'Place a shop on the glowing tile.', sub: 'Pick Commercial.', mark: ['S1'], zone: 'mid', done: () => zoneAt(pt('S1')) === 'C',
-        res: res('Things to do.', 'Shops give homes within 5 tiles somewhere to go, and a few jobs. Stacked shops are quieter than the same shops spread out, but each extra level draws fewer people.') },
+        res: res('Things to do.', 'Commercial buildings give homes within 5 tiles somewhere to go, and a few jobs. Stacking them is quieter than spreading the same shops out, but each extra level draws fewer visitors than the one below it.') },
       { say: 'Add ground on the glowing tiles.', sub: `With no zone picked, ${TOUCHY ? 'tap' : 'click'} each one. (${TOUCHY ? 'Tap a picked zone again' : 'Press Esc'} to put a zone down.)`, mark: ['W1', 'W2'], noZone: true,
         done: () => !!cellAt(pt('W1')) && !!cellAt(pt('W2')) && !zoneAt(pt('W1')) && !zoneAt(pt('W2')),
-        res: res('Ground spreads your city out.', 'Farther from industry is cleaner and quieter. But jobs reach 8 tiles, shops 5, and power only as far as a core\'s grid.') },
+        res: res('Ground spreads your city out.', 'Homes farther from Industrial buildings have cleaner air and less noise. But jobs only reach homes within 8 tiles, shops within 5 tiles, and power only as far as a core\'s grid.') },
       { say: 'Place a home on the farthest tile.', sub: 'Another mistake, on purpose.', mark: ['W2'], zone: 'low', done: () => zoneAt(pt('W2')) === 'R',
         resCard: 'W2', res: res('No power.', `It's outside the core's reach, so it stays dark. ${Tap} the core to see where its grid ends. A second core would power it, but every core makes some pollution.`) },
-      { say: 'Tall buildings block pollution.', sub: 'A building three levels or taller shields the homes up to 3 tiles behind it, but only from industry no taller than itself. The people inside breathe what they block, and unhappy residents turn to crime. Every level also uses more power than the last.', next: true },
-      { say: 'Let\'s finish your starter district.', sub: 'Watch: the dark home goes, and two more homes, more industry and a second shop go up.', onShow: () => { base.auto = false; autoBuild(() => { base.auto = true; }); }, done: () => base.auto === true, min: 1500,
+      { say: 'Tall buildings block pollution.', sub: 'A building three levels or taller blocks pollution for the homes up to 3 tiles behind it. It only stops pollution from Industrial buildings that are no taller than it: a 4-level tower stops pollution from Industrial buildings up to 4 levels high. The people living in the tower breathe the pollution it blocks, and unhappy residents turn to crime. Each level you add also uses more power than the one before.', next: true },
+      { say: 'Let\'s finish your starter district.', sub: 'Watch: the dark home is removed, and two more homes, a second Industrial building and a second Commercial building go up.', onShow: () => { base.auto = false; autoBuild(() => { base.auto = true; }); }, done: () => base.auto === true, min: 1500,
         resNoZone: true, res: res('Your district is running.', `People are moving in. It's one home short of your first goal: that one is up to you. ${TOUCHY ? 'Tap' : 'Point at'} any building to see how it's doing.`) },
+      { say: 'Practice: a power surge.', sub: 'Now and then a power core surges and glows yellow, then orange, then red. Click the glowing core, then keep the line inside the blue band until it is stable. (This practice one waits for you.)',
+        focus: () => { const m = core(); return m ? [{ i: m.i, j: m.j }] : []; }, noZone: true, onShow: () => { const m = core(); if (m) SURGE.start(m, { practice: true }); }, done: () => stabN > base.stab,
+        res: res('Stabilized.', 'Surges happen more often when a core is close to full load, and they hit the most heavily loaded core. If a surge is left until it turns red, the core shuts down and every building it powers goes dark, until you click the core and crank it back up. Keeping cores below full load keeps surges rare.') },
       { say: 'This is your city\'s balance.', sub: 'Homes filled: how many live in your homes, out of the room they have. Jobs and Things to do: short means build more of it, spare means there\'s room for more homes.', target: () => goalEl.querySelector('[data-bal]'), next: true },
       { say: `Your goal: ${TIERS[1].res} residents and ${TIERS[1].thr} thriving homes.`, sub: `${Tap} Thriving homes to see which homes miss what.`, target: () => goalEl.querySelector('[data-thr]'), done: () => thrN > base.thr,
         res: res('Check one need at a time.', 'Use the arrows: homes that pass glow green, the rest red. Replay these lessons from the ? on the goal card.'), last: true },
@@ -1687,10 +1828,11 @@ const PLAN = (() => {
       { say: 'Power comes from cores.', sub: `${Tap} a core to see how far it reaches and how much power it uses. Buildings outside its grid, or past a full core, stay dark.` },
       { say: 'Read the tag before you build.', sub: 'With a zone picked, point at a tile: the tag shows how many residents the city would gain (+) or lose (−) there.' },
       { say: `${TOUCHY ? 'Tap' : 'Point at'} a building to see what it needs.`, sub: 'Each bar is one need; the line marks enough. The note at the bottom says what would help.' },
-      { say: 'Industry and cores make pollution.', sub: 'Open the Pollution view: warm colors are heavy, white badges are its sources, and the wind carries it one way. Stacked industry keeps its cloud small but lands its smoke farther downwind.' },
-      { say: 'Industry, shops and transit are loud.', sub: 'The Noise view shows it. A building three levels or taller in between soaks it up. A stacked shop makes 3/4 the noise of the same shops spread out.' },
-      { say: 'Ground spreads you out.', sub: 'Farther from industry is cleaner and quieter, but jobs reach 8 tiles, shops 5, and power only as far as a core\'s grid.' },
+      { say: 'Industrial buildings and power cores make pollution.', sub: 'Open the Pollution view: warm colors mean heavy pollution, white badges mark where it comes from, and the wind carries it in one direction. A stacked Industrial building keeps less pollution around itself, but its smoke comes down farther downwind.' },
+      { say: 'Industrial buildings, Commercial buildings and transit are loud.', sub: 'The Noise view shows where. A building three levels or taller standing in between blocks some of the noise. A stacked Commercial building makes 3/4 of the noise of the same shops spread out.' },
+      { say: 'Ground lets you spread out.', sub: 'Homes farther from Industrial buildings have cleaner air and less noise. But jobs only reach homes within 8 tiles, shops within 5 tiles, and power only as far as a core\'s grid.' },
       GUIDED[11],
+      { say: 'Power cores sometimes surge.', sub: 'A surging core glows yellow, then orange, then red. Click it and keep the line inside the band to stabilize it. At red it shuts down and its buildings go dark until you crank it back up. Cores near full load surge more often.' },
       { say: 'Unhappy homes turn to crime.', sub: 'It spreads and makes the homes around it unhappy too. Fix what bothers them and it fades; police push it away.' },
       { say: 'Watch your balance and your goal.', sub: `The balance bars say what's short. ${Tap} Thriving homes to check one need at a time.`, last: true },
     ];
@@ -1710,7 +1852,7 @@ const PLAN = (() => {
       unpulse(); MARK.set([]);
       if (U.k >= beats.length){ end(); return; }
       const b = beats[U.k]; noteTut = true; clearTimeout(noteT); phase = 'do'; shownAt = now();
-      base = { clicks: WAVE.clicks(), thr: thrN, auto: base.auto };
+      base = { clicks: WAVE.clicks(), thr: thrN, auto: base.auto, stab: stabN };
       if (mode === 'lessons' || b.next) render(b, b.say, b.sub, b.last ? 'Got it' : 'Next');
       else render(b, b.say, b.sub, null);
       if (mode === 'guided'){
@@ -1723,7 +1865,7 @@ const PLAN = (() => {
     }
     // a marked tile holding the wrong kind of building (or a building where only ground was wanted): say so, and how to undo it
     let wrongSaid = false;
-    const ZW = { low: 'R', mid: 'C', ind: 'I' }, ZN = { R: 'a home', C: 'a shop', I: 'industry', L: 'a luxury home', K: 'corps' };
+    const ZW = { low: 'R', mid: 'C', ind: 'I' }, ZN = { R: 'a home', C: 'a Commercial building', I: 'an Industrial building', L: 'a luxury home', K: 'a Corps building' };
     function wrongOn(b){
       if (!b.mark) return null;
       for (const k of b.mark){ const z = zoneAt(pt(k)); if (!z) continue; if (b.zone ? z !== ZW[b.zone] : b.noZone && (k === 'W1' || k === 'W2')) return z; }
@@ -1784,7 +1926,9 @@ const PLAN = (() => {
       render(b, b.res.say, b.res.sub, b.last ? 'Got it' : 'Next'); noteEl.classList.add('done');
     }
     function advance(){ if (U.k === beats.length - 1){ finish(); return; } U.k++; if (mode === 'guided'){ st.tut.step = U.k; save(); } show(); }
-    function end(){ unpulse(); MARK.set([]); noteTut = false; noteEl.hidden = true; noteEl.className = 'pl-note'; if (mode === 'guided' || !st.tut.done){ st.tut.done = true; st.tut.step = GUIDED.length; save(); } beats = GUIDED; U.k = GUIDED.length; }
+    function end(){ unpulse(); MARK.set([]);
+      for (const m of megaList('emitter')){ const cs = SURGE.state(m); if (cs.surge && cs.surge.practice) cs.surge = null; }   // (a practice surge left when the lessons are skipped)
+      noteTut = false; noteEl.hidden = true; noteEl.className = 'pl-note'; if (mode === 'guided' || !st.tut.done){ st.tut.done = true; st.tut.step = GUIDED.length; save(); } beats = GUIDED; U.k = GUIDED.length; }
     function finish(){ job = null; U.k = beats.length; end(); }
     setInterval(check, 300);
     const gestureDone = () => { if (!TOUCHY) return true; try { const g = JSON.parse(localStorage.getItem('touch:nt.tut') || 'null'); return !!(g && g.done); } catch (e) { return true; } };
@@ -1807,7 +1951,7 @@ const PLAN = (() => {
 
   /* ---------- for tests and the console ---------- */
   E.freshState = freshState; E.state = () => st; E.P = P; E.TIERS = TIERS; E.save = save; E.compute = compute; E.snapshot = snapshot; E.last = () => LAST; E.building = k => B.get(k);
-  E.crime = CRIME; E.song = () => ({ ...SONG, push: songPush() });
+  E.crime = CRIME; E.song = () => ({ ...SONG, push: songPush() }); E.surge = SURGE;   // (PLAN.surge.start(megas.get(id)) starts one, for a look)
   E.dev = { tier(t){ st.tier = Math.max(0, Math.min(TIERS.length - 1, t)); onTier(st.tier, true); }, wind(a){ st.wind = a; save(); } };
   return E;
 })();

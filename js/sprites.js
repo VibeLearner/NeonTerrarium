@@ -8,13 +8,27 @@ const SPR = {"size":{"bush":[20,17],"bushFlower":[20,17],"moss":[16,13],"bonsai"
 // lawn grass: tufts, clumps and reeds cut from the overgrown-tile sheet (gt0-4 tufts, gt5 reeds, gt6-9 thick clumps)
 Object.assign(SPR.size, { gt0:[16,15], gt1:[15,9], gt2:[10,8], gt3:[13,8], gt4:[14,12], gt5:[16,16], gt6:[16,15], gt7:[16,16], gt8:[16,16], gt9:[16,15] });
 for (let k = 0; k < 10; k++) SPR.anchor['gt' + k] = 0;
+// tree tops (drawn in code: spritegen_trees.js), hung from their middle; four crossed copies each (garden.js canopy)
+Object.assign(SPR.size, { tc_round:[36,30], tc_oval:[26,36], tc_willow:[40,38], tc_pine:[28,40], tc_cypress:[14,40], tc_blossom:[38,30], tc_maple:[36,30], tc_palm:[40,30], tc_airy:[30,32], tc_wisteria:[38,34], tc_puff:[22,18] });
+for (const k in SPR.size) if (k.startsWith('tc_')) SPR.anchor[k] = .5;
 SPR.img = {}; for (const k in SPR.size) SPR.img[k] = 'assets/sprites/' + k + '.png';
 const PX = 18; // sprite pixels per world unit at the default 480p zoom, so one sprite pixel is about one screen pixel
-const FOL_UNI = { tint:{ value:new THREE.Color(1,1,1) }, time:{ value:0 }, normalMode:{ value:0 }, neonI:{ value:1 }, res:{ value:new THREE.Vector2(480,270) }, wind:{ value:1 } };
+const FOL_UNI = { tint:{ value:new THREE.Color(1,1,1) }, time:{ value:0 }, normalMode:{ value:0 }, neonI:{ value:1 }, res:{ value:new THREE.Vector2(480,270) }, wind:{ value:1 },
+  swayBand:{ value: typeof TOUCH !== 'undefined' && TOUCH.on ? 1 : 0 } };   // (touch: plants sway as whole pieces, see the plant shader)
 const FOL_MAT = {}, FOL_LIST = {};
 // Flickering lights: a few neon tubes, signs, lamps and windows are on their way out. Each has its own id; most
 // of the time it burns steady, then every so often it stutters through a short episode of cutting out and
 // half-dropping, at its own rhythm. Everything else (id 0) never flickers. Used by buildings, signs and glows.
+// A garden tree in the wind (computers only: on a touch screen trees stand still, so their trunks stay in the static cache). The trunk bends from the
+// ground, more the higher up (with the square of the height), in slow gusts that roll across the park (neighbouring trees nearly together); its crown
+// doesn't move on its own, it rides on the trunk's top. One function for both: the bark's shader (garden.js) moves each corner of the trunk by it,
+// the plant shader moves the crown by it at the height where the crown meets its trunk (canopy(), garden.js). p: a point in the world.
+const TREE_SWAY_GLSL = `
+  vec2 treeSway(vec3 p, float t, float w){
+    float h = max(p.y - 0.06, 0.0);
+    float s = sin(t*0.9 - dot(p.xz, vec2(.09, .06))) + 0.3*sin(t*1.9 - dot(p.xz, vec2(.2, .11)));
+    return vec2(.75, .45)*s*w*0.018*h*h;
+  }`;
 const FLK_GLSL = `
   float flkH(float n){ return fract(fract(n*0.1031)*(n*0.1031 + 33.33)*(fract(n*0.1031) + 19.19)); }
   float flicker(float id, float t){
@@ -30,11 +44,16 @@ const FLK_GLSL = `
     return r < 0.42 ? 0.1 : (r < 0.58 ? 0.5 : 1.0);
   }`;
 const texLoader = new THREE.TextureLoader();
-// how each sprite moves in the wind: 0 still, 1 laundry flapping from its line, 2 hanging greenery swinging from the top, 3 plants leaning at the tips
+// how each sprite moves in the wind: 0 still, 1 laundry flapping from its line, 2 hanging greenery swinging from the top, 3 plants leaning at the tips,
+// 4 lawn grass, 5 a tree's crown (garden.js): still of its own, carried by its trunk's sway (computers only)
 function swayTypeFor(kind){
   if (kind.startsWith('sign_') || kind.startsWith('glyph_') || kind.startsWith('graf_') || kind === 'w_tangle') return 0;
   if (kind.startsWith('l_') && kind !== 'l_mossroots') return 1;
-  if (/^gt\d$/.test(kind)) return 4;   // lawn grass: bends as a whole, in waves rolling across the lawn
+  if (/^gt\d$/.test(kind)) return 4;
+  // A tree's crown is four copies of its sprite crossed at angles (so it reads from every side). Its rows sliding sideways moved each copy along its
+  // own plane, four different ways at once, so the crown seemed to swell and shrink, a pulse rather than a sway (owner Nov 6). The crown doesn't
+  // move of its own now: the trunk sways and carries it (the vertex shader; garden.js)
+  if (kind.startsWith('tc_')) return 5;
   if (kind === 'vines' || kind === 'pothos' || kind === 'l_mossroots' || kind.startsWith('h_')) return 2;
   return 3;
 }
@@ -348,9 +367,14 @@ const FOL_ATLAS = (() => {
   return { tex, size: new THREE.Vector2(AW, AH), repaint(){ for (const k of kinds) if (SG.has(k)) paint(k); }, stats };
 })();
 const FOL_SHADER = new THREE.ShaderMaterial({
-    uniforms: { lightsOn: LIGHTS_ON, lodPlants: LOD.plants, map:{value:FOL_ATLAS.tex}, atlasSize:{value:FOL_ATLAS.size}, tint:FOL_UNI.tint, time:FOL_UNI.time, normalMode:FOL_UNI.normalMode, neonI:FOL_UNI.neonI, res:FOL_UNI.res, wind:FOL_UNI.wind },
-    vertexShader: `uniform vec2 res; uniform float time; uniform float lodPlants; uniform float lightsOn; uniform float wind; varying float vPhase; attribute vec4 aVar; attribute float aFixed; attribute vec4 aRect; attribute vec2 aKind; attribute float aOn;
-      varying vec2 vUv; varying float vShade; varying vec4 vRect; varying vec2 vKind; varying float vFlk; varying float vOn;` + FLK_GLSL + LIT_GLSL + `
+    uniforms: { lightsOn: LIGHTS_ON, lodPlants: LOD.plants, map:{value:FOL_ATLAS.tex}, atlasSize:{value:FOL_ATLAS.size}, tint:FOL_UNI.tint, time:FOL_UNI.time, normalMode:FOL_UNI.normalMode, neonI:FOL_UNI.neonI, res:FOL_UNI.res, wind:FOL_UNI.wind, swayBand:FOL_UNI.swayBand },
+    vertexShader: `uniform vec2 res; uniform float time; uniform float lodPlants; uniform float lightsOn; uniform float wind; uniform float swayBand; varying float vPhase; attribute vec4 aVar; attribute float aFixed; attribute vec4 aRect; attribute vec2 aKind; attribute float aOn;
+      varying vec2 vUv; varying float vShade; varying vec4 vRect; varying vec2 vKind; varying float vFlk; varying float vOn; varying float vFade;` + FLK_GLSL + LIT_GLSL + TREE_SWAY_GLSL + `
+      // a plant lies on or against what it grows from (moss on the floor, ivy on a wall, a bush's foot on its pot), at the same depth: it's kept in front by a
+      // fixed nudge toward the camera, about 0.06 of a unit (the view is orthographic, near 10 to far 900: 2/890 of clip depth a unit). The polygon
+      // offset below did this alone, but how far it moves is up to each graphics chip: on some phones (a Pixel 7 in Chrome) it was too little, and the
+      // plants and the surface under them took turns in front as the view turned, a flicker (Nov 2)
+      const float DBIAS = 0.06*2.0/890.0;
       void main(){
         vShade = aVar.z; vRect = aRect; vKind = aKind; vOn = aKind.y > 0.5 ? litOn(aOn, lightsOn, time) : 1.0;
         // about one lit sign in ten flickers (picked from its random phase)
@@ -359,7 +383,7 @@ const FOL_SHADER = new THREE.ShaderMaterial({
         vec2 local = vec2(position.x*aVar.y, position.y + 0.5 - aVar.x);
         // sway happens in the fragment shader by sliding whole texel rows, so the quad itself never bends.
         // Widen it by 3 texels on each side so the shifted rows have room.
-        float pad = swayType > 0.5 ? (texSize.x + 6.0)/texSize.x : 1.0;
+        float pad = (swayType > 0.5 && swayType < 2.5) || (swayType > 3.5 && swayType < 4.5) ? (texSize.x + 6.0)/texSize.x : 1.0;   // (a standing plant, 3, and a crown, 5, move by their corners: no room needed)
         local.x *= pad;
         vUv = vec2((uv.x - 0.5)*pad + 0.5, uv.y);
         vPhase = aVar.w;
@@ -376,6 +400,25 @@ const FOL_SHADER = new THREE.ShaderMaterial({
             wp.xz += vec2(.75, .45)*(.35 + .65*lean)*wind*.05*tip;
           }
           gl_Position = projectionMatrix * viewMatrix * wp;
+          if (swayType > 2.5 && swayType < 3.5){
+            // a standing plant (a bush, a fern, a flower): its top leans with the breeze and its foot stays put. A free plant is two copies crossed in an X;
+            // their rows used to slide sideways, each copy along its own plane (and the second one mirrored), so the two moved different ways and the
+            // plant seemed to swell and shrink, a pulse (owner Nov 6). Now both copies' tops move the same way in the world, by whole render pixels
+            vec3 base = (modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+            float s = sin(time*1.6 + aVar.w) + 0.3*sin(time*3.3 + aVar.w*1.3);
+            vec2 d = vec2(.75, .45)*s*wind*1.3*length(instanceMatrix[1].xyz)/max(texSize.y, 1.0);   // (about a texel and a bit at the top, as the rows did)
+            vec4 c0 = projectionMatrix * viewMatrix * vec4(base, 1.0), c1 = projectionMatrix * viewMatrix * vec4(base + vec3(d.x, 0.0, d.y), 1.0);
+            gl_Position.xy += floor((c1.xy/c1.w - c0.xy/c0.w)*0.5*res + 0.5)/res*2.0*gl_Position.w*clamp(uv.y, 0.0, 1.0);
+          }
+          if (swayType > 4.5 && swayBand < 0.5){   // a tree's crown: carried by its trunk's sway (TREE_SWAY_GLSL), all its copies together, as one piece,
+            // moved by the trunk's sway where they meet (that height rides in the phase's whole part: canopy(), garden.js), rounded to whole render pixels
+            // so its pixels never swim
+            vec3 base = (modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+            vec2 d = treeSway(vec3(base.x, floor(aVar.w*5.17 + 0.001)*0.1, base.z), time, wind);
+            vec4 c0 = projectionMatrix * viewMatrix * vec4(base, 1.0), c1 = projectionMatrix * viewMatrix * vec4(base + vec3(d.x, 0.0, d.y), 1.0);
+            gl_Position.xy += floor((c1.xy/c1.w - c0.xy/c0.w)*0.5*res + 0.5)/res*2.0*gl_Position.w;
+          }
+          gl_Position.z -= DBIAS*gl_Position.w;
         } else {
           // free-standing: faces the camera, with its anchor and corners snapped to whole render pixels
           vec4 a = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(0.0,0.0,0.0,1.0);
@@ -383,29 +426,44 @@ const FOL_SHADER = new THREE.ShaderMaterial({
           vec2 ap = floor((a.xy*0.5 + 0.5)*res + 0.5);
           vec2 off = floor(vec2(projectionMatrix[0][0], projectionMatrix[1][1]) * local * vec2(sx, sy) * 0.5 * res + 0.5);
           off = mix(off, max(off, vec2(1.0)), step(vec2(1e-4), local));   // (at least a render pixel across: far out, small tufts rounded to nothing and the grass went)
-          gl_Position = vec4((ap + off)/res*2.0 - 1.0, a.z, 1.0);
+          gl_Position = vec4((ap + off)/res*2.0 - 1.0, a.z - DBIAS, 1.0);
         }
         // zoomed out: thin the plants and laundry (small sprites go first); lit signs always stay
         float thin = lodPlants * (aRect.w < 24.0 ? 0.6 : 0.4);   // (at most six tufts in ten, four plants in ten: fewer than before, since plants cost little and the gaps showed)
-        if (aKind.y < 0.5 && fract(aVar.w*5.17) < thin) gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
+        // (each one fades out over a stretch of zoom, a dither of its pixels (owner, Nov 4: plants popping out and in as the view zoomed), rather than
+        //  going at once; gone altogether only once the fade is through)
+        vFade = 1.0;
+        if (aKind.y < 0.5){ float k = fract(aVar.w*5.17), f = (k - thin)/0.12 + 1.0; vFade = clamp(f, 0.0, 1.0); if (f <= 0.0) gl_Position = vec4(0.0, 0.0, 2.0, 1.0); }
       }`,
     side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4,
     fragmentShader: `uniform sampler2D map; uniform vec2 atlasSize; uniform vec3 tint; uniform float normalMode; uniform float neonI;
-      uniform float time; uniform float wind;
-      varying vec2 vUv; varying float vShade; varying float vPhase; varying vec4 vRect; varying vec2 vKind; varying float vFlk; varying float vOn;
+      uniform float time; uniform float wind; uniform float swayBand;
+      varying vec2 vUv; varying float vShade; varying float vPhase; varying vec4 vRect; varying vec2 vKind; varying float vFlk; varying float vOn; varying float vFade;
       void main(){
+        // a plant fading out as the view zooms out (vFade, the vertex shader): its pixels go in a 4x4 ordered dither, screen-fixed, so it thins like pixel art
+        if (vFade < 0.999){ vec2 q = mod(floor(gl_FragCoord.xy), 4.0);
+          float b = q.y < 0.5 ? (q.x < 0.5 ? 0.0 : q.x < 1.5 ? 8.0 : q.x < 2.5 ? 2.0 : 10.0) : q.y < 1.5 ? (q.x < 0.5 ? 12.0 : q.x < 1.5 ? 4.0 : q.x < 2.5 ? 14.0 : 6.0)
+            : q.y < 2.5 ? (q.x < 0.5 ? 3.0 : q.x < 1.5 ? 11.0 : q.x < 2.5 ? 1.0 : 9.0) : (q.x < 0.5 ? 15.0 : q.x < 1.5 ? 7.0 : q.x < 2.5 ? 13.0 : 5.0);
+          if (vFade*16.0 <= b + 0.5) discard; }
         vec2 texSize = floor(vRect.zw + 0.5); float swayType = vKind.x;
         vec2 tx = vUv * texSize;                 // position in texels
         float row = floor(tx.y);
         float fromTop = (texSize.y - row) / texSize.y, fromBottom = (row + 0.5) / texSize.y;
-        float ph = vPhase, sh = 0.0;
+        float ph = vPhase;
+        // On a touch screen (swayBand 1) the sway moves a few bands instead of every row: rows sliding one at a time read as scanlines on a phone,
+        // which draws each pixel big (Pixel 7, Nov 3). A standing plant keeps its bottom third still (its pot or its base) and leans in three bands
+        // above it, more toward the top; laundry and hanging vines hang still from the top third and swing in two bands below. Each band moves in whole
+        // screen pixels rather than whole texels, so zoomed in (a texel several pixels wide) it glides in small steps instead of jumping
+        float hang = swayBand > 0.5 ? min(floor(fromTop*3.0), 2.0)/2.0 : fromTop;   // (laundry and vines: 0 at the top, 1 at the hem)
+        float lean = swayBand > 0.5 ? (fromBottom < 0.34 ? 0.0 : (min(floor((fromBottom - 0.34)/0.66*3.0), 2.0) + 1.0)/3.0) : fromBottom;   // (standing plants)
+        float sh = 0.0;
         if (swayType > 0.5 && swayType < 1.5)       // laundry: hangs from the line, the hem swings furthest
-          sh = wind*(1.3*sin(time*2.0 + ph - fromTop*1.4) + 0.45*sin(time*4.1 + ph*1.7))*fromTop;
+          sh = wind*(1.3*sin(time*2.0 + ph - hang*1.4) + 0.45*sin(time*4.1 + ph*1.7))*hang;
         else if (swayType > 1.5 && swayType < 2.5)  // hanging vines: a slow wave travelling down to the tips
-          sh = wind*(1.6*sin(time*1.3 + ph - fromTop*1.6) + 0.5*sin(time*2.9 + ph*2.0))*pow(fromTop, 1.4);
-        else if (swayType > 2.5 && swayType < 3.5)  // standing plants: tips lean with the breeze
-          sh = wind*(1.0*sin(time*1.6 + ph) + 0.3*sin(time*3.3 + ph*1.3))*fromBottom*fromBottom;
-        tx.x -= floor(sh + 0.5);                 // whole texels only, so pixels never break up
+          sh = wind*(1.6*sin(time*1.3 + ph - hang*1.6) + 0.5*sin(time*2.9 + ph*2.0))*pow(hang, 1.4);
+        // (standing plants, 3: they lean by their corners in the vertex shader)
+        if (swayBand > 0.5){ float tpp = max(abs(dFdx(tx.x)), 0.05); tx.x -= floor(sh/tpp + 0.5)*tpp; }   // (tpp: texels a screen pixel)
+        else tx.x -= floor(sh + 0.5);                 // whole texels only, so pixels never break up
         if (tx.x < 0.0 || tx.x >= texSize.x || tx.y < 0.0 || tx.y >= texSize.y) discard;
         vec4 c = texture2D(map, (floor(vRect.xy + 0.5) + floor(tx) + 0.5) / atlasSize);
         if (c.a < 0.5) discard;
@@ -415,6 +473,7 @@ const FOL_SHADER = new THREE.ShaderMaterial({
         gl_FragColor = normalMode > 0.5 ? vec4(0.5,0.5,1.0,1.0) : vec4(col, 1.0);
       }`,
 });
+FOL_SHADER.extensions.derivatives = true;   // (dFdx in the sway, on touch screens: WebGL 1 needs asking)
 mrtShader(FOL_SHADER, 'vec4(0.5, 0.5, 1.0, 1.0)'); FOL_SHADER.userData.cutout = true;   // (its normal-pass output, written alongside the color: core.js)
 // anchor: 'b' bottom sits on the point, 't' top hangs from it, 'c' centered
 // fixed: lie flat in P's orientation (P's local z is the surface's outward direction).
@@ -608,13 +667,20 @@ function folFar(loss){
 // as one batch of points. (Thousands of individual sprites used to cost one draw call each.)
 let glowList = null;
 const _gv = new THREE.Vector3();
+// Street and park lamps (LAMP_GLOW set round their glow call): the same pool of light on the ground, but a smaller,
+// fainter halo round the bulb, so they don't bloom out across the street. Stored under '<kind>_lamp', which draws its
+// halo at LAMP_HALO of the size; the night-light pass still lights the ground at the full size.
+let LAMP_GLOW = false;
+const LAMP_HALO = .55;
+const glowBase = k => k.endsWith('_lamp') ? k.slice(0, -5) : k;
 function glow(P,x,y,z,kind,s=1){
   if (LUX && LUX.haloAll) s *= LUX.haloAll;   // a district whose halos run smaller (the works)
   if (LUX && LUX.glows[kind]){ s *= LUX.haloK || 1; kind = LUX.glows[kind]; }
   if (DARK === true && !KEEP_LIGHT && GLOW_FLK[kind]){ _gv.set(x,y,z).applyMatrix4(P); if (posHash(_gv.x, _gv.y, _gv.z) < 80) return; }
   if (DARK > 0 && !KEEP_LIGHT && GLOW_FLK[kind]){ _gv.set(x,y,z).applyMatrix4(P); if (_gv.y > DARK) return; }   // (economy mode: the halos of the unlit levels go too)
   if (DARK === true && GLOW_FLK[kind]) s = -s;   // marks a halo that flickers hard (see glowPoints)
-  if (!glowList){ if (LIGHT_ONLY[kind]) return; const sp = new THREE.Sprite(GLOW[kind]); sp.position.set(x,y,z).applyMatrix4(P); sp.scale.set(Math.abs(s),Math.abs(s),1); sp.layers.set(1); glowGroup.add(sp); return; }
+  if (!glowList){ if (LIGHT_ONLY[kind]) return; const sp = new THREE.Sprite(GLOW[kind]); sp.position.set(x,y,z).applyMatrix4(P); const hs = Math.abs(s)*(LAMP_GLOW ? LAMP_HALO : 1); sp.scale.set(hs,hs,1); sp.layers.set(1); glowGroup.add(sp); return; }
+  if (LAMP_GLOW && !LIGHT_ONLY[kind]) kind += '_lamp';
   _gv.set(x,y,z).applyMatrix4(P); (glowList[kind] || (glowList[kind] = [])).push(_gv.x, _gv.y, _gv.z, s);
 }
 const GLOW_PTS_UNI = { scale:{ value: 20 } };
@@ -622,7 +688,7 @@ const GLOW_PTS_UNI = { scale:{ value: 20 } };
 const GLOW_NIGHT = { value: 1 };
 const GLOW_PTS = new THREE.ShaderMaterial({
   uniforms: { map:{ value: glowTex }, nightOp: GLOW_NIGHT, scale: GLOW_PTS_UNI.scale, time: FOL_UNI.time, lightsOn: LIGHTS_ON },
-  vertexShader: 'attribute float size; attribute vec4 aCol; attribute float aFlk; attribute float aOn; uniform float scale; uniform float nightOp; uniform float time; uniform float lightsOn; varying vec4 vCol;' + FLK_GLSL + BLINK_GLSL + LIT_GLSL + ' void main(){ float op = aCol.a < -1.5 ? mix(0.04, 1.0, blink(position.y, time)) : (aCol.a < 0.0 ? nightOp*litOn(aOn, lightsOn, time) : aCol.a); vCol = vec4(aCol.rgb, op * flicker(aFlk, time)); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_PointSize = size * scale; }',
+  vertexShader: 'attribute float size; attribute float aHalo; attribute vec4 aCol; attribute float aFlk; attribute float aOn; uniform float scale; uniform float nightOp; uniform float time; uniform float lightsOn; varying vec4 vCol;' + FLK_GLSL + BLINK_GLSL + LIT_GLSL + ' void main(){ float op = aCol.a < -1.5 ? mix(0.04, 1.0, blink(position.y, time)) : (aCol.a < 0.0 ? nightOp*litOn(aOn, lightsOn, time) : aCol.a); vCol = vec4(aCol.rgb, op * flicker(aFlk, time) * (aHalo < 1.0 ? .7 : 1.0)); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_PointSize = size * scale * aHalo; }',
   fragmentShader: 'uniform sampler2D map; varying vec4 vCol; void main(){ float a = texture2D(map, gl_PointCoord).a; gl_FragColor = vec4(vCol.rgb, a * vCol.a); }',
   transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
 });
@@ -633,7 +699,7 @@ const GLOW_FLK = { pink: 'neon', cyan: 'neon', amber: 'neon', warm: 'bulb', oran
 const LIGHT_ONLY = { spill: true, spill2: true };
 function glowPoints(gl){
   const lo = {}, vis = {};
-  for (const k in gl) (LIGHT_ONLY[k] ? lo : vis)[k] = gl[k];
+  for (const k in gl) (LIGHT_ONLY[glowBase(k)] ? lo : vis)[k] = gl[k];
   if (!Object.keys(lo).length) return glowPointsOf(gl);
   const g = new THREE.Group();
   if (Object.keys(vis).length) g.add(glowPointsOf(vis));
@@ -642,18 +708,18 @@ function glowPoints(gl){
 }
 function glowPointsOf(gl){
   let n = 0; for (const k in gl) n += gl[k].length/4;
-  const pos = new Float32Array(n*3), size = new Float32Array(n), col = new Float32Array(n*4), flk = new Float32Array(n), ons = new Float32Array(n);
+  const pos = new Float32Array(n*3), size = new Float32Array(n), col = new Float32Array(n*4), flk = new Float32Array(n), ons = new Float32Array(n), halo = new Float32Array(n);
   let i = 0;
   for (const k in gl){
-    const arr = gl[k], c = GLOW[k].color, op = k === 'blink' ? -2 : GLOW_FIXED[k] !== undefined ? GLOW_FIXED[k] : -1;
+    const b = glowBase(k), hk = b === k ? 1 : LAMP_HALO, arr = gl[k], c = GLOW[b].color, op = b === 'blink' ? -2 : GLOW_FIXED[b] !== undefined ? GLOW_FIXED[b] : -1;
     for (let q=0;q<arr.length;q+=4, i++){
       pos[i*3] = arr[q]; pos[i*3+1] = arr[q+1]; pos[i*3+2] = arr[q+2]; size[i] = Math.abs(arr[q+3]);
       col[i*4] = c.r; col[i*4+1] = c.g; col[i*4+2] = c.b; col[i*4+3] = op;
-      flk[i] = arr[q+3] < 0 ? heavyFlickerId() : flickerId(GLOW_FLK[k]); ons[i] = litOrder(arr[q], arr[q+1], arr[q+2])/255;
+      flk[i] = arr[q+3] < 0 ? heavyFlickerId() : flickerId(GLOW_FLK[b]); halo[i] = hk; ons[i] = litOrder(arr[q], arr[q+1], arr[q+2])/255;
     }
   }
   const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('size', new THREE.BufferAttribute(size, 1)); g.setAttribute('aCol', new THREE.BufferAttribute(col, 4)); g.setAttribute('aFlk', new THREE.BufferAttribute(flk, 1)); g.setAttribute('aOn', new THREE.BufferAttribute(ons, 1));
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('size', new THREE.BufferAttribute(size, 1)); g.setAttribute('aCol', new THREE.BufferAttribute(col, 4)); g.setAttribute('aFlk', new THREE.BufferAttribute(flk, 1)); g.setAttribute('aHalo', new THREE.BufferAttribute(halo, 1)); g.setAttribute('aOn', new THREE.BufferAttribute(ons, 1));
   g.computeBoundingSphere();
   const pts = new THREE.Points(g, GLOW_PTS); pts.layers.set(1); pts.layers.enable(4); pts.frustumCulled = false; return pts;   // layer 4: the night-light pass (sky.js)
 }

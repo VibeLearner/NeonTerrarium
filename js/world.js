@@ -240,8 +240,11 @@ function shadowRanges(o, g){
   SHADOW_STRIP.push([o, g]);
 }
 function shadowRangesDone(){ for (const [o, g] of SHADOW_STRIP){ o.userData.md = null; g.drawRange.start = 0; g.drawRange.count = cutRest(g.userData.cut); } SHADOW_STRIP = null; }
+// (CUT_UNDER: the ponds' mirror, garden.js, looks up from under the water: it draws the undersides too, the floors' and the overhangs' bottoms, which
+//  the camera never sees from above. Without them a building in the water was see-through, only its edges showing, owner Nov 6)
+let CUT_UNDER = false;
 function cutBefore(r, s, c, g){
-  const u = g.userData.cut, P = g.userData.pcs; g.drawRange.start = 0; g.drawRange.count = g.userData.full ? cutRest(u) : u.A;
+  const u = g.userData.cut, P = g.userData.pcs; g.drawRange.start = 0; g.drawRange.count = g.userData.full ? cutRest(u) : CUT_UNDER ? u.A + u.H : u.A;
   if (P && !g.userData.full && c === CULL.cam){ const t = multiRows(this, P, 0, 0); if (t !== false){ g.drawRange.start = 0; g.drawRange.count = t; } }
 }
 function cutAfter(r, s, c, g){ g.drawRange.start = 0; g.drawRange.count = cutRest(g.userData.cut); this.userData.md = null; }
@@ -466,7 +469,7 @@ function ovbBefore(r, s, c, g){
   g.drawRange.start = 0; g.drawRange.count = tot; mdSet(this, _ovS, _ovN, m);
 }
 let SIDE_SPLIT = false;   // (set while a plot or a megastructure is collected: see collect)
-const atlasable = m => m && m.isMeshToonMaterial && !m.map && m !== M.cloud && m !== ATLAS && m !== ATLAS_SIDE;
+const atlasable = m => m && m.isMeshToonMaterial && !m.map && !m.userData.live && m !== M.cloud && m !== ATLAS && m !== ATLAS_SIDE;
 // Faces nobody can ever see: wholly and well inside one of the piece's solid blocks (a box's end sunk into a wall, a post
 // buried in a slab). From any angle the block is in front of them. A block only counts if it's always drawn (never thinned
 // out when zoomed out), opaque and a true box. (Faces pressed flat against a block's face are kept: in testing they still
@@ -872,7 +875,8 @@ function buildPlatformBody(c){
   else if (c.sections.length) groundLot({ x, z, cls: c.sections[0].zone, elev: 0, base: CURB, deck: false, cross: cells.has(ckey(c.i, c.j + 1)) });
   else {
     box(G.asph, P, 0, .012, 0, LOT, .025, LOT);
-    if (c.green === 'grass'){   // laid to lawn, edge to edge, with grass growing up out of it
+    if (c.green === 'grass' && c.gd && c.gd.p) gardenTile(c, P);   // part of a garden: its piece, its pond (garden.js)
+    else if (c.green === 'grass'){   // laid to lawn, edge to edge, with grass growing up out of it
       lawn(P, 4);
       // a garden lawn: one kind of short grass, packed in an even overlapping grid so it reads as a single carpet
       const n = 20, st = LOT/n;
@@ -884,27 +888,30 @@ function buildPlatformBody(c){
     }
     else { const n = 7, st = LOT/n;
       for (let i=0;i<n;i++) for (let j=0;j<n;j++) if (!chance(.04)) box(pick(TILES.mid), P, (i-(n-1)/2)*st, .03, (j-(n-1)/2)*st, st - .05, .045, st - .05); }
-    for (let k=0;k<(chance(.75) ? 1 : 0) + (chance(.2) ? 1 : 0);k++) plant(pick(['bush','bushFlower','g_fern3','bonsai']), P, rnd(-1.3,1.3), .05, rnd(-1.3,1.3), rnd(.7,.95));
+    const gdn = c.green === 'grass' && c.gd && c.gd.p;   // (a garden plot dresses itself: no stray bushes or bench on top)
+    if (!gdn) for (let k=0;k<(chance(.75) ? 1 : 0) + (chance(.2) ? 1 : 0);k++) plant(pick(['bush','bushFlower','g_fern3','bonsai']), P, rnd(-1.3,1.3), .05, rnd(-1.3,1.3), rnd(.7,.95));
     if (c.green !== 'grass') for (let k=0;k<irand(3,5);k++) floorBig(P, rnd(-1.3,1.3), .056, rnd(-1.3,1.3), rnd(.8,1.15));   // moss and vines grown over the paving
-    if (chance(.4)){ const Pb = under(P, T(rnd(-.9,.9), .05, rnd(-.9,.9), pick([0, PI/2]))); box(M.wood, Pb, 0, .14, 0, .5, .04, .15); box(M.frame, Pb, 0, .07, 0, .42, .14, .1);
+    if (!gdn && chance(.4)){ const Pb = under(P, T(rnd(-.9,.9), .05, rnd(-.9,.9), pick([0, PI/2]))); box(M.wood, Pb, 0, .14, 0, .5, .04, .15); box(M.frame, Pb, 0, .07, 0, .42, .14, .1);
       for (const sx of [-.13, .13]) spotAt(Pb, sx, .16, 0, 'seat', null, [0, 1]); }
   }
   const lamp = ([sx,sz]) => { const Pl = T(x + sx*(LOT/2 - .25), 0, z + sz*(LOT/2 - .25), Math.atan2(-sz, sx));   // (its arm reaches out over the crossing)
     cyl(M.metalDark, Pl, 0, .65, 0, .03, 1.3); box(M.metalDark, Pl, .12, 1.3, 0, .26, .03, .03);
-    KEEP_LIGHT = true; box(M.bulb, Pl, .24, 1.26, 0, .12, .05, .1); glow(Pl, .24, 1.2, 0, 'warm', 1.4); KEEP_LIGHT = false; };
+    KEEP_LIGHT = true; box(M.lampBulb, Pl, .24, 1.26, 0, .12, .05, .1); LAMP_GLOW = true; glow(Pl, .24, 1.2, 0, 'warm', 1.4); LAMP_GLOW = false; KEEP_LIGHT = false; };
   // part of a park (see parkCells): a tall garden lamp with a lantern globe, throwing a much wider pool of light,
   // on every park tile, so the whole green is lit at night
   const parkLamp = () => { const Pl = T(x, 0, z);
     cyl(M.metalDark, Pl, 0, .08, 0, .12, .16); cyl(M.metalDark, Pl, 0, 1.0, 0, .035, 1.85); cyl(M.metalDark, Pl, 0, 1.25, 0, .05, .06);
     for (const a of [0, PI/2, PI, -PI/2]) box(M.metalDark, Pl, Math.sin(a)*.07, 1.9, Math.cos(a)*.07, .02, .14, .02);
-    KEEP_LIGHT = true; sph(M.bulb, Pl, 0, 2.02, 0, .13); cyl(M.metalDark, Pl, 0, 2.17, 0, .1, .04); glow(Pl, 0, 2.02, 0, 'warm', 2.3); KEEP_LIGHT = false; };
+    KEEP_LIGHT = true; sph(M.lampBulb, Pl, 0, 2.02, 0, .13); cyl(M.metalDark, Pl, 0, 2.17, 0, .1, .04); LAMP_GLOW = true; glow(Pl, 0, 2.02, 0, 'warm', 2.3); LAMP_GLOW = false; KEEP_LIGHT = false; };
   // the park lamps stand in the middle of every other plot, on a checkerboard laid over the whole island, so
   // however the green grows they keep an even spacing (and the plots between are lit from the four around them)
   // The street lamps: one at every other crossing, on a checkerboard laid over the whole island, so they stand at an even
   // spacing along every street whatever gets built (each crossing's lamp belongs to the plot on its -x,-z side, on that
   // plot's corner, its arm out over the crossing). (They used to be a coin toss per plot on a random corner: bunched up in
   // places, missing for blocks in others, none at all along the shops.) A dark street's lamp is its failing one.
-  if (!c.sections.length && c.park){ if ((c.i + c.j) % 2 === 0) parkLamp(); }
+  // a garden lights itself (its lanterns, gazebos, bridges): only its open lawns keep the park lamps, and no street lamps stand in it
+  if (!c.sections.length && c.green === 'grass' && c.gd && c.gd.p){ if (c.gd.p === 'lawn' && c.park && (c.i + c.j) % 2 === 0) parkLamp(); }
+  else if (!c.sections.length && c.park){ if ((c.i + c.j) % 2 === 0) parkLamp(); }
   else if (((c.i + c.j) % 2 + 2) % 2 === 0) lamp([1, 1]);
 }
 
@@ -952,7 +959,8 @@ function* buildStackGen(c){
     c.sections.forEach((sec, k) => { const s0 = k === 0 ? c.lift.y : sec.at !== undefined && sec.at > tops[k - 1] + .01 ? sec.at : null;
       if (s0 !== null) bl.push([s0, tops[k], k, k]); else { bl[bl.length - 1][1] = tops[k]; bl[bl.length - 1][3] = k; } });
     c.podBlocks = bl;
-    for (const [s0, , k0] of bl) podBrackets(c, s0, c.sections[k0].zone);
+    if (c.lift.sc) yield* podScaffolds(c, bl);   // (the building it hung from is gone: podOrphans)
+    else for (const [s0, , k0] of bl) podBrackets(c, s0, c.sections[k0].zone);
   } else if (c.lift){ KEEP_FINE++; try { liftScaffold(c, c.lift.y); } finally { KEEP_FINE--; } }   // (its thin legs kept at every zoom: core.js KEEP_FINE)
   rooftopBoard(c, y);
   steamVent(c);
@@ -1025,6 +1033,21 @@ function liftSnap(c, y, y0){
   if (y < CURB + LIFT_MIN) return null;
   if (ly > c.height - .5) ly = c.height - .5;
   return ly;
+}
+// Where a scaffold's legs stand on the roof below: a square lined up with the plot (so the legs rise straight and
+// parallel, not leaning in like a pyramid when the roof is small or turned), as big as fits wholly on the roof with
+// `inset` to spare, and no bigger than `cap`. Centered on the plot if that leaves it near full size, else on the roof.
+// Returns the four feet in plot-local [x, z], in QS order (-,-) (+,-) (+,+) (-,+).
+function roofFeet(c, rc, inset, cap){
+  const cx = rc.reduce((a, p) => a + p[0], 0)/rc.length - c.x, cz = rc.reduce((a, p) => a + p[2], 0)/rc.length - c.z;
+  const poly = rc.map(p => [p[0] - c.x, p[2] - c.z]).sort((a, b) => Math.atan2(a[1] - cz, a[0] - cx) - Math.atan2(b[1] - cz, b[0] - cx));
+  const inside = (x, z) => { let sg = 0; for (let k = 0; k < poly.length; k++){ const [ax, az] = poly[k], [bx, bz] = poly[(k + 1) % poly.length];
+    const cr = (bx - ax)*(z - az) - (bz - az)*(x - ax); if (Math.abs(cr) < 1e-9) continue; const s = Math.sign(cr); if (sg && s !== sg) return false; sg = s; } return true; };
+  const fit = (ox, oz) => { let lo = 0, hi = cap + inset; if (!inside(ox, oz)) return 0;
+    for (let it = 0; it < 18; it++){ const m = (lo + hi)/2; if (inside(ox - m, oz - m) && inside(ox + m, oz - m) && inside(ox + m, oz + m) && inside(ox - m, oz + m)) lo = m; else hi = m; }
+    return Math.max(.12, Math.min(cap, lo - inset)); };
+  const s0 = fit(0, 0), s1 = fit(cx, cz), [ox, oz, s] = s0 >= s1*.85 ? [0, 0, s0] : [cx, cz, s1];
+  return [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sz]) => [ox + sx*s, oz + sz*s]);
 }
 // neighbours a pod at deck height y0 can tie into: a building that rises past the deck (a pod too, if it hangs lower)
 function liftSupports(c, y0){
@@ -1099,9 +1122,7 @@ function liftScaffoldCom(c, y0){
   let feet = QS.map(([sx, sz]) => [sx*E, sz*E]);
   if (onRoof){
     const rc = c.liftRoof || QS.map(([sx, sz]) => [c.x + sx*.75, base, c.z + sz*.75]);
-    const cx = rc.reduce((a, p) => a + p[0], 0)/4, cz = rc.reduce((a, p) => a + p[2], 0)/4;
-    feet = QS.map(([sx, sz]) => { let best = rc[0], bd = -Infinity; for (const p of rc){ const d = sx*(p[0] - cx) + sz*(p[2] - cz); if (d > bd){ bd = d; best = p; } }
-      const k = tw*.75 + rnd(0, .08), dx = cx - best[0], dz = cz - best[2], l = Math.hypot(dx, dz) || 1; return [best[0] - c.x + dx/l*k, best[2] - c.z + dz/l*k]; });
+    feet = roofFeet(c, rc, tw*.6, E);
   }
   for (const [x, z] of feet){ trussCol(P, x, z, base, y0 - .24, tw, mat()); box(M.concDD, P, x, base + .03, z, .5, .06, .5); }
   const edges = feet.map((f, k) => [f[0], f[1], feet[(k + 1) % 4][0], feet[(k + 1) % 4][1]]);
@@ -1116,11 +1137,11 @@ function liftScaffoldCom(c, y0){
   for (let k = 0; k < irand(2, 4); k++){ const a = rnd(0, TAU), r = rnd(.6, 1.1); sagCable(P, Math.cos(a)*r, y0 - .25, Math.sin(a)*r, Math.cos(a + .6)*r*.6, y0 - rnd(1, 2.2), Math.sin(a + .6)*r*.6, rnd(.2, .5)); }
   // the street entrance: a steel booth with a lit shutter and a ladder cage up the scaffold (or a ladder from the roof below)
   const free = SIDES4.filter(d => !supKey.has(d.join()));
-  const hs = free.length ? free[hash('liftdoor', c.i, c.j) % free.length] : SIDES4[0];
+  const hs = LIFT_SIDE || (free.length ? free[hash('liftdoor', c.i, c.j) % free.length] : SIDES4[0]);
   // the lift: a glass shaft lit with neon, from the street to the deck, its glass cab carrying people up and down
   const LX = .5, LZ = 1.44;
   { const F = under(P, T(0, 0, 0, Math.atan2(hs[0], hs[1])));
-    liftShaftCom(F, LX, LZ, CURB, y0);
+    if (!LIFT_NOSHAFT) liftShaftCom(F, LX, LZ, CURB, y0);
     const Wp = (x, z) => new THREE.Vector3(x, 0, z).applyMatrix4(F);
     const cc = Wp(LX, LZ), fr = Wp(LX + .26, LZ), ix = Wp(LX, .85), g = Wp(1, 0), o = Wp(0, 0), gx = g.x - o.x, gz = g.z - o.z;
     c.liftCab = { x: cc.x, z: cc.z, fx: fr.x, fz: fr.z, nx: gx, nz: gz, ix: ix.x, iz: ix.z, y0, ry: Math.atan2(gx, gz), style: 'com' };
@@ -1215,9 +1236,7 @@ function liftScaffoldInd(c, y0){
   let feet = cols.map(([x, z]) => [x, z]);
   if (onRoof){
     const rc = c.liftRoof || cols.map(([sx, sz]) => [c.x + Math.sign(sx)*.75, base, c.z + Math.sign(sz)*.75]);
-    const cx = rc.reduce((a, p) => a + p[0], 0)/4, cz = rc.reduce((a, p) => a + p[2], 0)/4;
-    feet = cols.map(([sx, sz]) => { let best = rc[0], bd = -Infinity; for (const p of rc){ const d = sx*(p[0] - cx) + sz*(p[2] - cz); if (d > bd){ bd = d; best = p; } }
-      const k = .22 + rnd(0, .08), dx = cx - best[0], dz = cz - best[2], l = Math.hypot(dx, dz) || 1; return [best[0] - c.x + dx/l*k, best[2] - c.z + dz/l*k]; });
+    feet = roofFeet(c, rc, .2, E);
   }
   for (const [x, z] of feet){ if (!onRoof) box(M.concM, P, x, base + .3, z, .5, .6, .5); else box(M.concDD, P, x, base + .03, z, .34, .06, .34); iBeam(rust(), P, x, z, base + (onRoof ? .06 : .6), y0 - .37); }
   const edges = feet.map((f, k) => [f[0], f[1], feet[(k + 1) % 4][0], feet[(k + 1) % 4][1]]);
@@ -1242,10 +1261,10 @@ function liftScaffoldInd(c, y0){
   // the lift: a heavy lattice tower beside the deck on a side with no walkway, from the street up past the deck, its
   // steel cab lined in red neon carrying people between the street and the deck
   const free = SIDES4.filter(d => !supKey.has(d.join()));
-  const hs = free.length ? free[hash('liftdoor', c.i, c.j) % free.length] : SIDES4[0];
+  const hs = LIFT_SIDE || (free.length ? free[hash('liftdoor', c.i, c.j) % free.length] : SIDES4[0]);
   const LX = .5, LZ = 1.44;
   { const F = under(P, T(0, 0, 0, Math.atan2(hs[0], hs[1])));
-    liftShaftInd(F, LX, LZ, CURB, y0);
+    if (!LIFT_NOSHAFT) liftShaftInd(F, LX, LZ, CURB, y0);
     const Wp = (x, z) => new THREE.Vector3(x, 0, z).applyMatrix4(F);
     const cc = Wp(LX, LZ), fr = Wp(LX + .26, LZ), ix = Wp(LX, .85), g = Wp(1, 0), o = Wp(0, 0), gx = g.x - o.x, gz = g.z - o.z;
     c.liftCab = { x: cc.x, z: cc.z, fx: fr.x, fz: fr.z, nx: gx, nz: gz, ix: ix.x, iz: ix.z, y0, ry: Math.atan2(gx, gz), style: 'ind' };
@@ -1361,10 +1380,7 @@ function liftPlatformLux(c, y0){
   let feet = QS.map(([sx, sz]) => [sx*.92, sz*.92]);
   if (onRoof){
     const rc = c.liftRoof || QS.map(([sx, sz]) => [c.x + sx*.75, base, c.z + sz*.75]);
-    const cx = rc.reduce((a, p) => a + p[0], 0)/4, cz = rc.reduce((a, p) => a + p[2], 0)/4;
-    feet = QS.map(([sx, sz]) => { let best = rc[0], bd = -Infinity; for (const p of rc){ const d = sx*(p[0] - cx) + sz*(p[2] - cz); if (d > bd){ bd = d; best = p; } }
-      const k = .2, dx = cx - best[0], dz = cz - best[2], l = Math.hypot(dx, dz) || 1;
-      return [clamp(best[0] - c.x + dx/l*k, -H + .2, H - .2), clamp(best[2] - c.z + dz/l*k, -H + .2, H - .2)]; });
+    feet = roofFeet(c, rc, .18, Math.min(.92, H - .2));
   }
   for (const [x, z] of feet){
     box(LUX_STONE2, P, x, base + .08, z, .3, .16, .3); box(M.idGold, P, x, base + .165, z, .26, .02, .26);
@@ -1377,10 +1393,10 @@ function liftPlatformLux(c, y0){
   for (let k = 0; k < 4; k++) if (chance(.5*S.green)){ const d = SIDES4[k], F = under(P, T(0, 0, 0, Math.atan2(d[0], d[1]))); plant(hangKind(), F, rnd(-.8, .8), yb - .1, H - .05, rnd(.55, .75), 't', true); }
   // the lift: a gold-ringed glass tube on a side with no walkway
   const free = SIDES4.filter(d => !supKey.has(d.join()));
-  const hs = free.length ? free[hash('liftdoor', c.i, c.j) % free.length] : SIDES4[0];
+  const hs = LIFT_SIDE || (free.length ? free[hash('liftdoor', c.i, c.j) % free.length] : SIDES4[0]);
   const LX = .5, LZ = 1.5;
   { const F = under(P, T(0, 0, 0, Math.atan2(hs[0], hs[1])));
-    luxTube(F, LX, LZ, CURB, y0);
+    if (!LIFT_NOSHAFT) luxTube(F, LX, LZ, CURB, y0);
     const Wp = (x, z) => new THREE.Vector3(x, 0, z).applyMatrix4(F);
     const cc = Wp(LX, LZ), fr = Wp(LX + .29, LZ), ix = Wp(LX, .9), g = Wp(1, 0), o = Wp(0, 0), gx = g.x - o.x, gz = g.z - o.z;
     c.liftCab = { x: cc.x, z: cc.z, fx: fr.x, fz: fr.z, nx: gx, nz: gz, ix: ix.x, iz: ix.z, y0, ry: Math.atan2(gx, gz), style: 'lux' };
@@ -1430,6 +1446,50 @@ function liftPlatformLux(c, y0){
     const dA = new THREE.Vector3(0, 0, z0 + .05).applyMatrix4(F), dB = new THREE.Vector3(0, 0, ze - .06).applyMatrix4(F), o0 = new THREE.Vector3(0, 0, 0).applyMatrix4(F), fz = new THREE.Vector3(0, 0, 1).applyMatrix4(F), nx = fz.x - o0.x, nz = fz.z - o0.z;
     c.walks.push({ ax: a.x, az: a.z, bx: b.x, bz: b.z, y: y0 + .01, doors: [{ x: dA.x, z: dA.z, n: [nx, nz] }, { x: dB.x, z: dB.z, n: [-nx, -nz] }], col: 0xd8c8a0 });
   }
+}
+// A side pod whose building is gone (owner, Nov 4): with nothing beside it to hang from, each of its blocks stands on a scaffold of its own, the lowest
+// from the street (or the roof of a building under it), each one above from the roof of the block under it. One lift serves them all: the top block's,
+// from the street up past the others on the side every block leaves free for it (owner, Nov 6: a lift for each block, each on a side of its own, ran
+// up through the decks and homes of the blocks below). The pod's own deck, rails and lift are the scaffold's (liftScaffold, its zone's kind); the
+// beams and gangway to the old building go.
+function* podScaffolds(c, bl){
+  const keepTop = c.belowTop, keepRoof = c.liftRoof; let cab = null;
+  // the lift's side: one that every block leaves free (no neighbour holding it up there), so the one shaft passes them all clear
+  const sup = new Set(); for (const [s0] of bl) for (const d of liftSupports(c, s0)) sup.add(d.join());
+  const free = SIDES4.filter(d => !sup.has(d.join()));
+  LIFT_SIDE = free.length ? free[hash('liftdoor', c.i, c.j) % free.length] : null;
+  try {
+    for (let n = bl.length - 1; n >= 0; n--){
+      const [s0] = bl[n];
+      c.belowTop = n === 0 ? keepTop : bl[n - 1][1]; c.liftRoof = n === 0 ? keepRoof : null;
+      LIFT_NOSHAFT = n !== bl.length - 1; KEEP_FINE++;
+      try { liftScaffold(c, s0); } finally { KEEP_FINE--; LIFT_NOSHAFT = false; }
+      if (n === bl.length - 1) cab = c.liftCab;
+      yield;
+    }
+  } finally { c.belowTop = keepTop; c.liftRoof = keepRoof; LIFT_SIDE = null; }
+  c.liftCab = cab;
+}
+let LIFT_NOSHAFT = false, LIFT_SIDE = null;   // (a block of a stacked pod under the top one: its lift is the top block's: podScaffolds)
+// After a building is removed or cut down: the side pods that hung from it. One that a building on another side can hold (as tall as its highest
+// block) hangs from that one now; one that nothing can hold goes onto scaffolds (c.lift.sc). Never back again: a new building where the old one stood
+// leaves it on its scaffolds (owner, Nov 4: remove it and build it again to hang it off a wall). Returns the pods changed (to be built again).
+function podOrphans(near){
+  const out = [];
+  for (const n of near){ if (!n) continue;
+    for (const [a, b] of SIDES4){
+      const p = cells.get(ckey(n.i + a, n.j + b));
+      if (!p || p.mega || !p.lift || p.lift.v !== 2 || p.lift.sc || !p.sections.length) continue;
+      const [da, db] = p.lift.d || [1, 0]; if (p.i - da !== n.i || p.j - db !== n.j) continue;   // (it hangs from n?)
+      let yTop = p.lift.y; for (const s of p.sections) if (s.at !== undefined && s.at > yTop) yTop = s.at;
+      const holds = h => !!h && !h.mega && h.sections.length > 0 && h.height >= yTop + .3 && !(h.lift && h.lift.y > p.lift.y + .3);
+      if (holds(cells.get(ckey(p.i - da, p.j - db)))) continue;
+      const other = SIDES4.map(([x, z]) => cells.get(ckey(p.i + x, p.j + z))).find(h => h !== n && holds(h));
+      if (other) p.lift.d = [p.i - other.i, p.j - other.j]; else p.lift.sc = 1;
+      out.push(p);
+    }
+  }
+  return out;
 }
 // A bracketed side pod (residential): one home hung off the wall of the building beside it, no scaffold to the street.
 // Its deck of planks rests on two rusty steel beams, one down each side, run back across the gap and bolted into the
@@ -1544,16 +1604,14 @@ function liftScaffold(c, y0){
   // roof (taken inward a little, at random, so no two rigs stand alike); with nothing below, the street under the deck.
   // Each leg runs from its deck corner to its foot, leaning in or splaying out as the roof is narrower or turned, so it
   // always lands on the roof. Ledgers and braces join the legs along their actual lines.
-  const QS = [[-1, -1], [1, -1], [1, 1], [-1, 1]], top = QS.map(([sx, sz]) => [sx*E, y0 - .1, sz*E]);
-  let feet;
+  const QS = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+  let top = QS.map(([sx, sz]) => [sx*E, y0 - .1, sz*E]), feet;
   if (onRoof){
+    // on a roof: the legs stand on a square lined up with the plot that fits on the roof, and rise straight up to the
+    // deck's underside from there (the deck overhangs them), so they never lean in like a pyramid
     const rc = c.liftRoof || QS.map(([sx, sz]) => [c.x + sx*.6, base, c.z + sz*.6]);   // (no corners recorded: a safe square well inside)
-    const cx = rc.reduce((a, p) => a + p[0], 0)/4, cz = rc.reduce((a, p) => a + p[2], 0)/4;
-    feet = QS.map(([sx, sz]) => {   // the roof corner lying furthest toward this deck corner
-      let best = rc[0], bd = -Infinity; for (const p of rc){ const d = sx*(p[0] - cx) + sz*(p[2] - cz); if (d > bd){ bd = d; best = p; } }
-      const k = rnd(.08, .2), dx = cx - best[0], dz = cz - best[2], l = Math.hypot(dx, dz) || 1;
-      return [best[0] - c.x + dx/l*k, base, best[2] - c.z + dz/l*k];
-    });
+    const sq = roofFeet(c, rc, .1, E);
+    feet = sq.map(([x, z]) => [x, base, z]); top = sq.map(([x, z]) => [x, y0 - .1, z]);
   } else feet = top.map(([x, , z]) => [x + wobble(), base, z + wobble()]);
   const legAt = (k, y) => { const a = feet[k], b = top[k], u = Math.max(0, Math.min(1, (y - a[1])/(b[1] - a[1]))); return [a[0] + (b[0] - a[0])*u, a[2] + (b[2] - a[2])*u]; };
   for (let k = 0; k < 4; k++){
@@ -1577,12 +1635,12 @@ function liftScaffold(c, y0){
   }
   // the stair hut and ladder: on a side with no walkway, the pod's front door at street level
   const free = SIDES4.filter(d => !supKey.has(d.join()));
-  const hs = free.length ? free[hash('liftdoor', c.i, c.j) % free.length] : SIDES4[0];
+  const hs = LIFT_SIDE || (free.length ? free[hash('liftdoor', c.i, c.j) % free.length] : SIDES4[0]);
   // the lift: a slim shaft beside the deck on that side, from the street up past the deck, its cab carrying people
   // between the street and the deck (the cab itself moves: see the lifts in people.js)
   const LX = .5, LZ = 1.42;
   { const F = under(P, T(0, 0, 0, Math.atan2(hs[0], hs[1])));   // local +z out to that side
-    liftShaft(F, LX, LZ, CURB, y0);
+    if (!LIFT_NOSHAFT) liftShaft(F, LX, LZ, CURB, y0);
     const W = (x, z) => new THREE.Vector3(x, 0, z).applyMatrix4(F);
     const cc = W(LX, LZ), fr = W(LX + .26, LZ), ix = W(LX, .85), g = W(1, 0), o = W(0, 0), gx = g.x - o.x, gz = g.z - o.z;
     c.liftCab = { x: cc.x, z: cc.z, fx: fr.x, fz: fr.z, nx: gx, nz: gz, ix: ix.x, iz: ix.z, y0, ry: Math.atan2(gx, gz) };
@@ -2522,7 +2580,7 @@ function parkCells(){
 }
 // the plots an edit to these must rebuild (the plots themselves, a park's, an air-filter hologram's tower, a side pod hanging on them), the pods last
 function refreshTodo(list, megaList = []){
-  list = list.concat(parkCells());
+  list = list.concat(typeof gardenUpdate === 'function' ? gardenUpdate() : [], parkCells());   // (the gardens first: a plot's garden comes and goes with its lawn, garden.js)
   // an air-filter hologram hangs over the plots in front of its tower, so a change next door rebuilds the tower too
   for (const a of airCells){
     if (cells.get(ckey(a.i, a.j)) !== a){ airCells.delete(a); continue; }
@@ -2557,7 +2615,7 @@ const PLAT_BOTTOM = -5.6;
 function addPlatform(i, j, zone = null){
   if (Math.abs(i) > GRID_MAX || Math.abs(j) > GRID_MAX || cells.has(ckey(i,j))) return null;
   // phone mode (touch.js): a city grows to PHONE.maxPlots plots at most, so it stays smooth and fits a phone's memory (a bigger one loaded from a file still loads)
-  if (self.PHONE && PHONE.on && cells.size >= PHONE.maxPlots){ const h = document.getElementById('modeHint'); if (h) h.textContent = 'This city is as big as a phone can keep smooth (' + PHONE.maxPlots + ' plots) · build up, or rebuild what\'s there'; return null; }
+  if (self.PHONE && PHONE.on && cells.size >= PHONE.maxPlots){ const h = document.getElementById('modeHint'); if (h){ h.classList.add('bad'); h.hidden = false; } if (h) h.textContent = 'Max city size on a phone: build up instead'; return null; }
   const c = newCell(i, j, zone ? [{ zone, seed: (Math.random()*1e9)|0, style: styleNow() }] : []);
   c.style = styleNow();
   cells.set(ckey(i,j), c);
@@ -2574,10 +2632,15 @@ function removePlatform(c){
   finishAnimsOn(c); solidDrop(c);   // (out of its block's merge at once: see removeArea)
   const old = { view: c.view, data: c.data }; c.view = null; c.data = null;
   cells.delete(ckey(c.i, c.j)); dirtyRegions.add(regKey(c.i, c.j));
-  refresh(SIDES4.map(([a,b]) => cells.get(ckey(c.i+a, c.j+b))));
+  // (a station or drop-off whose lift stood on the plot goes; the track or road over it stays: track needs no plot under it, owner Nov 4)
+  if (typeof hwDropLiftless === 'function') hwDropLiftless();
+  if (typeof mtDropLiftless === 'function') mtDropLiftless();
+  const near = SIDES4.map(([a,b]) => cells.get(ckey(c.i+a, c.j+b))).filter(Boolean);
+  podOrphans([c]);   // (rebuilt with the plots round it, just below)
+  refresh([...near]);
   startAnim(c, 'remove', PLAT_BOTTOM, CURB + 1.4, null, LOT, old);
 }
-const MAX_SECTIONS = 4, MAX_HEIGHT = 24;
+const MAX_SECTIONS = 10, MAX_HEIGHT = 57;   // (raised from 4 and 24, about 25 floors, to about 60 floors: owner, Nov 4)
 function addSection(c, zone, opt = {}){   // (opt.mf: a single unit, that many floors at most: Space)
   if (c.wall) return;   // (never on a perimeter wall's plot, whatever asks)
   stageFinishNear([c]);
@@ -2740,6 +2803,7 @@ function removeSection(c){
   // (a pod gone: the pods next door that had walkways over to it are rebuilt without them)
   refresh(wasPod && !c.lift ? [c, ...SIDES4.map(([a, b]) => cells.get(ckey(c.i + a, c.j + b))).filter(n => n && n.lift && !n.mega)] : [c]);
   startAnim(c, 'remove', (c.sections.length ? c.height : CURB) - .05, top + 1.2, zone, SIDE, old);
+  { const o = podOrphans([c]); if (o.length){ refresh(o); save(); } }   // (a side pod it held up: onto another wall, or onto scaffolds)
 }
 // Delete mode: everything in a block of plots goes at once: megastructures that reach into it (whole), and every
 // plot in it, buildings and platform alike, each with the removal sweep. One rebuild for the lot at the end.
@@ -2763,11 +2827,16 @@ function removeArea(r){
     startAnim(c, 'remove', PLAT_BOTTOM, top + 1.4, zone, LOT, old);
   }
   for (const c of gone) for (const [a, b] of SIDES4){ const n = cells.get(ckey(c.i + a, c.j + b)); if (n) touched.add(n); }
-  for (const [i, j] of lines){ const n = cells.get(ckey(i, j)); if (n && !n.mega) touched.add(n); }   // (the plots the lines stood on, outside the block: their pillars and lifts go)
+  for (const p of podOrphans(gone)) touched.add(p);   // (side pods that hung from them: their settings change before the plots round the block are made again)
+  const lineCells = new Set();
+  for (const [i, j] of lines){ const n = cells.get(ckey(i, j)); if (n && !n.mega){ touched.add(n); lineCells.add(n); } }   // (the plots the lines stood on, outside the block: their pillars and lifts go)
+  if (typeof trSync === 'function') for (const n of trSync(lines)){ touched.add(n); lineCells.add(n); }   // (and any other plot whose lines changed: metro.js trSync)
   if (gone.length) areaAgentsLeave(inR);
   if (gone.length || lines.length){
     if (lines.length){ SC_DIRTY.unknown = true; shadowDirty = true; }
-    if (STAGE_ON() && !SYNC_NOW() && RW.usable() && touched.size){ refresh([]); stageRefresh([...touched]); }   // (the removed plots' blocks now; the plots round them by the worker)
+    // (the plots under what's left of a cut line are made here and now, as laying track does (mtCommit): through the worker, a station left at the cut
+    //  came without its lift, and the cut-off end kept its old one, until something else rebuilt that plot: owner, Nov 4)
+    if (STAGE_ON() && !SYNC_NOW() && RW.usable() && touched.size){ refresh([...lineCells]); const rest = [...touched].filter(n => !lineCells.has(n)); if (rest.length) stageRefresh(rest); }   // (the removed plots' blocks now; the plots round them by the worker)
     else refresh([...touched]);
     save(); sfx.play('remove');
   }
@@ -2803,6 +2872,7 @@ function dropView(old){ if (old.view) world.remove(old.view); disposeData(old.da
 // Shadows redraw when a sweep ends.
 renderer.localClippingEnabled = true;
 const anims = [], heldRegions = new Map(), pendingRegions = new Set();
+let ANIM_KEEP = null;   // (see endAnim)
 const OUTLINE_GEO = new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1));
 function holdRegion(c){ const k = regKey(c.i, c.j); heldRegions.set(k, (heldRegions.get(k) || 0) + 1); }
 function releaseRegion(k){
@@ -2912,7 +2982,10 @@ function endAnim(i){
   for (const l of a.lines){ scene.remove(l); l.material.dispose(); }
   a.view.traverse(o => { if (o.isMesh && o.userData.isOv){ o.visible = true; return; } if (o.isMesh){ o.material = o.userData.baseMat || o.material; if (o.userData.baseLayer !== undefined) o.layers.mask = o.userData.baseLayer; else o.layers.set(0); } });
   showHidden(a.view, false);
-  a.mats.atlas.dispose(); a.mats.nrm.dispose();
+  // (the first sweep's materials are kept, never disposed: three deletes a compiled shader when the last material using it is disposed, so every
+  //  build compiled the sweep's shader again, a frame drop of its own on each build on a phone (a Pixel 7, Nov 3). Kept, the shader stays and every
+  //  later sweep's materials share it. Only the first build of a session pays for it)
+  if (!ANIM_KEEP) ANIM_KEEP = a.mats; else { a.mats.atlas.dispose(); a.mats.nrm.dispose(); }
   if (a.kind === 'remove'){ dropView(a.old); if (a.c.view) a.c.view.visible = true; }
   if (a.held) releaseRegion(a.reg);
   shadowDirty = true;
@@ -2938,7 +3011,7 @@ const SAVE_KEY = 'neonIsland.v2';
 const MEGA_SAVE_KEY = 'neonIsland.megas';
 function save(){
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify([...cells.values()].map(c => [c.i, c.j, c.sections, c.style || DEFAULT_STYLE, c.green || 'some', c.lift ? c.lift.y : 0, c.lift && c.below ? c.below : 0, c.lift && c.lift.v === 2 ? c.lift.d : 0, c.wall ? { z: c.wall.zone, n: c.wall.n || 0, g: c.wall.gate ? 1 : 0, s: c.wall.seed } : 0])));   // (the last: a bracketed side pod, the way to the wall it hangs from)
+    localStorage.setItem(SAVE_KEY, JSON.stringify([...cells.values()].map(c => [c.i, c.j, c.sections, c.style || DEFAULT_STYLE, c.green || 'some', c.lift ? c.lift.y : 0, c.lift && c.below ? c.below : 0, c.lift && c.lift.v === 2 ? (c.lift.sc ? [c.lift.d[0], c.lift.d[1], 1] : c.lift.d) : 0, c.wall ? { z: c.wall.zone, n: c.wall.n || 0, g: c.wall.gate ? 1 : 0, s: c.wall.seed } : 0, typeof gdSave === 'function' ? gdSave(c) : 0])));   // (a bracketed side pod, the way to the wall it hangs from; then the wall; then the plot's garden piece, garden.js)
     localStorage.setItem(MEGA_SAVE_KEY, JSON.stringify([...megas.values()].map(m => ({ id: m.id, kind: m.kind, i: m.i, j: m.j, w: m.w, h: m.h, levels: m.levels, seed: m.seed, centre: m.centre || undefined, rot: m.rot, si: m.si, sj: m.sj }))));
   } catch (e) {}
   hwSave(); mtSave();
@@ -2947,7 +3020,7 @@ function load(){
   try {
     const d = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
     if (!Array.isArray(d) || !d.length) return false;
-    for (const [i,j,secs,st,gr,lf,bl,lv,wl] of d){ const c = newCell(i, j, (secs || []).filter(s => s && ZONES[s.zone])); c.style = st || DEFAULT_STYLE; c.green = GREEN_MODES.includes(gr) ? gr : 'some'; if (lf > 0 && c.sections.length){ c.lift = Array.isArray(lv) ? { y: lf, v: 2, d: lv } : { y: lf }; if (Array.isArray(bl)){ const b2 = bl.filter(s => s && ZONES[s.zone]); if (b2.length) c.below = b2; } } if (wl && wl.z && ZONES[wl.z] && !c.sections.length) c.wall = { zone: wl.z, n: Math.max(0, wl.n | 0), gate: !!wl.g, seed: wl.s | 0 }; cells.set(ckey(i,j), c); }
+    for (const [i,j,secs,st,gr,lf,bl,lv,wl,gdv] of d){ const c = newCell(i, j, (secs || []).filter(s => s && ZONES[s.zone])); c.style = st || DEFAULT_STYLE; c.green = GREEN_MODES.includes(gr) ? gr : 'some'; if (lf > 0 && c.sections.length){ c.lift = Array.isArray(lv) ? Object.assign({ y: lf, v: 2, d: [lv[0], lv[1]] }, lv[2] === 1 ? { sc: 1 } : {}) : { y: lf }; if (Array.isArray(bl)){ const b2 = bl.filter(s => s && ZONES[s.zone]); if (b2.length) c.below = b2; } } if (wl && wl.z && ZONES[wl.z] && !c.sections.length) c.wall = { zone: wl.z, n: Math.max(0, wl.n | 0), gate: !!wl.g, seed: wl.s | 0 }; if (gdv && !c.sections.length && !c.wall && typeof gdLoad === 'function') gdLoad(c, gdv); cells.set(ckey(i,j), c); }
     hwLoad(); mtLoad();   // (before the plots are built: the highways' and the metro's pillars stand on them)
     if (typeof renderBmenu === 'function') renderBmenu();   // (a city with highways or a metro has Transit, whatever its megastructures: it was hidden when they loaded after the menu was drawn)
     try { for (const m of JSON.parse(localStorage.getItem(MEGA_SAVE_KEY) || '[]')) { const mm = placeMega(m.kind, m.i, m.j, m.seed, m.w, m.h, m.levels, m.id || null); if (mm && m.centre) mm.centre = m.centre; if (mm && Number.isInteger(m.rot)) mm.rot = ((m.rot % 4) + 4) % 4; if (mm && Number.isInteger(m.si) && Number.isInteger(m.sj)){ mm.si = m.si; mm.sj = m.sj; } } } catch (e) {}
@@ -3116,7 +3189,7 @@ function pickAt0(){
   for (const c of cells.values()){
     let h = pickBox(c.x - LOT/2, -.8, c.z - LOT/2, c.x + LOT/2, CURB, c.z + LOT/2);
     if (h && (!best || h.t < best.t - 1e-4)) best = { t: h.t, n: h.n, o: c, slab: true };
-    if (c.lift && c.lift.v !== 2 && !c.mega && c.sections.length){ const gt = groundTop(c);   // (not under a bracketed pod: the street runs open under it)
+    if (c.lift && !(c.lift.v === 2 && !c.lift.sc) && !c.mega && c.sections.length){ const gt = groundTop(c);   // (not under a bracketed pod: the street runs open under it)
       h = pickBox(c.x - SIDE/2, gt, c.z - SIDE/2, c.x + SIDE/2, c.lift.y - .15, c.z + SIDE/2);
       if (h && (!best || h.t < best.t - 1e-4)) best = { t: h.t, n: h.n, o: c, gap: true }; }
   }
@@ -3293,9 +3366,10 @@ function applyTarget(t){
   if (t.type === 'onto' && t.c.lift){ return zone ? addBelowUp(t.c, zone) : null; }
   if (t.type === 'side'){ if (!zone) return null; const c = t.c || addPlatform(t.i, t.j, null); if (c) finishAnimsOn(c);
     // residential: a single home on brackets off the wall (the other zones keep their scaffolds for now)
-    if (c && c.lift && c.lift.v === 2) return addFloatPod(c, t.y, zone);
     const opt = t.from ? { d: [t.i - t.from.i, t.j - t.from.j], mf: 1 } : {};   // (a single pod on brackets, every zone)
-    return c ? addLift(c, t.y, zone, opt) : null; }
+    const r = c && c.lift && c.lift.v === 2 ? addFloatPod(c, t.y, zone) : c ? addLift(c, t.y, zone, opt) : null;
+    if (r && typeof tEmit === 'function') tEmit('side');   // (nt:side: the tutorials, pctut.js and tutorial.js)
+    return r; }
   if (!zone && t.type === 'onto' && !t.c.mega && !t.c.sections.length){ cycleGreen(t.c); if (typeof tEmit === 'function') tEmit('surface'); return t.c; }   // no zone picked: an empty plot's greenery cycles
   if (!zone || t.c.mega) return null;
   addSection(t.c, zone, t.after !== undefined ? { after: t.after } : {}); return t.c;

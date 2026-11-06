@@ -10,8 +10,63 @@
 //  - press and hold anything that explains itself in a hover tooltip (a title) and the explanation shows on a plate; Settings' rows get an "i" too
 //  - small vibrations on a build and a removal (Android; a setting)
 'use strict';
+// Restore: a removed building's plot as it was (its pieces, pod, ground, greenery and style), and putting it back. Shared by a finger's Restore chip (TUI,
+// below) and the mouse's (input.js, after a right-click removal: owner, Nov 4)
+const RESTORE = (() => {
+  const clone = v => v === undefined || v === null ? v : JSON.parse(JSON.stringify(v));
+  const snap = pk => {
+    if (!pk || pk.kind === 'sky' || !pk.c || pk.c.mega || pk.c.wall) return null;
+    const c = pk.c; return { i: c.i, j: c.j, sections: clone(c.sections), lift: clone(c.lift), below: clone(c.below), green: c.green, style: c.style };
+  };
+  function put(s){
+    try {
+      let c = cells.get(ckey(s.i, s.j));
+      if (!c){ c = addPlatform(s.i, s.j, null); if (!c) return false; }
+      stageFinishNear([c]); finishAnimsOn(c);
+      const top = s.sections && s.sections.length ? s.sections[s.sections.length - 1].zone : null;
+      if (top) holdRegion(c);   // (only when a build sweep follows to let it go: see freshRebuild in input.js)
+      const old = { view: c.view, data: c.data }; c.view = null; c.data = null;
+      c.sections = clone(s.sections) || []; c.lift = clone(s.lift) || null; c.below = clone(s.below) || null; if (s.green) c.green = s.green; if (s.style) c.style = s.style;
+      const near = SIDES4.map(([a, b]) => cells.get(ckey(c.i + a, c.j + b))).filter(n => n && n.lift && !n.mega);
+      refresh([c, ...near]); dropView(old);
+      if (top) startAnim(c, 'build', CURB - .05, c.height + 1.2, top, SIDE, null);
+      return true;
+    } catch (e){ console.warn('restore', e); return false; }
+  }
+
+  // the mouse's Restore button (owner, Nov 4: a finger had one, a right-click had none): just above "Hover for controls" and "City settings", for three
+  //  seconds, or until something else is built (owner, Nov 4). Another right-click moves it on to that removal
+  let btn = null, held = null, tm = 0;
+  const hide = () => { if (btn) btn.hidden = true; held = null; clearTimeout(tm); };
+  function place(){
+    const row = document.querySelector('.zonebar .ctlwrap.hint'); if (!row) return;
+    let top = row.getBoundingClientRect().top;
+    for (const id of ['modeHint', 'tiltChip']){ const e = document.getElementById(id); if (e && !e.hidden && e.offsetHeight) top = Math.min(top, e.getBoundingClientRect().top); }
+    const r = row.getBoundingClientRect(), cb = document.getElementById('puCityBtn'), q = cb && cb.offsetWidth ? cb.getBoundingClientRect() : r;   // (centered over both: Hover for controls and City settings)
+    btn.style.left = Math.round((Math.min(r.left, q.left) + Math.max(r.right, q.right))/2) + 'px'; btn.style.top = Math.round(top - 8) + 'px';
+  }
+  function offer(s){
+    if (typeof TOUCH !== 'undefined' && TOUCH.on) return;
+    if (!btn){ btn = document.createElement('button'); btn.type = 'button'; btn.className = 'pcrestore'; btn.textContent = '\u21BA Restore'; btn.hidden = true; document.body.appendChild(btn);
+      btn.addEventListener('pointerdown', e => e.stopPropagation());
+      btn.addEventListener('click', () => { const v = held; hide(); if (v && put(v)) dispatchEvent(new CustomEvent('nt:restore')); }); }
+    held = s; btn.hidden = false; place();
+    clearTimeout(tm); tm = setTimeout(hide, 3000);
+  }
+  // something else built: the chance to undo the removal is over (a finger's chip too: TUI below)
+  //  (every way of building goes through one of these: a click or tap (applyTarget, which walls go through too), a picked height (hlBuild), Space's floor
+  //  (unitAt), a megastructure (placeFromMenu), a piece of highway or metro (hwApply, mtApply). Each is wrapped once everything has loaded)
+  const over = () => { hide(); if (typeof TUI !== 'undefined' && TUI.hideRestore) TUI.hideRestore(); };
+  addEventListener('DOMContentLoaded', () => {
+    for (const name of ['applyTarget', 'hlBuild', 'unitAt', 'placeFromMenu', 'hwApply', 'mtApply']){
+      const f = self[name]; if (typeof f !== 'function' || f._restoreWrapped) continue;
+      const w = function(){ const r = f.apply(this, arguments); if (r) over(); else if (name === 'hlBuild') over(); return r; }; w._restoreWrapped = true; self[name] = w;
+    }
+  });
+  return { snap, put, offer };
+})();
 const TUI = (() => {
-  const U = { buzz(){}, ring(){}, snapCell(){ return null; }, offerRestore(){}, megaTap(){ return false; }, eraseChip(){}, aimTip(){}, toast(){} };
+  const U = { buzz(){}, ring(){}, snapCell(){ return null; }, offerRestore(){}, hideRestore(){}, megaTap(){ return false; }, eraseChip(){}, aimTip(){}, toast(){} };
   if (typeof TOUCH === 'undefined' || !TOUCH.on) return U;
   const $ = id => document.getElementById(id);
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
@@ -33,12 +88,8 @@ const TUI = (() => {
     ring.style.left = x + 'px'; ring.style.top = y + 'px'; ring.style.setProperty('--ms', Math.max(100, ms - 140) + 'ms');
     ringT = setTimeout(() => { void ring.offsetWidth; ring.classList.add('on'); }, 140); };
 
-  /* ---------- Restore: the last removal, put back ---------- */
-  const clone = v => v === undefined || v === null ? v : JSON.parse(JSON.stringify(v));
-  U.snapCell = pk => {
-    if (!pk || pk.kind === 'sky' || !pk.c || pk.c.mega || pk.c.wall) return null;
-    const c = pk.c; return { i: c.i, j: c.j, sections: clone(c.sections), lift: clone(c.lift), below: clone(c.below), green: c.green, style: c.style };
-  };
+  /* ---------- Restore: the last removal, put back (the snapshot and the putting back: RESTORE, above, shared with the mouse) ---------- */
+  U.snapCell = pk => RESTORE.snap(pk);
   const chip = el('button', 'trestore', 'Restore'); chip.type = 'button'; chip.hidden = true; document.body.appendChild(chip);
   let chipSnap = null, chipT = 0;
   // (it sits just above the zone card, the Perimeter button's size, owner Oct 30: placed from their boxes each time it shows)
@@ -48,23 +99,9 @@ const TUI = (() => {
     const w = pr && pr.width ? pr.width : r.width, h = pr && pr.height ? pr.height : 15;
     chip.style.left = Math.round(r.left + (r.width - w)/2) + 'px'; chip.style.width = Math.round(w) + 'px'; chip.style.height = Math.round(h) + 'px';
     const top = col ? col.getBoundingClientRect().top : r.top; chip.style.bottom = Math.round(innerHeight - top + (document.documentElement.classList.contains('tport') ? 18 : 8)) + 'px'; };   // (upright: clear of the zone deck's peeking edges)
-  U.offerRestore = snap => { chipSnap = snap; chip.hidden = false; placeChip(); clearTimeout(chipT); chipT = setTimeout(() => { chip.hidden = true; chipSnap = null; }, 5000); };
-  chip.addEventListener('click', () => { const s = chipSnap; chip.hidden = true; chipSnap = null; clearTimeout(chipT); if (s && restore(s)){ U.buzz(12); dispatchEvent(new CustomEvent('nt:restore')); } });
-  function restore(s){
-    try {
-      let c = cells.get(ckey(s.i, s.j));
-      if (!c){ c = addPlatform(s.i, s.j, null); if (!c) return false; }
-      stageFinishNear([c]); finishAnimsOn(c);
-      const top = s.sections && s.sections.length ? s.sections[s.sections.length - 1].zone : null;
-      if (top) holdRegion(c);   // (only when a build sweep follows to let it go: see freshRebuild in input.js)
-      const old = { view: c.view, data: c.data }; c.view = null; c.data = null;
-      c.sections = clone(s.sections) || []; c.lift = clone(s.lift) || null; c.below = clone(s.below) || null; if (s.green) c.green = s.green; if (s.style) c.style = s.style;
-      const near = SIDES4.map(([a, b]) => cells.get(ckey(c.i + a, c.j + b))).filter(n => n && n.lift && !n.mega);
-      refresh([c, ...near]); dropView(old);
-      if (top) startAnim(c, 'build', CURB - .05, c.height + 1.2, top, SIDE, null);
-      return true;
-    } catch (e){ console.warn('restore', e); return false; }
-  }
+  U.offerRestore = snap => { chipSnap = snap; chip.hidden = false; placeChip(); clearTimeout(chipT); chipT = setTimeout(() => { chip.hidden = true; chipSnap = null; }, 3000); };   // (three seconds, or until something else is built: owner, Nov 4)
+  U.hideRestore = () => { chip.hidden = true; chipSnap = null; clearTimeout(chipT); };
+  chip.addEventListener('click', () => { const s = chipSnap; chip.hidden = true; chipSnap = null; clearTimeout(chipT); if (s && RESTORE.put(s)){ U.buzz(12); dispatchEvent(new CustomEvent('nt:restore')); } });
 
   /* ---------- megastructures: the holo-tags ---------- */
   // The tag over a tapped megastructure (owner, Oct 31: no card any more). One with a screen gets its button, which opens it; the LIDAR Array gets SCAN,

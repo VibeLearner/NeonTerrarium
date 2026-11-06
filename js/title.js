@@ -447,7 +447,7 @@ const TITLE = (() => {
     setTimeout(() => { const c = menu.querySelector('[data-act="continue"]'); if (c) c.focus({ preventScroll: true }); }, 60);
   };
   T.hide = (instant) => {
-    if (!T.on) return;
+    if (!T.on || (T.leaving && !instant)) return;   // (already on the way in: a second click on Continue started the push again, owner Nov 4)
     closePanel(); setDeck(false);
     if (instant || reduced){ finish(); return; }
     root.classList.add('leaving'); T.leaving = true; leaveAt = performance.now(); crossed = false;
@@ -522,6 +522,7 @@ const TITLE = (() => {
   // the settings deck's own Close button closes it here too
   { const tg = $t('deckToggle'); if (tg) tg.addEventListener('click', () => { if (T.on && !$t('deck').classList.contains('open')) document.documentElement.classList.remove('title-deck'); }); }
   menu.addEventListener('click', e => {
+    if (T.leaving) return;   // (on the way in: the menu is going, nothing on it does anything)
     const b = e.target.closest('button'); if (!b) return;
     const act = b.dataset.act;
     if (act === 'continue'){

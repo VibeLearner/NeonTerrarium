@@ -4,7 +4,7 @@
 // settings) is global and not part of the recipe: see tools/perf/recipe_proof.py for how that was checked.
 // recipeGen(r) makes the plot from the recipe alone, on a stand-in cell in a map holding only the plot and stand-ins for its four neighbors that throw when read,
 // so a builder reading any neighbor field fails loudly. Same steps as rebuildCell, nothing of the live city changed.
-const RECIPE_IN = ['i', 'j', 'x', 'z', 'green', 'style', 'mega', 'park', 'sections', 'below', 'lift', 'wall', 'wallN', 'wallG', 'wallB', 'wallR', 'wallRL', 'wallCap'];   // (wall: a perimeter, with its neighbors and any highway cap worked out here: perimeter.js wallPrep)
+const RECIPE_IN = ['i', 'j', 'x', 'z', 'green', 'style', 'mega', 'park', 'sections', 'below', 'lift', 'wall', 'wallN', 'wallG', 'wallB', 'wallR', 'wallRL', 'wallCap', 'gd'];   // (gd: a garden plot's piece and what it needs of its neighbours, garden.js; wall: a perimeter, with its neighbors and any highway cap worked out here: perimeter.js wallPrep)
 // a plot that may throw the air-filter hologram (rooftopBoard picks it from the plot alone; whether there is room is decided by the neighbors' heights)
 function recipeIsAir(c){ const key = c.i + ',' + c.j; return window.AIR_FORCE === key || (!(window.WALL_FORCE === key || hash('wallholo', c.i, c.j) % WALL_HOLO_ODDS === 0) && hash('airholo', c.i, c.j) % AIR_HOLO_ODDS === 0); }
 function recipeOf(c){
@@ -21,7 +21,7 @@ function recipeOf(c){
   if (at.length){ r.nbi = []; for (const [a, b] of at){ const n = cells.get(ckey(c.i + a, c.j + b)); if (n && !r.nbi.some(e => e[0] === a && e[1] === b)) r.nbi.push([a, b, { mega: !!n.mega, sec: n.sections.length, height: n.height, liftY: n.lift ? n.lift.y : null }]); } }
   // a luxury pod's walkways ask how far the neighbor's wall really stands (wallGap): the triangles of the neighbor in the corridor, taken here from its own geometry
   // (a bracketed pod's beams too: from its deck's edge to the wall, the whole height of its stack, see podBrackets)
-  const br = c.lift && c.lift.v === 2;
+  const br = c.lift && c.lift.v === 2 && !c.lift.sc;
   if (c.lift && c.sections[0] && (c.sections[0].zone === 'high' || br)) for (const [a, b] of SIDES4){
     const n = cells.get(ckey(c.i + a, c.j + b)), e = n && r.nbi.find(q => q[0] === a && q[1] === b); if (!e || !n.data || !n.data.geo) continue;
     const F = under(T(c.x, 0, c.z), T(0, 0, 0, Math.atan2(a, b))), { a: pa, b: pb } = br ? wallCorridor(F, POD_Z1, POD_FAR) : wallCorridor(F, LOT - 1.05, 1.6), y0 = c.lift.y;
@@ -107,7 +107,7 @@ function recipePack(raw, geoOnly){
     if (id !== undefined && out.has(v)) return { $r: id };
     if (open.has(v)) throw new Error('recipePack: a cycle');
     let o;
-    if (v.isVector3) o = { $v3: [v.x, v.y, v.z] };
+    if (v.isVector3) o = { $v3: typeof v.roofY === "number" ? [v.x, v.y, v.z, v.roofY] : [v.x, v.y, v.z] };   // (a steam source's ceiling rides along)
     else if (v.isVector2) o = { $v2: [v.x, v.y] };
     else if (v.isMatrix4) o = { $m4: v.elements.slice() };
     else if (v.isColor) o = { $c: [v.r, v.g, v.b] };
@@ -147,7 +147,7 @@ function recipeUnpack(m){
     if (v === null || typeof v !== 'object' || ArrayBuffer.isView(v)) return v;
     if (v.$r !== undefined) return table.get(v.$r);
     if (v.$i !== undefined){ const o = up(v.v); table.set(v.$i, o); return o; }
-    if (v.$v3) return new THREE.Vector3(v.$v3[0], v.$v3[1], v.$v3[2]);
+    if (v.$v3){ const o = new THREE.Vector3(v.$v3[0], v.$v3[1], v.$v3[2]); if (v.$v3.length > 3) o.roofY = v.$v3[3]; return o; }
     if (v.$v2) return new THREE.Vector2(v.$v2[0], v.$v2[1]);
     if (v.$m4){ const x = new THREE.Matrix4(); x.elements = v.$m4; return x; }
     if (v.$c) return new THREE.Color(v.$c[0], v.$c[1], v.$c[2]);
@@ -199,7 +199,7 @@ RW.start = () => {
   if (window.__realNow && !window.__GEN_WORKER) return;
   const scripts = [...document.scripts].map(s => s.src).filter(Boolean);
   const three = scripts.find(u => /three(\.min)?\.js/.test(u)), bgu = scripts.find(u => /BufferGeometryUtils/.test(u));
-  const names = ['matreg', 'core', 'spritegen', 'artgen', 'peoplegen', 'sprites', 'buildings', 'ground', 'vehicles', 'sky', 'audio', 'world', 'perimeter', 'mega', 'people', 'highway', 'metro', 'recipe'];
+  const names = ['matreg', 'core', 'spritegen', 'artgen', 'peoplegen', 'sprites', 'buildings', 'ground', 'vehicles', 'sky', 'audio', 'world', 'garden', 'perimeter', 'mega', 'people', 'highway', 'metro', 'recipe'];
   const urls = names.map(n => scripts.find(u => u.includes('/js/' + n + '.js'))); if (!three || urls.some(u => !u)) return;
   RW.state = 'loading';
   try { RW.w = new Worker(RW.src.replace('recipe.js', 'recipeworker.js')); } catch (e){ RW.state = 'failed'; RW.error = String(e); return; }

@@ -140,11 +140,12 @@ function hwTargetAt(pk){
 }
 
 /* ---------- making changes ---------- */
+let HW_BATCH = false;   // (as MT_BATCH, metro.js)
 function hwCommit(h, touched){
-  hwReindex();
+  hwReindex(); if (HW_BATCH) return;
   if (h) hwBuildView(h);
   hwClearCars(h);
-  const list = [...new Set(touched.map(([i, j]) => cells.get(ckey(i, j))).filter(Boolean))];
+  const list = [...new Set([...touched.map(([i, j]) => cells.get(ckey(i, j))).filter(Boolean), ...(typeof trSync === 'function' ? trSync(touched) : [])])];
   refresh(list);   // the pillars and the lift shaft stand on the plots (see hwFeet), so the walking paths go round them
   SC_DIRTY.unknown = true; shadowDirty = true;
 }
@@ -160,7 +161,7 @@ function hwApply(t){
     const h = t.h, e = h.tiles[h.tiles.length - 1];
     h.done = true; h.side = t.side; hwActive = h; hwCommit(h, [[e.i, e.j], [Math.round(hwLiftSpot(h, h.side).sx/LOT), Math.round(hwLiftSpot(h, h.side).sz/LOT)]]);
   } else return false;
-  sfx.play('place'); return true;
+  if (!HW_BATCH) sfx.play('place'); return true;
 }
 // right-click a highway plot: the drop-off goes first (the line stays, open again); anywhere else it's cut back to
 // before that plot (the whole thing, from its entry)
@@ -192,7 +193,14 @@ function hwRemoveArea(r){
   }
   return out;
 }
-function hwClearAll(){ for (const h of highways){ hwDropView(h); hwClearCars(h); } highways = []; hwActive = null; hwReindex(); }
+// a plot gone from under a drop-off's lift (a right-click on the bare plot): the drop-off goes, the road stays, open there again (owner, Nov 4)
+function hwDropLiftless(){
+  const lost = (x, z) => !cells.get(ckey(Math.round(x/LOT), Math.round(z/LOT)));
+  for (const h of highways){ if (!h.done) continue; const L = hwLiftSpot(h, h.side);
+    if (!lost(L.sx, L.sz) && !lost(L.stand.x, L.stand.z)) continue;
+    const e = h.tiles[h.tiles.length - 1]; h.done = false; hwCommit(h, [[e.i, e.j], [Math.round(L.sx/LOT), Math.round(L.sz/LOT)], [Math.round(L.stand.x/LOT), Math.round(L.stand.z/LOT)]]); }
+}
+function hwClearAll(){ for (const h of highways){ hwDropView(h); hwClearCars(h); } highways = []; hwActive = null; hwReindex(); if (typeof MT_SIG !== 'undefined') MT_SIG = null; }
 function hwSetLanes(n){
   hwLanesPick = n;
   const h = hwActive && highways.includes(hwActive) ? hwActive : null;
@@ -850,15 +858,42 @@ function hwShowGhost(t){
   hwGhost.pole.position.set(x, (top + by)/2, z); hwGhost.pole.scale.set(.06, Math.max(.01, top - by), .06);
   hwGhost.g.visible = true;
 }
+// The rules' reasons (hwTileWhy, mtTileWhy and the rest), cut down to a few plain words. Every refusal shows these, mouse and finger alike
+// (owner, Nov 4: error messages short and easy to understand)
+const WHY_SHORT = [
+  [/off the map/, 'Edge of the world'], [/megastructure/, 'Blocked by a megastructure'],
+  [/sky ramp would hit a building/, 'No room for the ramp: a building'], [/sky ramp/, 'No room for the ramp'],
+  [/building is too tall/, 'Blocked by a tall building'], [/building is in the way/, 'Blocked by a building: go higher'],
+  [/another highway is there/, 'Another highway in the way'], [/metro line is already here/, 'Another line in the way'],
+  [/metro station's lift/, 'A station lift is in the way'], [/metro is in the way/, 'The metro is in the way'],
+  [/highway's ramp/, 'A highway ramp is in the way'], [/sky highway is in the way/, 'A highway is in the way'],
+  [/station's lift|lift has no room|room here for the/, 'No room for the lift: the station needs a tile under it, clear on one side'], [/lift down to the street/, 'No room for the lift'],
+  [/stays a station/, 'Go straight on from the end station'], [/straight track/, 'Stations need straight track'],
+  [/too close to another station/, 'Too close to another station'], [/come into the first station from behind/, 'Close the loop from behind the station'],
+  [/needs a second station/, 'Add a second station first'], [/^finished/, 'Already finished'],
+  [/next plot first/, 'Add the next piece first'], [/out of range/, 'Too high or too low'],
+];
+function whyShort(why){ if (!why) return ''; if (/^finished/.test(why) && typeof TOUCH !== 'undefined' && TOUCH.on) return 'Finished: hold the drop-off to reopen'; for (const [re, s] of WHY_SHORT) if (re.test(why)) return s; const w = why.split(':')[0]; return w[0].toUpperCase() + w.slice(1); }
 // highway mode's line under the bar: only what's wrong, when something is (the Instructions panel has the rest)
-function hwHintText(why){ return why || ''; }
+function hwHintText(why){ return whyShort(why); }
 let hwLastPt = null;
-function hwHover(cx, cy, touch){ hwLastPt = { x: cx, y: cy, touch }; const t = hwTargetAt(touch ? hwPickTouch(cx, cy) : hwPick(cx, cy)); hwShowGhost(t);
-  const el = $('modeHint'), why = hwHintText(t && !t.ok && t.type !== 'none' ? t.why : ''); el.textContent = why; el.hidden = !why; }
-function hwClick(cx, cy, touch){ const t = hwTargetAt(touch ? hwPickTouch(cx, cy) : hwPick(cx, cy)); if (hwApply(t)) hwHover(cx, cy, touch); }   // (touch: a tap, see hwPickTouch)
+// (the mouse picks as a finger does too, owner Nov 3: the air in front of the road, at its height, is the next piece: see mtHover)
+function hwHover(cx, cy, touch){ hwLastPt = { x: cx, y: cy, touch }; const t = hwTargetAt(hwPickTouch(cx, cy)); hwShowGhost(t);
+  const el = $('modeHint'), why = hwHintText(t && !t.ok && t.type !== 'none' ? t.why : ''); el.textContent = why; el.hidden = !why; el.classList.toggle('bad', !!why); }
+// With a mouse, a click (or a drag of track) the rules refuse says why, beside the pointer, for a moment (owner, Nov 4): the reason was only in the hint
+// line at the bottom, and a refused click looked like nothing happening. (A finger has its own prompts: transit-touch.js)
+const transitWhy = (() => { let el = null, tm = 0;
+  return (why, x, y) => {
+    if (!why || (typeof TOUCH !== 'undefined' && TOUCH.on)) return;
+    if (!el){ el = document.createElement('div'); el.className = 'twhy'; el.setAttribute('role', 'status'); document.body.appendChild(el); }
+    el.textContent = whyShort(why); el.style.left = Math.round(x) + 'px'; el.style.top = Math.round(y) + 'px'; el.hidden = false;
+    clearTimeout(tm); tm = setTimeout(() => { el.hidden = true; }, 2800);
+  };
+})();
+function hwClick(cx, cy, touch){ const t = hwTargetAt(hwPickTouch(cx, cy)); if (hwApply(t)) hwHover(cx, cy, touch); else if (t && !t.ok) transitWhy(t.why, cx, cy); }   // (touch: a tap, see hwPickTouch)
 function hwRightClick(cx, cy){ const pk = hwPick(cx, cy); if (pk && pk.kind === 'hwTile'){ hwCutAt(pk.h, pk.k); hwHover(cx, cy); } }
 // (with a finger, the outline aimed is aimed again at the new height or lanes instead: transit-touch.js)
-function hwSetLevel(L){ hwLevel = Math.max(HW_MIN_L, Math.min(HW_MAX_L, L)); const el = document.getElementById('hwLevel'); if (el) el.textContent = hwLevel; if (typeof TT !== 'undefined' && TT.relevel()) return; if (hwLastPt) hwHover(hwLastPt.x, hwLastPt.y, hwLastPt.touch); }
+function hwSetLevel(L){ hwLevel = Math.max(HW_MIN_L, Math.min(HW_MAX_L, L)); const el = document.getElementById('hwLevel'); if (el) el.textContent = hwLevel; if (typeof TP !== 'undefined' && TP && ptrLast){ tpUpdate(ptrLast.x, ptrLast.y); return; } if (typeof TT !== 'undefined' && TT.relevel()) return; if (hwLastPt) hwHover(hwLastPt.x, hwLastPt.y, hwLastPt.touch); }
 function hwSetLanesUI(n){ hwSetLanes(n); const el = document.getElementById('hwLanes'); if (el) el.textContent = n + ' lanes'; if (typeof TT !== 'undefined' && TT.relevel()) return; if (hwLastPt) hwHover(hwLastPt.x, hwLastPt.y, hwLastPt.touch); }
 function setHwMode(on, quiet){
   hwMode = on;
@@ -866,6 +901,6 @@ function setHwMode(on, quiet){
   else { hwGhost.g.visible = false; hwHighlight(null); }
   const b = document.getElementById('hwBtn'); if (b){ b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); }
   const bar = document.getElementById('hwbar'); if (bar) bar.hidden = !on;
-  $('modeHint').hidden = on; if (on) $('modeHint').textContent = '';
+  $('modeHint').hidden = on; $('modeHint').classList.remove('bad'); if (on) $('modeHint').textContent = '';
   else if (!quiet) selectZone(S.zone);
 }

@@ -18,7 +18,7 @@ let IDLE_SKIP = false, TITLE_SKIP = false;
 const idleNow = now => S.idleRest && !PH.on && now - LAST_INPUT > 10000 && !dragging && !keys.size && Math.abs(yawT - yaw) < 1e-3 && Math.abs(zoomT - zoom) < 1e-3 && camT.distanceTo(camGoal) < 1e-3 && !anims.length && !STAGE_Q.length && !STAGE_READY.length && !STAGE_CHAINS.size;
 // what the hitch catcher (perfhud.js) notes with each frame: the cache, how fast the view turned, the speed classes, the shadow map, merges and tiers
 PH.state = () => 'cache: ' + SC.state + (SC.why ? ' (' + SC.why + ')' : '') + '; turned ' + (SD.dYaw*180/Math.PI).toFixed(2) + ' deg, speed classes ' + SD.hist.slice(0, 4).join('/') + ' (fastest ' + SD.top.toFixed(0) + ' px)' + (SC.tinyCulled ? ', ' + SC.tinyCulled + ' tiny things left out' : '')
-  + '; shadows ' + (LIGHT_JUMP ? 'sun jumped' : shJob ? 'strip ' + shJob.k + ' of ' + shJob.K : 'kept')
+  + '; shadows ' + (LIGHT_JUMP ? 'sun jumped' : shJob ? 'strip ' + shJob.k + ' of ' + shJob.K : 'kept') + (GLIDE.line() ? '; ' + GLIDE.line() : '')
   + '; merges waiting ' + solidDirty.size + (SOLID_JOB ? ' (one under way)' : '') + (SOLID_HELD ? ' (held: the view is turning)' : '') + ', tier changes ' + TIER.changes + ', to free ' + DISPOSE_Q.length + '; drag ' + (dragging ? 'held' : 'off');
 function frame(now){
   requestAnimationFrame(frame);
@@ -63,7 +63,9 @@ function frameBody(now){
   // Against the screen's own refresh (PERF.vs, learned from the frames that come on time: 16.7 ms at 60 Hz, 8.3 at 120), not fixed numbers: "quick"
   // used to mean under 15 ms, which a 60 Hz screen never shows, so once lowered it never came back. Back up a step at a time, and a step that
   // brings the slowness back is the ceiling for the next two minutes, so it no longer swings between sharp-and-slow and soft-and-smooth
-  { const ms = now - last; if (ms < 250 && now >= PERF.quietUntil){ PERF.ema += (ms - PERF.ema)*.05; PERF.t += ms; if (ms > 4 && ms < PERF.vs*1.3) PERF.vs += (ms - PERF.vs)*.02; }
+  // (not while the shadows glide (staticcache.js GLIDE): a change of resolution remakes the pictures it plays, so it had to let the glide go and the
+  //  shadows snapped, most often zoomed out over a big city, where the resolution moves most; and its background drawing isn't the city's own cost)
+  { const ms = now - last; if (ms < 250 && now >= PERF.quietUntil && !GLIDE.busy()){ PERF.ema += (ms - PERF.ema)*.05; PERF.t += ms; if (ms > 4 && ms < PERF.vs*1.3) PERF.vs += (ms - PERF.vs)*.02; }
     if (PERF.t > 2000){ PERF.t = 0;
       const slowMs = Math.max(PERF.vs*1.35, 21), quickMs = PERF.vs*1.1 + .5;
       if (now > PERF.ceilUntil) PERF.ceil = Infinity;
@@ -93,6 +95,7 @@ function frameBody(now){
   PH.subBegin(); updateVehicleShadows(); PH.sub('vehicle shadows');
   updateAnims(dt); PH.sub('build animations');
   updateMegaFx(dt, now/1000);
+  if (typeof gardenFx === 'function') gardenFx(dt);   // (the ponds' rings and floating lily pads: garden.js)
   PH.lap('megastructures, animations');
   updatePeople(dt*FF.ppl, FF.peopleTime(rdt, now/1000));   // (fast forward: the people's own clock runs quicker too)
   STORY.tick(rdt);   // story moments, the shape of the day, the monitor's log (story.js)
@@ -123,8 +126,10 @@ function frameBody(now){
   { // detail levels: only needed once zooming out outruns the screen's resolution (see applyRenderRes)
     // (by the size without the sharp view's extra lines: as the view settled and the resolution stepped up, the plants and fine pieces came back, and
     //  went again as soon as it moved: foliage popping in and out when turning zoomed out, owner Oct 25. Now they stay as they are while moving)
-    const loss = (zoomS()/ZOOM_REF)*(BASE_H/(H_LOD || H));   // (the short side's zoom: a phone held upright the same as on its side, sky.js ZK)   // 1 = every building keeps all its pixels
-    const t = clamp((loss - 1.15)/1.0, 0, 1), e = t*t*(3 - 2*t);
+    const lk = LOD_PICK.k[LOD_PICK.v] ?? 1;   // (the setting: Low thins sooner, High later, Full never)
+    const loss = lk ? (zoomS()/ZOOM_REF)*(BASE_H/(H_LOD || H))/lk : 0;   // (the short side's zoom: a phone held upright the same as on its side, sky.js ZK)   // 1 = every building keeps all its pixels
+    // (over a longer stretch of zoom than before (1.0): fewer small pieces go at each step of the wheel, owner Nov 4, pop-in)
+    const t = clamp((loss - 1.15)/1.4, 0, 1), e = t*t*(3 - 2*t);
     // (plants thin later and more gently than the fine pieces: they are a few percent of a frame (tools/procfol/MEASURE.md), and tufts vanishing while
     //  still a pixel tall showed as pop-in with the render fixed; from loss 1.6, fully thinned only by 3.2)
     const tp = clamp((loss - 1.6)/1.6, 0, 1), ep = tp*tp*(3 - 2*tp);
@@ -151,10 +156,12 @@ function frameBody(now){
   sdTrack();
   if (window.NT_RENDER){ shadowDirty = true; window.HOUR_DRAG_AT = -1e9; }   // (render mode: the whole shadow map drawn again every frame, never held back)   // how fast the view is turning and zooming (world.js)
   cam.layers.enableAll(); shadowFrame(); PH.sub('view: shadows');   // shadows: redrawn at once, a strip in the background, or not at all (sky.js)
+  if (typeof gardenMirror === 'function'){ PH.begin('pond reflections (garden mirror)'); try { gardenMirror(); } catch (e){ if (!window.__gdMirErr){ window.__gdMirErr = 1; console.error('pond mirror:', e); } } finally { PH.end(); } }   // the ponds' mirrored picture, before the colors (garden.js; computers only), timed on its own line in the F3 overlay
   PH.shadow(); PH.begin(renderer.shadowMap.needsUpdate ? 'color + shadow redraw' : 'color');
   const pt = PH.tests;   // (the overlay's tests: perfhud.js)
   if (pt.quarter) rtC.viewport.set(0, 0, W >> 1, H >> 1);   // (plain shading: see renderBufferDirect in sky.js)
   if (pt.quarter || !SC.frame()){   // (the static cache draws the frame when it can: staticcache.js)
+    if (GLIDE.busy()) GLIDE.abort('drawn the old way' + (SC.why ? ' (' + SC.why + ')' : SC.state ? ' (' + SC.state + ')' : ''));   // (a frame not from the cache: the glide's pictures no longer match it)
     renderer.setRenderTarget(rtC); renderer.setClearColor(0x000000, 1);
     if (MRT) mrtBegin();   // the normal image is drawn along with the colors (core.js, sky.js)
     sdApply();   // the old way's frames: plots that move fast on screen lose their smallest triangles (world.js, speed-based detail)

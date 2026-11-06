@@ -224,24 +224,37 @@ function mtLoopTarget(l){
 function mtTouched(l){ const out = l.tiles.map(t => [t.i, t.j]); for (const k of mtStops(l)){ const c = mtLiftCell(l, k); if (c) out.push(c); } return out; }
 // what the metro puts on each plot (see mtFeet, mtKeepOut): its pillars, where they stand and which way they face, and the lift shafts, as one string per plot.
 // An edit rebuilds only the plots whose string changed: laying a line used to rebuild every plot under it on every click
-let MT_SIG = null;   // (as the plots were last built; null: not known, after loading or an edit made without mtCommit, so the next commit rebuilds all it is given)
+let MT_SIG = null;   // (as the plots were last built; null: not known, after loading, so the next commit rebuilds all it is given)
+// (the highways' part too (owner, Nov 4): a plot is built with the pillars and lift shafts of every line over it, so any change to what a line puts on a plot, metro or
+//  highway, from any edit, finds that plot here and it is built again at once. A plot left with a deleted station's lift in it showed the lift in its full detail and not
+//  in its stand-in, which is made from the lines as they are now: the lift flashed in and out as the camera moved)
 function mtPlotSig(){
   const m = new Map(), add = (q, v) => m.set(q, (m.get(q) || '') + v + ';'), f = v => v.toFixed(3);
   for (const l of metros){
     l.tiles.forEach((t, k) => { const c = hwCenter(l, k, .5); add(ckey(t.i, t.j), 'p' + f(c.x) + ',' + f(c.z) + ',' + f(c.tx) + ',' + f(c.tz)); });
     for (const k of mtStops(l)){ const s = l.sides && l.sides[k]; if (!s) continue; const L = mtLiftSpot(l, k, s); add(ckey(Math.round(L.sx/LOT), Math.round(L.sz/LOT)), 's' + f(L.sx) + ',' + f(L.sz) + ',' + L.dx + ',' + L.dz); }
   }
+  if (typeof highways !== 'undefined') for (const h of highways){
+    h.tiles.forEach((t, k) => { const c = hwCenter(h, k, .5); add(ckey(t.i, t.j), 'h' + f(c.x) + ',' + f(c.z) + ',' + f(c.tx) + ',' + f(c.tz) + ',' + f(hwHeight(h, k, .5)) + ',' + t.L + ',' + h.lanes); });
+    if (h.done && h.tiles.length >= 2){ const L = hwLiftSpot(h, h.side); add(ckey(Math.round(L.sx/LOT), Math.round(L.sz/LOT)), 'd' + f(L.sx) + ',' + f(L.sz) + ',' + L.dx + ',' + L.dz + ',' + h.tiles[h.tiles.length - 1].L); }
+  }
   return m;
 }
-function mtCommit(l, touched){
-  mtReindex();
-  if (l){ mtSides(l); mtBuildView(l); mtResetTrain(l); }
-  const sig = mtPlotSig();
-  let keys;
+// (MT_BATCH: a planned run of track (input.js tpConfirm) laid piece by piece with only the index kept up; the views and plots made once, at the end:
+//  each piece's commit rebuilt the whole line and its plots, a stall of a frame or more a piece, owner Nov 4)
+let MT_BATCH = false;
+// the plots whose lines changed since they were last built (or, not known yet, the ones given), and the record brought up to date
+function trSync(touched){
+  const sig = mtPlotSig(); let keys;
   if (MT_SIG){ keys = new Set(); for (const [q, v] of sig) if (MT_SIG.get(q) !== v) keys.add(q); for (const q of MT_SIG.keys()) if (!sig.has(q)) keys.add(q); }
-  else keys = new Set(touched.concat(l ? mtTouched(l) : []).map(([i, j]) => ckey(i, j)));
+  else keys = new Set((touched || []).map(([i, j]) => ckey(i, j)));
   MT_SIG = sig;
-  const list = [...keys].map(q => cells.get(q)).filter(Boolean);
+  return [...keys].map(q => cells.get(q)).filter(c => c && !c.mega);
+}
+function mtCommit(l, touched){
+  mtReindex(); if (MT_BATCH) return;
+  if (l){ mtSides(l); mtBuildView(l); mtResetTrain(l); }
+  const list = trSync(touched.concat(l ? mtTouched(l) : []));
   refresh(list);   // its pillars and lift shafts stand on the plots (see mtFeet), so the walking paths go round them
   SC_DIRTY.unknown = true; shadowDirty = true;
 }
@@ -274,7 +287,7 @@ function mtApply(t){
     const l = t.l, before = mtTouched(l);
     l.st = t.type === 'stop' ? [...l.st, t.k] : l.st.filter(k => k !== t.k); mtActive = l; mtCommit(l, before);
   } else return false;
-  sfx.play('place'); return true;
+  if (!MT_BATCH) sfx.play('place'); return true;
 }
 // right-click a metro plot: its first plot alone goes (the next plot is the first station now, and the line can be carried on from there either way); its
 // last plot alone goes; from anywhere in the middle, that plot and the rest of the line beyond it go (the last station included), and what's left is open
@@ -289,14 +302,14 @@ function mtCutAt(l, k, quiet){
   else { tiles = l.tiles.slice(0, k); keys.delete(mtTileKey(l.tiles[k - 1])); }   // (cut in the middle: the plot before the cut is the open end now, no station there yet)
   if (l.loop) keys.delete(mtTileKey(l.tiles[(k - 1 + n) % n]));   // (an opened loop: the plot before the cut is its open end)
   mtReshape(l, tiles, keys, sides); mtActive = l;
-  if (quiet){ MT_SIG = null; mtReindex(); mtSides(l); mtBuildView(l); mtResetTrain(l); } else { mtCommit(l, touched); sfx.play('remove'); }
+  if (quiet){ mtReindex(); mtSides(l); mtBuildView(l); mtResetTrain(l); } else { mtCommit(l, touched); sfx.play('remove'); }
   return touched;
 }
 function mtRemove(l, quiet){
   const touched = mtTouched(l);
   metros = metros.filter(q => q !== l); if (mtActive === l) mtActive = null;
   mtDropView(l); l.train = null;
-  if (!quiet){ mtCommit(null, touched); sfx.play('remove'); } else { MT_SIG = null; mtReindex(); }
+  if (!quiet){ mtCommit(null, touched); sfx.play('remove'); } else mtReindex();   // (quiet: the caller rebuilds the plots, trSync)
   return touched;
 }
 // delete mode: a line's plots in the block go, and with them any station whose lift shaft stands in the block (in the middle of the line, it becomes plain
@@ -326,9 +339,23 @@ function mtRemoveArea(r){
     });
     if (mtActive && !metros.includes(mtActive)) mtActive = null;
   }
-  if (out.length) MT_SIG = null;
   mtReindex();
   return out;
+}
+// A plot gone from under a station's lift (a right-click on the bare plot): that station goes, the track stays (owner, Nov 4: track needs no plot under it,
+// a station does, for its lift). A middle station turns to plain track, a finished line's end station leaves the line open there, and a line's first
+// station goes with its piece of track (a line always starts at a station: the next plot is its first station now)
+function mtDropLiftless(){
+  const lost = s => !s || !cells.get(ckey(Math.round(s.x/LOT), Math.round(s.z/LOT)));
+  for (const l of [...metros]){
+    const keys = mtStationKeys(l); let drop0 = false, any = false;
+    for (const k of mtStops(l)){ const s = l.sides && l.sides[k]; if (!s) continue; const L = mtLiftSpot(l, k, s);
+      if (lost({ x: L.sx, z: L.sz }) || lost(L.stand)){ any = true; if (k === 0) drop0 = true; else keys.delete(mtTileKey(l.tiles[k])); } }
+    if (!any) continue;
+    const before = mtTouched(l), tiles = drop0 ? l.tiles.slice(1) : l.tiles;
+    if (!tiles.length){ mtRemove(l); continue; }
+    mtReshape(l, tiles, keys, mtSideKeys(l), l.loop && !drop0); mtCommit(l, before);
+  }
 }
 function mtClearAll(){ for (const l of metros) mtDropView(l); metros = []; mtActive = null; MT_SIG = null; mtReindex(); }
 function mtSave(){ try { localStorage.setItem(MT_SAVE_KEY, JSON.stringify(metros.map(l => ({ id: l.id, done: l.done, loop: !!l.loop, st: l.st, sides: l.sides, d0: l.tiles.length === 1 && l.dir0 ? l.dir0 : undefined, t: l.tiles.map(t => [t.i, t.j]) })))); } catch (e) {} }   // (d0: the way a lone first station faces, turned with a double tap on a touch screen)
@@ -873,18 +900,20 @@ function mtShowGhost(t){
   hwGhost.g.visible = true;
 }
 let mtLastPt = null;
-function mtHover(cx, cy, touch){ mtLastPt = { x: cx, y: cy, touch }; const t = mtTargetAt(touch ? mtPickTouch(cx, cy) : mtPick(cx, cy)); mtShowGhost(t);
-  const say = !t ? '' : !t.ok ? t.why : t.type === 'loop' ? 'click to close the loop: the train will go round and round'
+// (the mouse picks as a finger does too, owner Nov 3: pointing at the air in front of a line, at the track's height, means the next piece there. Picked by
+//  the plane under the pointer, it took the station in front for itself, and the next piece came only by pointing at the ground under it)
+function mtHover(cx, cy, touch){ mtLastPt = { x: cx, y: cy, touch }; const t = mtTargetAt(mtPickTouch(cx, cy)); mtShowGhost(t);
+  const say = !t ? '' : !t.ok ? whyShort(t.why) : t.type === 'loop' ? 'click to close the loop: the train will go round and round'
     : t.type === 'join' ? 'click to join the two lines into one' + (t.lost ? ' (a station right beside another becomes plain track)' : '') : t.note || '';
-  const el = $('modeHint'); el.textContent = say || ''; el.hidden = !say; }
-function mtClick(cx, cy, touch){ const t = mtTargetAt(touch ? mtPickTouch(cx, cy) : mtPick(cx, cy)); if (mtApply(t)) mtHover(cx, cy, touch); }   // (touch: a tap, see mtPickTouch)
+  const el = $('modeHint'); el.textContent = say || ''; el.hidden = !say; el.classList.toggle('bad', !!say && !!t && !t.ok); }
+function mtClick(cx, cy, touch){ const t = mtTargetAt(mtPickTouch(cx, cy)); if (mtApply(t)) mtHover(cx, cy, touch); else if (t && !t.ok) transitWhy(t.why, cx, cy); }   // (refused: why, beside the pointer, highway.js transitWhy)   // (touch: a tap, see mtPickTouch)
 function mtRightClick(cx, cy){ const pk = mtPick(cx, cy); if (pk && pk.kind === 'mtTile'){ mtCutAt(pk.l, pk.k); mtHover(cx, cy); } }
 function setMtMode(on, quiet){
   mtMode = on;
   if (on){ if (hwMode) setHwMode(false, true); if (S.zone) selectZone(null); if (delMode) setDelMode(false, true); if (megaPick) selectMega(null, true); hover.visible = hoverFill.visible = hoverStrip.visible = false; showMegaGhost(null); }
   else { hwGhost.g.visible = false; mtHighlight(null); }
   const b = document.getElementById('mtBtn'); if (b){ b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); }
-  $('modeHint').hidden = on; if (on) $('modeHint').textContent = '';
+  $('modeHint').hidden = on; $('modeHint').classList.remove('bad'); if (on) $('modeHint').textContent = '';
   else if (!quiet) selectZone(S.zone);
 }
 

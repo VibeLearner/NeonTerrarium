@@ -143,6 +143,7 @@ const M = {
   glassDark: toon(0x2c3a52), glassTeal: toon(0x2b4a55),
   winLit: toon(0x5a4630,{em:0xFFCF7A, kind:'window'}),
   bulb: toon(0x5a4630,{em:0xFFCF7A, kind:'bulb'}),
+  lampBulb: toon(0x5a4630,{em:0xD8A866, kind:'bulb'}),   // the street and park lamps' bulbs: a little dimmer, so they bloom less
   neonPink: toon(0x5a1d3a,{em:0xFF4FA3, kind:'neon'}), neonCyan: toon(0x145452,{em:0x38E8E0, kind:'neon'}), neonAmber: toon(0x5a3e18,{em:0xFFB347, kind:'neon'}),
   trimCyan: toon(0x2a5452,{em:0x7FE8E0, kind:'trim'}),
   thruster: toon(0x1a3050,{em:0x5ab8ff, kind:'thruster'}),
@@ -160,6 +161,8 @@ const greenMat = () => pick([M.green1,M.green2,M.green3]);
 // details (railings, cables, window frames, small plants, crease outlines) turn to noise. Past the default zoom
 // these thin out gradually until the city reads as clean blocks of colour and light. 0 = full detail, 1 = far.
 const LOD = { fine: { value: 0 }, plants: { value: 0 }, lines: { value: 0 } };
+// the player's setting (Game Settings, Detail when zoomed out: playerui.js): 0 Low, 1 Medium, 2 High, 3 Full (nothing thins out). How far out the thinning starts and ends
+const LOD_PICK = { v: 1, k: [.8, 1, 1.6, 0] };
 // 1 in the Smooth render mode (see setRenderLines in sky.js): the shaders skip their pixel-art stepping and dithering
 const SMOOTH_LOOK = { value: 0 };
 // Thin and tiny pieces carry an id (1-255, 0 = always kept); as LOD.fine rises, more of them are dropped.
@@ -242,6 +245,8 @@ function keptOut(geo, m){
 // a light thin enough to fall between pixels when zoomed out (the metro pillars' strips): dropped with the fine details as the view goes out, instead of
 // kept like the other lights, where it shimmered in and out as the view moved (owner Oct 26). Set round the pieces that are, then cleared
 let FINE_LIGHT = false;
+// (set round a piece whose light must never stutter: a big neon ring reads as the ring blinking out of existence, owner Nov 4)
+let NO_FLICKER = false;
 // and each such light, as the line down its middle (start, end, its detail id, its glow kind, its color and glow color, when it switches on): once the view is far enough out
 // that the strip has gone with the fine details, the line is drawn in its place, a steady pixel wide whatever the zoom (world.js fineLines). Collected while a piece is made
 let curFine = null;
@@ -250,7 +255,7 @@ function put(geo, mat, m, lean){
   if (LUX){ let sub = LUX.mats.get(mat); if (!sub && LUX.auto && mat.userData && mat.userData.glow) sub = LUX.auto(mat); if (sub){ mat = sub; if (LUX.halo) LUX.halo(sub, m); } }
   if (DARK && !KEEP_LIGHT && mat.userData && DARK_SUB[mat.userData.glow] && (DARK === true ? posHash(m.elements[12], m.elements[13], m.elements[14]) < 82 : DARK > 0 && m.elements[13] > DARK)) mat = DARK_SUB[mat.userData.glow];   // (a number: economy mode, every light above that height is off: the floors nobody lives on yet, economy.js)
   let b = buckets.get(mat); if (!b){ b = { p: [], n: [], d: [], f: mat.userData && mat.userData.glow ? [] : null, o: mat.userData && mat.userData.glow ? [] : null }; buckets.set(mat, b); }
-  const fid = b.f ? (DARK === true && mat.userData.glow !== 'blink' ? heavyFlickerId() : flickerId(mat.userData.glow, DARK === -1 ? 1.6 : DARK === -2 ? 4 : 1)) : 0;   // (economy mode: -1 and -2, a building mid-way and far from its Emitter Core, flickers more)
+  let fid = b.f ? (DARK === true && mat.userData.glow !== 'blink' ? heavyFlickerId() : flickerId(mat.userData.glow, DARK === -1 ? 1.6 : DARK === -2 ? 4 : 1)) : 0; if (NO_FLICKER) fid = 0;   // (economy mode: -1 and -2, a building mid-way and far from its Emitter Core, flickers more)
   const did = b.f && !FINE_LIGHT ? 0 : detailId(geo, m), ord = b.f ? litOrder(m.elements[12], m.elements[13], m.elements[14]) : 0;   // lights are never dropped: they carry the look from far away
   if (FINE_LIGHT && did > 0 && curFine && geo === U.box){
     const e = m.elements; let a = 0, al = 0; for (let q = 0; q < 3; q++){ const l = Math.hypot(e[q*4], e[q*4 + 1], e[q*4 + 2]); if (l > al){ al = l; a = q; } }
@@ -370,6 +375,9 @@ function sph(mat,P,x,y,z,r,sy=1){ put(U.sph, mat, under(P, T(x,y,z,0,2*r,2*r*sy,
 function blob(mat,P,x,y,z,r,sy=1){ put(U.blob, mat, under(P, T(x,y,z,rnd(0,TAU),2*r,2*r*sy,2*r,rnd(0,1)))); }
 
 let city = null, glowGroup = null, emitters = [];
+// a steam source under a roof (a stall's canopy, the slab over a shopfront, a building's floor above): its puffs rise
+// only as far as `ceil` (local height in F) and fade out there, instead of drifting up through the roof and the floors
+function steamUnder(F, x, y, z, ceil){ const v = new THREE.Vector3(x, y, z).applyMatrix4(F); v.roofY = new THREE.Vector3(x, ceil, z).applyMatrix4(F).y; emitters.push(v); return v; }
 // Places where people can stand or sit (bench seats, stall keepers' and customers' spots), noted while a piece is
 // generated: world position, which way they face, and what kind of spot it is. See people.js.
 let curSpots = null;

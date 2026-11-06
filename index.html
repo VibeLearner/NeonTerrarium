@@ -5,6 +5,8 @@
 <!-- every player goes to m.html: this page with smaller scripts (tools/mobile/build.js; phones from Oct 30, computers too from the same day). ?full keeps it here, with the full-size scripts, for testing -->
 <script>/* phone page */if(!/[?&]full\b/.test(location.search)&&!/#demo\b/.test(location.hash)){location.replace('m.html'+location.search+location.hash);document.write('<plaintext hidden>')}</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- a browser that played before the computer's tutorial came (a city already kept here): its tutorial is marked done, before any game script saves a city (pctut.js) -->
+<script>try{if(!localStorage.getItem('neonIsland.tutPC')&&(localStorage.getItem('neonTerrarium.activeSlot')||localStorage.getItem('neonIsland.v2')))localStorage.setItem('neonIsland.tutPC','{"done":true,"beats":{},"existing":true}')}catch(e){}</script>
 <title>Neon Terrarium</title>
 <script src="js/benchboot.js?v=2026-10-30p"></script>   <!-- the phone benchmark, only with ?bench in the address (does nothing otherwise) -->
 <script src="js/saveguard.js?v=2026-10-31ec"></script>
@@ -16,7 +18,7 @@
 <link rel="icon" href="data:,">
 <script src="js/touch.js?v=2026-10-30mc"></script>
 <script src="js/tsheet.js?v=2026-10-30pc"></script>   <!-- the touch screen's shared bottom sheet (nothing with a mouse) -->
-<link rel="stylesheet" href="css/style.css?v=2026-10-31ec">
+<link rel="stylesheet" href="css/style.css?v=2026-11-04r2">
 <link rel="stylesheet" href="css/player.css?v=2026-10-30u">
 <link rel="stylesheet" href="css/touchui.css?v=2026-10-31mt">
 <link rel="stylesheet" href="css/touch-sheets.css?v=2026-10-30pc">
@@ -127,6 +129,8 @@
   <dl>
     <dt>Click a plot</dt><dd>Start a highway</dd>
     <dt>Click next to the end</dt><dd>Extend it</dd>
+    <dt class="touchonly">Drag from the end</dt><dd class="touchonly">Lay several pieces at once</dd>
+    <dt><kbd>Shift</kbd> at the end</dt><dd>Plan several pieces: click builds them, right-click cancels</dd>
     <dt>Click the last piece</dt><dd>Add the drop-off</dd>
     <dt>Right-click a piece</dt><dd>Cut the road back</dd>
     <dt><kbd>[</kbd> <kbd>]</kbd> or <kbd>−</kbd> <kbd>+</kbd></dt><dd>Lower or raise the height</dd>
@@ -142,6 +146,8 @@
   <dl>
     <dt>Click a plot</dt><dd>Start a line at its first station</dd>
     <dt>Click next to the end</dt><dd>Extend it</dd>
+    <dt class="touchonly">Drag from the end</dt><dd class="touchonly">Lay several pieces at once</dd>
+    <dt><kbd>Shift</kbd> at either end</dt><dd>Plan several pieces: click builds them, right-click cancels</dd>
     <dt>Click the last piece</dt><dd>Finish it with a station</dd>
     <dt>Click next to an end station</dt><dd>Carry the line on (the station stays)</dd>
     <dt>Click a straight piece</dt><dd>Add or remove a station</dd>
@@ -159,7 +165,7 @@
     <button id="hwLanes" class="hwlanes" title="Lanes for the highway you're building (L)">2 lanes</button>
   </div>
   <p class="tiltchip" id="tiltChip" hidden>Camera tilt · drag up or down (or W / S) to tilt · drag sideways (or A / D) to turn · Space to go back</p>
-  <p class="modehint" id="modeHint">Click the sky to grow the platform · pick a zone to build</p>
+  <p class="modehint" id="modeHint"></p>
   <div class="ctlwrap hint">
     <p class="modehint ctlhover" tabindex="0">Hover for controls</p>
     <div class="ctlpanel" role="tooltip">
@@ -277,6 +283,18 @@
       <button data-q="2" class="on">Balanced</button>
       <button data-q="1">Sharp</button>
     </div>
+    <div class="chips" id="lodChips" aria-label="Detail when zoomed out">
+      <button data-l="0">Low</button>
+      <button data-l="1" class="on">Medium</button>
+      <button data-l="2">High</button>
+      <button data-l="3">Full</button>
+    </div>
+    <div class="chips" id="shadowChips" aria-label="Shadow movement">
+      <button data-s="snap">Snap</button>
+      <button data-s="fade">Fade</button>
+      <button data-s="glide3" class="on">Glide</button>
+      <button data-s="glide6">Smooth glide</button>
+    </div>
     <h3 class="subhead">Optimize framerate</h3>
     <div class="togs">
       <label class="tog" title="After 10 seconds without any input, draw every other frame (30 a second) so a laptop runs cooler; any click or key brings it straight back"><input type="checkbox" id="idleRest"> Rest when idle</label>
@@ -309,12 +327,13 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/BufferGeometryUtils.js"></script>
 <!-- ?v= makes browsers fetch fresh copies after an update; change it with every release -->
 <script src="js/matreg.js?v=2026-10-13l"></script>
-<script src="js/core.js?v=2026-10-31ec"></script>
-<script src="js/spritegen.js?v=2026-10-13l"></script>
+<script src="js/core.js?v=2026-11-06t"></script>
+<script src="js/spritegen.js?v=2026-11-06gd2"></script>
 <script src="js/spritegen_grass.js?v=2026-10-13l"></script>
 <script src="js/spritegen_shrubs.js?v=2026-10-13l"></script>
 <script src="js/spritegen_hang.js?v=2026-10-13l"></script>
 <script src="js/spritegen_lawn.js?v=2026-10-13l"></script>
+<script src="js/spritegen_trees.js?v=2026-11-06gd2"></script>
 <script src="js/artgen.js?v=2026-10-13l"></script>
 <script src="js/artgen_tools.js?v=2026-10-13l"></script>
 <script src="js/artgen_icons.js?v=2026-10-13l"></script>
@@ -331,25 +350,26 @@
 <script src="js/peoplegen_roles.js?v=2026-10-13l"></script>
 <script src="js/peoplegen_umbrella.js?v=2026-10-13l"></script>
 <script src="js/peoplegen_held.js?v=2026-10-13l"></script>
-<script src="js/sprites.js?v=2026-11-01w"></script>
-<script src="js/buildings.js?v=2026-11-01w"></script>
-<script src="js/ground.js?v=2026-10-13l"></script>
-<script src="js/vehicles.js?v=2026-10-26k"></script>
-<script src="js/sky.js?v=2026-10-30aim"></script>
+<script src="js/sprites.js?v=2026-11-06t"></script>
+<script src="js/buildings.js?v=2026-11-06t"></script>
+<script src="js/ground.js?v=2026-11-06t"></script>
+<script src="js/vehicles.js?v=2026-11-06t"></script>
+<script src="js/sky.js?v=2026-11-06w4"></script>
 <script src="js/looks.js?v=2026-10-16aj"></script>
 <script src="js/lookui.js?v=2026-10-30u"></script>
 <script src="js/audio.js?v=2026-11-01e"></script>
-<script src="js/world.js?v=2026-11-01w"></script>
-<script src="js/perimeter.js?v=2026-10-26r"></script>
-<script src="js/mega.js?v=2026-11-01w"></script>
-<script src="js/people.js?v=2026-10-31ec"></script>
-<script src="js/highway.js?v=2026-10-31tx"></script>
-<script src="js/metro.js?v=2026-10-31tx"></script>
+<script src="js/world.js?v=2026-11-06t"></script>
+<script src="js/garden.js?v=2026-11-06m"></script>
+<script src="js/perimeter.js?v=2026-11-04s"></script>
+<script src="js/mega.js?v=2026-11-06t"></script>
+<script src="js/people.js?v=2026-11-04p1"></script>
+<script src="js/highway.js?v=2026-11-04y"></script>
+<script src="js/metro.js?v=2026-11-04y"></script>
 <script src="js/story.js?v=2026-10-30u2"></script>
 <script src="js/cases.js?v=2026-10-26e"></script>
 <script src="js/pacing.js?v=2026-10-20p"></script>
-<script src="js/monitor.js?v=2026-10-31nq"></script>
-<script src="js/recipe.js?v=2026-10-29a"></script>
+<script src="js/monitor.js?v=2026-11-03a"></script>
+<script src="js/recipe.js?v=2026-11-06t"></script>
 <script src="js/loadcity.js?v=2026-10-13l"></script>
 <script src="js/grid_panel.js?v=2026-10-30u2"></script>
 <script src="js/grid_engine.js?v=2026-10-20b"></script>
@@ -357,28 +377,29 @@
 <script src="js/grid_viz.js?v=2026-10-30u2"></script>
 <script src="js/booth_song.js?v=2026-10-18g"></script>
 <script src="js/booth.js?v=2026-10-30u2"></script>
-<script src="js/input.js?v=2026-11-01w"></script>
-<script src="js/transit-touch.js?v=2026-10-31t3"></script>   <!-- building transit with a finger (nothing with a mouse) -->
+<script src="js/input.js?v=2026-11-04r2"></script>
+<script src="js/transit-touch.js?v=2026-11-04s"></script>   <!-- building transit with a finger (nothing with a mouse) -->
 <script src="js/furnish.js?v=2026-10-31ec"></script>
 <script src="js/lidar.js?v=2026-10-26e"></script>
 <script src="js/perfhud.js?v=2026-10-27b"></script>
 <script src="js/memcensus.js?v=2026-10-27a"></script>
-<script src="js/staticcache.js?v=2026-10-27d"></script>
-<script src="js/neverseen.js?v=2026-10-26s"></script>
+<script src="js/staticcache.js?v=2026-11-06h"></script>
+<script src="js/neverseen.js?v=2026-11-06n"></script>
 <script src="js/economy.js?v=2026-11-01x"></script>
 <script src="js/demo.js?v=2026-11-02a"></script>   <!-- the 15 s demo clip, only with #demo in the address (does nothing otherwise) -->
-<script src="js/main.js?v=2026-10-30pw"></script>
+<script src="js/main.js?v=2026-11-06w3"></script>
 <script src="js/cityledger.js?v=2026-10-29a"></script>
 <script src="js/overseer.js?v=2026-10-31ec"></script>
 <script src="js/policedesk.js?v=2026-10-30t"></script>
 <script src="js/wirelog.js?v=2026-10-31ec"></script>
 <script src="js/slots.js?v=2026-10-31ec"></script>
-<script src="js/title.js?v=2026-10-31pa"></script>
+<script src="js/title.js?v=2026-11-04t1"></script>
 <script>document.getElementById('toTitle').addEventListener('click', () => { const tg = document.getElementById('deckToggle'); if (document.getElementById('deck').classList.contains('open')) tg.click(); (TITLE.fromGame || TITLE.show)(); });</script>
 <!-- the player's interface for the public build (settings dialog, city settings, folds): not on #dev -->
-<script src="js/playerui.js?v=2026-10-30ui"></script>
+<script src="js/pctut.js?v=2026-11-04r2"></script>   <!-- the tutorial on a computer (a touch screen has tutorial.js) -->
+<script src="js/playerui.js?v=2026-11-06w"></script>
 <!-- the touch screen's own pieces and its tutorial (nothing with a mouse and keyboard) -->
-<script src="js/touchui.js?v=2026-10-31mt"></script>
-<script src="js/tutorial.js?v=2026-10-31mt"></script>
+<script src="js/touchui.js?v=2026-11-04r2"></script>
+<script src="js/tutorial.js?v=2026-11-04z"></script>
 </body>
 </html>

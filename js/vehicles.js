@@ -486,7 +486,7 @@ const steamMat = new THREE.ShaderMaterial({
   fragmentShader: 'uniform sampler2D map; uniform vec3 color; uniform float aK; varying float vA; void main(){ float a = texture2D(map, gl_PointCoord).a * vA * aK; if (a < .01) discard; gl_FragColor = vec4(color, a); }',
   transparent: true, depthWrite: false,
 });
-let steamCeil = null;
+let steamCeil = null, steamRise = null;
 function setupSteam(){
   // (an edit calls this again for the whole city: the puffs of every source still there carry on where they were, instead
   // of all restarting at once, and the new puffs are placed right away, so no frame draws them all faded out: see the end)
@@ -503,6 +503,10 @@ function setupSteam(){
       for (const { h, k: t } of hwAt(i, j)){ const under = hwY(h.tiles[t].L) - HW_THICK - HW_GIRDER; if (under > e.y - .2) steamCeil[k] = Math.min(steamCeil[k], under); }
       if (mtAt(i, j).length){ const under = MT_Y - MT_DECK - MT_GIRD; if (under > e.y - .2) steamCeil[k] = Math.min(steamCeil[k], under); } }
   });
+  // a source under a roof (a stall's canopy, a shopfront's slab: e.roofY) gets a shorter rise, so its puffs have faded by
+  // the time they reach the roof instead of drifting up through it: rise, drift and size all scaled by the room it has
+  steamRise = new Float32Array(steamSrc.length).fill(1);
+  steamSrc.forEach((e, k) => { if (typeof e.roofY === "number") steamRise[k] = Math.max(.12, Math.min(1, (e.roofY - .1 - e.y)/2.3)); });
   const n = steamSrc.length*STEAM_PER; if (!n) return;
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n*3), 3));
@@ -528,21 +532,21 @@ function updateSteam(dt, night){
   for (let i=0;i<steamLife.length;i++){
     let L = steamLife[i] + dt*.32; if (L > 1) L -= 1; steamLife[i] = L;
     const e = steamSrc[(i/STEAM_PER)|0];
-    const k = (i/STEAM_PER)|0, top = steamCeil ? steamCeil[k] - .45 : 1e9, up = e.y + L*2.3, over = Math.max(0, up - top);   // (over: how far past the deck above it)
-    P[i*3] = e.x + L*.7 + Math.sin(steamWob[i] + L*4)*.08 + Math.cos(steamWob[i])*over*.9; P[i*3+1] = Math.min(up, top); P[i*3+2] = e.z + L*.2 + Math.sin(steamWob[i])*over*.9;
-    Sz[i] = (.45 + L*1.5)*Math.max(.45, 1 - over*.5); A[i] = Math.min(1, L*6)*(1 - L)*.75*Math.max(0, 1 - over/1.3);
+    const k = (i/STEAM_PER)|0, rs = steamRise ? steamRise[k] : 1, top = steamCeil ? steamCeil[k] - .45 : 1e9, up = e.y + L*2.3*rs, over = Math.max(0, up - top);   // (over: how far past the deck above it)
+    P[i*3] = e.x + L*.7*rs + Math.sin(steamWob[i] + L*4)*.08*rs + Math.cos(steamWob[i])*over*.9; P[i*3+1] = Math.min(up, top); P[i*3+2] = e.z + L*.2*rs + Math.sin(steamWob[i])*over*.9;
+    Sz[i] = (.45 + L*1.5*rs)*Math.max(.45, 1 - over*.5); A[i] = Math.min(1, L*6)*(1 - L)*.75*Math.max(0, 1 - over/1.3);
   }
   } else {
     // (a puff not under a deck, nearly all of them, is not pushed sideways: that term is the cosine or sine times zero, so the two calls are skipped; the same numbers)
     const n = steamLife.length, dL = dt*.32;
     for (let k = 0, i = 0; i < n; k++){
-      const e = steamSrc[k], top = steamCeil ? steamCeil[k] - .45 : 1e9, ex = e.x, ey = e.y, ez = e.z, end = Math.min(n, i + STEAM_PER);
+      const e = steamSrc[k], top = steamCeil ? steamCeil[k] - .45 : 1e9, ex = e.x, ey = e.y, ez = e.z, end = Math.min(n, i + STEAM_PER), rs = steamRise ? steamRise[k] : 1, rU = 2.3*rs, rX = .7*rs, rZ = .2*rs, rW = .08*rs, rS = 1.5*rs;
       for (; i < end; i++){
         let L = steamLife[i] + dL; if (L > 1) L -= 1; steamLife[i] = L;
-        const up = ey + L*2.3, over = Math.max(0, up - top), w = steamWob[i];
-        if (over === 0){ P[i*3] = ex + L*.7 + Math.sin(w + L*4)*.08 + 1*over*.9; P[i*3+1] = Math.min(up, top); P[i*3+2] = ez + L*.2 + 0*over*.9; }
-        else { P[i*3] = ex + L*.7 + Math.sin(w + L*4)*.08 + Math.cos(w)*over*.9; P[i*3+1] = Math.min(up, top); P[i*3+2] = ez + L*.2 + Math.sin(w)*over*.9; }
-        Sz[i] = (.45 + L*1.5)*Math.max(.45, 1 - over*.5); A[i] = Math.min(1, L*6)*(1 - L)*.75*Math.max(0, 1 - over/1.3);
+        const up = ey + L*rU, over = Math.max(0, up - top), w = steamWob[i];
+        if (over === 0){ P[i*3] = ex + L*rX + Math.sin(w + L*4)*rW; P[i*3+1] = up; P[i*3+2] = ez + L*rZ; }
+        else { P[i*3] = ex + L*rX + Math.sin(w + L*4)*rW + Math.cos(w)*over*.9; P[i*3+1] = top; P[i*3+2] = ez + L*rZ + Math.sin(w)*over*.9; }
+        Sz[i] = (.45 + L*rS)*Math.max(.45, 1 - over*.5); A[i] = Math.min(1, L*6)*(1 - L)*.75*Math.max(0, 1 - over/1.3);
       }
     }
   }

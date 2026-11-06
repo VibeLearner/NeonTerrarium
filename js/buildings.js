@@ -340,8 +340,8 @@ const ROOF = {
   ring(P,spot,st){ const s=spot(.4); if(!s) return;
     const m = pick(st.neonMats), r = rnd(.35,.5), Q = under(P, T(s.x,0,s.z,rnd(0,PI)));
     cyl(M.frame,Q,0,.5,0,.035,1);
-    put(U.torus, m, under(Q, T(0,1+r,0,0,2*r,2*r,2*r)));
-    put(U.torus, m, under(Q, T(0,1+r,0,0,2*r*.7,2*r*.7,2*r*.7)));
+    // (steady: the flicker some neon has made a whole ring blink out and back, owner Nov 4)
+    NO_FLICKER = true; try { put(U.torus, m, under(Q, T(0,1+r,0,0,2*r,2*r,2*r))); put(U.torus, m, under(Q, T(0,1+r,0,0,2*r*.7,2*r*.7,2*r*.7))); } finally { NO_FLICKER = false; }
     glow(Q,0,1+r,0,NEON_GLOW.get(m),2.4*r+1); },
   bonsai(P,spot){ const s=spot(.3); if(!s) return; bonsaiAt(P,s.x,0,s.z); },
   bamboo(P,spot){ const s=spot(.25); if(!s) return; bambooAt(P,s.x,0,s.z); },
@@ -2020,7 +2020,7 @@ function spiralTower(lot, st, P0){
   box(M.inWood2, Fs, .35, .35, .03, .26, .62, MIN_T);   // a slatted side door
   for (let t = .26; t < .47; t += .05) box(M.inWood, Fs, t, .35, .045, .02, .6, MIN_T);
   box(M.inWood, Fs, -.1, .28, .2, .7, .05, .22); for (const x of [-.32, .12]) box(M.inWood2, Fs, x, .14, .2, .04, .28, .18);   // counter
-  for (const x of [-.3, -.05]){ cyl(MC.white, Fs, x, .33, .2, .06, .04); emitters.push(new THREE.Vector3(x, .5, .2).applyMatrix4(Fs)); }
+  for (const x of [-.3, -.05]){ cyl(MC.white, Fs, x, .33, .2, .06, .04); steamUnder(Fs, x, .5, .2, 1.15); }
   box(MC.board, Fs, -.05, .98, .14, 2.0, .58, .05);
   wordSign(Fs, 'sign_w_noodles', -.05, .98, .18, 1, 'amber');
   for (const x of [-.75, .65]){ box(M.lantern, Fs, x, .75, .25, .14, .2, .14); box(M.frame, Fs, x, .88, .25, .03, .06, .03); glow(Fs, x, .75, .25, 'red', .5); noteLight(Fs, x, .75, .25, 0xff4030); }
@@ -2239,7 +2239,7 @@ function tiledShop(lot, st, P0){
       const nm = pick([COM.noren, COM.noren2]); for (let q = -2; q <= 2; q++) box(nm, Ff, q*.09, .62, .05, .08, .28, .015);
       box(COM.wood, Ff, 0, .25, .38, w - .5, .5, .26); counterGoods(Ff, -w/2 + .4, w/2 - .4, .51, .38, 'food');
       for (const s of [-1, 1]) paperLantern(Ff, s*(w/2 - .18), h0 - .12, .12, COM.lanRed, 1.3); } }
-  if (typeof steamPot === 'function') steamPot(under(P, T(0, 0, d/2, 0)), w/2 - .45, .51, .38);
+  if (typeof steamPot === 'function') steamPot(under(P, T(0, 0, d/2, 0)), w/2 - .45, .51, .38, h0 + .3);
   tileRoof(P, h0, w + .4, d + .4, .32, COM.tile);
   // the upper floor: pale plaster between dark posts, warm lattice windows, and the shop's name across it
   const Pu = under(P, T(0, h0 + .2, 0, 0)), uw = w - .35, ud = d - .35;
@@ -2348,7 +2348,7 @@ function foodPlaza(lot, st, P0){
   // the noodle bar along the back: a long counter, stools, steaming pots, lanterns, its sign on a beam
   const Fb = under(P, T(0, 0, -S2/2 + .25, 0));
   box(COM.wood, Fb, 0, .3, 0, 1.7, .6, .45); box(COM.wood2, Fb, 0, .61, .05, 1.8, .03, .55);
-  for (const x of [-.55, 0, .55]) if (typeof steamPot === 'function') steamPot(Fb, x, .62, -.05);
+  for (const x of [-.55, 0, .55]) if (typeof steamPot === 'function') steamPot(Fb, x, .62, -.05, 1.3);
   for (let x = -.75; x <= .75; x += .5) if (typeof foodBowl === 'function') foodBowl(Fb, x + .12, .62, .15, .05);
   for (const s of [-1, 1]) cyl(COM.wood2, Fb, s*.88, .75, -.1, .04, 1.5);
   box(COM.wood2, Fb, 0, 1.45, -.1, 1.9, .06, .08);
@@ -2523,7 +2523,7 @@ function stallMarket(lot, st, P0){
     if (goods === 'food' && chance(.5)) for (let q=0; q<4; q++){ const hx = -sw/2 + .12 + q*.16; cyl(M.frame, F, hx, 1.0, sd/2 - .04, .004, .08); box(pick([MC.chili, MC.tomato, M.awn3]), F, hx, .9, sd/2 - .04, .035, .12, .035); }
     if (chance(.6)) paperLantern(F, rnd(-.2, .2), .96, sd/2 - .05, null, .9);
     if (chance(.45)){ const [sn, sc] = pick(signs); box(M.frame, F, 0, 1.25, sd/2, sw, .2, .03); fitSign(under(F, T(0, 0, sd/2 + .02, 0)), sn, 0, 1.25, 0, sw - .06, .55, sc); }
-    if (goods === 'food' && chance(.4)){ cyl(M.metalDark, F, sw/2 - .15, .55, sd/2 - .12, .07, .06); emitters.push(new THREE.Vector3(sw/2 - .15, .68, sd/2 - .12).applyMatrix4(F)); }
+    if (goods === 'food' && chance(.4)){ cyl(M.metalDark, F, sw/2 - .15, .55, sd/2 - .12, .07, .06); steamUnder(F, sw/2 - .15, .68, sd/2 - .12, 1.08); }
     if (chance(.7)) figureAt(F, rnd(-.2, .2), 0, -.12);
     if (k === 0 || k === 2){ const side = k === 0 ? -1 : 1, Fs = under(F, T(side*sw/2, 0, 0, side*PI/2)); box(rm, Fs, 0, .55, -.01, sd, 1.1, .02); if (chance(.6)) neonTag(Fs, sd, 1.1); }
   }
@@ -2548,7 +2548,7 @@ function foodDeck(lot, st, P0, rot){
   const stall = (F, len) => {
     box(COM.wood, F, 0, .1 + .25, 0, len - .1, .5, .32); box(COM.wood2, F, 0, .61, .02, len, .03, .38);   // the counter
     box(COM.wood2, F, 0, .62, -.31, len - .1, .9, .02); box(COM.warm2, F, 0, .78, -.29, len - .3, .4, .01);   // the kitchen wall behind, a warm hatch in it
-    for (let x = -len/2 + .2; x < len/2 - .1; x += .32){ if (typeof steamPot === 'function' && chance(.45)) steamPot(F, x, .62, -.05); else if (typeof foodBowl === 'function') foodBowl(F, x, .62, .06, .065); }
+    for (let x = -len/2 + .2; x < len/2 - .1; x += .32){ if (typeof steamPot === 'function' && chance(.45)) steamPot(F, x, .62, -.05, 1.12); else if (typeof foodBowl === 'function') foodBowl(F, x, .62, .06, .065); }
     const nm = pick([COM.noren, COM.noren2, toon(0x2a6a5a), toon(0xb0803a)]);
     for (let x = -len/2 + .08; x < len/2 - .05; x += .11) box(nm, F, x, h - .2, .14, .1, .22, .012);       // the noren
     if (chance(.6)) for (let q=0; q<5; q++){ const hx = -len/2 + .2 + q*.12; cyl(M.frame, F, hx, h - .1, .2, .004, .1); box(MC.chili, F, hx, h - .2, .2, .03, .12, .03); }
@@ -2620,7 +2620,7 @@ function stallBase(lot, st, P0){
       else { const rm = pick(COM.corr); box(rm, F, cx, 1.06, zf + .14, sw - .02, .025, .36, -.3); for (let t = cx - sw/2 + .05; t < cx + sw/2; t += .09) box(rm, F, t, 1.075, zf + .14, .02, .02, .36, -.3); }
       if (chance(.75)) paperLantern(F, cx + rnd(-.2, .2), .86, zf + .2, chance(.4) ? COM.lanGold : null, .9);
       if (goods === 'food' && chance(.45)) for (let q=0; q<4; q++){ const hx = cx - sw/2 + .14 + q*.15; cyl(M.frame, F, hx, .98, zf - .05, .004, .08); box(pick([MC.chili, MC.tomato, M.awn3]), F, hx, .88, zf - .05, .035, .12, .035); }
-      if (goods === 'food' && chance(.35)){ cyl(M.metalDark, F, cx + sw/2 - .17, .55, zf - .2, .06, .06); emitters.push(new THREE.Vector3(cx + sw/2 - .17, .66, zf - .2).applyMatrix4(F)); }
+      if (goods === 'food' && chance(.35)){ cyl(M.metalDark, F, cx + sw/2 - .17, .55, zf - .2, .06, .06); steamUnder(F, cx + sw/2 - .17, .66, zf - .2, h - .14); }
       if (chance(.7)) figureAt(F, cx + rnd(-.15, .15), 0, zf - .36);
       if (chance(.6*S.neon)){ const [sn, sc] = pick(BASE_SIGNS); fitSign(under(F, T(0, 0, zf + .07, 0)), sn, cx, h - .05, 0, sw - .12, .5, sc); }
       // the warm spill: out over the street in front of the stall, lighting the road (no halo of its own)

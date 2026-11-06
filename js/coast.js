@@ -633,6 +633,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
         vec4 wp = vec4(p.x + dsp.x, y, p.y + dsp.z, 1.0);
         vP = p; vG = dot(p - ctr, fwd); float gp = max(vG - g0, 0.0); wp.y -= curveK*gp*gp; gl_Position = projectionMatrix * viewMatrix * wp; }`,
     fragmentShader: `
+      precision highp sampler2D;   // (the depth at full precision: a phone reads images at low precision unless asked, sky.js composite)
       uniform float time, pxW; uniform sampler2D depthTex, dudvTex, causTex, reflTex, foamTex; uniform vec3 foamBox; uniform vec2 resPx; uniform vec4 box; uniform vec3 sunDir; uniform vec2 camXZ; uniform vec3 tint, glint, hazeC; uniform float hzNear, hzFar, hzMax, glintK, nightK;
       varying vec2 vP; varying float vG; varying vec3 vWN; varying vec3 vWJ;
       float h21(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x*p.y); }

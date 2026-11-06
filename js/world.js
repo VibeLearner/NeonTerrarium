@@ -1034,6 +1034,21 @@ function liftSnap(c, y, y0){
   if (ly > c.height - .5) ly = c.height - .5;
   return ly;
 }
+// Where a scaffold's legs stand on the roof below: a square lined up with the plot (so the legs rise straight and
+// parallel, not leaning in like a pyramid when the roof is small or turned), as big as fits wholly on the roof with
+// `inset` to spare, and no bigger than `cap`. Centered on the plot if that leaves it near full size, else on the roof.
+// Returns the four feet in plot-local [x, z], in QS order (-,-) (+,-) (+,+) (-,+).
+function roofFeet(c, rc, inset, cap){
+  const cx = rc.reduce((a, p) => a + p[0], 0)/rc.length - c.x, cz = rc.reduce((a, p) => a + p[2], 0)/rc.length - c.z;
+  const poly = rc.map(p => [p[0] - c.x, p[2] - c.z]).sort((a, b) => Math.atan2(a[1] - cz, a[0] - cx) - Math.atan2(b[1] - cz, b[0] - cx));
+  const inside = (x, z) => { let sg = 0; for (let k = 0; k < poly.length; k++){ const [ax, az] = poly[k], [bx, bz] = poly[(k + 1) % poly.length];
+    const cr = (bx - ax)*(z - az) - (bz - az)*(x - ax); if (Math.abs(cr) < 1e-9) continue; const s = Math.sign(cr); if (sg && s !== sg) return false; sg = s; } return true; };
+  const fit = (ox, oz) => { let lo = 0, hi = cap + inset; if (!inside(ox, oz)) return 0;
+    for (let it = 0; it < 18; it++){ const m = (lo + hi)/2; if (inside(ox - m, oz - m) && inside(ox + m, oz - m) && inside(ox + m, oz + m) && inside(ox - m, oz + m)) lo = m; else hi = m; }
+    return Math.max(.12, Math.min(cap, lo - inset)); };
+  const s0 = fit(0, 0), s1 = fit(cx, cz), [ox, oz, s] = s0 >= s1*.85 ? [0, 0, s0] : [cx, cz, s1];
+  return [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sz]) => [ox + sx*s, oz + sz*s]);
+}
 // neighbours a pod at deck height y0 can tie into: a building that rises past the deck (a pod too, if it hangs lower)
 function liftSupports(c, y0){
   const out = [];
@@ -1107,9 +1122,7 @@ function liftScaffoldCom(c, y0){
   let feet = QS.map(([sx, sz]) => [sx*E, sz*E]);
   if (onRoof){
     const rc = c.liftRoof || QS.map(([sx, sz]) => [c.x + sx*.75, base, c.z + sz*.75]);
-    const cx = rc.reduce((a, p) => a + p[0], 0)/4, cz = rc.reduce((a, p) => a + p[2], 0)/4;
-    feet = QS.map(([sx, sz]) => { let best = rc[0], bd = -Infinity; for (const p of rc){ const d = sx*(p[0] - cx) + sz*(p[2] - cz); if (d > bd){ bd = d; best = p; } }
-      const k = tw*.75 + rnd(0, .08), dx = cx - best[0], dz = cz - best[2], l = Math.hypot(dx, dz) || 1; return [best[0] - c.x + dx/l*k, best[2] - c.z + dz/l*k]; });
+    feet = roofFeet(c, rc, tw*.6, E);
   }
   for (const [x, z] of feet){ trussCol(P, x, z, base, y0 - .24, tw, mat()); box(M.concDD, P, x, base + .03, z, .5, .06, .5); }
   const edges = feet.map((f, k) => [f[0], f[1], feet[(k + 1) % 4][0], feet[(k + 1) % 4][1]]);
@@ -1124,11 +1137,11 @@ function liftScaffoldCom(c, y0){
   for (let k = 0; k < irand(2, 4); k++){ const a = rnd(0, TAU), r = rnd(.6, 1.1); sagCable(P, Math.cos(a)*r, y0 - .25, Math.sin(a)*r, Math.cos(a + .6)*r*.6, y0 - rnd(1, 2.2), Math.sin(a + .6)*r*.6, rnd(.2, .5)); }
   // the street entrance: a steel booth with a lit shutter and a ladder cage up the scaffold (or a ladder from the roof below)
   const free = SIDES4.filter(d => !supKey.has(d.join()));
-  const hs = free.length ? free[(hash('liftdoor', c.i, c.j) + LIFT_SHIFT) % free.length] : SIDES4[0];
+  const hs = LIFT_SIDE || (free.length ? free[hash('liftdoor', c.i, c.j) % free.length] : SIDES4[0]);
   // the lift: a glass shaft lit with neon, from the street to the deck, its glass cab carrying people up and down
   const LX = .5, LZ = 1.44;
   { const F = under(P, T(0, 0, 0, Math.atan2(hs[0], hs[1])));
-    liftShaftCom(F, LX, LZ, CURB, y0);
+    if (!LIFT_NOSHAFT) liftShaftCom(F, LX, LZ, CURB, y0);
     const Wp = (x, z) => new THREE.Vector3(x, 0, z).applyMatrix4(F);
     const cc = Wp(LX, LZ), fr = Wp(LX + .26, LZ), ix = Wp(LX, .85), g = Wp(1, 0), o = Wp(0, 0), gx = g.x - o.x, gz = g.z - o.z;
     c.liftCab = { x: cc.x, z: cc.z, fx: fr.x, fz: fr.z, nx: gx, nz: gz, ix: ix.x, iz: ix.z, y0, ry: Math.atan2(gx, gz), style: 'com' };
@@ -1223,9 +1236,7 @@ function liftScaffoldInd(c, y0){
   let feet = cols.map(([x, z]) => [x, z]);
   if (onRoof){
     const rc = c.liftRoof || cols.map(([sx, sz]) => [c.x + Math.sign(sx)*.75, base, c.z + Math.sign(sz)*.75]);
-    const cx = rc.reduce((a, p) => a + p[0], 0)/4, cz = rc.reduce((a, p) => a + p[2], 0)/4;
-    feet = cols.map(([sx, sz]) => { let best = rc[0], bd = -Infinity; for (const p of rc){ const d = sx*(p[0] - cx) + sz*(p[2] - cz); if (d > bd){ bd = d; best = p; } }
-      const k = .22 + rnd(0, .08), dx = cx - best[0], dz = cz - best[2], l = Math.hypot(dx, dz) || 1; return [best[0] - c.x + dx/l*k, best[2] - c.z + dz/l*k]; });
+    feet = roofFeet(c, rc, .2, E);
   }
   for (const [x, z] of feet){ if (!onRoof) box(M.concM, P, x, base + .3, z, .5, .6, .5); else box(M.concDD, P, x, base + .03, z, .34, .06, .34); iBeam(rust(), P, x, z, base + (onRoof ? .06 : .6), y0 - .37); }
   const edges = feet.map((f, k) => [f[0], f[1], feet[(k + 1) % 4][0], feet[(k + 1) % 4][1]]);
@@ -1250,10 +1261,10 @@ function liftScaffoldInd(c, y0){
   // the lift: a heavy lattice tower beside the deck on a side with no walkway, from the street up past the deck, its
   // steel cab lined in red neon carrying people between the street and the deck
   const free = SIDES4.filter(d => !supKey.has(d.join()));
-  const hs = free.length ? free[(hash('liftdoor', c.i, c.j) + LIFT_SHIFT) % free.length] : SIDES4[0];
+  const hs = LIFT_SIDE || (free.length ? free[hash('liftdoor', c.i, c.j) % free.length] : SIDES4[0]);
   const LX = .5, LZ = 1.44;
   { const F = under(P, T(0, 0, 0, Math.atan2(hs[0], hs[1])));
-    liftShaftInd(F, LX, LZ, CURB, y0);
+    if (!LIFT_NOSHAFT) liftShaftInd(F, LX, LZ, CURB, y0);
     const Wp = (x, z) => new THREE.Vector3(x, 0, z).applyMatrix4(F);
     const cc = Wp(LX, LZ), fr = Wp(LX + .26, LZ), ix = Wp(LX, .85), g = Wp(1, 0), o = Wp(0, 0), gx = g.x - o.x, gz = g.z - o.z;
     c.liftCab = { x: cc.x, z: cc.z, fx: fr.x, fz: fr.z, nx: gx, nz: gz, ix: ix.x, iz: ix.z, y0, ry: Math.atan2(gx, gz), style: 'ind' };
@@ -1369,10 +1380,7 @@ function liftPlatformLux(c, y0){
   let feet = QS.map(([sx, sz]) => [sx*.92, sz*.92]);
   if (onRoof){
     const rc = c.liftRoof || QS.map(([sx, sz]) => [c.x + sx*.75, base, c.z + sz*.75]);
-    const cx = rc.reduce((a, p) => a + p[0], 0)/4, cz = rc.reduce((a, p) => a + p[2], 0)/4;
-    feet = QS.map(([sx, sz]) => { let best = rc[0], bd = -Infinity; for (const p of rc){ const d = sx*(p[0] - cx) + sz*(p[2] - cz); if (d > bd){ bd = d; best = p; } }
-      const k = .2, dx = cx - best[0], dz = cz - best[2], l = Math.hypot(dx, dz) || 1;
-      return [clamp(best[0] - c.x + dx/l*k, -H + .2, H - .2), clamp(best[2] - c.z + dz/l*k, -H + .2, H - .2)]; });
+    feet = roofFeet(c, rc, .18, Math.min(.92, H - .2));
   }
   for (const [x, z] of feet){
     box(LUX_STONE2, P, x, base + .08, z, .3, .16, .3); box(M.idGold, P, x, base + .165, z, .26, .02, .26);
@@ -1385,10 +1393,10 @@ function liftPlatformLux(c, y0){
   for (let k = 0; k < 4; k++) if (chance(.5*S.green)){ const d = SIDES4[k], F = under(P, T(0, 0, 0, Math.atan2(d[0], d[1]))); plant(hangKind(), F, rnd(-.8, .8), yb - .1, H - .05, rnd(.55, .75), 't', true); }
   // the lift: a gold-ringed glass tube on a side with no walkway
   const free = SIDES4.filter(d => !supKey.has(d.join()));
-  const hs = free.length ? free[(hash('liftdoor', c.i, c.j) + LIFT_SHIFT) % free.length] : SIDES4[0];
+  const hs = LIFT_SIDE || (free.length ? free[hash('liftdoor', c.i, c.j) % free.length] : SIDES4[0]);
   const LX = .5, LZ = 1.5;
   { const F = under(P, T(0, 0, 0, Math.atan2(hs[0], hs[1])));
-    luxTube(F, LX, LZ, CURB, y0);
+    if (!LIFT_NOSHAFT) luxTube(F, LX, LZ, CURB, y0);
     const Wp = (x, z) => new THREE.Vector3(x, 0, z).applyMatrix4(F);
     const cc = Wp(LX, LZ), fr = Wp(LX + .29, LZ), ix = Wp(LX, .9), g = Wp(1, 0), o = Wp(0, 0), gx = g.x - o.x, gz = g.z - o.z;
     c.liftCab = { x: cc.x, z: cc.z, fx: fr.x, fz: fr.z, nx: gx, nz: gz, ix: ix.x, iz: ix.z, y0, ry: Math.atan2(gx, gz), style: 'lux' };
@@ -1440,24 +1448,29 @@ function liftPlatformLux(c, y0){
   }
 }
 // A side pod whose building is gone (owner, Nov 4): with nothing beside it to hang from, each of its blocks stands on a scaffold of its own, the lowest
-// from the street (or the roof of a building under it), each one above from the roof of the block under it, and each has its lift down to the street
-// for the people living there (on a side of its own where it can, so the shafts don't stand in one another). The pod's own deck, rails and lift are
-// the scaffold's (liftScaffold, its zone's kind); the beams and gangway to the old building go. The lowest block's lift is the one people ride.
+// from the street (or the roof of a building under it), each one above from the roof of the block under it. One lift serves them all: the top block's,
+// from the street up past the others on the side every block leaves free for it (owner, Nov 6: a lift for each block, each on a side of its own, ran
+// up through the decks and homes of the blocks below). The pod's own deck, rails and lift are the scaffold's (liftScaffold, its zone's kind); the
+// beams and gangway to the old building go.
 function* podScaffolds(c, bl){
   const keepTop = c.belowTop, keepRoof = c.liftRoof; let cab = null;
+  // the lift's side: one that every block leaves free (no neighbour holding it up there), so the one shaft passes them all clear
+  const sup = new Set(); for (const [s0] of bl) for (const d of liftSupports(c, s0)) sup.add(d.join());
+  const free = SIDES4.filter(d => !sup.has(d.join()));
+  LIFT_SIDE = free.length ? free[hash('liftdoor', c.i, c.j) % free.length] : null;
   try {
-    for (let n = bl.length - 1; n >= 0; n--){   // (the lowest last: its lift is the plot's)
+    for (let n = bl.length - 1; n >= 0; n--){
       const [s0] = bl[n];
       c.belowTop = n === 0 ? keepTop : bl[n - 1][1]; c.liftRoof = n === 0 ? keepRoof : null;
-      LIFT_SHIFT = n; KEEP_FINE++;
-      try { liftScaffold(c, s0); } finally { KEEP_FINE--; LIFT_SHIFT = 0; }
-      if (n === 0) cab = c.liftCab;
+      LIFT_NOSHAFT = n !== bl.length - 1; KEEP_FINE++;
+      try { liftScaffold(c, s0); } finally { KEEP_FINE--; LIFT_NOSHAFT = false; }
+      if (n === bl.length - 1) cab = c.liftCab;
       yield;
     }
-  } finally { c.belowTop = keepTop; c.liftRoof = keepRoof; }
+  } finally { c.belowTop = keepTop; c.liftRoof = keepRoof; LIFT_SIDE = null; }
   c.liftCab = cab;
 }
-let LIFT_SHIFT = 0;   // (which free side a scaffold's lift takes: the next one round for each block up a stack)
+let LIFT_NOSHAFT = false, LIFT_SIDE = null;   // (a block of a stacked pod under the top one: its lift is the top block's: podScaffolds)
 // After a building is removed or cut down: the side pods that hung from it. One that a building on another side can hold (as tall as its highest
 // block) hangs from that one now; one that nothing can hold goes onto scaffolds (c.lift.sc). Never back again: a new building where the old one stood
 // leaves it on its scaffolds (owner, Nov 4: remove it and build it again to hang it off a wall). Returns the pods changed (to be built again).
@@ -1591,16 +1604,14 @@ function liftScaffold(c, y0){
   // roof (taken inward a little, at random, so no two rigs stand alike); with nothing below, the street under the deck.
   // Each leg runs from its deck corner to its foot, leaning in or splaying out as the roof is narrower or turned, so it
   // always lands on the roof. Ledgers and braces join the legs along their actual lines.
-  const QS = [[-1, -1], [1, -1], [1, 1], [-1, 1]], top = QS.map(([sx, sz]) => [sx*E, y0 - .1, sz*E]);
-  let feet;
+  const QS = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+  let top = QS.map(([sx, sz]) => [sx*E, y0 - .1, sz*E]), feet;
   if (onRoof){
+    // on a roof: the legs stand on a square lined up with the plot that fits on the roof, and rise straight up to the
+    // deck's underside from there (the deck overhangs them), so they never lean in like a pyramid
     const rc = c.liftRoof || QS.map(([sx, sz]) => [c.x + sx*.6, base, c.z + sz*.6]);   // (no corners recorded: a safe square well inside)
-    const cx = rc.reduce((a, p) => a + p[0], 0)/4, cz = rc.reduce((a, p) => a + p[2], 0)/4;
-    feet = QS.map(([sx, sz]) => {   // the roof corner lying furthest toward this deck corner
-      let best = rc[0], bd = -Infinity; for (const p of rc){ const d = sx*(p[0] - cx) + sz*(p[2] - cz); if (d > bd){ bd = d; best = p; } }
-      const k = rnd(.08, .2), dx = cx - best[0], dz = cz - best[2], l = Math.hypot(dx, dz) || 1;
-      return [best[0] - c.x + dx/l*k, base, best[2] - c.z + dz/l*k];
-    });
+    const sq = roofFeet(c, rc, .1, E);
+    feet = sq.map(([x, z]) => [x, base, z]); top = sq.map(([x, z]) => [x, y0 - .1, z]);
   } else feet = top.map(([x, , z]) => [x + wobble(), base, z + wobble()]);
   const legAt = (k, y) => { const a = feet[k], b = top[k], u = Math.max(0, Math.min(1, (y - a[1])/(b[1] - a[1]))); return [a[0] + (b[0] - a[0])*u, a[2] + (b[2] - a[2])*u]; };
   for (let k = 0; k < 4; k++){
@@ -1624,12 +1635,12 @@ function liftScaffold(c, y0){
   }
   // the stair hut and ladder: on a side with no walkway, the pod's front door at street level
   const free = SIDES4.filter(d => !supKey.has(d.join()));
-  const hs = free.length ? free[(hash('liftdoor', c.i, c.j) + LIFT_SHIFT) % free.length] : SIDES4[0];
+  const hs = LIFT_SIDE || (free.length ? free[hash('liftdoor', c.i, c.j) % free.length] : SIDES4[0]);
   // the lift: a slim shaft beside the deck on that side, from the street up past the deck, its cab carrying people
   // between the street and the deck (the cab itself moves: see the lifts in people.js)
   const LX = .5, LZ = 1.42;
   { const F = under(P, T(0, 0, 0, Math.atan2(hs[0], hs[1])));   // local +z out to that side
-    liftShaft(F, LX, LZ, CURB, y0);
+    if (!LIFT_NOSHAFT) liftShaft(F, LX, LZ, CURB, y0);
     const W = (x, z) => new THREE.Vector3(x, 0, z).applyMatrix4(F);
     const cc = W(LX, LZ), fr = W(LX + .26, LZ), ix = W(LX, .85), g = W(1, 0), o = W(0, 0), gx = g.x - o.x, gz = g.z - o.z;
     c.liftCab = { x: cc.x, z: cc.z, fx: fr.x, fz: fr.z, nx: gx, nz: gz, ix: ix.x, iz: ix.z, y0, ry: Math.atan2(gx, gz) };

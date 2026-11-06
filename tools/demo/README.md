@@ -72,3 +72,29 @@ Times are at the top of `js/demo.js` (`MK`, `CLICK_T`), captions in `CAPS`, the 
 - The pull out over the city starts at 23 s and the title holds to the end.
 
 Its apartment steps are in `RL` and its times in `MK` at the top of `js/demo.js`; the sofa is `SOFA`.
+
+## The procedural generation cut (60 s)
+
+`python3 tools/demo/record.py --pg` makes `tools/demo/out/neon-terrarium-procgen.mp4` (code: `js/demo_pg.js`, opened with `index.html?full#demo&pg`).
+No captions; the cursor, the zone bar and the Grid's music player are the only interface on screen, with "Neon Terrarium" small in the
+bottom right.
+
+| Time | Shot |
+|---|---|
+| 0 s | One bare plot in the night sky |
+| 1 to 11 s | Each zone picked on the zone bar and built, then stacked: Residential, Commercial, Luxury, Industrial |
+| 11.6 to 18 s | One tower of every zone stacked on each other (zones picked with the number keys) |
+| 19 to 25 s | A tall Commercial building, and three homes hung off its side |
+| 26 to 28 s | The building taken down a section at a time (right-click): the homes go onto scaffolds of their own |
+| 29.6 to 41.5 s | Its bare plot cycled to lawn, then fifteen lawn plots laid beside it: the garden grows its paths, pieces, pond and bridge |
+| 47 to 60 s | The camera pulls out over the whole city; a fade to black at the very end so it loops |
+
+- The music is the Grid's own live music (it stands far out of sight, so it plays from the first frame). It is never the same twice, so for
+  `--pg` the sound pass runs first and notes what the player showed each moment (`out/procgen-deck.json`); the picture pass then shows exactly
+  that, so the player on screen matches what you hear.
+- The garden's rolls come from a salt picked before the film: it tries 500 and keeps the one that grows a pond of 2 to 5 plots partway
+  through, a bridge and a gazebo. What it picked, and everything else the plan saw, is in `out/procgen-log.txt`.
+- `--stills` (PNGs at the key moments, no sound pass, so the player there shows live music), `--preview` and `--test` work as for the clip.
+
+Tuning: the clicks are `ACTS` at the top of `js/demo_pg.js` (time, kind, plot), the garden's plots and their order `LAWNS`, the camera's shots
+`shots()` and its slow turn `yawAt`.

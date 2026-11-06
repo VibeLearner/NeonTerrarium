@@ -5,6 +5,7 @@
 resize();
 bakeClouds();
 if (window.NT_DEMO && typeof DEMO !== 'undefined' && DEMO.on) DEMO.city();   // (#demo: the clip's own city, never saved: js/demo.js)
+else if (window.NT_DEMO && typeof DEMOPG !== 'undefined' && DEMOPG.on) DEMOPG.city();   // (#demo&pg: the procedural generation cut's, js/demo_pg.js)
 else if (!load()) clearIsland(); else if (loadWanted()) loadStart(); else rebuildAll();   // (a saved city is made from its recipes by the worker, nearest the camera first: loadcity.js)
 centerView(true);
 selectZone(null);
@@ -23,6 +24,7 @@ PH.state = () => 'cache: ' + SC.state + (SC.why ? ' (' + SC.why + ')' : '') + ';
 function frame(now){
   requestAnimationFrame(frame);
   if (window.NT_DEMO && typeof DEMO !== 'undefined' && DEMO.frameNow){ const n = DEMO.frameNow(now); if (n === null) return; now = n; }   // (#demo: the film's own clock, and nothing drawn while it holds: js/demo.js)
+  else if (window.NT_DEMO && typeof DEMOPG !== 'undefined' && DEMOPG.frameNow){ const n = DEMOPG.frameNow(now); if (n === null) return; now = n; }   // (#demo&pg: the same, js/demo_pg.js)
   if (typeof OVERSEER !== 'undefined' && OVERSEER.hold) return;   // (the Overseer's desk covers the screen: the city waits)
   if (typeof PRECINCT !== 'undefined' && PRECINCT.hold){ if (PRECINCT.live) try { simBody(now); } catch (e){ console.warn('desk sim', e); } return; }   // (and the Precinct desk: the city goes on under it undrawn, so its plan is live, policedesk.js)
   if (typeof GRIDPANEL !== 'undefined' && GRIDPANEL.hold) return;   // (so does the Acoustic Panel; the broadcast plays on)

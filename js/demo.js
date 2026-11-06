@@ -16,7 +16,7 @@
 // Nothing is saved and none of the player's own city or settings are read (saveguard.js, NT_DEMO).
 'use strict';
 const DEMO = (() => {
-  const D = { on: !!window.NT_DEMO, ready: false, playing: false, done: false, held: false, t: 0, frame: 0, drawn: 0, log: [], info: {}, failed: null, len: window.__DM_LONG ? 29 : 15 };
+  const D = { on: !!window.NT_DEMO && !/[#&]pg\b/.test(location.hash), ready: false, playing: false, done: false, held: false, t: 0, frame: 0, drawn: 0, log: [], info: {}, failed: null, len: window.__DM_LONG ? 29 : 15 };
   if (!D.on) return D;
   const CAP = !!window.__TR_CAPTURE;   // the picture pass: the recorder steps the clock and films each frame
   const AUTO = !!window.__DM_AUDIO;    // the sound pass: real time, nothing drawn, only what makes a sound

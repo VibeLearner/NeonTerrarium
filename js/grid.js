@@ -399,9 +399,11 @@ const music = (() => {
     const folded = typeof TOUCH !== 'undefined' && TOUCH.on && deckFolded(), sheet = folded && ui.sheetOn();
     if (folded && !sheet && !PANEL.open){ textT -= d; if (textT <= 0){ textT = .25; ui.text(); } return; }
     readBands(d);
+    if (window.__dmDeck) try { window.__dmDeck(bands, 0); } catch (e) {}   // (#demo&pg: the recorder notes what the player shows, or shows it again: js/demo_pg.js)
     if (!folded) ui.draw(rt, d); else if (sheet) ui.drawSheet(rt, d);
     PANEL.draw(rt, d); if (PANEL.open && typeof GRIDVIZ !== 'undefined') GRIDVIZ.draw(rt, d, bands, on && !paused ? level : 0);
     textT -= d; if (textT <= 0){ textT = .25; ui.text(); }
+    if (window.__dmDeck) try { window.__dmDeck(null, 1); } catch (e) {}
   }
   requestAnimationFrame(loop);
 

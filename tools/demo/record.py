@@ -11,6 +11,10 @@ Then the two are put together.
     python3 tools/demo/record.py --preview     # a quick 720p, 30 fps look
     python3 tools/demo/record.py               # the clip -> tools/demo/out/neon-terrarium-demo.mp4
     python3 tools/demo/record.py --vertical    # the clip, plus a 1080 x 1920 version for phones
+    python3 tools/demo/record.py --pg          # the procedural generation cut (60 s, js/demo_pg.js) -> tools/demo/out/neon-terrarium-procgen.mp4
+
+The --pg cut plays the Grid's own live music, which is never the same twice, so its sound pass runs first and notes what the music player showed
+each moment; the picture pass then shows exactly that, so the player on screen matches what you hear.
 
 Needs: pip3 install playwright && python3 -m playwright install chromium  (it uses Google Chrome if installed), and ffmpeg.
 """
@@ -21,6 +25,7 @@ ROOT = os.path.abspath(os.path.join(HERE, '..', '..'))
 OUT = os.path.join(HERE, 'out')
 FPS = 60
 STILLS = [.8, 2.0, 3.2, 4.4, 5.2, 5.5, 5.8, 6.6, 7.8, 8.9, 10.2, 11.0, 12.2, 13.6, 14.7]
+STILLS_PG = [.6, 2.3, 5.0, 8.9, 11.0, 14.3, 18.4, 21.3, 23.2, 25.0, 26.6, 28.4, 30.6, 33.5, 36.5, 39.0, 41.8, 44.0, 46.0, 49.0, 53.0, 57.0, 59.5]
 STILLS_LONG = [1.0, 2.5, 4.0, 5.5, 6.8, 7.2, 8.6, 10.2, 11.9, 13.5, 15.0, 16.6, 18.0, 19.5, 20.8, 22.0, 23.5, 26.0, 28.5]
 
 
@@ -54,11 +59,14 @@ def log_page(page):
     page.on('crash', lambda *_: print('  the page crashed (the graphics process may have run out of memory)'))
 
 
+DM = 'DEMO'   # (the clip's object in the page: DEMOPG for --pg)
+
+
 def wait_ready(ev, t0, limit=1500):
     last = ''
     while True:
-        st = ev('typeof DEMO !== "undefined" ? DEMO.state() : null') or {}
-        fail = ev('typeof DEMO !== "undefined" && DEMO.failed')
+        st = ev(f'typeof {DM} !== "undefined" ? {DM}.state() : null') or {}
+        fail = ev(f'typeof {DM} !== "undefined" && {DM}.failed')
         if fail: sys.exit('the demo could not set up: ' + str(fail) + '\n' + '\n'.join(st.get('log', [])))
         if st.get('stage') != last: last = st.get('stage'); print(f'[{time.time() - t0:5.1f}s] {last}')
         if st.get('ready'): return st
@@ -79,24 +87,58 @@ def main():
     ap.add_argument('--crf', type=int, default=16)
     ap.add_argument('--long', action='store_true', help='the long cut: 29 s, no captions or badge, the furnisher'"'"'s sofa put back on camera, the work light off at the end')
     ap.add_argument('--nolab', action='store_true', help='checking only: leave the apartment out')
+    ap.add_argument('--pg', action='store_true', help='the procedural generation cut (60 s, no captions, the Grid\'s live music and its player on screen: js/demo_pg.js)')
     ap.add_argument('--test', action='store_true', help='for checking on a machine without a graphics card: a small 640 x 360 picture at 30 fps, software drawing, no sound')
     a = ap.parse_args()
-    global FPS
+    global FPS, DM
+    if a.pg: DM = 'DEMOPG'
+
     VW, VH = 1920, 1080
     DSF = 1
     if a.test: VW, VH, DSF, FPS, a.no_audio = 1920, 1080, .5, 30, True   # (the desktop layout of every panel, drawn at half the pixels)
-    a.out = a.out or os.path.join(OUT, 'neon-terrarium-demo' + ('-long' if a.long else '') + ('-test' if a.test else '-preview' if a.preview else '') + '.mp4')
+    a.out = a.out or os.path.join(OUT, ('neon-terrarium-procgen' if a.pg else 'neon-terrarium-demo') + ('-long' if a.long else '') + ('-test' if a.test else '-preview' if a.preview else '') + '.mp4')
     if not shutil.which('ffmpeg') and not a.stills: sys.exit('ffmpeg is needed: brew install ffmpeg')
     from playwright.sync_api import sync_playwright
     os.makedirs(OUT, exist_ok=True)
     srv = serve(a.port)
-    url = f'http://127.0.0.1:{a.port}/index.html?full#demo'
+    url = f'http://127.0.0.1:{a.port}/index.html?full#demo' + ('&pg' if a.pg else '')
     with sync_playwright() as pw:
-        # ---------- 1. the picture ----------
+        # ---------- the sound: the clip played in real time in a hidden browser, recording what the game plays ----------
+        def sound_pass():
+            print('the sound: playing the clip in real time, in a hidden browser, recording what the game plays')
+            browser = launch(pw, True)
+            ctx = browser.new_context(viewport={'width': 1920, 'height': 1080}, device_scale_factor=1)
+            if a.long: ctx.add_init_script(script='window.__DM_LONG = true;')
+            ctx.add_init_script(path=os.path.join(HERE, 'audio.js'))
+            page = ctx.new_page(); log_page(page); page.goto(url, wait_until='load')
+            t0 = time.time()
+            for _ in wait_ready(page.evaluate, t0): time.sleep(.25)
+            while not page.evaluate(f'{DM}.state().done'):
+                if time.time() - t0 > 2400: raise RuntimeError('the clip never finished')
+                time.sleep(.2)
+            recs = page.evaluate('__dmStop()')
+            deck = page.evaluate(f'{DM}.deckTrack ? {DM}.deckTrack() : null') if a.pg else None
+            browser.close()
+            out = []
+            for k, r in enumerate(recs):
+                p = os.path.join(OUT, f'demo-audio-{k}.webm'); open(p, 'wb').write(base64.b64decode(r['data'])); out.append((p, r['at']/1000))
+            print('  recorded', len(out), 'sound track(s)' + (f', and {len(deck)} moments of the music player' if deck else ''))
+            return out, deck
+        tracks, deck = [], None
+        # (--pg: the sound first, so the picture can show the music player as it was while that sound played)
+        if a.pg and not a.no_audio and not a.stills:
+            try:
+                tracks, deck = sound_pass()
+                if deck:
+                    with open(os.path.join(OUT, 'procgen-deck.json'), 'w') as fh: json.dump(deck, fh)
+            except Exception as e:
+                print('  the sound pass failed (the clip will be silent):', e)
+        # ---------- the picture ----------
         def open_page(headless):
             browser = launch(pw, headless, soft=a.test)
             ctx = browser.new_context(viewport={'width': VW, 'height': VH}, device_scale_factor=DSF)
             ctx.add_init_script(script=f'window.__DM_FPS = {FPS};' + ('window.__DM_NOLAB = true;' if a.nolab else '') + ('window.__DM_TEST = true;' if a.test else '') + ('window.__DM_LONG = true;' if a.long else ''))
+            if deck: ctx.add_init_script(script='window.__DM_DECK = ' + json.dumps(deck, separators=(',', ':')) + ';')
             ctx.add_init_script(path=os.path.join(HERE, 'shim.js'))
             page = ctx.new_page(); cdp = ctx.new_cdp_session(page); log_page(page)
             page.goto(url, wait_until='load')
@@ -120,14 +162,14 @@ def main():
         t0 = time.time()
         for _ in wait_ready(ev, t0, 14400 if a.test else 1500):
             ev(f'__step(2, {1000/FPS})'); time.sleep(.01)
-        st = ev('DEMO.state()')
+        st = ev(f'{DM}.state()')
         print('ready:', json.dumps(st.get('info')))
-        if not ev('DEMO.start()'): sys.exit('the clip would not start')
+        if not ev(f'{DM}.start()'): sys.exit('the clip would not start')
         length = float(st.get('len') or 15)
         frames = int(round(length*FPS)); every = 2 if a.preview else 1
         enc = None
         if a.stills:
-            want = sorted(int(round(s*FPS)) for s in (STILLS_LONG if a.long else STILLS) if s < length)
+            want = sorted(int(round(s*FPS)) for s in (STILLS_PG if a.pg else STILLS_LONG if a.long else STILLS) if s < length)
             sd = os.path.join(OUT, 'stills'); os.makedirs(sd, exist_ok=True)
         else:
             raw = os.path.splitext(a.out)[0] + '.video.mp4'
@@ -139,12 +181,12 @@ def main():
         # one picture per frame the film draws: while it holds (the apartment lab still working) the clock steps on and no picture is taken
         held_steps = 0
         for f in range(frames):
-            d0 = ev('DEMO.drawn'); n = 0
+            d0 = ev(f'{DM}.drawn'); n = 0
             while True:
                 ev(f'__step(1, {1000/FPS})')
-                if ev('DEMO.drawn') != d0: break
+                if ev(f'{DM}.drawn') != d0: break
                 n += 1; held_steps += 1; time.sleep(.004)
-                if n % 600 == 0: print(f'  the film is holding for the apartment lab ({n} steps so far): ' + str(ev('DEMO.state().info.wait')))
+                if n % 600 == 0: print(f'  the film is holding for the apartment lab ({n} steps so far): ' + str(ev(f'{DM}.state().info.wait')))
             if n > 2: print(f'  at {f/FPS:.2f}s the film held {n} steps for the lab')
             if a.stills:
                 if f in want:
@@ -155,36 +197,18 @@ def main():
             if f % FPS == 0:
                 el = time.time() - t1; eta = el/(f + 1)*(frames - f - 1)
                 print(f'  {f/FPS:4.0f}s of {length:.0f}s   ({el:4.0f}s elapsed, about {eta/60:.1f} min to go)')
-        st = ev('DEMO.state()')
+        st = ev(f'{DM}.state()')
         browser.close()
         st['info']['heldSteps'] = held_steps
-        with open(os.path.join(OUT, 'demo-log.txt'), 'w') as fh: fh.write(json.dumps(st.get('info'), indent=1) + '\n' + '\n'.join(st.get('log', [])) + '\n')
+        with open(os.path.join(OUT, 'procgen-log.txt' if a.pg else 'demo-log.txt'), 'w') as fh: fh.write(json.dumps(st.get('info'), indent=1) + '\n' + '\n'.join(st.get('log', [])) + '\n')
         if a.stills:
             srv.shutdown(); print('stills in', os.path.relpath(sd, ROOT), '(and what happened when in tools/demo/out/demo-log.txt)'); return
         enc.stdin.close(); enc.wait()
 
-        # ---------- 2. the sound ----------
-        tracks = []
-        if not a.no_audio:
-            print('the sound: playing the clip again in real time, in a hidden browser, recording what the game plays')
-            try:
-                browser = launch(pw, True)
-                ctx = browser.new_context(viewport={'width': 1920, 'height': 1080}, device_scale_factor=1)
-                if a.long: ctx.add_init_script(script='window.__DM_LONG = true;')
-                ctx.add_init_script(path=os.path.join(HERE, 'audio.js'))
-                page = ctx.new_page(); log_page(page); page.goto(url, wait_until='load')
-                t0 = time.time()
-                for _ in wait_ready(page.evaluate, t0): time.sleep(.25)
-                while not page.evaluate('DEMO.state().done'):
-                    if time.time() - t0 > 2400: raise RuntimeError('the clip never finished')
-                    time.sleep(.2)
-                recs = page.evaluate('__dmStop()')
-                browser.close()
-                for k, r in enumerate(recs):
-                    p = os.path.join(OUT, f'demo-audio-{k}.webm'); open(p, 'wb').write(base64.b64decode(r['data'])); tracks.append((p, r['at']/1000))
-                print('  recorded', len(tracks), 'sound track(s)')
-            except Exception as e:
-                print('  the sound pass failed (the clip will be silent):', e)
+        # ---------- the sound (the 15 s clip: after the picture) ----------
+        if not a.no_audio and not a.pg:
+            try: tracks, _ = sound_pass()
+            except Exception as e: print('  the sound pass failed (the clip will be silent):', e)
     srv.shutdown()
     if tracks:
         ins, chains, mix = ['-i', raw], [], ''

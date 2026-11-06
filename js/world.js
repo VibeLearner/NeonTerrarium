@@ -466,7 +466,7 @@ function ovbBefore(r, s, c, g){
   g.drawRange.start = 0; g.drawRange.count = tot; mdSet(this, _ovS, _ovN, m);
 }
 let SIDE_SPLIT = false;   // (set while a plot or a megastructure is collected: see collect)
-const atlasable = m => m && m.isMeshToonMaterial && !m.map && m !== M.cloud && m !== ATLAS && m !== ATLAS_SIDE;
+const atlasable = m => m && m.isMeshToonMaterial && !m.map && !m.userData.live && m !== M.cloud && m !== ATLAS && m !== ATLAS_SIDE;
 // Faces nobody can ever see: wholly and well inside one of the piece's solid blocks (a box's end sunk into a wall, a post
 // buried in a slab). From any angle the block is in front of them. A block only counts if it's always drawn (never thinned
 // out when zoomed out), opaque and a true box. (Faces pressed flat against a block's face are kept: in testing they still

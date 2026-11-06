@@ -42,6 +42,60 @@ const GM = {
   reflect: toon(0x22495a, { em: 0xe8c27a, kind: 'bulb' }),   // a lantern's reflection on the water: the water's own color by day, a warm streak once the lights are on
 };
 
+/* ---------- the water ---------- */
+// The pond's water, after the coast's sea (coast.js): its color comes from how deep it is (shallow and pale at the banks, darkening toward the middle),
+// banded the way pixel art bands a gradient and dithered at the band edges; ripples wobble the bands; the slow swell is lit in flat facets (a coarse
+// triangle grid, each facet a little lighter turned toward the sun, a little darker turned away, in a few steps); caustics play over the shallows by day;
+// sun glints wink on and off. It gives off no light of its own: at night it goes dark with everything else and the lanterns' reflections show on it.
+// The depth rides in the surface's height (GD_WATER_Y plus up to GD_WATER_K at the deepest, a few millimetres): one material for every pond, no
+// textures. It moves, so it is drawn live (userData.live: not folded into the buildings' one material, not kept in the static cache).
+const GD_WATER_Y = .04, GD_WATER_K = .006;
+const GD_WATER_MAT = (() => {
+  const m = toon(0x5d9294); m.userData.live = true; m.userData.noCast = true;
+  m.customProgramCacheKey = () => 'gdwater';
+  m.onBeforeCompile = sh => {
+    sh.uniforms.gTime = FOL_UNI.time; sh.uniforms.gLights = LIGHTS_ON;
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWP;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
+varying vec3 vWP; uniform float gTime; uniform float gLights;
+float gh(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x*p.y); }
+float gBayer(vec2 p){ vec2 q = mod(floor(p), 4.0); vec2 a = mod(q, 2.0), b = floor(q/2.0); return ((a.x*2.0 + a.y*3.0 - 2.0*a.x*a.y)*4.0 + (b.x*2.0 + b.y*3.0 - 2.0*b.x*b.y))/16.0; }
+float gSwell(vec2 q){ return 0.07*sin(q.x*0.9 + gTime*0.55)*sin(q.y*1.1 - gTime*0.45) + 0.035*sin(q.x*2.3 - q.y*1.7 + gTime*0.9); }
+float gCaus(vec2 p){ vec2 i = floor(p), f = fract(p); float f1 = 8.0, f2 = 8.0;
+  for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++){ vec2 o = vec2(float(x), float(y)), c = i + o;
+    vec2 r = o + vec2(gh(c), gh(c + 7.3))*0.8 + 0.12*sin(gTime*0.5 + 6.28*vec2(gh(c + 3.1), gh(c + 5.7))) - f; float d = dot(r, r);
+    if (d < f1){ f2 = f1; f1 = d; } else if (d < f2) f2 = d; }
+  return sqrt(f2) - sqrt(f1); }`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+vec2 gp = vWP.xz; float gD0 = clamp((vWP.y - ${GD_WATER_Y.toFixed(3)})/${GD_WATER_K.toFixed(4)}, 0.0, 1.0), gDi = gBayer(gl_FragCoord.xy) - 0.5;
+vec2 gRip = vec2(sin(gp.x*1.7 + gp.y*0.9 + gTime*0.6), sin(gp.y*1.9 - gp.x*0.7 - gTime*0.5))*0.035;
+float gDq = floor((gD0 + gRip.x + gDi*0.09)*5.0 + 0.5)/5.0;
+vec3 gE = vec3(0.48, 0.66, 0.64), gS = vec3(0.365, 0.573, 0.58), gM = vec3(0.2, 0.396, 0.478), gDp = vec3(0.133, 0.286, 0.353);
+vec3 gW = gDq < 0.2 ? mix(gE, gS, gDq/0.2) : gDq < 0.6 ? mix(gS, gM, (gDq - 0.2)/0.4) : mix(gM, gDp, clamp((gDq - 0.6)/0.4, 0.0, 1.0));
+float gC = gCaus(gp*2.2 + gRip*6.0), gCl = gC < 0.07 ? 1.0 : gC < 0.13 ? 0.4 : 0.0;
+gW += gCl*(1.0 - smoothstep(0.0, 0.6, gD0 + gDi*0.15))*vec3(0.1, 0.1, 0.07)*(1.0 - gLights);
+diffuseColor.rgb = gW;
+vec3 gGlint = vec3(0.0);
+{ vec2 cell = floor(gp*6.0); float g = gh(cell + floor(gTime*2.0 + gh(cell)*7.0));
+  gGlint = step(0.9965, g)*smoothstep(0.15, 0.6, gD0)*vec3(0.62, 0.74, 0.72)*(1.0 - 0.85*gLights); }`)
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+{ // the swell lit in flat facets: a coarse grid of triangles over it, each lit by the sun as one, in a few steps (calmer in the shallows)
+  const float CS = 0.6; vec2 cg = gp/CS, c0 = floor(cg), cf = cg - c0;
+  vec2 qa = c0*CS, qb = (cf.x > cf.y ? c0 + vec2(1.0, 0.0) : c0 + vec2(1.0, 1.0))*CS, qc = (cf.x > cf.y ? c0 + vec2(1.0, 1.0) : c0 + vec2(0.0, 1.0))*CS;
+  vec3 fa = vec3(qa.x, gSwell(qa), qa.y), fb = vec3(qb.x, gSwell(qb), qb.y), fc = vec3(qc.x, gSwell(qc), qc.y);
+  vec3 fn = normalize(cross(fc - fa, fb - fa)); if (fn.y < 0.0) fn = -fn;
+  #if NUM_DIR_LIGHTS > 0
+  vec3 gL = directionalLights[0].direction, fv = normalize((viewMatrix*vec4(fn, 0.0)).xyz), uv0 = normalize((viewMatrix*vec4(0.0, 1.0, 0.0, 0.0)).xyz);
+  float fr = (dot(fv, gL) - dot(uv0, gL))*(0.35 + 0.65*gD0) + gDi*0.012;
+  diffuseColor.rgb *= fr < -0.05 ? 0.88 : fr < -0.018 ? 0.95 : fr > 0.05 ? 1.1 : fr > 0.018 ? 1.04 : 1.0;
+  #endif
+}`)
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += gGlint;');
+  };
+  return m;
+})();
+
 /* ---------- the rules ---------- */
 const GD_PIECES = ['lawn', 'grove', 'tree', 'shrubs', 'flowers', 'birdbath', 'arch', 'gazebo', 'greenhouse', 'koideck', 'misters', 'grotto', 'water'];
 const GD_OFF = new Set(['gazebo', 'greenhouse', 'koideck', 'misters', 'grotto']);   // set off the paths: one path at most, a spur leading to it
@@ -548,12 +602,18 @@ function gdGrotto(P, x, clear, k){
 // a pond of six or more; and a bridge where the water is one plot wide.
 function gdWater(P, gd, x){
   const e = x.e || [0, 0, 0, 0], br = x.br || 0;
-  // three depths: shallow all over, mid and deep set in from every bank (not from a side that carries on into more water, so a big pond deepens toward its middle)
-  const layer = (m, inset, y) => { const x0 = -LOT/2 + (e[1] !== 2 ? inset : 0), x1 = LOT/2 - (e[0] !== 2 ? inset : 0), z0 = -LOT/2 + (e[3] !== 2 ? inset : 0), z1 = LOT/2 - (e[2] !== 2 ? inset : 0);
-    if (x1 > x0 && z1 > z0) box(m, P, (x0 + x1)/2, y, (z0 + z1)/2, x1 - x0, .02, z1 - z0); };
-  layer(GM.water, 0, .03); layer(GM.waterMid, .5, .033); layer(GM.waterDeep, 1.0, .036);
-  // a few faint glints of sky, lying along the water
-  for (let q = 0; q < irand(1, 3); q++){ const gx = rnd(-1.2, 1.2), gz = rnd(-1.2, 1.2); if ((br === 1 && Math.abs(gz) < .7) || (br === 2 && Math.abs(gx) < .7)) continue; box(GM.glint, P, gx, .047, gz, rnd(.3, .55), .004, .035, rnd(-.15, .15)); }
+  // the surface: one sheet, a little finer than a grid of 10 x 10, whose corners carry how far each is from the nearest bank (as a few millimetres of height:
+  // the water shader reads it back as depth, GD_WATER_MAT). Measured from this plot's own banks, and its inner corners: straight banks run on into
+  // the next plot, so the depths meet across the line between two water plots.
+  const cw = x.cw || [0, 0, 0, 0], H = LOT/2;
+  const dep = (lx, lz) => { let d = 9;
+    if (e[0] !== 2) d = Math.min(d, H - lx); if (e[1] !== 2) d = Math.min(d, lx + H); if (e[2] !== 2) d = Math.min(d, H - lz); if (e[3] !== 2) d = Math.min(d, lz + H);
+    cw.forEach((v, k) => { if (v){ const [sx, sz] = GD_CORNERS[k]; d = Math.min(d, Math.hypot(lx - sx*H, lz - sz*H)); } });
+    return Math.max(0, Math.min(1, (d - .2)/1.45)); };
+  const sheet = new THREE.PlaneGeometry(LOT, LOT, 10, 10); sheet.rotateX(-PI/2);
+  const sp = sheet.attributes.position; for (let i = 0; i < sp.count; i++) sp.setY(i, GD_WATER_Y + GD_WATER_K*dep(sp.getX(i), sp.getZ(i)));
+  const flat = sheet.toNonIndexed(); sheet.dispose(); flat.computeVertexNormals(); { const n = flat.attributes.normal; for (let i = 0; i < n.count; i++) n.setXYZ(i, 0, 1, 0); }
+  put(flat, GD_WATER_MAT, P); flat.dispose();
   e.forEach((v, k) => {
     if (v === 2) return;
     const [a, b] = SIDES4[k], E = under(P, T(a*LOT/2, 0, b*LOT/2, Math.atan2(a, b))), gap = (br === 1 && k < 2) || (br === 2 && k >= 2);
@@ -578,7 +638,7 @@ function gdWater(P, gd, x){
     put(U.cyl16, GM.pad, under(P, T(px, .05, pz, 0, rnd(.24, .34), .012, rnd(.24, .34))));
     if (chance(.35)) box(GM.solar, P, px, .058, pz, .1, .008, .1); else if (chance(.4)) blob(pick([GM.coral, GM.cream]), P, px, .07, pz, .04, .7); }
   if ((x.pd || 0) >= 6) for (let q = 0; q < irand(2, 4); q++){ const px = rnd(-1.3, 1.3), pz = rnd(-1.3, 1.3), ry = rnd(0, TAU); if (!free(px, pz)) continue;
-    const Pk = under(P, T(px, .052, pz, ry)), m = chance(.6) ? GM.koi : GM.koiW;
+    const Pk = under(P, T(px, .054, pz, ry)), m = chance(.6) ? GM.koi : GM.koiW;
     box(m, Pk, 0, 0, 0, .05, .014, .17); box(m, Pk, 0, 0, -.11, .07, .01, .05); if (m === GM.koiW) box(GM.koi, Pk, 0, .006, .03, .03, .006, .05); }
   if (br) gdBridge(br === 1 ? under(P, T(0, 0, 0, PI/2)) : P);
 }
@@ -600,6 +660,6 @@ function gdBridge(F){
 // a lantern's reflection on the water: a short broken streak, warm once the lights come on (the water's own color by day)
 function gdReflect(F, x, z){
   KEEP_LIGHT = true;
-  for (let q = 0; q < 3; q++) box(GM.reflect, F, x + rnd(-.02, .02), .046, z - q*.13, .05 - q*.012, .004, .08);
+  for (let q = 0; q < 3; q++) box(GM.reflect, F, x + rnd(-.02, .02), .05, z - q*.13, .05 - q*.012, .004, .08);
   KEEP_LIGHT = false;
 }

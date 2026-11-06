@@ -28,7 +28,8 @@ const GM = {
   wood: toon(0xb9774a), woodDark: toon(0x8a5434), roof: toon(0x9a5a36), verdigris: toon(0x5e9a86),
   leaf: toon(0x5aa83c), leaf2: toon(0x3d7f2a), leaf3: toon(0x7cc24f), trunk: toon(0x6a4a32), lip: toon(0x5f8f3e),
   coral: toon(0xff8f6b), cream: toon(0xfff1d6), iris: toon(0x8f6ad8), blossom: toon(0xffc2ae),
-  water: toon(0x3fb5b9, { em: 0x0d3c44, kind: 'trim' }), bowl: toon(0x4cc6c9, { em: 0x0d3c44, kind: 'trim' }),
+  // the water (palette C, "Stream", owner Nov 6): three depths, no light of its own (it goes dark at night like real water and shows the lanterns' reflections)
+  water: toon(0x5d9294), bowl: toon(0x33657a),
   pad: toon(0x4f9a3a), solar: toon(0x24363a, { em: 0x9ff0d0, kind: 'window' }),
   koi: toon(0xff8a3a, { em: 0x5a2206, kind: 'trim' }), koiW: toon(0xf6f0e6, { em: 0x3a3020, kind: 'trim' }),
   edge: toon(0x5a3e18, { em: 0xf2b14e, kind: 'trim' }),         // the soft copper-gold neon round the ponds and along the promenades
@@ -37,6 +38,8 @@ const GM = {
   glass: toon(0x3d6a66, { em: 0x6a3a52, kind: 'window' }),      // greenhouse panes: grow lights behind them at night
   teal: toon(0x3f9a9a), gold: toon(0xd9963a), hammock: toon(0xf2e6cc),
   birch: toon(0xe2dccd), palmBark: toon(0x9a7a52),
+  waterMid: toon(0x33657a), waterDeep: toon(0x22495a), glint: toon(0xc2dcda),
+  reflect: toon(0x22495a, { em: 0xe8c27a, kind: 'bulb' }),   // a lantern's reflection on the water: the water's own color by day, a warm streak once the lights are on
 };
 
 /* ---------- the rules ---------- */
@@ -544,8 +547,13 @@ function gdGrotto(P, x, clear, k){
 // away from the garden, a strip of grass outside the rim: a pond always has its grass border); lily pads, some with glowing solar cells; koi in
 // a pond of six or more; and a bridge where the water is one plot wide.
 function gdWater(P, gd, x){
-  box(GM.water, P, 0, .035, 0, LOT, .02, LOT);
   const e = x.e || [0, 0, 0, 0], br = x.br || 0;
+  // three depths: shallow all over, mid and deep set in from every bank (not from a side that carries on into more water, so a big pond deepens toward its middle)
+  const layer = (m, inset, y) => { const x0 = -LOT/2 + (e[1] !== 2 ? inset : 0), x1 = LOT/2 - (e[0] !== 2 ? inset : 0), z0 = -LOT/2 + (e[3] !== 2 ? inset : 0), z1 = LOT/2 - (e[2] !== 2 ? inset : 0);
+    if (x1 > x0 && z1 > z0) box(m, P, (x0 + x1)/2, y, (z0 + z1)/2, x1 - x0, .02, z1 - z0); };
+  layer(GM.water, 0, .03); layer(GM.waterMid, .5, .033); layer(GM.waterDeep, 1.0, .036);
+  // a few faint glints of sky, lying along the water
+  for (let q = 0; q < irand(1, 3); q++){ const gx = rnd(-1.2, 1.2), gz = rnd(-1.2, 1.2); if ((br === 1 && Math.abs(gz) < .7) || (br === 2 && Math.abs(gx) < .7)) continue; box(GM.glint, P, gx, .047, gz, rnd(.3, .55), .004, .035, rnd(-.15, .15)); }
   e.forEach((v, k) => {
     if (v === 2) return;
     const [a, b] = SIDES4[k], E = under(P, T(a*LOT/2, 0, b*LOT/2, Math.atan2(a, b))), gap = (br === 1 && k < 2) || (br === 2 && k >= 2);
@@ -558,6 +566,9 @@ function gdWater(P, gd, x){
     if (gap){ for (const s of [-1, 1]) box(GM.edge, E, s*1.2, .05, -.42, 1.3, .015, .025); }
     else box(GM.edge, E, 0, .05, -.42, LOT - .1, .015, .025);
     if (chance(.5)) plant(pick(['g_fern3', 'bushFlower']), E, rnd(-1.4, 1.4), .06, -.2, rnd(.5, .65));
+    if (chance(.3)){ const t = pick([-1.3, 1.3]) + rnd(-.15, .15);   // a little stone lantern on the bank, and its reflection
+      cyl(GM.stone2, E, t, .14, -.22, .07, .28); box(GM.stone, E, t, .3, -.22, .14, .04, .14); KEEP_LIGHT = true; box(M.bulb, E, t, .36, -.22, .07, .07, .07); glow(E, t, .37, -.22, 'warm', 1.0); KEEP_LIGHT = false;
+      put(U.cone, GM.roof, under(E, T(t, .44, -.22, 0, .2, .08, .2))); gdReflect(E, t, -.6); }
   });
   // inner corners (water on both sides, grass on the corner): a few stones
   (x.cw || []).forEach((v, k) => { if (!v) return; const [sx, sz] = GD_CORNERS[k];
@@ -567,7 +578,7 @@ function gdWater(P, gd, x){
     put(U.cyl16, GM.pad, under(P, T(px, .05, pz, 0, rnd(.24, .34), .012, rnd(.24, .34))));
     if (chance(.35)) box(GM.solar, P, px, .058, pz, .1, .008, .1); else if (chance(.4)) blob(pick([GM.coral, GM.cream]), P, px, .07, pz, .04, .7); }
   if ((x.pd || 0) >= 6) for (let q = 0; q < irand(2, 4); q++){ const px = rnd(-1.3, 1.3), pz = rnd(-1.3, 1.3), ry = rnd(0, TAU); if (!free(px, pz)) continue;
-    const Pk = under(P, T(px, .046, pz, ry)), m = chance(.6) ? GM.koi : GM.koiW;
+    const Pk = under(P, T(px, .052, pz, ry)), m = chance(.6) ? GM.koi : GM.koiW;
     box(m, Pk, 0, 0, 0, .05, .014, .17); box(m, Pk, 0, 0, -.11, .07, .01, .05); if (m === GM.koiW) box(GM.koi, Pk, 0, .006, .03, .03, .006, .05); }
   if (br) gdBridge(br === 1 ? under(P, T(0, 0, 0, PI/2)) : P);
 }
@@ -584,4 +595,11 @@ function gdBridge(F){
     strut(GM.woodDark, F, s*.47, .2, -1.8, s*.47, .2, 1.8, .025);
   }
   KEEP_LIGHT = true; for (const s of [-1, 1]) for (const t of [-1.75, 1.75]){ box(M.bulb, F, s*.47, yr(t) + .09, t, .07, .08, .07); glow(F, s*.47, yr(t) + .09, t, 'warm', 1.1); } KEEP_LIGHT = false;
+  for (const s of [-1, 1]) for (const t of [-1.3, 1.3]){ const F2 = under(F, T(s*.72, 0, t, PI/2)); gdReflect(F2, 0, 0); }
+}
+// a lantern's reflection on the water: a short broken streak, warm once the lights come on (the water's own color by day)
+function gdReflect(F, x, z){
+  KEEP_LIGHT = true;
+  for (let q = 0; q < 3; q++) box(GM.reflect, F, x + rnd(-.02, .02), .046, z - q*.13, .05 - q*.012, .004, .08);
+  KEEP_LIGHT = false;
 }

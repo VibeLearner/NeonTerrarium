@@ -61,7 +61,9 @@ function frameBody(now){
   // Against the screen's own refresh (PERF.vs, learned from the frames that come on time: 16.7 ms at 60 Hz, 8.3 at 120), not fixed numbers: "quick"
   // used to mean under 15 ms, which a 60 Hz screen never shows, so once lowered it never came back. Back up a step at a time, and a step that
   // brings the slowness back is the ceiling for the next two minutes, so it no longer swings between sharp-and-slow and soft-and-smooth
-  { const ms = now - last; if (ms < 250 && now >= PERF.quietUntil){ PERF.ema += (ms - PERF.ema)*.05; PERF.t += ms; if (ms > 4 && ms < PERF.vs*1.3) PERF.vs += (ms - PERF.vs)*.02; }
+  // (not while the shadows glide (staticcache.js GLIDE): a change of resolution remakes the pictures it plays, so it had to let the glide go and the
+  //  shadows snapped, most often zoomed out over a big city, where the resolution moves most; and its background drawing isn't the city's own cost)
+  { const ms = now - last; if (ms < 250 && now >= PERF.quietUntil && GLIDE.phase === 'idle'){ PERF.ema += (ms - PERF.ema)*.05; PERF.t += ms; if (ms > 4 && ms < PERF.vs*1.3) PERF.vs += (ms - PERF.vs)*.02; }
     if (PERF.t > 2000){ PERF.t = 0;
       const slowMs = Math.max(PERF.vs*1.35, 21), quickMs = PERF.vs*1.1 + .5;
       if (now > PERF.ceilUntil) PERF.ceil = Infinity;

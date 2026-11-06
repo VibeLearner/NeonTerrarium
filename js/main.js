@@ -93,6 +93,7 @@ function frameBody(now){
   PH.subBegin(); updateVehicleShadows(); PH.sub('vehicle shadows');
   updateAnims(dt); PH.sub('build animations');
   updateMegaFx(dt, now/1000);
+  if (typeof gardenFx === 'function') gardenFx(dt);   // (the ponds' rings and floating lily pads: garden.js)
   PH.lap('megastructures, animations');
   updatePeople(dt*FF.ppl, FF.peopleTime(rdt, now/1000));   // (fast forward: the people's own clock runs quicker too)
   STORY.tick(rdt);   // story moments, the shape of the day, the monitor's log (story.js)
@@ -150,6 +151,7 @@ function frameBody(now){
   cullFrame(); PH.sub('view: culling');   // and which merged pieces are in view
   sdTrack();   // how fast the view is turning and zooming (world.js)
   cam.layers.enableAll(); shadowFrame(); PH.sub('view: shadows');   // shadows: redrawn at once, a strip in the background, or not at all (sky.js)
+  if (typeof gardenMirror === 'function'){ PH.begin('pond reflections (garden mirror)'); try { gardenMirror(); } catch (e){ if (!window.__gdMirErr){ window.__gdMirErr = 1; console.error('pond mirror:', e); } } finally { PH.end(); } }   // the ponds' mirrored picture, before the colors (garden.js; computers only), timed on its own line in the F3 overlay
   PH.shadow(); PH.begin(renderer.shadowMap.needsUpdate ? 'color + shadow redraw' : 'color');
   const pt = PH.tests;   // (the overlay's tests: perfhud.js)
   if (pt.quarter) rtC.viewport.set(0, 0, W >> 1, H >> 1);   // (plain shading: see renderBufferDirect in sky.js)

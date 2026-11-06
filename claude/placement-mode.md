@@ -80,8 +80,9 @@ Unlocks in `TIERS[].opens`. Tiers, once reached, are kept; counts are smoothed o
 
 ## Interface
 
-- Always night (as in Economy): `applyTime` is worked out at 23:00 and the time controls are hidden; the clock, people and stories run on, and
-  the simulation never reads the hour. The title room is lit for night too (title.js `econNight`, now any mode).
+- Day and night as in the sandbox. What must always show is drawn last, over the finished picture (`world.js` `HUD3D`, rendered in
+  `main.js` after the grade and glow): the outline of where a click would build (now with a dark edge under it, for bright streets), the
+  tutorial's chevron and the status pins. The tutorial tile has a dark rim under a bright line, and its beam is a solid tint.
 - Planner hides the force-field dome over cores (`fieldPlan` returns nothing). Power has no view: each core sends a hologram grid wave (cyan lines, a pink front, the furnish pod's colors) over its whole reach, water
   included, when it's clicked, looping under a core being placed, and from every core when a goal is reached (never on its own). The last two
   plots of a reach, at 80% power, are amber. The core's card shows its load and its tuning; a refit takes 20 s and counts down.

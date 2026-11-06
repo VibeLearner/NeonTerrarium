@@ -3411,16 +3411,18 @@ function applyTarget(t){
 function removeAt(pk){ if (pk && pk.c && pk.c.wall && !pk.c.mega && !pk.c.sections.length && pk.kind !== 'sky'){ stageFinishAll(); return removeWallTier(pk.c); } if (pk && pk.c && !pk.c.mega) stageFinishNear([pk.c, ...SIDES4.map(([a, b]) => cells.get(ckey(pk.c.i + a, pk.c.j + b)))]); else stageFinishAll(); if (!pk || pk.kind === 'sky') return; if (pk.c.mega) return removeMegaTier(megas.get(pk.c.mega)); if (pk.kind === 'low') return removeBelow(pk.c); if (pk.bl) return removePodSection(pk.c, pk.bl[3]); removeSection(pk.c); }
 
 /* ---------- hover outline showing where a click would build ---------- */
+// (HUD3D: drawn last, on top of the finished picture (main.js), so the day, the night, the grade and the glow never wash it out)
+const HUD3D = new THREE.Scene();
 const hoverMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: .85, depthTest: false });
 const hover = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1,1,1)), hoverMat);
-hover.layers.set(1); hover.renderOrder = 999; hover.visible = false; scene.add(hover);
+hover.layers.set(1); hover.renderOrder = 999; hover.visible = false; HUD3D.add(hover);
 // a side pod's outline is filled too (in its own pink), so it stands out against the wall it hangs from
 const hoverFill = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0xff5ad8, transparent: true, opacity: .22, depthTest: false, depthWrite: false }));
-hoverFill.layers.set(1); hoverFill.renderOrder = 998; hoverFill.visible = false; scene.add(hoverFill);
+hoverFill.layers.set(1); hoverFill.renderOrder = 998; hoverFill.visible = false; HUD3D.add(hoverFill);
 // and the floor of the wall it would hang from lights up, right where the pointer is, so it's plain which floor a pod
 // lines up with even though the pod itself is drawn across the street
 const hoverStrip = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0xff5ad8, transparent: true, opacity: .5, depthTest: false, depthWrite: false }));
-hoverStrip.layers.set(1); hoverStrip.renderOrder = 999; hoverStrip.visible = false; scene.add(hoverStrip);
+hoverStrip.layers.set(1); hoverStrip.renderOrder = 999; hoverStrip.visible = false; HUD3D.add(hoverStrip);
 // The outline drawn bold: WebGL draws lines one pixel wide whatever is asked, so the box's twelve edges are also laid as thin bars about
 // three render pixels thick at any zoom, with a soft fill of the same colour inside; both breathe a little so the spot reads against busy
 // buildings. They follow the outline (its place, size, colour and whether it shows) every frame, whatever set it.
@@ -3428,9 +3430,12 @@ const hoverBold = (() => {
   const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .95, depthTest: false, depthWrite: false });
   const fillM = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .14, depthTest: false, depthWrite: false });
   const g = new THREE.Group(), bars = [], geo = new THREE.BoxGeometry(1, 1, 1);
+  // (each bar has a dark edge drawn under it, a little wider: a pale outline still reads on a bright daytime street)
+  const edgeM = new THREE.MeshBasicMaterial({ color: 0x07060c, transparent: true, opacity: .6, depthTest: false, depthWrite: false }), edges = [];
+  for (let k = 0; k < 12; k++){ const m = new THREE.Mesh(geo, edgeM); m.layers.set(1); m.renderOrder = 999; g.add(m); edges.push(m); }
   for (let k = 0; k < 12; k++){ const m = new THREE.Mesh(geo, mat); m.layers.set(1); m.renderOrder = 1000; g.add(m); bars.push(m); }
   const fill = new THREE.Mesh(geo, fillM); fill.layers.set(1); fill.renderOrder = 997; g.add(fill);
-  g.visible = false; scene.add(g);
+  g.visible = false; HUD3D.add(g);
   let shown = false; Object.defineProperty(hover, 'visible', { configurable: true, get(){ return shown; }, set(v){ shown = v; g.visible = v; } });
   hoverMat.opacity = 1;
   function tick(now){
@@ -3439,7 +3444,8 @@ const hoverBold = (() => {
     const px = typeof zoom !== 'undefined' && H ? 2*zoom/H : .05, t = px*3, p = hover.position, sc = hover.scale, hx = sc.x/2, hy = sc.y/2, hz = sc.z/2;
     const pulse = .5 + .5*Math.sin(now/260);
     mat.color.copy(hoverMat.color); fillM.color.copy(hoverMat.color); mat.opacity = .8 + .2*pulse; fillM.opacity = hoverFill.visible ? 0 : .08 + .08*pulse;
-    let k = 0; const bar = (x, y, z, sx, sy, sz) => { const m = bars[k++]; m.position.set(p.x + x, p.y + y, p.z + z); m.scale.set(sx, sy, sz); };
+    let k = 0; const bar = (x, y, z, sx, sy, sz) => { const m = bars[k], e = edges[k]; k++; m.position.set(p.x + x, p.y + y, p.z + z); m.scale.set(sx, sy, sz);
+      e.position.copy(m.position); e.scale.set(sx === t ? t*2.4 : sx + t*1.4, sy === t ? t*2.4 : sy + t*1.4, sz === t ? t*2.4 : sz + t*1.4); };
     for (const a of [-1, 1]) for (const b of [-1, 1]){
       bar(0, a*hy, b*hz, sc.x + t, t, t);   // the edges along x
       bar(a*hx, 0, b*hz, t, sc.y + t, t);   // along y

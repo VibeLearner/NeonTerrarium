@@ -211,6 +211,8 @@ function frameBody(now){
   PH.begin('composite'); renderer.setRenderTarget(rtOut); renderer.render(compScene, compCam); PH.end();
   PH.begin('bloom and grade'); renderGlow(); PH.end();   // bloom and halation (sky.js)
   if (!GLOW_DIRECT){ PH.begin('to screen'); renderer.setRenderTarget(null); renderer.render(upScene, compCam); PH.end(); }   // (drawn straight to the screen already when the sizes match: sky.js renderGlow)
+  // the outline of where a click would build (and Planner's markers and pins): last, over the finished picture, so no light or grade dims them
+  if (HUD3D.children.some(o => o.visible)){ renderer.setRenderTarget(null); renderer.autoClear = false; cam.layers.enableAll(); renderer.render(HUD3D, cam); renderer.autoClear = true; }
   MON.blit(); MON.syncBar(); MON.hoverFrame();   // the monitor's feed: a crop of the frame just drawn (monitor.js)
   PH.frameEnd();
 }

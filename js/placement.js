@@ -628,12 +628,7 @@ const PLAN = (() => {
   });
   // Clear island: a fresh start, so a new starter core, and the old city's hotspots, refits and choices go with it
   wrap('clearIsland', function (orig, ...a){ const r = orig(...a); if (!st.tut.done){ st.tut = { step: 0, done: false, v: 2 }; setTimeout(() => { try { TUTE.restart(); } catch (e) {} }, 0); } st.fresh = true; st.crime.spots.length = 0; st.refit = {}; st.forks = {}; booted = false; BASE = null; REV++; save(); return r; });
-  // always night, as in Economy: only the picture (sky, glows, window lights) is worked out as if it were this hour; the clock, people's days and
-  // the stories run on as usual. The simulation never reads the hour, so nothing in the puzzle changes
   PLAN_HEIGHTS = true;   // (a level is about 3 floors tall here, whatever the design: world.js PLAN_TYPES)
-  const NIGHT_HOUR = 23;
-  wrap('phaseName', function (){ return 'Night'; });
-  wrap('applyTime', function (orig){ if (typeof S === 'undefined') return orig(); const h = S.hour; S.hour = NIGHT_HOUR; try { return orig(); } finally { S.hour = h; } });
   wrap('fieldPlan', function (){ return []; });   // (no force-field dome over the cores here: their reach is the grid wave)
   wrap('maybeSpawnMegas', function (){ /* nothing arrives on its own here: the tiers open things, the player places them */ });
   wrap('mtApply', function (orig, t){ if (t && t.ok && st.tier < 2){ say('The metro opens at ' + TIERS[2].name); return false; } ledgerMark(); return orig(t); });
@@ -676,7 +671,6 @@ const PLAN = (() => {
   html.plan { --p-bg: rgba(11,10,18,.9); --p-line: rgba(255,255,255,.12); --p-txt: #ece4d6; --p-dim: #958ea3; --p-acc: #8fe8d8; --p-warm: #ffb347; --p-good: #6ff0a8; --p-bad: #ff7a8a; }
   html.plan #modeHint { display: none !important; }
   html.plan .tmode { display: none !important; }
-  html.plan #hour, html.plan #presets, html.plan label.tog:has(#cycle) { display: none !important; }   /* (always night here: the time controls would change nothing you can see) */
   html.plan-nolux .zone[data-zone="high"], html.plan-nolux [data-perim="high"] { display: none !important; }
   html.plan-noperim .perim { display: none !important; }
   .pl-goal { position: fixed; z-index: 4; left: max(16px, env(safe-area-inset-left,0px)); top: calc(40px + env(safe-area-inset-top,0px)); width: 214px; box-sizing: border-box;
@@ -876,6 +870,8 @@ const PLAN = (() => {
   // (layer 1 is drawn after the cached city with its depth put back, so these sit in the scene: buildings hide the ground under them)
   const overlayMat = (fs, uni, add) => { const m = new THREE.ShaderMaterial({ uniforms: uni, vertexShader: VSW, fragmentShader: fs, transparent: true, depthTest: true, depthWrite: false, blending: add ? THREE.AdditiveBlending : THREE.NormalBlending }); m.extensions = { derivatives: true }; return m; };
   const onLayer = (o, order) => { o.layers.set(1); o.renderOrder = order; o.frustumCulled = false; if (typeof scene !== 'undefined') scene.add(o); return o; };
+  // (over the finished picture: world.js HUD3D, drawn last, so neither daylight nor the night grade dims it)
+  const onHud = (o, order) => { o.layers.set(1); o.renderOrder = order; o.frustumCulled = false; if (typeof HUD3D !== 'undefined') HUD3D.add(o); else if (typeof scene !== 'undefined') scene.add(o); return o; };
 
   /* ---------- a building lit in a color: thin bright edges, a faint fill (the furnish hologram's look), for the views and the thriving check ---------- */
   const TINT = (() => {
@@ -919,7 +915,7 @@ const PLAN = (() => {
       noise: mk('#ffffff', g => { g.beginPath(); g.moveTo(30, 38); g.lineTo(38, 38); g.lineTo(48, 29); g.lineTo(48, 59); g.lineTo(38, 50); g.lineTo(30, 50); g.closePath(); g.fill(); g.lineWidth = 5; g.beginPath(); g.arc(50, 44, 10, -.8, .8); g.stroke(); g.beginPath(); g.arc(50, 44, 17, -.8, .8); g.stroke(); }),
     };
     const pool = [], live = [];
-    const get = () => { const sp = pool.pop() || onLayer(new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthTest: false, depthWrite: false })), 1001); sp.center.set(.5, 0); sp.visible = true; return sp; };
+    const get = () => { const sp = pool.pop() || onHud(new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthTest: false, depthWrite: false })), 1001); sp.center.set(.5, 0); sp.visible = true; return sp; };
     (function run(){ requestAnimationFrame(run); if (!live.length) return; const t = performance.now()/1000;
       for (const sp of live) if (sp.userData.src) sp.scale.setScalar(sp.userData.s*(1 + .12*Math.sin(t*5 + sp.userData.ph))); })();
     // list: [{ c (a plot) or m (a megastructure), kind: good | mid | bad | air | noise }]
@@ -1725,7 +1721,8 @@ const PLAN = (() => {
      as cards to read. */
   const MARK = (() => {
     const cv = document.createElement('canvas'); cv.width = cv.height = 128; const g = cv.getContext('2d');
-    g.strokeStyle = 'rgba(255,255,255,1)'; g.lineWidth = 7; g.strokeRect(10, 10, 108, 108); g.globalAlpha = .22; g.fillStyle = '#fff'; g.fillRect(10, 10, 108, 108);
+    g.strokeStyle = 'rgba(7,6,12,.85)'; g.lineWidth = 16; g.strokeRect(10, 10, 108, 108);
+    g.strokeStyle = '#9ff7ea'; g.lineWidth = 7; g.strokeRect(10, 10, 108, 108); g.globalAlpha = .3; g.fillStyle = '#9ff7ea'; g.fillRect(14, 14, 100, 100);
     const tex = new THREE.CanvasTexture(cv);
     const bcv = document.createElement('canvas'); bcv.width = 32; bcv.height = 128; const bg = bcv.getContext('2d'), gr = bg.createLinearGradient(0, 128, 0, 0);
     gr.addColorStop(0, 'rgba(255,255,255,.9)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); bg.fillStyle = gr; bg.fillRect(0, 0, 32, 128);
@@ -1735,9 +1732,9 @@ const PLAN = (() => {
     cg.strokeStyle = '#061214'; cg.lineWidth = 16; cg.stroke(); cg.strokeStyle = '#9ff7ea'; cg.lineWidth = 9; cg.stroke();
     const ctex = new THREE.CanvasTexture(ccv), sets = [];
     for (let k = 0; k < 3; k++){
-      const tile = onLayer(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: tex, color: 0x8fe8d8, transparent: true, depthTest: true, depthWrite: false, blending: THREE.AdditiveBlending })), 999); tile.rotation.x = -Math.PI/2;
-      const beam = onLayer(new THREE.Sprite(new THREE.SpriteMaterial({ map: btex, color: 0x8fe8d8, transparent: true, depthTest: true, depthWrite: false, blending: THREE.AdditiveBlending })), 999); beam.center.set(.5, 0);
-      const chev = onLayer(new THREE.Sprite(new THREE.SpriteMaterial({ map: ctex, transparent: true, depthTest: false, depthWrite: false })), 1000); chev.center.set(.5, 0);
+      const tile = onLayer(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthTest: true, depthWrite: false })), 999); tile.rotation.x = -Math.PI/2;
+      const beam = onLayer(new THREE.Sprite(new THREE.SpriteMaterial({ map: btex, color: 0x6ff0de, transparent: true, depthTest: true, depthWrite: false })), 999);   // (a solid tint, not light added: it shows by day too) beam.center.set(.5, 0);
+      const chev = onHud(new THREE.Sprite(new THREE.SpriteMaterial({ map: ctex, transparent: true, depthTest: false, depthWrite: false })), 1000); chev.center.set(.5, 0);
       sets.push({ tile, beam, chev });
     }
     let list = [];

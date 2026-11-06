@@ -33,6 +33,13 @@ things go. Design doc: the owner's Claude doc "Neon Terrarium: Placement Puzzle 
   Checked: a one-core city left alone fell from 555 residents to 10 in 90 s, kept its tier, and was back to 100% 3.5 min after the crank.
   The tutorial has a practice surge that waits (`practice`); never during the tutorial otherwise; the first comes 4 min after it.
   Console: `PLAN.surge.start(megas.get(id))`.
+- Level heights (`world.js` `PLAN_TYPES`, `PLAN_CAP`, `PLAN_HEIGHTS`): a level is built only from designs about 2 to 3.5 floors tall, and the
+  tenement, sign shop and luxury slab are capped at 3 floors (`lot.mf`). The page sets the flag; the plot worker gets it with every plot
+  (`far.plan`). Measured with the real builders (40 stacks each): floors tall for 1/2/3/4/5 levels, 10% to 90%: Residential 2.4-3.2,
+  5.1-6.2, 8.0-9.7, 11.1-12.3, 13.7-15.5; Commercial 2.2-4.5, 4.9-7.6, 7.2-9.9, 9.5-12.5, 12.6-15.3; Industrial 2.3-3.3, 4.9-6.2,
+  7.6-9.7, 10.2-12.5, 12.8-15.7; Luxury 3.1, 6.3, 9.5, 12.7, 16.0. A building with fewer levels has the taller median in 0 of 160
+  pairings (24 in the sandbox). Not covered: side pods (their own designs) and Corps buildings (brutalist towers, 4 to 8 floors a level).
+  Measuring harness: the scratchpad's heights/measure.js and stacks.js (they load the game's scripts in node, as the plot worker does).
 - Wording: Industrial buildings and Commercial buildings, never "industry"; rules spelled out in full.
 - Industry, n levels, strength 1.5 + 0.35(n-1): a share stays close in (1 - 0.2(n-1), at least 0.3) as a cloud of radius 3, then 2 (two or three
   levels), then 1 (four or more); the rest rides the wind as a thin trail and comes down in a radius-2 patch 2n tiles downwind, over water

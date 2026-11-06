@@ -233,7 +233,7 @@ RW.request = (job, skipWorld) => {
   job.rw = rw; RW.jobs.set(id, rw);
   if (!skipWorld) RW.sendWorld();   // (loading a city sends the lines once, then asks for plots)
   const r = recipeOf(job.c); job.dark = r.dark; job.r = r;
-  const m = { t: 'gen', id, r, far: { lean: !!(PH.tests.leanRound || window.__LEAN_ROUND), sticks: !!(PH.tests.thinSticks || window.__THIN_STICKS) } };
+  const m = { t: 'gen', id, r, far: { lean: !!(PH.tests.leanRound || window.__LEAN_ROUND), sticks: !!(PH.tests.thinSticks || window.__THIN_STICKS), plan: PLAN_HEIGHTS } };
   m.rb = []; for (const [k, g] of rbCache) if (!RW.rbSent.has(k)){ RW.rbSent.add(k); m.rb.push([k, rbPack(g, false)]); }   // (structured clone copies them)
   if (window.__randState) m.rs = window.__randState();
   RW.w.postMessage(m);
@@ -255,13 +255,13 @@ RW.recheck = (h, e) => {
   RW.checking = true; const rec = h.d.rec, id = RW.next++;
   RW.jobs.set(id, { id, cb: m => { try { if (m.t === 'done'){ const u = recipeUnpack(m.msg).data; e.again = [pmCnt(u.geo.get(ATLAS)), pmCnt(u.sgeo)]; e.againOver = m.over || 0; } else e.again = 'error: ' + m.err; } catch (err){ e.again = 'error: ' + err; } RW.checking = false; RW.restart(); } });
   RW.sendWorld();
-  RW.w.postMessage({ t: 'gen', id, r: Object.assign({}, rec.r, { draws: rec.draws }), far: { lean: !!(PH.tests.leanRound || window.__LEAN_ROUND), sticks: !!(PH.tests.thinSticks || window.__THIN_STICKS) }, rb: [], regen: true });
+  RW.w.postMessage({ t: 'gen', id, r: Object.assign({}, rec.r, { draws: rec.draws }), far: { lean: !!(PH.tests.leanRound || window.__LEAN_ROUND), sticks: !!(PH.tests.thinSticks || window.__THIN_STICKS), plan: PLAN_HEIGHTS }, rb: [], regen: true });
 };
 // the worker makes a plot again for its arrays (the answer goes to pmFill, not to a stage job)
 RW.regen = (h, r) => {
   const id = RW.next++, rw = { id, done: false, res: null, fail: null, cancelled: false, regen: h }; RW.jobs.set(id, rw);
   RW.sendWorld();
-  const m = { t: 'gen', id, r, far: { lean: !!(PH.tests.leanRound || window.__LEAN_ROUND), sticks: !!(PH.tests.thinSticks || window.__THIN_STICKS) }, rb: [], regen: true };
+  const m = { t: 'gen', id, r, far: { lean: !!(PH.tests.leanRound || window.__LEAN_ROUND), sticks: !!(PH.tests.thinSticks || window.__THIN_STICKS), plan: PLAN_HEIGHTS }, rb: [], regen: true };
   for (const [k, g] of rbCache) if (!RW.rbSent.has(k)){ RW.rbSent.add(k); m.rb.push([k, rbPack(g, false)]); }
   RW.w.postMessage(m);
 };

@@ -630,6 +630,7 @@ const PLAN = (() => {
   wrap('clearIsland', function (orig, ...a){ const r = orig(...a); if (!st.tut.done){ st.tut = { step: 0, done: false, v: 2 }; setTimeout(() => { try { TUTE.restart(); } catch (e) {} }, 0); } st.fresh = true; st.crime.spots.length = 0; st.refit = {}; st.forks = {}; booted = false; BASE = null; REV++; save(); return r; });
   // always night, as in Economy: only the picture (sky, glows, window lights) is worked out as if it were this hour; the clock, people's days and
   // the stories run on as usual. The simulation never reads the hour, so nothing in the puzzle changes
+  PLAN_HEIGHTS = true;   // (a level is about 3 floors tall here, whatever the design: world.js PLAN_TYPES)
   const NIGHT_HOUR = 23;
   wrap('phaseName', function (){ return 'Night'; });
   wrap('applyTime', function (orig){ if (typeof S === 'undefined') return orig(); const h = S.hour; S.hour = NIGHT_HOUR; try { return orig(); } finally { S.hour = h; } });

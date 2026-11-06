@@ -78,12 +78,12 @@ const GD_WATER_MAT = (() => {
   m.customProgramCacheKey = () => 'gdwater';
   m.onBeforeCompile = sh => {
     sh.uniforms.gTime = FOL_UNI.time; sh.uniforms.gLights = LIGHTS_ON; sh.uniforms.gRips = GD_RIP.rips; sh.uniforms.gRipN = GD_RIP.n;
-    sh.uniforms.gMir = GD_MIR.tex; sh.uniforms.gMirM = GD_MIR.M; sh.uniforms.gMirOn = GD_MIR.use; sh.uniforms.gMirRes = GD_MIR.res;
+    sh.uniforms.gMir = GD_MIR.tex; sh.uniforms.gMirM = GD_MIR.M; sh.uniforms.gMirOn = GD_MIR.use; sh.uniforms.gMirRes = GD_MIR.res; sh.uniforms.gMirScreen = GD_MIR.scr;
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWP;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
 varying vec3 vWP; uniform float gTime; uniform float gLights; uniform vec4 gRips[8]; uniform float gRipN;
-uniform sampler2D gMir; uniform mat4 gMirM; uniform float gMirOn; uniform vec2 gMirRes;
+uniform sampler2D gMir; uniform mat4 gMirM; uniform float gMirOn; uniform vec2 gMirRes; uniform vec2 gMirScreen;
 float gh(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x*p.y); }
 float gBayer(vec2 p){ vec2 q = mod(floor(p), 4.0); vec2 a = mod(q, 2.0), b = floor(q/2.0); return ((a.x*2.0 + a.y*3.0 - 2.0*a.x*a.y)*4.0 + (b.x*2.0 + b.y*3.0 - 2.0*b.x*b.y))/16.0; }
 float gSwell(vec2 q){ return 0.07*sin(q.x*0.9 + gTime*0.55)*sin(q.y*1.1 - gTime*0.45) + 0.035*sin(q.x*2.3 - q.y*1.7 + gTime*0.9); }
@@ -144,7 +144,7 @@ diffuseColor.rgb = gW;
     // the rings, over the water's own color: half of it, more for lights (a third let the water show through a building's reflection, owner Nov 6)
     sh.fragmentShader = sh.fragmentShader.replace('#include <tonemapping_fragment>', `if (gMirOn > 0.5){
   vec4 gmc = gMirM*vec4(vWP.x, ${GD_MIR_Y.toFixed(3)}, vWP.z, 1.0); vec2 gmu = gmc.xy/gmc.w;
-  gmu += vec2(floor(gWv*1.2 + gRg*3.0 + 0.5), floor(gRg*2.0 + 0.5))/gMirRes;
+  gmu += vec2(floor(gWv*1.2 + gRg*3.0 + 0.5), floor(gRg*2.0 + 0.5))/max(gMirRes, gMirScreen);   // (in the frame's own pixels)
   vec4 gm = texture2D(gMir, gmu);
   if (gm.a > 0.5){ float gml = dot(gm.rgb, vec3(0.3, 0.59, 0.11)); gl_FragColor.rgb = mix(gl_FragColor.rgb, gm.rgb, 0.5 + 0.3*smoothstep(0.55, 0.95, gml)); }
 }
@@ -1005,7 +1005,7 @@ if (!self.IN_RECIPE_WORKER && typeof canvas !== 'undefined' && canvas.addEventLi
 //  - The view is the frame's own (its projection copied, so it zooms, turns and steps by whole pixels with it); people, trees, lights all show.
 //  - Only what stands within two plots of a pond is drawn in it (owner Nov 6: the whole view near the ponds cost too much): gdMirFilter.
 const GD_MIR_Y = GD_WATER_Y + .003;
-const GD_MIR = { rt: null, cam: null, on: false, M: { value: new THREE.Matrix4() }, tex: { value: null }, use: { value: 0 }, res: { value: new THREE.Vector2(1, 1) } };
+const GD_MIR = { rt: null, cam: null, on: false, M: { value: new THREE.Matrix4() }, tex: { value: null }, use: { value: 0 }, res: { value: new THREE.Vector2(1, 1) }, scr: { value: new THREE.Vector2(1, 1) } };
 const gdMirWanted = () => !self.IN_RECIPE_WORKER && !(typeof TOUCH !== 'undefined' && TOUCH.on) && typeof renderer !== 'undefined' && renderer.capabilities.isWebGL2 && !window.__NO_POND_MIRROR;
 const _gmV = new THREE.Vector3(), _gmT = new THREE.Vector3(), _gmU = new THREE.Vector3(), _gmN = new THREE.Vector3(0, 1, 0), _gm4 = new THREE.Vector4(), _gmQ = new THREE.Vector4();
 const _gmP = new THREE.Matrix4(), _gmI = new THREE.Matrix4(), _gmS = new THREE.Matrix4(), _gmB = new THREE.Matrix4().set(.5, 0, 0, .5, 0, .5, 0, .5, 0, 0, .5, .5, 0, 0, 0, 1);
@@ -1067,12 +1067,15 @@ function gdMirFilter(){
 function gardenMirror(){
   GD_MIR.on = false; GD_MIR.use.value = 0;
   if (!gdMirWanted() || !GD_FX.water || !GD_FX.wcells || !GD_FX.wcells.length) return;
-  const w = W, h = H;
+  // (at half the frame's size each way, a quarter of the pixels, read back smoothed: owner Nov 6. window.__POND_MIRROR_FULL: the frame's own size, to compare)
+  const full = !!window.__POND_MIRROR_FULL, w = full ? W : Math.ceil(W/2), h = full ? H : Math.ceil(H/2);
   if (!GD_MIR.rt || GD_MIR.rt.width !== w || GD_MIR.rt.height !== h){
     if (GD_MIR.rt) GD_MIR.rt.dispose();
-    GD_MIR.rt = new THREE.WebGLRenderTarget(w, h, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, format: THREE.RGBAFormat });
+    const f = full ? THREE.NearestFilter : THREE.LinearFilter;
+    GD_MIR.rt = new THREE.WebGLRenderTarget(w, h, { minFilter: f, magFilter: f, format: THREE.RGBAFormat });
     GD_MIR.tex.value = GD_MIR.rt.texture; GD_MIR.res.value.set(w, h);
   }
+  GD_MIR.scr.value.set(W, H);
   if (!GD_MIR.cam) GD_MIR.cam = new THREE.OrthographicCamera(-1, 1, 1, -1, cam.near, cam.far);
   const vc = GD_MIR.cam;
   // the camera mirrored in the water's surface (its place, where it looks, its up), as three's own Reflector does it

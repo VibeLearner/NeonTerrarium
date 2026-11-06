@@ -579,9 +579,9 @@ const comp = new THREE.ShaderMaterial({
           if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) break;
           float sd = texture2D(tDepth, uv).x, qd = cp.z*0.5 + 0.5;
           if (qd > sd + 0.0003*DK && qd - sd < 0.015*DK){
-          // (a pond passes over something a pixel or two wide that the ray goes behind on both sides: a pole, a stem. Its reflection was a 1-pixel streak
-          //  that shimmered, owner Nov 6: on the water only things of some size reflect)
-          if (watPx && texture2D(tDepth, uv - vec2(1.5/res.x, 0.0)).x > qd && texture2D(tDepth, uv + vec2(1.5/res.x, 0.0)).x > qd) continue;
+          // (a pond passes over anything narrow that the ray goes behind on both sides: a pole, a stem, a trunk. Its reflection was a 1-pixel streak
+          //  that shimmered, owner Nov 6: on the water only things of some size reflect, and lit lamps at night)
+          if (watPx && ((texture2D(tDepth, uv - vec2(1.5/res.x, 0.0)).x > qd && texture2D(tDepth, uv + vec2(1.5/res.x, 0.0)).x > qd) || (texture2D(tDepth, uv - vec2(2.5/res.x, 0.0)).x > qd && texture2D(tDepth, uv + vec2(2.5/res.x, 0.0)).x > qd)) && !(night > 0.5 && dot(texture2D(tColor, uv).rgb, vec3(0.3, 0.59, 0.11)) > 0.7)) continue;   // (up to about four pixels wide: a pole, a trunk (a pale birch's swayed in and out: a streak bobbing up and down, owner Nov 6); only a lit lamp at night still shows)
           huv = uv; hit = 1.0; break; }
         }
         if (hit > 0.5){
@@ -835,9 +835,9 @@ const SOFT_WET = SOFT_HEAD + `
         if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) break;
         float sd = texture2D(tDepth, uv).x, qd = cp.z*0.5 + 0.5;
         if (qd > sd + 0.0003*DK && qd - sd < 0.015*DK){
-          // (a pond passes over something a pixel or two wide that the ray goes behind on both sides: a pole, a stem. Its reflection was a 1-pixel streak
-          //  that shimmered, owner Nov 6: on the water only things of some size reflect)
-          if (watPx && texture2D(tDepth, uv - vec2(1.5/res.x, 0.0)).x > qd && texture2D(tDepth, uv + vec2(1.5/res.x, 0.0)).x > qd) continue;
+          // (a pond passes over anything narrow that the ray goes behind on both sides: a pole, a stem, a trunk. Its reflection was a 1-pixel streak
+          //  that shimmered, owner Nov 6: on the water only things of some size reflect, and lit lamps at night)
+          if (watPx && ((texture2D(tDepth, uv - vec2(1.5/res.x, 0.0)).x > qd && texture2D(tDepth, uv + vec2(1.5/res.x, 0.0)).x > qd) || (texture2D(tDepth, uv - vec2(2.5/res.x, 0.0)).x > qd && texture2D(tDepth, uv + vec2(2.5/res.x, 0.0)).x > qd)) && !(night > 0.5 && dot(texture2D(tColor, uv).rgb, vec3(0.3, 0.59, 0.11)) > 0.7)) continue;   // (up to about four pixels wide: a pole, a trunk (a pale birch's swayed in and out: a streak bobbing up and down, owner Nov 6); only a lit lamp at night still shows)
           huv = uv; hit = 1.0; break; }
       }
       if (hit > 0.5){

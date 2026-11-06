@@ -1031,13 +1031,22 @@ function gdMirMeshNear(o){
   if (!g.boundingSphere) g.computeBoundingSphere(); if (!g.boundingSphere) return true;
   _gfS.copy(g.boundingSphere).applyMatrix4(o.matrixWorld); return gdMirNear(_gfS.center.x, _gfS.center.z, _gfS.radius);
 }
-// a moving group: its place now, and its size (measured once, round its own origin)
+// a moving group: where its bounds are now. Their middle and size are measured in the group's own frame and kept, measured again when its parts
+// change in number, when it was empty, and every second or so (a building rising in its build animation, a group filled over a few frames: measured
+// once, while still empty, it was taken as nothing at its origin and left out of the mirror, owner Nov 6: reflections not catching up with building)
+const _gfL = new THREE.Vector3(), _gfI = new THREE.Matrix4();
 function gdMirRootNear(o){
   if (o.isMesh || o.isPoints || o.isLine) return !o.frustumCulled || gdMirMeshNear(o);
-  let r = GD_MIRF.rad.get(o);
-  if (r === undefined){ _gfB.setFromObject(o); _gfV.setFromMatrixPosition(o.matrixWorld);
-    r = _gfB.isEmpty() ? 0 : Math.max(_gfB.min.distanceTo(_gfV), _gfB.max.distanceTo(_gfV)); GD_MIRF.rad.set(o, r); }
-  const e = o.matrixWorld.elements; return gdMirNear(e[12], e[14], r);
+  let m = GD_MIRF.rad.get(o);
+  if (!m || !m.r || m.n !== o.children.length || ++m.t > 60){
+    _gfB.setFromObject(o);
+    if (_gfB.isEmpty()) m = { r: 0, n: o.children.length, t: 0, c: new THREE.Vector3() };
+    else { _gfB.getCenter(_gfL); const r = _gfB.min.distanceTo(_gfB.max)/2;
+      m = { r, n: o.children.length, t: 0, c: _gfL.clone().applyMatrix4(_gfI.copy(o.matrixWorld).invert()) }; }
+    GD_MIRF.rad.set(o, m);
+  }
+  if (!m.r) return true;   // (nothing measured yet: drawn)
+  _gfL.copy(m.c).applyMatrix4(o.matrixWorld); return gdMirNear(_gfL.x, _gfL.z, m.r);
 }
 const gdStill = o => o.matrixAutoUpdate === false;
 function gdMirFilter(){
@@ -1054,12 +1063,17 @@ function gdMirFilter(){
     const walk = o => {
       for (const ch of o.children){
         if (!gdStill(ch)){ if (o !== scene && o !== world && !ch.isLight && !ch.isCamera) F.deep.push(ch); continue; }   // (a moving one: the top levels are gone through each frame)
-        if ((ch.isMesh || ch.isPoints || ch.isLine) && ch.frustumCulled && !gdMirMeshNear(ch)) F.far.push(ch);
+        if ((ch.isMesh || ch.isPoints || ch.isLine) && ch.frustumCulled && !gdMirMeshNear(ch)) F.far.push(ch, ch.geometry);
         walk(ch); } };
     walk(scene);
   }
   const hid = F.hid; hid.length = 0;
-  for (const o of F.far) if (o.visible){ o.visible = false; hid.push(o); }
+  if (window.__POND_MIRROR_NOFILTER) return hid;   // (everything drawn, to compare)
+  // (a still thing given a new geometry since it was sorted, a plot remade in place: judged again; one now near is drawn from now on)
+  for (let k = 0; k < F.far.length; k += 2){ const o = F.far[k];
+    if (o.geometry !== F.far[k + 1]){ if (gdMirMeshNear(o)){ F.far[k + 1] = null; continue; } F.far[k + 1] = o.geometry; }
+    else if (!F.far[k + 1]) continue;
+    if (o.visible){ o.visible = false; hid.push(o); } }
   const tops = [scene.children, world.children, F.deep];
   for (const L of tops) for (const o of L) if (o.visible && !gdStill(o) && o !== world && !o.isLight && !o.isCamera && !gdMirRootNear(o)){ o.visible = false; hid.push(o); }   // (never a light: switching one off changes every shader)
   return hid;

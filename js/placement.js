@@ -189,7 +189,7 @@ const PLAN = (() => {
       for (let a = a0; a <= a1; a++){ const da = a < c.i ? c.i - a : a > c.i + c.w - 1 ? a - c.i - c.w + 1 : 0;
         for (let b = b0; b <= b1; b++){ const db = b < c.j ? c.j - b : b > c.j + c.h - 1 ? b - c.j - c.h + 1 : 0, d = da > db ? da : db, k = (a - i0)*NJ + (b - j0), v = d <= rIn ? 2 : 1; if (v > PWR[k]) PWR[k] = v; } } }
     // load: each core powers P.coreCap; the buildings nearest a core are served first, each by the nearest core in reach with room. Past that, dark.
-    const drawOf = b => P.draw[b.z]*b.floors*(1 + .15*(b.floors - 1));
+    const drawOf = b => { const n = b.floors - 1; return P.draw[b.z]*(b.floors + .08*n*n + .02*n*n*n); };   // (1, 2.1, 3.5, 5.3, 7.6, 10.5 for 1 to 6 levels)
     for (const c of cores){ c.cap = P.coreCap; c.load = 0; }
     const PW = new Map(), cand = [];
     const CB = cores.map(c => { const x0 = Math.round(c.i), y0 = Math.round(c.j); return { c, x0, x1: x0 + (c.w || 1) - 1, y0, y1: y0 + (c.h || 1) - 1, rr: Math.floor(c.reachNow) }; });
@@ -230,8 +230,10 @@ const PLAN = (() => {
     // haze: a tall building (three levels or more) on the way shades the plots up to P.shadow behind it, and breathes part of what it stops
     // itself (BLK); past that, the haze goes on as if nothing were there. The source's own building never shades its own haze.
     const BLK = F(), SRC = { air: [], noise: [] };
+    // (the tiles a stacked shop's levels would take, spread out one level each: its own, the ring of 8, then the ring of 16)
+    const RING = (() => { const r = [[0, 0]]; for (const d of [1, 2]) for (let a = -d; a <= d; a++) for (let b = -d; b <= d; b++) if (Math.max(Math.abs(a), Math.abs(b)) === d) r.push([a, b]); return r; })();
     const pol = s => { const si = Math.round(s.i + ((s.w || 1) - 1)/2), sj = Math.round(s.j + ((s.h || 1) - 1)/2), o = s.o;
-      if (o) SRC.air.push({ i: o.i, j: o.j, w: o.w || 1, h: o.h || 1, s: s.s, k: o.k });
+      if (o && !s.quiet && !s.plume) SRC.air.push({ i: o.i, j: o.j, w: o.w || 1, h: o.h || 1, s: s.s, k: o.k });
       paint(s, (k, v, a, b, d, x0, x1, y0, y1) => {
         if (d >= 1){ const steps = Math.max(Math.abs(si - a), Math.abs(sj - b));
           for (let q = 1; q < steps && q <= P.shadow; q++){ const x = Math.round(a + (si - a)*q/steps), y = Math.round(b + (sj - b)*q/steps);
@@ -255,12 +257,27 @@ const PLAN = (() => {
       if (!lit(b)) continue;   // (no power: no jobs, nothing to do, no smoke)
       if (b.z === 'I' || b.z === 'K'){
         jobsS.push({ i: b.i, j: b.j, r: P.walk, cap: b.floors*(b.z === 'K' ? P.jobs.K : P.jobs.I)*(1 + .1*(b.floors - 1)), lux: b.z === 'K', k: b.k, z: b.z });
-        if (b.z === 'I'){ const fd = foundries.some(f => megaD(b.i, b.j, f) <= 5) ? .6 : 1; pol({ i: b.i + wx, j: b.j + wz, r: b.floors >= 4 ? 4 : 3, s: (1.5 + .35*(b.floors - 1))*fd, lv: b.floors, o: { i: b.i, j: b.j, k: b.k } }); noise({ i: b.i, j: b.j, r: 2, s: 1.6 + .4*(b.floors - 1), k: b.k }); }
+        if (b.z === 'I'){ const fd = foundries.some(f => megaD(b.i, b.j, f) <= 5) ? .6 : 1, n = b.floors, S_ = (1.5 + .35*(n - 1))*fd, own = { i: b.i, j: b.j, k: b.k };
+          // close in: a cloud that shrinks as the stack rises (radius 3, then 2 at two or three levels, 1 from four) and holds less of the smoke
+          const loc = Math.max(.3, 1 - .2*(n - 1));
+          pol({ i: b.i + wx, j: b.j + wz, r: n >= 4 ? 1 : n >= 2 ? 2 : 3, s: S_*loc, lv: n, o: own });
+          // the rest rides the wind: a thin trail, then it comes down 2 tiles farther for each level (over water too: build there later and it lands
+          // on you). Only a building at least as tall as the stack, and three levels or more, stops it on the way down
+          if (n >= 2){ const L = 2*n; let rest = S_*(1 - loc);
+            for (let q = 1; q <= L; q++){ const x = b.i + Math.round(wx_*q), y = b.j + Math.round(wz_*q);
+              // a building at least as tall as the stack (and three levels or more) in the way catches most of it, and breathes it
+              if (inG(x, y) && LV[id(x, y)] >= Math.max(3, n)){ const k = id(x, y); BLK[k] = Math.max(BLK[k], rest*.7*1.4); rest *= .3; }
+              else if (q >= 2 && q < L) pol({ i: x, j: y, r: 0, s: rest*.12, lv: n, o: own, quiet: true }); }
+            pol({ i: b.i + Math.round(wx_*L), j: b.j + Math.round(wz_*L), r: 2, s: rest, lv: n, o: own, plume: true }); }
+          noise({ i: b.i, j: b.j, r: 2, s: 1.6 + .4*(n - 1), k: b.k }); }   // (the noise stays close, and grows with height: tall industry is still no neighbor)
         else noise({ i: b.i, j: b.j, r: 1, s: .6, k: b.k });
       } else if (b.z === 'C'){
         jobsS.push({ i: b.i, j: b.j, r: P.walk, cap: b.floors*P.jobs.C, k: b.k, z: b.z });
         lifeS.push({ i: b.i, j: b.j, r: P.shopWalk, cap: P.shop*(1 + P.shopTall[0]*Math.min(1, b.floors - 1) + P.shopTall[1]*Math.max(0, b.floors - 2)), k: b.k });   // (a tall shop: fewer visitors per level)
-        noise({ i: b.i, j: b.j, r: b.floors >= 3 ? 2 : 1, s: (.25 + .35*(b.floors - 1))*day, k: b.k }); eye({ i: b.i, j: b.j, r: 1, s: .15 });   // (and louder, never as far as haze)
+        { const n = b.floors, s1 = .25*day, f = n === 1 ? 1 : .75;   // stacked: 3/4 the noise its levels would make spread round it one level each
+          for (let q = 0; q < n && q < RING.length; q++) noise({ i: b.i + RING[q][0], j: b.j + RING[q][1], r: 1, s: s1*f, k: b.k });
+          if (n*s1*f > .3) SRC.noise.push({ i: b.i, j: b.j, w: 1, h: 1, s: n*s1*f, k: b.k }); }
+        eye({ i: b.i, j: b.j, r: 1, s: .15 });
       }
     }
     const megaJobs = { market: 40, foundry: 80, logistics: 60, greenhouse: 30, mall: 25, club: 20, square: 12, pagoda: 20, wirenest: 6, spire: 6, police: 4, emitter: 4, bathhouse: 6, lidar: 4 };
@@ -1301,8 +1318,8 @@ const PLAN = (() => {
     } else {
       html += `<div class="t"><span>${h.powered ? h.isolated ? 'Cut off' : Math.round(h.fill*100) + '% busy' : 'No power'}</span></div>`;
       if (!h.powered || h.isolated) notes.push(['bad', h.isolated ? PROB.isolated[1] : PROB[h.overload ? 'overload' : 'power'][1]]);
-      if (h.z === 'I') notes.push(['mid', h.floors >= 3 ? 'More jobs per level · its pollution passes over shorter buildings' : 'Gives jobs · pollution drifts downwind']);
-      if (h.z === 'C') notes.push(['mid', h.floors >= 3 ? 'Tall shops are louder, and draw fewer visitors per level' : 'Gives work and things to do · a little noise']);
+      if (h.z === 'I') notes.push(['mid', h.floors >= 2 ? `More jobs per level · smaller cloud close in, but its smoke lands ${2*h.floors} tiles downwind, over anything shorter` : 'Gives jobs · pollution drifts downwind']);
+      if (h.z === 'C') notes.push(['mid', h.floors >= 2 ? 'Stacked: 3/4 the noise of the same shops spread out, but fewer visitors per level' : 'Gives jobs and things to do · a little noise']);
     }
     notes.push(['mid', `Uses ${(+h.draw).toFixed(1)} power`]);
     if (h.shade > .2) notes.push(['mid', 'Blocks pollution for the homes behind it, and breathes some of it']);
@@ -1647,19 +1664,19 @@ const PLAN = (() => {
       { say: 'Now a mistake, on purpose.', sub: 'Place a home right next to the industry, on the glowing tile.', mark: ['HB'], zone: 'low', done: () => zoneAt(pt('HB')) === 'R',
         resCard: 'HB', res: res('It struggles.', 'Its card is open: Clean air and Quiet are low. Industry is polluting and loud up close. You can check any building like this with no zone picked.') },
       { say: 'Open the Pollution view.', sub: `Views show what you can't see.${TOUCHY ? '' : ' Press V to cycle through them.'}`, target: lensBtn('air'), done: () => lens === 'air',
-        res: res('Warm colors are heavy pollution.', 'The pulsing ring is where it comes from, and the arrows show the wind. Homes glow green (fine), amber or red. Taller industry blows its pollution over shorter buildings.') },
+        res: res('Warm colors are heavy pollution.', 'The white badge marks where it comes from, and the arrows show the wind. Stacking industry shrinks the cloud around it, but carries the smoke farther downwind before it lands.') },
       { say: 'Now open the Noise view.', sub: 'The button next to Pollution.', target: lensBtn('noise'), done: () => lens === 'noise',
-        res: res('Rings spread from loud buildings.', 'Industry is loud, and taller shops are louder. Noise doesn\'t reach as far as pollution, and a building three levels or taller in between soaks it up.') },
+        res: res('Rings spread from loud buildings.', 'Industry is loud up close, and louder as it stacks. A stacked shop makes 3/4 the noise of the same shops spread out. A building three levels or taller in between soaks noise up.') },
       { say: 'Remove the struggling home.', sub: TOUCHY ? 'Press and hold it.' : 'Right-click it.', mark: ['HB'], noZone: true, onShow: () => setLens(null), done: () => !zoneAt(pt('HB')),
         res: res('Gone.', 'Moving things costs nothing: build, look, and move it if it doesn\'t work.') },
       { say: 'Place a shop on the glowing tile.', sub: 'Pick Commercial.', mark: ['S1'], zone: 'mid', done: () => zoneAt(pt('S1')) === 'C',
-        res: res('Things to do.', 'Shops give homes within 5 tiles somewhere to go, and a few jobs. Taller shops hold more, but each level draws fewer people, and they get louder.') },
+        res: res('Things to do.', 'Shops give homes within 5 tiles somewhere to go, and a few jobs. Stacked shops are quieter than the same shops spread out, but each extra level draws fewer people.') },
       { say: 'Add ground on the glowing tiles.', sub: `With no zone picked, ${TOUCHY ? 'tap' : 'click'} each one. (${TOUCHY ? 'Tap a picked zone again' : 'Press Esc'} to put a zone down.)`, mark: ['W1', 'W2'], noZone: true,
         done: () => !!cellAt(pt('W1')) && !!cellAt(pt('W2')) && !zoneAt(pt('W1')) && !zoneAt(pt('W2')),
         res: res('Ground spreads your city out.', 'Farther from industry is cleaner and quieter. But jobs reach 8 tiles, shops 5, and power only as far as a core\'s grid.') },
       { say: 'Place a home on the farthest tile.', sub: 'Another mistake, on purpose.', mark: ['W2'], zone: 'low', done: () => zoneAt(pt('W2')) === 'R',
         resCard: 'W2', res: res('No power.', `It's outside the core's reach, so it stays dark. ${Tap} the core to see where its grid ends. A second core would power it, but every core makes some pollution.`) },
-      { say: 'Tall buildings block pollution.', sub: 'A building three levels or taller shields the homes up to 3 tiles behind it. But the people inside breathe what they block, and unhappy residents turn to crime, which spreads to the homes around them.', next: true },
+      { say: 'Tall buildings block pollution.', sub: 'A building three levels or taller shields the homes up to 3 tiles behind it, but only from industry no taller than itself. The people inside breathe what they block, and unhappy residents turn to crime. Every level also uses more power than the last.', next: true },
       { say: 'Let\'s finish your starter district.', sub: 'Watch: the dark home goes, and two more homes, more industry and a second shop go up.', onShow: () => { base.auto = false; autoBuild(() => { base.auto = true; }); }, done: () => base.auto === true, min: 1500,
         resNoZone: true, res: res('Your district is running.', `People are moving in. It's one home short of your first goal: that one is up to you. ${TOUCHY ? 'Tap' : 'Point at'} any building to see how it's doing.`) },
       { say: 'This is your city\'s balance.', sub: 'Homes filled: how many live in your homes, out of the room they have. Jobs and Things to do: short means build more of it, spare means there\'s room for more homes.', target: () => goalEl.querySelector('[data-bal]'), next: true },
@@ -1670,8 +1687,8 @@ const PLAN = (() => {
       { say: 'Power comes from cores.', sub: `${Tap} a core to see how far it reaches and how much power it uses. Buildings outside its grid, or past a full core, stay dark.` },
       { say: 'Read the tag before you build.', sub: 'With a zone picked, point at a tile: the tag shows how many residents the city would gain (+) or lose (−) there.' },
       { say: `${TOUCHY ? 'Tap' : 'Point at'} a building to see what it needs.`, sub: 'Each bar is one need; the line marks enough. The note at the bottom says what would help.' },
-      { say: 'Industry and cores make pollution.', sub: 'Open the Pollution view: warm colors are heavy pollution, pulsing rings are its sources, and the wind carries it one way. Taller industry blows it over shorter buildings.' },
-      { say: 'Industry, shops and transit are loud.', sub: 'The Noise view shows it. A building three levels or taller in between soaks it up. Taller shops are louder.' },
+      { say: 'Industry and cores make pollution.', sub: 'Open the Pollution view: warm colors are heavy, white badges are its sources, and the wind carries it one way. Stacked industry keeps its cloud small but lands its smoke farther downwind.' },
+      { say: 'Industry, shops and transit are loud.', sub: 'The Noise view shows it. A building three levels or taller in between soaks it up. A stacked shop makes 3/4 the noise of the same shops spread out.' },
       { say: 'Ground spreads you out.', sub: 'Farther from industry is cleaner and quieter, but jobs reach 8 tiles, shops 5, and power only as far as a core\'s grid.' },
       GUIDED[11],
       { say: 'Unhappy homes turn to crime.', sub: 'It spreads and makes the homes around it unhappy too. Fix what bothers them and it fades; police push it away.' },

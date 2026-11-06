@@ -23,10 +23,17 @@ things go. Design doc: the owner's Claude doc "Neon Terrarium: Placement Puzzle 
 - `fill = levels x needs x max(0.3, support) x (0.4 + 0.6 x comfort) x rent`. Only the supported share counts toward tiers
   (`counted = fill x people x support / max(0.3, support)`), so towers with no jobs glow but don't progress.
 - Needs: powered and reachable (not isolated). Power: inside a core's reach (the last 2 plots at 80%) and within its load. Each core powers
-  `P.coreCap` (60); a level draws `P.draw` (home 1, shop and luxury 1.5, industry 2, corps 2.5) x (1 + 0.15 per extra level). Buildings nearest a
+  `P.coreCap` (60); a building draws `P.draw` (home 1, shop and luxury 1.5, industry 2, corps 2.5) x n + 0.08(n-1)^2 + 0.02(n-1)^3 for n levels
+  (1, 2.1, 3.5, 5.3, 7.6, 10.5, 14.2, 18.8 for 1 to 8: gentle at first, steep up high). Buildings nearest a
   core are served first, each by the nearest core in reach with room; the rest go dark, and a dark building gives no jobs, shops or pollution.
-- Taller industry: 10% more jobs per extra level, pollution reaches 4 plots from four levels up, and its pollution passes over any building
-  shorter than it (only a blocker at least as tall, and three levels or more, shades it).
+- Industry, n levels, strength 1.5 + 0.35(n-1): a share stays close in (1 - 0.2(n-1), at least 0.3) as a cloud of radius 3, then 2 (two or three
+  levels), then 1 (four or more); the rest rides the wind as a thin trail and comes down in a radius-2 patch 2n tiles downwind, over water
+  too (build there later and it lands on you). A building at least as tall as the stack (and three levels or more) on the line catches 70% of
+  it and breathes it; shorter ones don't. Noise stays radius 2 and grows with height, so tall industry is still no neighbor. 10% more jobs per
+  extra level. Checked: 4 one-level vs one 4-level industry beside 9 homes: both 9/9 thriving; spread pollutes 7 to 9 tiles downwind, the stack
+  lands at 11 to 13, gives 208 jobs against 172, and draws 10.5 power against 8.
+- Shops, n levels: the noise their levels would make spread one level each over the tile and the rings round it, at 3/4 (exactly 0.75 of the
+  total, checked); a second level draws 0.75 of the first's visitors, each above 0.45.
 - Support (jobs, 0 to 1) and Life (things to do) are shared out by capacity: each place's capacity over everyone in its reach, full pull close
   in and about half over the last few plots of its reach. Metro stops join everyone near a stop to everything near any stop. A Logistics
   Hub shuttles up to 300 workers to industry near it from homes within 12 plots.
@@ -34,8 +41,7 @@ things go. Design doc: the owner's Claude doc "Neon Terrarium: Placement Puzzle 
   Air, Quiet, Safety and Life count from the start; Ease (feeling watched) opens with police at Patrolled and fades in over 20 minutes.
 - Tall buildings (three levels or more) shade haze for the 3 plots behind them; past that it carries on. The tower breathes part of what it stops
   (`BLK`: half the most it stops from any one plot), so its residents get unhappy. Noise is soaked up by tall buildings anywhere along the way.
-- Shops: a second level draws 0.75 of a first level's visitors, each level above that 0.45 (`P.shopTall`). Taller shops are louder (0.2 + 0.3 per
-  extra level, by day) and reach 2 plots from three levels up, never as far as haze (3).
+
 - Thriving home: powered and connected, support 0.8+, every open dial 0.7+.
 - Fields are painted on a grid (haze leans one plot downwind; noise is soaked up by anything three floors or taller in between; helpful
   effects that overlap give less each time, harmful ones add up), jobs and Life use summed-area tables. The painting runs only after an

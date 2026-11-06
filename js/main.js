@@ -17,7 +17,7 @@ let IDLE_SKIP = false, TITLE_SKIP = false;
 const idleNow = now => S.idleRest && !PH.on && now - LAST_INPUT > 10000 && !dragging && !keys.size && Math.abs(yawT - yaw) < 1e-3 && Math.abs(zoomT - zoom) < 1e-3 && camT.distanceTo(camGoal) < 1e-3 && !anims.length && !STAGE_Q.length && !STAGE_READY.length && !STAGE_CHAINS.size;
 // what the hitch catcher (perfhud.js) notes with each frame: the cache, how fast the view turned, the speed classes, the shadow map, merges and tiers
 PH.state = () => 'cache: ' + SC.state + (SC.why ? ' (' + SC.why + ')' : '') + '; turned ' + (SD.dYaw*180/Math.PI).toFixed(2) + ' deg, speed classes ' + SD.hist.slice(0, 4).join('/') + ' (fastest ' + SD.top.toFixed(0) + ' px)' + (SC.tinyCulled ? ', ' + SC.tinyCulled + ' tiny things left out' : '')
-  + '; shadows ' + (LIGHT_JUMP ? 'sun jumped' : shJob ? 'strip ' + shJob.k + ' of ' + shJob.K : 'kept')
+  + '; shadows ' + (LIGHT_JUMP ? 'sun jumped' : shJob ? 'strip ' + shJob.k + ' of ' + shJob.K : 'kept') + (GLIDE.line() ? '; ' + GLIDE.line() : '')
   + '; merges waiting ' + solidDirty.size + (SOLID_JOB ? ' (one under way)' : '') + (SOLID_HELD ? ' (held: the view is turning)' : '') + ', tier changes ' + TIER.changes + ', to free ' + DISPOSE_Q.length + '; drag ' + (dragging ? 'held' : 'off');
 function frame(now){
   requestAnimationFrame(frame);
@@ -152,6 +152,7 @@ function frameBody(now){
   const pt = PH.tests;   // (the overlay's tests: perfhud.js)
   if (pt.quarter) rtC.viewport.set(0, 0, W >> 1, H >> 1);   // (plain shading: see renderBufferDirect in sky.js)
   if (pt.quarter || !SC.frame()){   // (the static cache draws the frame when it can: staticcache.js)
+    if (GLIDE.phase !== 'idle') GLIDE.abort('drawn the old way');   // (a frame not from the cache: the glide's pictures no longer match it)
     renderer.setRenderTarget(rtC); renderer.setClearColor(0x000000, 1);
     if (MRT) mrtBegin();   // the normal image is drawn along with the colors (core.js, sky.js)
     sdApply();   // the old way's frames: plots that move fast on screen lose their smallest triangles (world.js, speed-based detail)

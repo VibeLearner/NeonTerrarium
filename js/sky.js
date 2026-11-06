@@ -31,7 +31,9 @@ const SUN_DIR = new THREE.Vector3(0, 1, 0), _sunC = new THREE.Vector3();
 // seconds at normal speed, instead of creeping on every frame: the shadows stay still, then shift once. (Creeping, the
 // shadow map was redrawn and swapped twice a second, so the shadows were never still.) Set by hand, the hour is exact.
 const SUN_STEP = .25;
-const sunHour = h => S.cycle ? Math.floor(h/SUN_STEP)*SUN_STEP : h;
+// (with the day cycle running, each step can glide (staticcache.js GLIDE): the sun is walked through the in-between hours while their pictures are drawn
+//  in the background, then the pictures are played in order)
+const sunHour = h => S.cycle ? (typeof GLIDE !== 'undefined' ? GLIDE.hour(h) : Math.floor(h/SUN_STEP)*SUN_STEP) : (typeof GLIDE !== 'undefined' && GLIDE.phase !== 'idle' && GLIDE.abort('the day cycle stopped'), h);
 const SUN_BACK = 260;
 // Stable shadows: the box only ever moves by whole shadow-map texels, measured along the sun's own view axes, so
 // when it moves and the shadows are redrawn they land on exactly the same grid as before and nothing changes on
@@ -104,7 +106,8 @@ function shadowFrame(){
   // While the hour slider is being dragged the sun jumps every frame, and every frame drew the whole shadow map again (30 fps while scrubbing, owner's M2,
   // Oct 25): then only every fourth frame does, and the sun's direction for the others waits for it
   const drag = performance.now() - (window.HOUR_DRAG_AT || -1e9) < 250;
-  let jump = shHavePrev && shPrevDir.distanceToSquared(shNeed.dir) > SH_SUN && !(PH.tests.slowShadowJump || window.__SLOW_SHADOW_JUMP);
+  const gp = typeof GLIDE !== 'undefined' && GLIDE.phase === 'prep';   // (a glide's in-between suns: each map in the background, a strip a frame, never at once)
+  let jump = shHavePrev && shPrevDir.distanceToSquared(shNeed.dir) > SH_SUN && !gp && !(PH.tests.slowShadowJump || window.__SLOW_SHADOW_JUMP);
   let held = false; if (jump && drag && ++shDragN % 4 !== 0){ jump = false; held = true; } else if (jump) shDragN = 0;
   if (!held) shPrevDir.copy(shNeed.dir); shHavePrev = true; LIGHT_JUMP = jump;   // (held: measured from the last map drawn, so the next frame still counts as a jump)
   let now = shadowDirty || jump || !shFront || shSlack(shFront) < 0; shadowDirty = false;
@@ -112,8 +115,8 @@ function shadowFrame(){
     // time to start the next map? (the sun moved, the box size changed, or the view has used up 40% of the room; a map
     // under way is only started again if the sun has jumped, the box size changed or the view would leave it)
     const sunD = shFront.dir.distanceToSquared(shNeed.dir), viewDue = shFront.half !== shNeed.half || shSlack(shFront) < .6*(SH_F - 1)*shNeed.half;
-    const due = viewDue || sunD > 1e-12, slow = !viewDue && sunD <= SH_SUN;   // (only the sun creeping on: spread it thin)
-    if (shJob && (shJob.half !== shNeed.half || shJob.dir.distanceToSquared(shNeed.dir) > SH_SUN || shSlack(shJob) < 0 || (viewDue && shJob.K !== SH_K))){ shSpare = shJob.rt; shJob = null; }   // aimed at a view that's gone, or too slow for it: start again
+    const due = viewDue || sunD > 1e-12, slow = !viewDue && (sunD <= SH_SUN || gp);   // (only the sun creeping on: spread it thin)
+    if (shJob && (shJob.half !== shNeed.half || (shJob.dir.distanceToSquared(shNeed.dir) > SH_SUN && !gp) || shSlack(shJob) < 0 || (viewDue && shJob.K !== SH_K))){ shSpare = shJob.rt; shJob = null; }   // aimed at a view that's gone, or too slow for it: start again
     if (due && !shJob){ shJob = shSnap(shSpare || shTarget(), slow ? SH_K_SUN : SH_K); shSpare = null; shAim(shJob); sh.updateMatrices(sun); shJob.matrix.copy(sh.matrix); }
     if (shJob){
       PH.begin('shadow strip (background)');
@@ -121,9 +124,10 @@ function shadowFrame(){
       // (a building mid-sweep: three's own shadow pass ignores its clipping, so the strip does too)
       for (const a of anims) a.mats.atlas.clippingPlanes = [];
       // (the strip's own culling: the merged blocks' pieces against the strip's frustum, world.js shadowRanges; no size classes dropped: the map keeps every triangle)
+      const lv0 = CULL.lvl;   // (put back after: the cache's key reads the view's level, and a strip left it at -1, so every strip frame looked like a change to the view: the cache let go for a frame)
       sh.updateMatrices(sun); cullFrame(sh.camera); CULL.lvl = -1; SHADOW_STRIP = [];
       const ac = renderer.autoClear; renderer.autoClear = false; renderer.setRenderTarget(shHostRT); renderer.render(shHost, cam); renderer.autoClear = ac;
-      shadowRangesDone();
+      shadowRangesDone(); CULL.lvl = lv0;
       for (const a of anims) a.mats.atlas.clippingPlanes = [a.u.plane];
       shJob.rt.scissorTest = false;
       PH.end();

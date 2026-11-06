@@ -84,16 +84,24 @@ float gRings(vec2 p){ float s = 0.0;
 vec2 gp = vWP.xz; float gD0 = clamp((vWP.y - ${GD_WATER_Y.toFixed(3)})/${GD_WATER_K.toFixed(4)}, 0.0, 1.0), gDi = gBayer(gl_FragCoord.xy) - 0.5;
 vec2 gRip = vec2(sin(gp.x*1.7 + gp.y*0.9 + gTime*0.6), sin(gp.y*1.9 - gp.x*0.7 - gTime*0.5))*0.035;
 float gRg = gRings(gp) + gDi*0.05;
-float gDq = floor((gD0 + gRip.x + gRg*0.05 + gDi*0.09)*5.0 + 0.5)/5.0;
+// the waves: a long gentle swell rolling in from one side (about two metres between crests, half a metre a second) and a smaller one across it, their crests
+// wandering a little; the same everywhere in the world, so they run on from plot to plot. They lift the depth bands as they pass (the shallows breathe),
+// light their crests a step, and wash up the banks (gLap)
+float gWp = 0.8*sin(gp.x*0.55 + gp.y*0.35 + gTime*0.17);
+float gWv = 0.65*sin(dot(gp, vec2(0.85, 0.53))*3.6 - gTime*1.55 + gWp) + 0.35*sin(dot(gp, vec2(-0.38, 0.92))*5.2 - gTime*1.4 + gWp*1.3);
+float gDq = floor((gD0 + gRip.x + gWv*0.045 + gRg*0.05 + gDi*0.09)*5.0 + 0.5)/5.0;
 vec3 gE = vec3(0.48, 0.66, 0.64), gS = vec3(0.365, 0.573, 0.58), gM = vec3(0.2, 0.396, 0.478), gDp = vec3(0.133, 0.286, 0.353);
 vec3 gW = gDq < 0.2 ? mix(gE, gS, gDq/0.2) : gDq < 0.6 ? mix(gS, gM, (gDq - 0.2)/0.4) : mix(gM, gDp, clamp((gDq - 0.6)/0.4, 0.0, 1.0));
 float gC = gCaus(gp*2.2 + gRip*6.0), gCl = gC < 0.07 ? 1.0 : gC < 0.13 ? 0.4 : 0.0;
 gW += gCl*(1.0 - smoothstep(0.0, 0.6, gD0 + gDi*0.15))*vec3(0.1, 0.1, 0.07)*(1.0 - gLights);
 // the rings' crests a step lighter, their troughs a step darker (two steps each, pixel-art fashion)
 gW *= 1.0 + (gRg > 0.24 ? 0.15 : gRg > 0.11 ? 0.065 : gRg < -0.24 ? -0.1 : gRg < -0.11 ? -0.045 : 0.0);
+// the swell's crests a step lighter and its troughs a touch darker, in open water (in the shallows they turn into the lapping instead)
+if (gD0 + gDi*0.12 > 0.16){ float gCr = gWv + gDi*0.14; gW *= 1.0 + (gCr > 0.66 ? 0.085 : gCr > 0.4 ? 0.035 : gCr < -0.7 ? -0.045 : 0.0); }
 // the water lapping at the banks: a pale lip that creeps up the shallows and draws back, unevenly along the bank, a darker wet line just past it
-float gLap = 0.13 + 0.05*sin(gTime*1.25 + gp.x*1.7 + gp.y*1.1) + 0.02*sin(gTime*2.1 - gp.x*0.6 + gp.y*2.3), gLd = gD0 + gDi*0.04;
-if (gLd < gLap) gW = mix(gW, vec3(0.62, 0.78, 0.74), 0.5); else if (gLd < gLap + 0.035) gW *= 0.93;
+// (each crest that reaches a bank pushes the lip up the shallows, then it draws back; it whitens a little as it peaks)
+float gLap = 0.12 + 0.07*gWv + 0.02*sin(gTime*2.1 - gp.x*0.6 + gp.y*2.3), gLd = gD0 + gDi*0.04;
+if (gLd < gLap) gW = mix(gW, vec3(0.64, 0.8, 0.76), 0.42 + 0.22*max(gWv, 0.0)); else if (gLd < gLap + 0.04) gW *= 0.92;
 diffuseColor.rgb = gW;
 `)
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
@@ -810,10 +818,43 @@ function gdRing(x, z, w){
   if (bAge < .16) return false;
   R[best].set(x, z, t, w); GD_FX.lastRing = { x, z, t: performance.now()/1000 }; return true;
 }
+// A ring only where the pond is what's under the pointer, not a tree, a bridge or a roof standing in front of it (the pointer's ray reaches the
+// water behind them too, and the rings rose round the trees, owner Nov 6). The water marks its pixels in the normal image (GD_WATER_MAT), so one
+// pixel of it says: read into a buffer on the graphics card and fetched a frame or two later, once it is there (never waiting for it: no stall).
+// Without WebGL 2 (no marks), every hit on the water counts.
+const GD_PICK = { pbo: null, req: null, wait: null, buf: new Uint8Array(4) };
+function gdRingIfSeen(cx, cy, x, z, w){
+  if (typeof MRT === 'undefined' || !MRT || typeof rtN === 'undefined' || !rtN){ gdRing(x, z, w); return; }
+  const r = viewRect(); GD_PICK.req = { u: (cx - r.left)/r.width, v: 1 - (cy - r.top)/r.height, x, z, w };   // (the newest wins)
+}
+function gdPickPoll(){
+  const P = GD_PICK; if (!P.wait && !P.req) return;
+  const gl = renderer.getContext();
+  if (P.wait){
+    const st = gl.clientWaitSync(P.wait.fence, 0, 0);
+    if (st === gl.TIMEOUT_EXPIRED && ++P.wait.n < 8) return;
+    if (st === gl.ALREADY_SIGNALED || st === gl.CONDITION_SATISFIED){
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, P.pbo); gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, P.buf); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+      const a = P.buf[3]; if (a > 100 && a < 160){ const q = P.wait.r; gdRing(q.x, q.z, q.w); }
+    }
+    gl.deleteSync(P.wait.fence); P.wait = null;
+  }
+  if (!P.req) return;
+  const q = P.req; P.req = null;
+  const fb = renderer.properties.get(rtN).__webglFramebuffer; if (!fb){ gdRing(q.x, q.z, q.w); return; }
+  if (!P.pbo){ P.pbo = gl.createBuffer(); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, P.pbo); gl.bufferData(gl.PIXEL_PACK_BUFFER, 4, gl.STREAM_READ); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null); }
+  const px = Math.min(rtN.width - 1, Math.max(0, Math.floor(q.u*rtN.width))), py = Math.min(rtN.height - 1, Math.max(0, Math.floor(q.v*rtN.height)));
+  const prev = gl.getParameter(gl.READ_FRAMEBUFFER_BINDING);
+  gl.bindFramebuffer(gl.READ_FRAMEBUFFER, fb); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, P.pbo);
+  gl.readPixels(px, py, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, 0);
+  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null); gl.bindFramebuffer(gl.READ_FRAMEBUFFER, prev);
+  P.wait = { fence: gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0), r: q, n: 0 };
+}
 // every frame (main.js): the pads' floating, the rings' count, whether the composite should look for water to reflect in
 function gardenFx(dt){
   if (self.IN_RECIPE_WORKER) return;
   if (GD_FX.dirty) gdPadsBuild();
+  if (GD_PICK.wait || GD_PICK.req) try { gdPickPoll(); } catch (e){ GD_PICK.wait = GD_PICK.req = null; }
   GD_RIP.n.value = typeof TOUCH !== 'undefined' && TOUCH.on ? 4 : 8;
   if (typeof comp !== 'undefined' && comp.uniforms.waterOn) comp.uniforms.waterOn.value = GD_FX.water > 0 ? 1 : 0;
   const pads = GD_FX.pads; if (!pads.length && !GD_FX.mesh) return;
@@ -821,7 +862,7 @@ function gardenFx(dt){
   if (!pads.length){ if (MS.pad.count) MS.pad.count = MS.sol.count = MS.blo.count = 0; return; }
   dt = Math.min(dt, .05);
   const t = FOL_UNI.time.value, R = GD_RIP.rips.value, N = GD_RIP.n.value, damp = Math.exp(-1.6*dt), dampA = Math.exp(-2.2*dt);
-  let moving = GD_FX.moved; GD_FX.moved = false;
+  let moving = true; GD_FX.moved = false;   // (always redrawn: they ride the swell, below)
   for (const p of pads){
     let ax = (p.hx - p.x)*.05, az = (p.hz - p.z)*.05;   // the slow drift home
     for (let i = 0; i < N; i++){ const r = R[i], age = t - r.z; if (age < 0 || age > GD_RIP_LIFE || r.w < .55) continue;   // (a gentle ring only rocks the light)
@@ -841,8 +882,11 @@ function gardenFx(dt){
   if (!moving) return;
   let ns = 0, nb = 0;
   pads.forEach((p, n) => {
-    const ca = Math.cos(p.a), sa = Math.sin(p.a), at = (ox, oz) => [p.x + ox*ca + oz*sa, p.z - ox*sa + oz*ca];
-    _gdO.position.set(p.x, .051, p.z); _gdO.rotation.set(0, p.a, 0); _gdO.scale.set(p.s, 1, p.s); _gdO.updateMatrix(); MS.pad.setMatrixAt(n, _gdO.matrix);
+    // riding the swell: a little to and fro along it, and a little turn, in step with the shader's main wave (gWv) where the pad is
+    const wp = .8*Math.sin(p.x*.55 + p.z*.35 + t*.17), ph = (p.x*.85 + p.z*.53)*3.6 - t*1.55 + wp, sw = .035*Math.cos(ph);
+    const X = p.x + .85*sw, Z = p.z + .53*sw, A = p.a + .07*Math.sin(ph + p.hx);
+    const ca = Math.cos(A), sa = Math.sin(A), at = (ox, oz) => [X + ox*ca + oz*sa, Z - ox*sa + oz*ca];
+    _gdO.position.set(X, .051, Z); _gdO.rotation.set(0, A, 0); _gdO.scale.set(p.s, 1, p.s); _gdO.updateMatrix(); MS.pad.setMatrixAt(n, _gdO.matrix);
     if (p.kind === 1){ const [x, z] = at(.02, -.02); _gdO.position.set(x, .056, z); _gdO.scale.set(.1, .008, .1); _gdO.updateMatrix(); MS.sol.setMatrixAt(ns++, _gdO.matrix); }
     else if (p.kind === 2){ const [x, z] = at(-.03, .02); _gdO.position.set(x, .068, z); _gdO.scale.set(.055, .04, .055); _gdO.updateMatrix(); MS.blo.setMatrixAt(nb, _gdO.matrix); MS.blo.setColorAt(nb++, _gdC.setHex(p.col)); }
   });
@@ -866,11 +910,11 @@ if (!self.IN_RECIPE_WORKER && typeof canvas !== 'undefined' && canvas.addEventLi
     const L = GD_FX.last, d = L ? Math.hypot(h.x - L.x, h.z - L.z) : 0, sp = L ? L.sp*.6 + .4*d/Math.max(now - L.t, 1/120) : 0;
     GD_FX.last = { x: h.x, z: h.z, t: now, sp };
     const R = GD_FX.lastRing, far = !R || Math.hypot(h.x - R.x, h.z - R.z) > .5, idle = R && now - R.t > .7 && d > .02;
-    if (far || idle) gdRing(h.x, h.z, Math.min(1.6, Math.max(.3, .3 + sp/14)));
+    if (far || idle) gdRingIfSeen(e.clientX, e.clientY, h.x, h.z, Math.min(1.6, Math.max(.3, .3 + sp/14)));
   }, { passive: true });
   // a tap on the water (a phone): one ring, strong enough to nudge the pads
   canvas.addEventListener('pointerdown', e => {
     if (e.pointerType !== 'touch' || !GD_FX.water) return;
-    const h = gdWaterAt(e.clientX, e.clientY); if (h) gdRing(h.x, h.z, 1.0);
+    const h = gdWaterAt(e.clientX, e.clientY); if (h) gdRingIfSeen(e.clientX, e.clientY, h.x, h.z, 1.0);
   }, { passive: true });
 }

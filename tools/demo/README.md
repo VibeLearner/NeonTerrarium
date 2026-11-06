@@ -98,3 +98,15 @@ bottom right.
 
 Tuning: the clicks are `ACTS` at the top of `js/demo_pg.js` (time, kind, plot), the garden's plots and their order `LAWNS`, the camera's shots
 `shots()` and its slow turn `yawAt`.
+
+## The city cut (30 s, wide and tall)
+
+`python3 tools/demo/record.py --city --both` films it twice, natively each time: `out/neon-terrarium-city.mp4` (1920 x 1080) and
+`out/neon-terrarium-city-tall.mp4` (1080 x 1920), each with its own sound pass. Opened by hand: `index.html?full#demo&pg&city`.
+
+- 0 to 5 s: the cursor builds the first three by hand (a Luxury tower in the middle, two Commercial beside it).
+- 5.6 to 23 s: the rest rises on its own, ring by ring: Luxury in the middle, Commercial round it, homes outside, an Industrial quarter at the
+  back, three towers of every zone, two gardens. The layout comes from its own seed (`cityActs` in `js/demo_pg.js`), the same every run.
+- 23 to 30 s: the camera pulls out and turns over the whole city; fade to black at the end.
+
+Every run (any cut) also writes a `-compressed.mp4` copy beside the full-quality file: H.264 at about a tenth of the size, ready to post.

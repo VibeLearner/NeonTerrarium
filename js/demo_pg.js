@@ -20,6 +20,11 @@
 const DEMOPG = (() => {
   const D = { on: !!window.NT_DEMO && /[#&]pg\b/.test(location.hash), ready: false, playing: false, done: false, held: false, t: 0, frame: 0, drawn: 0, log: [], info: {}, failed: null, len: 60 };
   if (!D.on) return D;
+  // #demo&pg&city: the city cut instead (30 s): one bare plot grows into a whole city. A few buildings by hand with the cursor, then the rest
+  // rises ring by ring on its own (Luxury towers in the middle, Commercial round them, homes outside, an Industrial quarter at the back, a few
+  // towers of every zone, and two gardens), and the camera pulls out over it. Filmed wide (1920 x 1080) or tall (1080 x 1920) as the page is
+  const CITY = /[#&]city\b/.test(location.hash);
+  if (CITY) D.len = 30;
   const CAP = !!window.__TR_CAPTURE;   // the picture pass: the recorder steps the clock and films each frame
   const AUTO = !!window.__DM_AUDIO;    // the sound pass: real time, nothing drawn, only what makes a sound
   const FPS = +window.__DM_FPS || 60;
@@ -51,7 +56,7 @@ const DEMOPG = (() => {
   // stays), onto / up / sky (build on a plot, stack on its roof, build out into the sky), pod (a home hung off a wall: host plot, the way out,
   // how far up the wall), del (right-click: the top section goes), green (a bare plot's ground cycled), lawn (a lawn plot laid in the sky)
   const LAWNS = [[2, 1], [3, 1], [3, 2], [2, 2], [1, 2], [2, 3], [3, 3], [1, 3], [0, 2], [0, 3], [-1, 2], [-1, 3], [0, 4], [1, 4], [2, 4]];
-  const ACTS = [
+  const FEAT_ACTS = [
     [1.15, 'btn', 'low'],  [1.95, 'onto', [0, 0]],  [2.55, 'up', [0, 0]],  [3.1, 'up', [0, 0]],
     [3.85, 'btn', 'mid'],  [4.65, 'sky', [1, 0]],   [5.25, 'up', [1, 0]],  [5.8, 'up', [1, 0]],
     [6.55, 'btn', 'high'], [7.35, 'sky', [0, 1]],   [7.95, 'up', [0, 1]],  [8.5, 'up', [0, 1]],
@@ -71,10 +76,66 @@ const DEMOPG = (() => {
     // the garden: the bare plot to lawn (bare, then lawn), then lawn plots laid beside it
     [29.6, 'green', [2, 0]], [30.2, 'green', [2, 0]],
     ...LAWNS.map(([i, j], k) => [31.0 + k*.75, 'lawn', [i, j]]),
-  ].map(([t, kind, v], n) => ({ n, t, kind, v }));
-  const GARDEN0 = ACTS.findIndex(a => a.kind === 'green');
+  ];
+  // the city cut's clicks: [time, kind, plot, zone (auto: none for the cursor's own)]. The layout comes from its own seed, the same every run
+  function cityActs(){
+    const R = rng(h32('city layout', 7)), jit = (i, j, k) => (h32('j', i, j, k) % 1000)/1000;
+    const plots = [];
+    for (let i = -6; i <= 6; i++) for (let j = -6; j <= 6; j++){
+      const d = Math.hypot(i*.95, j), n = (jit(i, j, 0) - .5)*1.3;
+      if (d + n < 4.7 || (i === 0 && j === 0)) plots.push({ i, j, d, a: Math.atan2(j, i) });
+    }
+    // zones: Luxury in the middle, Commercial round it, homes outside, Industrial at the back (away from the camera: it sits at +x +z)
+    const back = a => { let x = Math.abs(a - (-2.35)); x = Math.min(x, Math.PI*2 - x); return x; };
+    for (const p of plots){
+      const r = jit(p.i, p.j, 1);
+      p.z = p.d < 1.6 ? (r < .8 ? 'high' : 'mid') : p.d < 3.0 ? (r < .78 ? 'mid' : r < .9 ? 'high' : 'low') : (back(p.a) < .75 && p.d > 2.5 ? 'ind' : 'low');
+      p.n = { high: 4 + (r*3 | 0), mid: 2 + (r*3 | 0), low: 1 + (r*3 | 0), ind: 1 + (r*2 | 0) }[p.z];
+    }
+    const at = (i, j) => plots.find(p => p.i === i && p.j === j);
+    // two gardens on the camera's side, out in the homes: six or seven lawn plots each, grown out from a start plot
+    const used = new Set();
+    for (const [si, sj] of [[3, 1], [0, 3]]){
+      let start = at(si, sj) || plots.filter(p => p.z === 'low' && !used.has(p)).sort((a, b) => Math.hypot(a.i - si, a.j - sj) - Math.hypot(b.i - si, b.j - sj))[0];
+      if (!start) continue;
+      const patch = [start], want = 6 + (jit(si, sj, 2)*2 | 0);
+      for (let k = 0; k < patch.length && patch.length < want; k++)
+        for (const [di, dj] of [[1, 0], [0, 1], [-1, 0], [0, -1]]){ const q = at(patch[k].i + di, patch[k].j + dj);
+          if (q && q.z !== 'ind' && q.d > 1.7 && !patch.includes(q) && !used.has(q) && patch.length < want) patch.push(q); }
+      for (const q of patch){ q.z = null; q.n = 0; used.add(q); }
+    }
+    // a few towers of every zone stacked on each other, near the middle
+    const MIX = ['high', 'mid', 'low', 'high', 'ind', 'mid'];
+    for (const [i, j] of [[-1, 1], [1, -1], [-2, 0]]){ const p = at(i, j); if (p && p.z){ p.mix = true; p.n = 6; } }
+    // the cursor's own: the middle plot (Luxury, three high) and two beside it (Commercial, two high)
+    const hand = { '0,0': ['high', 3], '1,0': ['mid', 2], '0,1': ['mid', 2] };
+    for (const k in hand){ const [i, j] = k.split(',').map(Number), p = at(i, j); if (p){ p.z = hand[k][0]; p.mix = false; p.hand = hand[k][1]; p.n = Math.max(p.n, hand[k][1] + 1); } }
+    const out = [
+      [.9, 'btn', 'high'], [1.55, 'onto', [0, 0]], [2.05, 'up', [0, 0]], [2.5, 'up', [0, 0]],
+      [3.0, 'btn', 'mid'], [3.6, 'sky', [1, 0]], [4.05, 'up', [1, 0]], [4.5, 'sky', [0, 1]], [4.95, 'up', [0, 1]],
+    ];
+    // the rest rise on their own, ring by ring from the middle, each plot's floors stacking a beat after it appears (faster as it goes)
+    const rest = plots.filter(p => !p.hand).sort((a, b) => (a.d + jit(a.i, a.j, 3)*.9) - (b.d + jit(b.i, b.j, 3)*.9));
+    const T0 = 5.6, T1 = 21.2;
+    rest.forEach((p, r) => {
+      const tb = T0 + (T1 - T0)*Math.pow(r/Math.max(1, rest.length - 1), .82);
+      if (!p.z){ out.push([tb, 'lawn', [p.i, p.j], null]); return; }
+      const zs = k => p.mix ? MIX[k % MIX.length] : p.z;
+      out.push([tb, 'sky', [p.i, p.j], zs(0)]);
+      for (let k = 1; k < p.n; k++) out.push([Math.min(23.4, tb + k*(.26 + jit(p.i, p.j, 10 + k)*.18)), 'up', [p.i, p.j], zs(k)]);
+    });
+    // and the hand-built ones keep rising too
+    for (const p of plots) if (p.hand) for (let k = p.hand; k < p.n; k++) out.push([6.2 + k*.45 + jit(p.i, p.j, 20 + k)*.3, 'up', [p.i, p.j], p.z]);
+    out.sort((a, b) => a[0] - b[0]);
+    CITY_INFO.plots = plots.length; CITY_INFO.lawns = plots.filter(p => !p.z).map(p => [p.i, p.j]);
+    return out;
+  }
+  const CITY_INFO = {};
+  const ACTS = (CITY ? cityActs() : FEAT_ACTS).map(([t, kind, v, z], n) => ({ n, t, kind, v, z, auto: z !== undefined }));
+  const GARDEN0 = CITY ? ACTS.findIndex(a => a.kind === 'lawn') : ACTS.findIndex(a => a.kind === 'green');
   const LAST_ACT = ACTS[ACTS.length - 1].t;
-  const T_OUT = 47.2;   // (the pull out over the whole city)
+  const T_OUT = CITY ? 5.4 : 47.2;   // (the zone bar goes: the city cut, once it builds on its own; the feature cut, as it pulls out)
+  const CUR_OFF = CITY ? 5.4 : LAST_ACT + .5;   // (the cursor goes)
   const HOUR = 20.6;
   const GRID_AT = [70, 70];   // (the Grid stands well out of sight, so its music plays from the first frame)
 
@@ -177,10 +238,13 @@ const DEMOPG = (() => {
     // garden plot can take a good while) froze the page long enough for the music to fall behind, glitch and stop. So nothing is built there:
     // each click only makes its sound, at its moment (the same sounds the builds make: world.js startAnim, cycleGreen)
     if (AUTO) return true;   // (and no click sounds either, owner Nov 6: only the Grid's music is heard)
+    // (the city cut's own clicks: their zone set straight on, the zone bar is gone by then; a lawn plot laid with no zone, its ground grass)
+    if (a.auto){ S.zone = a.z; GREEN_DEFAULT = a.kind === 'lawn' ? 'grass' : 'some'; }
     const T = targetOf2(a); if (!T) return false;
     if (a.kind === 'del'){ const n0 = T.c.sections.length; removeAt({ c: T.c, kind: 'bld', p: new THREE.Vector3(T.at.x, T.at.y, T.at.z) }); return T.c.sections.length < n0; }
     const before = JSON.stringify(stateOf(a));
-    withSeed(h32('act', a.n), () => applyTarget(T.tg));
+    try { withSeed(h32('act', a.n), () => applyTarget(T.tg)); }
+    finally { if (a.auto) GREEN_DEFAULT = 'some'; }
     return JSON.stringify(stateOf(a)) !== before;
   }
   // (what a click should have changed: to check it did)
@@ -193,29 +257,35 @@ const DEMOPG = (() => {
   const PLAN = { snap: [] };
   const tops = () => { const m = {}; for (const c of cells.values()) if (Math.abs(c.i) < 20) m[ckey(c.i, c.j)] = { i: c.i, j: c.j, top: Math.max(c.height || CURB, c.topY || 0) }; return m; };
   function gardenSim(salt){   // the garden's rules alone (no drawing): what this salt grows, plot by plot
-    GD_SALT = salt; const H = cellAt(2, 0), g0 = H.green, added = []; let first = -1;
+    GD_SALT = salt; const H = CITY ? null : cellAt(2, 0), g0 = H && H.green, added = []; let first = -1;
+    const steps = CITY ? CITY_INFO.lawns : LAWNS;
     const pieces = () => [...cells.values()].filter(c => c.gd && c.gd.p);
     try {
       for (const c of cells.values()) c.gd = null;
-      H.green = 'grass'; gardenUpdate();
-      LAWNS.forEach(([i, j], k) => { const c = newCell(i, j); c.green = 'grass'; c.style = DEFAULT_STYLE; cells.set(ckey(i, j), c); added.push(c); gardenUpdate();
+      if (H){ H.green = 'grass'; gardenUpdate(); }
+      steps.forEach(([i, j], k) => { if (cellAt(i, j)) return; const c = newCell(i, j); c.green = 'grass'; c.style = DEFAULT_STYLE; cells.set(ckey(i, j), c); added.push(c); gardenUpdate();
         if (first < 0 && pieces().some(q => q.gd.w)) first = k; });
       const P = pieces(), w = P.filter(q => q.gd.w).length, b = P.filter(q => q.gd.w && q.gd.b).length, kinds = new Set(P.map(q => q.gd.p));
       const ok = w >= 2 && w <= 5;
-      const score = (ok ? 100 : 0) + (b ? 60 : 0) + (kinds.has('gazebo') ? 40 : 0) + (first >= 5 && first <= LAWNS.length - 4 ? 25 : 0) + kinds.size*3 + (kinds.has('koideck') || kinds.has('greenhouse') ? 8 : 0);
+      const score = (ok ? 100 : 0) + (b ? 60 : 0) + (kinds.has('gazebo') ? 40 : 0) + (first >= 5 && first <= steps.length - 4 ? 25 : 0) + kinds.size*3 + (kinds.has('koideck') || kinds.has('greenhouse') ? 8 : 0);
       return { salt, score, water: w, bridge: b, first, kinds: [...kinds].join(' ') };
-    } finally { for (const c of added) cells.delete(ckey(c.i, c.j)); H.green = g0; for (const c of cells.values()) c.gd = null; }
+    } finally { for (const c of added) cells.delete(ckey(c.i, c.j)); if (H) H.green = g0; for (const c of cells.values()) c.gd = null; }
   }
   function plan(){
     PLAN.snap = [];
+    const sync0 = window.__SYNC_NOW; if (CITY) window.__SYNC_NOW = false;   // (the city's walkways and people needn't follow every one of its many clicks here)
+    try { planActs(); } finally { window.__SYNC_NOW = sync0; }
+  }
+  function planActs(){
     ACTS.forEach((a, k) => {
       if (k === GARDEN0){   // the garden's salt: the one that grows the best garden on camera (a pond of 2 to 5 plots opening partway, a bridge, a gazebo)
-        let best = null; for (let s = 1; s <= 500; s++){ const r = safe('garden sim', () => gardenSim(s)); if (r && (!best || r.score > best.score)) best = r; }
+        let best = null; for (let s = 1; s <= (CITY ? 200 : 500); s++){ const r = safe('garden sim', () => gardenSim(s)); if (r && (!best || r.score > best.score)) best = r; }
         GD_SALT = best ? best.salt : 1; D.info.garden = best; say('garden:', JSON.stringify(best));
       }
       if (a.kind === 'pod'){ const T = targetOf2(a); a.planY = T ? T.y : undefined; }
       const ok = act(a); settleAll();
-      if (!ok && a.kind !== 'btn' && a.kind !== 'key') warn('plan', 'click ' + a.n + ' (' + a.kind + ' ' + JSON.stringify(a.v) + ' at ' + a.t + ' s) changed nothing');
+      if (!ok && CITY && a.kind === 'up'){ D.info.capped = (D.info.capped || 0) + 1; }   // (a stack at its height limit: the game just stops it)
+      else if (!ok && a.kind !== 'btn' && a.kind !== 'key') warn('plan', 'click ' + a.n + ' (' + a.kind + ' ' + JSON.stringify(a.v) + ' at ' + a.t + ' s) changed nothing');
       PLAN.snap[k] = tops();
     });
     // what came of it
@@ -225,7 +295,9 @@ const DEMOPG = (() => {
       pods: pod ? pod.sections.length + (pod.lift && pod.lift.sc ? ', on scaffolds' : ', NOT on scaffolds') : 'none',
       garden: [...cells.values()].filter(c => c.gd && c.gd.p).map(c => c.gd.p + (c.gd.b ? '+bridge' : '')).join(' ') };
     PLAN.water = [...cells.values()].filter(c => c.gd && c.gd.w).map(c => [c.i, c.j]);
-    if (pod && !(pod.lift && pod.lift.sc)) warn('plan', 'the homes did not go onto scaffolds');
+    if (CITY){ D.info.plan = { plots: CITY_INFO.plots, clicks: ACTS.length, tallest: Math.max(...[...cells.values()].filter(c => Math.abs(c.i) < 20).map(c => c.height || 0)).toFixed(1),
+      garden: D.info.plan.garden }; }
+    else if (pod && !(pod.lift && pod.lift.sc)) warn('plan', 'the homes did not go onto scaffolds');
     say('plan:', JSON.stringify(D.info.plan));
   }
   const snapAt = t => { let k = -1; ACTS.forEach((a, n) => { if (a.t <= t) k = n; }); return k < 0 ? null : PLAN.snap[k]; };
@@ -240,7 +312,7 @@ const DEMOPG = (() => {
       html.dm-on.dm-zones .zonebar .zones{visibility:visible!important}
       html.dm-on .zonebar .zones .rot,html.dm-on .zonebar .zones .furnbtn,html.dm-on .zonebar .perim,html.dm-on .zonebar .zones .perim{visibility:hidden!important}
       html.dm-on .zonebar .zones{transition:none!important}
-      html.dm-on #gridDeck{top:3.2vh!important;left:2.2vh!important;transform-origin:top left;scale:var(--dk,1.2);transition:none!important}
+      html.dm-on #gridDeck{top:3.2vmin!important;left:2.2vmin!important;transform-origin:top left;scale:var(--dk,1.2);transition:none!important}
       html.dm-on #gridDeck .pu-fold{visibility:hidden!important}
       html.dm-on, html.dm-on *{cursor:none!important}
       html.dm-on #dmOv.ask, html.dm-on #dmOv.ask *{cursor:pointer!important}
@@ -251,8 +323,8 @@ const DEMOPG = (() => {
       #dmBlack{background:#04050b}
       #dmCur{position:absolute;left:0;top:0;width:30px;height:30px;margin:-3px 0 0 -4px;opacity:0;filter:drop-shadow(0 3px 6px rgba(0,0,0,.55))}
       #dmRing{position:absolute;left:0;top:0;width:64px;height:64px;margin:-32px 0 0 -32px;border-radius:50%;border:2px solid #fff;opacity:0}
-      #dmTag{position:absolute;right:0;bottom:0;padding:0 2.6vw 3.4vh 0;display:flex;align-items:center;gap:9px;opacity:0}
-      #dmTag span{font-weight:600;font-size:1.45vh;letter-spacing:.3em;text-transform:uppercase;color:rgba(234,250,255,.82);text-shadow:0 1px 6px rgba(0,0,0,.8)}
+      #dmTag{position:absolute;right:0;bottom:0;padding:0 2.6vmin 3.4vmin 0;display:flex;align-items:center;gap:9px;opacity:0}
+      #dmTag span{font-weight:600;font-size:1.45vmin;letter-spacing:.3em;text-transform:uppercase;color:rgba(234,250,255,.82);text-shadow:0 1px 6px rgba(0,0,0,.8)}
       #dmTag u{display:block;width:6px;height:6px;background:#38e8e0;box-shadow:0 1px 8px rgba(56,232,224,.8);text-decoration:none}
       #dmMsg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font:13px/1.6 "JetBrains Mono",ui-monospace,monospace;color:#9fdcff;text-align:center;letter-spacing:.06em}
       #dmMsg b{display:block;font-family:Silkscreen,ui-monospace,monospace;font-weight:400;font-size:22px;letter-spacing:.14em;color:#38e8e0;margin-bottom:6px}`;
@@ -266,7 +338,7 @@ const DEMOPG = (() => {
     const q = s => ov.querySelector(s);
     D.el = { ov, black: q('#dmBlack'), cur: q('#dmCur'), ring: q('#dmRing'), tag: q('#dmTag'), msg: q('#dmMsg'), status: q('#dmStatus') };
     D.el.black.style.opacity = '1';
-    const dk = () => html.style.setProperty('--dk', (1.2*innerHeight/1080).toFixed(3)); dk(); addEventListener('resize', dk);
+    const dk = () => html.style.setProperty('--dk', (1.2*Math.min(innerWidth, innerHeight)/1080).toFixed(3)); dk(); addEventListener('resize', dk);
     if (CAP || AUTO) D.el.msg.hidden = true;
   }
   const status = s => { D.stage = s; if (D.el) D.el.status.textContent = s; };
@@ -304,6 +376,7 @@ const DEMOPG = (() => {
     safe('hover', () => showHover(T.tg));   // (the game's own outline of where the click builds; none for a removal)
   }
   function doAct(a){
+    if (a.auto){ safe('click ' + a.n, () => act(a)); return; }   // (the city cut's own: no cursor, no outline)
     const ok = safe('click ' + a.n, () => act(a));
     if (a.kind === 'key') return;
     if (a.kind === 'del') click('#ff4f6a');
@@ -329,7 +402,7 @@ const DEMOPG = (() => {
   }
   // the yaw turns slowly the whole time (a third of a turn over the film, a little faster as it pulls out at the end), so every shot shows depth
   const Y0 = .5;
-  const yawAt = t => Y0 + .62*t/60 + .32*ss(seg(t, T_OUT, 60));
+  const yawAt = t => CITY ? Y0 + .95*t/30 + .25*ss(seg(t, 22, 30)) : Y0 + .62*t/60 + .32*ss(seg(t, T_OUT, 60));
   // the plots a shot frames, each to its height at that moment of the film
   function boxes(keys, t){
     const S2 = snapAt(t) || {}, out = [];
@@ -341,6 +414,19 @@ const DEMOPG = (() => {
   const allPlots = t => Object.values(snapAt(t) || {}).map(s => [s.i, s.j]);
   // the shots: [time, plots, pitch, margin, at (the moment whose heights it frames; its own time if left out), smallest zoom]
   function shots(){
+    if (CITY){
+      const hand = [[0, 0], [1, 0], [0, 1]];
+      return [
+        [0,    [[0, 0]], 34, 3.2, 0, 4.2],
+        [2.8,  [[0, 0]], 34, 1.4, 2.8],
+        [5.6,  hand, 35, 1.25, 5.6],
+        [9.5,  allPlots(9.5), 36, 1.18, 9.5],
+        [14,   allPlots(14), 37, 1.14, 14],
+        [19,   allPlots(19), 37, 1.12, 19],
+        [23.5, allPlots(LAST_ACT), 36, 1.1, LAST_ACT],
+        [30,   allPlots(LAST_ACT), 34, 1.16, LAST_ACT],
+      ].map(([t, keys, pd, mg, at, mz]) => ({ t, ...fit(boxes(keys, at ?? t), yawAt(t), pd*DEG, mg, .05, mz) }));
+    }
     const garden = [[2, 0], ...LAWNS], pondish = PLAN.water.length ? PLAN.water : [[1, 3]];
     const near = pondish.flatMap(([i, j]) => [[i, j], [i + 1, j], [i - 1, j], [i, j + 1], [i, j - 1]]);
     return [
@@ -388,10 +474,10 @@ const DEMOPG = (() => {
   function timeline(){
     at(.35, () => { html.classList.add('dm-zones'); }, 'zone bar up');
     for (const a of ACTS){
-      if (!AUTO && LEAD[a.kind]) at(a.t - LEAD[a.kind], () => aimFor(a), 'aim ' + a.n + ' ' + a.kind);
+      if (!AUTO && !a.auto && LEAD[a.kind]) at(a.t - LEAD[a.kind], () => aimFor(a), 'aim ' + a.n + ' ' + a.kind);
       at(a.t, () => doAct(a), a.kind + ' ' + JSON.stringify(a.v));
     }
-    at(LAST_ACT + .5, () => { safe('hover', () => showHover(null)); if (S.zone) selectZone(null); CUR.want = 0; }, 'building done: cursor away');
+    at(CUR_OFF, () => { safe('hover', () => showHover(null)); if (S.zone) selectZone(null); CUR.want = 0; }, 'building done: cursor away');
     at(D.len, () => { D.playing = false; D.done = true; say('done at', D.t.toFixed(2));
       if (!CAP && !AUTO){ D.el.msg.hidden = false; D.el.status.innerHTML = 'click to play again'; D.el.ov.classList.add('ask'); D.el.ov.addEventListener('click', () => location.reload(), { once: true }); } }, 'end');
     EV.sort((a, b) => a.t - b.t);

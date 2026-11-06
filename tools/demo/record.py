@@ -11,6 +11,7 @@ Then the two are put together.
     python3 tools/demo/record.py --preview     # a quick 720p, 30 fps look
     python3 tools/demo/record.py               # the clip -> tools/demo/out/neon-terrarium-demo.mp4
     python3 tools/demo/record.py --vertical    # the clip, plus a 1080 x 1920 version for phones
+    python3 tools/demo/record.py --city --both # the city cut (30 s): wide 1920 x 1080 and tall 1080 x 1920, each filmed natively
     python3 tools/demo/record.py --pg          # the procedural generation cut (60 s, js/demo_pg.js) -> tools/demo/out/neon-terrarium-procgen.mp4
 
 The --pg cut plays the Grid's own live music, which is never the same twice, so its sound pass runs first and notes what the music player showed
@@ -25,6 +26,7 @@ ROOT = os.path.abspath(os.path.join(HERE, '..', '..'))
 OUT = os.path.join(HERE, 'out')
 FPS = 60
 STILLS = [.8, 2.0, 3.2, 4.4, 5.2, 5.5, 5.8, 6.6, 7.8, 8.9, 10.2, 11.0, 12.2, 13.6, 14.7]
+STILLS_CITY = [.6, 1.8, 3.4, 5.2, 7.5, 10.0, 13.0, 16.0, 19.0, 22.0, 25.0, 28.0, 29.4]
 STILLS_PG = [.6, 2.3, 5.0, 8.9, 11.0, 14.3, 18.4, 21.3, 23.2, 25.0, 26.6, 28.4, 30.6, 33.5, 36.5, 39.0, 41.8, 44.0, 46.0, 49.0, 53.0, 57.0, 59.5]
 STILLS_LONG = [1.0, 2.5, 4.0, 5.5, 6.8, 7.2, 8.6, 10.2, 11.9, 13.5, 15.0, 16.6, 18.0, 19.5, 20.8, 22.0, 23.5, 26.0, 28.5]
 
@@ -88,26 +90,35 @@ def main():
     ap.add_argument('--long', action='store_true', help='the long cut: 29 s, no captions or badge, the furnisher'"'"'s sofa put back on camera, the work light off at the end')
     ap.add_argument('--nolab', action='store_true', help='checking only: leave the apartment out')
     ap.add_argument('--pg', action='store_true', help='the procedural generation cut (60 s, no captions, the Grid\'s live music and its player on screen: js/demo_pg.js)')
+    ap.add_argument('--city', action='store_true', help='the city cut (30 s): one bare plot grows into a whole city, the Grid\'s music on (js/demo_pg.js)')
+    ap.add_argument('--tall', action='store_true', help='film it tall, 1080 x 1920, its own framing (not a crop of the wide one)')
+    ap.add_argument('--both', action='store_true', help='film it wide and then tall, one after the other')
     ap.add_argument('--test', action='store_true', help='for checking on a machine without a graphics card: a small 640 x 360 picture at 30 fps, software drawing, no sound')
     a = ap.parse_args()
     global FPS, DM
+    if a.city: a.pg = True
     if a.pg: DM = 'DEMOPG'
+    if a.both:   # (two runs, wide then tall, each with its own sound pass)
+        args = [x for x in sys.argv[1:] if x not in ('--both', '--tall')]
+        for extra in ([], ['--tall']):
+            subprocess.run([sys.executable, os.path.abspath(__file__), *args, *extra], check=True)
+        return
 
-    VW, VH = 1920, 1080
+    VW, VH = (1080, 1920) if a.tall else (1920, 1080)
     DSF = 1
-    if a.test: VW, VH, DSF, FPS, a.no_audio = 1920, 1080, .5, 30, True   # (the desktop layout of every panel, drawn at half the pixels)
-    a.out = a.out or os.path.join(OUT, ('neon-terrarium-procgen' if a.pg else 'neon-terrarium-demo') + ('-long' if a.long else '') + ('-test' if a.test else '-preview' if a.preview else '') + '.mp4')
+    if a.test: DSF, FPS, a.no_audio = .5, 30, True   # (the desktop layout of every panel, drawn at half the pixels)
+    a.out = a.out or os.path.join(OUT, ('neon-terrarium-city' if a.city else 'neon-terrarium-procgen' if a.pg else 'neon-terrarium-demo') + ('-tall' if a.tall else '') + ('-long' if a.long else '') + ('-test' if a.test else '-preview' if a.preview else '') + '.mp4')
     if not shutil.which('ffmpeg') and not a.stills: sys.exit('ffmpeg is needed: brew install ffmpeg')
     from playwright.sync_api import sync_playwright
     os.makedirs(OUT, exist_ok=True)
     srv = serve(a.port)
-    url = f'http://127.0.0.1:{a.port}/index.html?full#demo' + ('&pg' if a.pg else '')
+    url = f'http://127.0.0.1:{a.port}/index.html?full#demo' + ('&pg' if a.pg else '') + ('&city' if a.city else '')
     with sync_playwright() as pw:
         # ---------- the sound: the clip played in real time in a hidden browser, recording what the game plays ----------
         def sound_pass():
             print('the sound: playing the clip in real time, in a hidden browser, recording what the game plays')
             browser = launch(pw, True)
-            ctx = browser.new_context(viewport={'width': 1920, 'height': 1080}, device_scale_factor=1)
+            ctx = browser.new_context(viewport={'width': VW, 'height': VH}, device_scale_factor=1)
             if a.long: ctx.add_init_script(script='window.__DM_LONG = true;')
             ctx.add_init_script(path=os.path.join(HERE, 'audio.js'))
             page = ctx.new_page(); log_page(page); page.goto(url, wait_until='load')
@@ -130,7 +141,7 @@ def main():
             try:
                 tracks, deck = sound_pass()
                 if deck:
-                    with open(os.path.join(OUT, 'procgen-deck.json'), 'w') as fh: json.dump(deck, fh)
+                    with open(os.path.join(OUT, ('city' if a.city else 'procgen') + ('-tall' if a.tall else '') + '-deck.json'), 'w') as fh: json.dump(deck, fh)
             except Exception as e:
                 print('  the sound pass failed (the clip will be silent):', e)
         # ---------- the picture ----------
@@ -154,7 +165,7 @@ def main():
         # everything off center. Then it goes headless after all. A Retina window at twice the pixels is fine.)
         if not a.headless:
             png = grab('png'); w, h = struct.unpack('>II', png[16:24])
-            if (w, h) != (int(VW*DSF), int(VH*DSF)) and not (w % 1920 == 0 and h % 1080 == 0 and w//1920 == h//1080):
+            if (w, h) != (int(VW*DSF), int(VH*DSF)) and not (w % VW == 0 and h % VH == 0 and w//VW == h//VH):
                 print(f'  the browser window only shows {w} x {h} of the 1920 x 1080 picture: filming without a window instead, so nothing is off center')
                 browser.close(); a.headless = True
                 browser, page, cdp = open_page(True)
@@ -169,11 +180,11 @@ def main():
         frames = int(round(length*FPS)); every = 2 if a.preview else 1
         enc = None
         if a.stills:
-            want = sorted(int(round(s*FPS)) for s in (STILLS_PG if a.pg else STILLS_LONG if a.long else STILLS) if s < length)
+            want = sorted(int(round(s*FPS)) for s in (STILLS_CITY if a.city else STILLS_PG if a.pg else STILLS_LONG if a.long else STILLS) if s < length)
             sd = os.path.join(OUT, 'stills'); os.makedirs(sd, exist_ok=True)
         else:
             raw = os.path.splitext(a.out)[0] + '.video.mp4'
-            size, fps = ('1280:720', FPS//2) if a.preview else (f'{VW}:{VH}', FPS)
+            size, fps = (('720:1280' if a.tall else '1280:720'), FPS//2) if a.preview else (f'{VW}:{VH}', FPS)
             enc = subprocess.Popen(['ffmpeg', '-v', 'error', '-y', '-f', 'image2pipe', '-framerate', str(fps), '-c:v', 'mjpeg', '-i', '-',
                                     '-vf', f'scale={size}:flags=lanczos', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', str(a.crf + (5 if a.preview else 0)),
                                     '-pix_fmt', 'yuv420p', '-r', str(fps), raw], stdin=subprocess.PIPE)
@@ -200,7 +211,7 @@ def main():
         st = ev(f'{DM}.state()')
         browser.close()
         st['info']['heldSteps'] = held_steps
-        with open(os.path.join(OUT, 'procgen-log.txt' if a.pg else 'demo-log.txt'), 'w') as fh: fh.write(json.dumps(st.get('info'), indent=1) + '\n' + '\n'.join(st.get('log', [])) + '\n')
+        with open(os.path.join(OUT, (('city' if a.city else 'procgen') + ('-tall' if a.tall else '') + '-log.txt') if a.pg else 'demo-log.txt'), 'w') as fh: fh.write(json.dumps(st.get('info'), indent=1) + '\n' + '\n'.join(st.get('log', [])) + '\n')
         if a.stills:
             srv.shutdown(); print('stills in', os.path.relpath(sd, ROOT), '(and what happened when in tools/demo/out/demo-log.txt)'); return
         enc.stdin.close(); enc.wait()
@@ -223,6 +234,14 @@ def main():
     else:
         os.replace(raw, a.out)
     print('done:', os.path.relpath(a.out, ROOT))
+    # a compressed copy to post (H.264 at a sensible size for Reddit, YouTube and phones; the full-quality one stays beside it)
+    if not a.preview and not a.test:
+        co = os.path.splitext(a.out)[0] + '-compressed.mp4'
+        has_audio = bool(tracks)
+        subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', a.out, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '24', '-maxrate', '10M', '-bufsize', '20M',
+                        '-pix_fmt', 'yuv420p', *(['-c:a', 'aac', '-b:a', '160k'] if has_audio else ['-an']), '-movflags', '+faststart', co], check=True)
+        mb = lambda f: os.path.getsize(f)/1e6
+        print(f'compressed: {os.path.relpath(co, ROOT)}  ({mb(co):.0f} MB, from {mb(a.out):.0f} MB)')
     if a.vertical:
         vo = os.path.splitext(a.out)[0] + '-vertical.mp4'
         subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', a.out, '-filter_complex',

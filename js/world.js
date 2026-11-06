@@ -1117,11 +1117,11 @@ function liftScaffoldCom(c, y0){
   for (let k = 0; k < irand(2, 4); k++){ const a = rnd(0, TAU), r = rnd(.6, 1.1); sagCable(P, Math.cos(a)*r, y0 - .25, Math.sin(a)*r, Math.cos(a + .6)*r*.6, y0 - rnd(1, 2.2), Math.sin(a + .6)*r*.6, rnd(.2, .5)); }
   // the street entrance: a steel booth with a lit shutter and a ladder cage up the scaffold (or a ladder from the roof below)
   const free = SIDES4.filter(d => !supKey.has(d.join()));
-  const hs = free.length ? free[(hash('liftdoor', c.i, c.j) + LIFT_SHIFT) % free.length] : SIDES4[0];
+  const hs = LIFT_SIDE || (free.length ? free[hash('liftdoor', c.i, c.j) % free.length] : SIDES4[0]);
   // the lift: a glass shaft lit with neon, from the street to the deck, its glass cab carrying people up and down
   const LX = .5, LZ = 1.44;
   { const F = under(P, T(0, 0, 0, Math.atan2(hs[0], hs[1])));
-    liftShaftCom(F, LX, LZ, CURB, y0);
+    if (!LIFT_NOSHAFT) liftShaftCom(F, LX, LZ, CURB, y0);
     const Wp = (x, z) => new THREE.Vector3(x, 0, z).applyMatrix4(F);
     const cc = Wp(LX, LZ), fr = Wp(LX + .26, LZ), ix = Wp(LX, .85), g = Wp(1, 0), o = Wp(0, 0), gx = g.x - o.x, gz = g.z - o.z;
     c.liftCab = { x: cc.x, z: cc.z, fx: fr.x, fz: fr.z, nx: gx, nz: gz, ix: ix.x, iz: ix.z, y0, ry: Math.atan2(gx, gz), style: 'com' };
@@ -1243,10 +1243,10 @@ function liftScaffoldInd(c, y0){
   // the lift: a heavy lattice tower beside the deck on a side with no walkway, from the street up past the deck, its
   // steel cab lined in red neon carrying people between the street and the deck
   const free = SIDES4.filter(d => !supKey.has(d.join()));
-  const hs = free.length ? free[(hash('liftdoor', c.i, c.j) + LIFT_SHIFT) % free.length] : SIDES4[0];
+  const hs = LIFT_SIDE || (free.length ? free[hash('liftdoor', c.i, c.j) % free.length] : SIDES4[0]);
   const LX = .5, LZ = 1.44;
   { const F = under(P, T(0, 0, 0, Math.atan2(hs[0], hs[1])));
-    liftShaftInd(F, LX, LZ, CURB, y0);
+    if (!LIFT_NOSHAFT) liftShaftInd(F, LX, LZ, CURB, y0);
     const Wp = (x, z) => new THREE.Vector3(x, 0, z).applyMatrix4(F);
     const cc = Wp(LX, LZ), fr = Wp(LX + .26, LZ), ix = Wp(LX, .85), g = Wp(1, 0), o = Wp(0, 0), gx = g.x - o.x, gz = g.z - o.z;
     c.liftCab = { x: cc.x, z: cc.z, fx: fr.x, fz: fr.z, nx: gx, nz: gz, ix: ix.x, iz: ix.z, y0, ry: Math.atan2(gx, gz), style: 'ind' };
@@ -1378,10 +1378,10 @@ function liftPlatformLux(c, y0){
   for (let k = 0; k < 4; k++) if (chance(.5*S.green)){ const d = SIDES4[k], F = under(P, T(0, 0, 0, Math.atan2(d[0], d[1]))); plant(hangKind(), F, rnd(-.8, .8), yb - .1, H - .05, rnd(.55, .75), 't', true); }
   // the lift: a gold-ringed glass tube on a side with no walkway
   const free = SIDES4.filter(d => !supKey.has(d.join()));
-  const hs = free.length ? free[(hash('liftdoor', c.i, c.j) + LIFT_SHIFT) % free.length] : SIDES4[0];
+  const hs = LIFT_SIDE || (free.length ? free[hash('liftdoor', c.i, c.j) % free.length] : SIDES4[0]);
   const LX = .5, LZ = 1.5;
   { const F = under(P, T(0, 0, 0, Math.atan2(hs[0], hs[1])));
-    luxTube(F, LX, LZ, CURB, y0);
+    if (!LIFT_NOSHAFT) luxTube(F, LX, LZ, CURB, y0);
     const Wp = (x, z) => new THREE.Vector3(x, 0, z).applyMatrix4(F);
     const cc = Wp(LX, LZ), fr = Wp(LX + .29, LZ), ix = Wp(LX, .9), g = Wp(1, 0), o = Wp(0, 0), gx = g.x - o.x, gz = g.z - o.z;
     c.liftCab = { x: cc.x, z: cc.z, fx: fr.x, fz: fr.z, nx: gx, nz: gz, ix: ix.x, iz: ix.z, y0, ry: Math.atan2(gx, gz), style: 'lux' };
@@ -1433,24 +1433,29 @@ function liftPlatformLux(c, y0){
   }
 }
 // A side pod whose building is gone (owner, Nov 4): with nothing beside it to hang from, each of its blocks stands on a scaffold of its own, the lowest
-// from the street (or the roof of a building under it), each one above from the roof of the block under it, and each has its lift down to the street
-// for the people living there (on a side of its own where it can, so the shafts don't stand in one another). The pod's own deck, rails and lift are
-// the scaffold's (liftScaffold, its zone's kind); the beams and gangway to the old building go. The lowest block's lift is the one people ride.
+// from the street (or the roof of a building under it), each one above from the roof of the block under it. One lift serves them all: the top block's,
+// from the street up past the others on the side every block leaves free for it (owner, Nov 6: a lift for each block, each on a side of its own, ran
+// up through the decks and homes of the blocks below). The pod's own deck, rails and lift are the scaffold's (liftScaffold, its zone's kind); the
+// beams and gangway to the old building go.
 function* podScaffolds(c, bl){
   const keepTop = c.belowTop, keepRoof = c.liftRoof; let cab = null;
+  // the lift's side: one that every block leaves free (no neighbour holding it up there), so the one shaft passes them all clear
+  const sup = new Set(); for (const [s0] of bl) for (const d of liftSupports(c, s0)) sup.add(d.join());
+  const free = SIDES4.filter(d => !sup.has(d.join()));
+  LIFT_SIDE = free.length ? free[hash('liftdoor', c.i, c.j) % free.length] : null;
   try {
-    for (let n = bl.length - 1; n >= 0; n--){   // (the lowest last: its lift is the plot's)
+    for (let n = bl.length - 1; n >= 0; n--){
       const [s0] = bl[n];
       c.belowTop = n === 0 ? keepTop : bl[n - 1][1]; c.liftRoof = n === 0 ? keepRoof : null;
-      LIFT_SHIFT = n; KEEP_FINE++;
-      try { liftScaffold(c, s0); } finally { KEEP_FINE--; LIFT_SHIFT = 0; }
-      if (n === 0) cab = c.liftCab;
+      LIFT_NOSHAFT = n !== bl.length - 1; KEEP_FINE++;
+      try { liftScaffold(c, s0); } finally { KEEP_FINE--; LIFT_NOSHAFT = false; }
+      if (n === bl.length - 1) cab = c.liftCab;
       yield;
     }
-  } finally { c.belowTop = keepTop; c.liftRoof = keepRoof; }
+  } finally { c.belowTop = keepTop; c.liftRoof = keepRoof; LIFT_SIDE = null; }
   c.liftCab = cab;
 }
-let LIFT_SHIFT = 0;   // (which free side a scaffold's lift takes: the next one round for each block up a stack)
+let LIFT_NOSHAFT = false, LIFT_SIDE = null;   // (a block of a stacked pod under the top one: its lift is the top block's: podScaffolds)
 // After a building is removed or cut down: the side pods that hung from it. One that a building on another side can hold (as tall as its highest
 // block) hangs from that one now; one that nothing can hold goes onto scaffolds (c.lift.sc). Never back again: a new building where the old one stood
 // leaves it on its scaffolds (owner, Nov 4: remove it and build it again to hang it off a wall). Returns the pods changed (to be built again).
@@ -1617,12 +1622,12 @@ function liftScaffold(c, y0){
   }
   // the stair hut and ladder: on a side with no walkway, the pod's front door at street level
   const free = SIDES4.filter(d => !supKey.has(d.join()));
-  const hs = free.length ? free[(hash('liftdoor', c.i, c.j) + LIFT_SHIFT) % free.length] : SIDES4[0];
+  const hs = LIFT_SIDE || (free.length ? free[hash('liftdoor', c.i, c.j) % free.length] : SIDES4[0]);
   // the lift: a slim shaft beside the deck on that side, from the street up past the deck, its cab carrying people
   // between the street and the deck (the cab itself moves: see the lifts in people.js)
   const LX = .5, LZ = 1.42;
   { const F = under(P, T(0, 0, 0, Math.atan2(hs[0], hs[1])));   // local +z out to that side
-    liftShaft(F, LX, LZ, CURB, y0);
+    if (!LIFT_NOSHAFT) liftShaft(F, LX, LZ, CURB, y0);
     const W = (x, z) => new THREE.Vector3(x, 0, z).applyMatrix4(F);
     const cc = W(LX, LZ), fr = W(LX + .26, LZ), ix = W(LX, .85), g = W(1, 0), o = W(0, 0), gx = g.x - o.x, gz = g.z - o.z;
     c.liftCab = { x: cc.x, z: cc.z, fx: fr.x, fz: fr.z, nx: gx, nz: gz, ix: ix.x, iz: ix.z, y0, ry: Math.atan2(gx, gz) };

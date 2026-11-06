@@ -273,10 +273,13 @@ const comp = new THREE.ShaderMaterial({
     uniform mat4 invVP; uniform sampler2D shadowMap; uniform mat4 shadowMat;
     uniform mat4 VP; uniform vec3 upView; uniform float wet; uniform float waterOn; uniform float rainOn; uniform sampler2D tCloud;
     // (a garden pond's reflection search: how many steps, and how far apart on screen in render pixels; on a phone, fewer and longer: softLite)
-    #define WSTEPS 48
+    // (and never shorter than WREACH over all the steps: zoomed in, steps of a pixel and a half reached only a couple of units, and buildings set back
+    //  from the bank no longer showed, owner Nov 6; the wet ground's own search reaches about six)
+    #define WSTEPS 56
     #define WSTEP_PX 1.6
-    #define WSTEPS_LITE 26
+    #define WSTEPS_LITE 28
     #define WSTEP_PX_LITE 2.8
+    #define WREACH 6.5
     uniform float rainAmt; uniform float rainVis; uniform float rainDens; uniform float rainT; uniform float starVis; uniform vec3 skyMid; uniform float skyMidOn; uniform float hazeK; uniform vec3 mistTint; uniform float sparkle;   // (the looks: js/looks.js)
     uniform vec3 sunDir; uniform vec3 sunCol; uniform vec3 cityGlow;
     uniform float cloudOn; uniform float raysOn; uniform float rayI; uniform float rainDark;
@@ -555,7 +558,7 @@ const comp = new THREE.ShaderMaterial({
         }
         if (Wt > 1e-4){
           float kk = floor(Kh/Wt*5.0 + 0.5)/5.0;                                        // stepped, to stay pixel art
-          col = mix(col, max(col, Ch/max(Kh, 1e-5)*0.9), clamp(kk, 0.0, 0.8));
+          col = mix(col, waterOn > 0.0 && texture2D(tNormal, vUv).a < 0.75 ? Ch/max(Kh, 1e-5)*0.9 : max(col, Ch/max(Kh, 1e-5)*0.9), clamp(kk, 0.0, 0.8));   // (a pond: a mirror, see below)
           col = mix(col, mix(skyBot, skyTop, 0.5)*0.7, Cs/Wt);
         }
       }
@@ -569,7 +572,7 @@ const comp = new THREE.ShaderMaterial({
         vec3 hitCol = vec3(0.0); float hit = 0.0, t = 0.03; vec2 huv = vec2(0.0);
         // (on a pond the search goes in even steps of about a render pixel and a half on screen, so thin things (lamps, rails) aren't stepped over at
         //  some angles and caught at others: their reflections flashed in and out as the view turned, owner Nov 6)
-        float wst = 0.0; if (watPx){ vec4 a0 = VP*vec4(wp, 1.0), a1 = VP*vec4(wp + rr, 1.0); wst = WSTEP_PX/max(length((a1.xy/a1.w - a0.xy/a0.w)*0.5*res), 1e-3); t = 0.0; }
+        float wst = 0.0; if (watPx){ vec4 a0 = VP*vec4(wp, 1.0), a1 = VP*vec4(wp + rr, 1.0); wst = max(WSTEP_PX/max(length((a1.xy/a1.w - a0.xy/a0.w)*0.5*res), 1e-3), WREACH/float(WSTEPS)); t = 0.0; }
         for (int i=0; i<WSTEPS; i++){
           if (!watPx && i >= 22) break;
           t += watPx ? wst : 0.05 + t*0.14;
@@ -580,20 +583,21 @@ const comp = new THREE.ShaderMaterial({
           float sd = texture2D(tDepth, uv).x, qd = cp.z*0.5 + 0.5;
           if (qd > sd + 0.0003*DK && qd - sd < 0.015*DK){
           // (a pond passes over anything narrow that the ray goes behind on both sides: a pole, a stem, a trunk. Its reflection was a 1-pixel streak
-          //  that shimmered, owner Nov 6: on the water only things of some size reflect, and lit lamps at night)
-          if (watPx && ((texture2D(tDepth, uv - vec2(1.5/res.x, 0.0)).x > qd && texture2D(tDepth, uv + vec2(1.5/res.x, 0.0)).x > qd) || (texture2D(tDepth, uv - vec2(2.5/res.x, 0.0)).x > qd && texture2D(tDepth, uv + vec2(2.5/res.x, 0.0)).x > qd)) && !(night > 0.5 && dot(texture2D(tColor, uv).rgb, vec3(0.3, 0.59, 0.11)) > 0.7)) continue;   // (up to about four pixels wide: a pole, a trunk (a pale birch's swayed in and out: a streak bobbing up and down, owner Nov 6); only a lit lamp at night still shows)
+          //  that shimmered, owner Nov 6: on the water only things of some size reflect, and lit lamps at night. Only when it stands free, with open
+          //  space well behind it on both sides (a third of a unit and more): a railing, plant or sign against a wall still reflects with the wall)
+          if (watPx && ((texture2D(tDepth, uv - vec2(1.5/res.x, 0.0)).x > qd + 0.0035*DK && texture2D(tDepth, uv + vec2(1.5/res.x, 0.0)).x > qd + 0.0035*DK) || (texture2D(tDepth, uv - vec2(2.5/res.x, 0.0)).x > qd + 0.0035*DK && texture2D(tDepth, uv + vec2(2.5/res.x, 0.0)).x > qd + 0.0035*DK)) && !(night > 0.5 && dot(texture2D(tColor, uv).rgb, vec3(0.3, 0.59, 0.11)) > 0.7)) continue;   // (up to about four pixels wide: a pole, a trunk (a pale birch's swayed in and out: a streak bobbing up and down, owner Nov 6); only a lit lamp at night still shows)
           huv = uv; hit = 1.0; break; }
         }
         if (hit > 0.5){
           // smear the reflection downward a few pixels: the streaky look of lights on wet asphalt
           vec2 st = vec2(0.0, -1.0/res.y);
-          // (a pond: just what was hit, no sideways shiver or downward smear: they sampled past thin things to what's behind them, a shimmering streak)
-          hitCol = watPx ? texture2D(tColor, huv).rgb : texture2D(tColor, huv).rgb*0.4 + texture2D(tColor, huv+st*2.0).rgb*0.3 + texture2D(tColor, huv+st*4.0).rgb*0.2 + texture2D(tColor, huv+st*6.0).rgb*0.1;
+          // (a pond: no sideways shiver: it sampled past thin things to what's behind them, a shimmering streak; thin free-standing things aren't hit at all)
+          hitCol = texture2D(tColor, huv).rgb*0.4 + texture2D(tColor, huv+st*2.0).rgb*0.3 + texture2D(tColor, huv+st*4.0).rgb*0.2 + texture2D(tColor, huv+st*6.0).rgb*0.1;
           float lum = dot(hitCol, vec3(0.3, 0.59, 0.11));
           float bright = smoothstep(0.35, 0.95, lum);                       // only lights really reflect
-          float k = watPx ? clamp(bright*0.95 + 0.18, 0.0, 1.0) : wet * mix(bright*0.9, 0.7, pud);   // puddles reflect everything, pavement only the lights; a pond the lights strongly and the rest faintly
+          float k = watPx ? clamp(bright*0.6 + 0.3, 0.0, 1.0) : wet * mix(bright*0.9, 0.7, pud);   // puddles reflect everything, pavement only the lights; a pond everything, lights most
           k = floor(k*5.0 + 0.5)/5.0;                                        // stepped, to stay pixel art
-          col = mix(col, max(col, hitCol*0.9), clamp(k, 0.0, 0.8));
+          col = mix(col, watPx ? hitCol*0.9 : max(col, hitCol*0.9), clamp(k, 0.0, 0.8));   // (a pond is a mirror: what it shows replaces the water's own color, dark or light)
         } else if (pud > 0.0){
           col = mix(col, mix(skyBot, skyTop, 0.5)*0.7, 0.35*pud*wet*2.0);   // puddles show the sky when nothing is above
         }
@@ -825,7 +829,7 @@ const SOFT_WET = SOFT_HEAD + `
       pud *= 0.35 + 0.65*rainAmt;
       vec3 rr = reflect(rdir, vec3(0.0, 1.0, 0.0));
       vec3 hitCol = vec3(0.0); float hit = 0.0, t = 0.03; vec2 huv = vec2(0.0);
-      float wst = 0.0; if (watPx){ vec4 a0 = VP*vec4(wp, 1.0), a1 = VP*vec4(wp + rr, 1.0); wst = WSTEP_PX/max(length((a1.xy/a1.w - a0.xy/a0.w)*0.5*res), 1e-3); t = 0.0; }   // (a pond: even steps, see the composite)
+      float wst = 0.0; if (watPx){ vec4 a0 = VP*vec4(wp, 1.0), a1 = VP*vec4(wp + rr, 1.0); wst = max(WSTEP_PX/max(length((a1.xy/a1.w - a0.xy/a0.w)*0.5*res), 1e-3), WREACH/float(WSTEPS)); t = 0.0; }   // (a pond: even steps, see the composite)
       for (int i=0; i<WSTEPS; i++){
         if (!watPx && i >= 22) break;
         t += watPx ? wst : 0.05 + t*0.14;
@@ -836,17 +840,18 @@ const SOFT_WET = SOFT_HEAD + `
         float sd = texture2D(tDepth, uv).x, qd = cp.z*0.5 + 0.5;
         if (qd > sd + 0.0003*DK && qd - sd < 0.015*DK){
           // (a pond passes over anything narrow that the ray goes behind on both sides: a pole, a stem, a trunk. Its reflection was a 1-pixel streak
-          //  that shimmered, owner Nov 6: on the water only things of some size reflect, and lit lamps at night)
-          if (watPx && ((texture2D(tDepth, uv - vec2(1.5/res.x, 0.0)).x > qd && texture2D(tDepth, uv + vec2(1.5/res.x, 0.0)).x > qd) || (texture2D(tDepth, uv - vec2(2.5/res.x, 0.0)).x > qd && texture2D(tDepth, uv + vec2(2.5/res.x, 0.0)).x > qd)) && !(night > 0.5 && dot(texture2D(tColor, uv).rgb, vec3(0.3, 0.59, 0.11)) > 0.7)) continue;   // (up to about four pixels wide: a pole, a trunk (a pale birch's swayed in and out: a streak bobbing up and down, owner Nov 6); only a lit lamp at night still shows)
+          //  that shimmered, owner Nov 6: on the water only things of some size reflect, and lit lamps at night. Only when it stands free, with open
+          //  space well behind it on both sides (a third of a unit and more): a railing, plant or sign against a wall still reflects with the wall)
+          if (watPx && ((texture2D(tDepth, uv - vec2(1.5/res.x, 0.0)).x > qd + 0.0035*DK && texture2D(tDepth, uv + vec2(1.5/res.x, 0.0)).x > qd + 0.0035*DK) || (texture2D(tDepth, uv - vec2(2.5/res.x, 0.0)).x > qd + 0.0035*DK && texture2D(tDepth, uv + vec2(2.5/res.x, 0.0)).x > qd + 0.0035*DK)) && !(night > 0.5 && dot(texture2D(tColor, uv).rgb, vec3(0.3, 0.59, 0.11)) > 0.7)) continue;   // (up to about four pixels wide: a pole, a trunk (a pale birch's swayed in and out: a streak bobbing up and down, owner Nov 6); only a lit lamp at night still shows)
           huv = uv; hit = 1.0; break; }
       }
       if (hit > 0.5){
         vec2 st = vec2(0.0, -1.0/res.y);
-        // (a pond: just what was hit, no sideways shiver or downward smear: they sampled past thin things to what's behind them, a shimmering streak)
-        hitCol = watPx ? texture2D(tColor, huv).rgb : texture2D(tColor, huv).rgb*0.4 + texture2D(tColor, huv+st*2.0).rgb*0.3 + texture2D(tColor, huv+st*4.0).rgb*0.2 + texture2D(tColor, huv+st*6.0).rgb*0.1;
+        // (a pond: no sideways shiver: it sampled past thin things to what's behind them, a shimmering streak; thin free-standing things aren't hit at all)
+        hitCol = texture2D(tColor, huv).rgb*0.4 + texture2D(tColor, huv+st*2.0).rgb*0.3 + texture2D(tColor, huv+st*4.0).rgb*0.2 + texture2D(tColor, huv+st*6.0).rgb*0.1;
         float lum = dot(hitCol, vec3(0.3, 0.59, 0.11));
         float bright = smoothstep(0.35, 0.95, lum);
-        float k = watPx ? clamp(bright*0.95 + 0.18, 0.0, 1.0) : wet * mix(bright*0.9, 0.7, pud);
+        float k = watPx ? clamp(bright*0.6 + 0.3, 0.0, 1.0) : wet * mix(bright*0.9, 0.7, pud);
         outv = vec4(hitCol, 0.02 + clamp(k, 0.0, 1.0)*0.48);
       } else if (pud > 0.0) outv = vec4(0.0, 0.0, 0.0, 0.52 + clamp(0.35*pud*wet*2.0/0.7, 0.0, 1.0)*0.48);
       else outv = vec4(0.0, 0.0, 0.0, 0.02);

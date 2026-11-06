@@ -87,7 +87,7 @@ for (const box of ['resChips', 'cloudChips', 'zoomResChips', 'lodChips', 'shadow
   box.addEventListener('click', e => { const b = e.target.closest('button'); if (b) pick(+b.dataset.l); }); }
 // how shadows move when the sun steps with the day cycle (owner, Nov 6): snap (at once, as before), fade, glide (3 in-between pictures) or smooth glide (6)
 //  (staticcache.js GLIDE). Kept here
-{ const box = $('shadowChips'), pick = v => { if (!['snap', 'fade', 'glide3', 'glide6'].includes(v)) return; GLIDE.mode = v; if (v === 'snap' && GLIDE.phase !== 'idle') GLIDE.abort('switched to snap');
+{ const box = $('shadowChips'), pick = v => { if (!['snap', 'fade', 'glide3', 'glide6'].includes(v)) return; GLIDE.mode = v; if (v === 'snap' && GLIDE.phase !== 'idle') GLIDE.abort('switched to snap', true);
     for (const b of box.querySelectorAll('button')) b.classList.toggle('on', b.dataset.s === v); lsSet(K + 'shmove', v); };
   const q = lsGet(K + 'shmove'); if (q) pick(q); else { const pr = PRESETS[lsGet(K + 'preset')]; if (pr) pick(pr.shmove); }
   box.addEventListener('click', e => { const b = e.target.closest('button'); if (b) pick(b.dataset.s); }); }

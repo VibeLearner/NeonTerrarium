@@ -186,9 +186,12 @@ function scEditRect(px, py, shk, soft){
   const D = SC_DIRTY;
   if (scNoRect()) return SC.rectWhy = 'rectangles switched off', false;
   if (D.unknown || D.boxes.length > 24) return SC.rectWhy = D.unknown ? 'something changed that has no box' : 'too many boxes', false;
+  // (only merges, which change nothing on screen: nothing to draw, whatever the light. Checked before the light: a merge while the shadows glided
+  //  (GLIDE, the light between steps) redrew the whole picture and let the glide go, a jump, in the owner's log of Nov 6. A strip job under way
+  //  stays good too.)
+  if (!D.boxes.length){ if (SC.job && SC.job.edits === SC.editsSeen) SC.job.edits = SC_EDITS; SC.editsSeen = SC_EDITS; return true; }
   if (!scSame(shk, SC.shk)) return SC.rectWhy = 'the shadow map changed', false;
   if (scDelta(soft, SC.soft) > SC_RECT_EPS) return SC.rectWhy = 'the light moved', false;   // (the cache tolerates a drift up to SC_EPS; a rectangle redrawn beside older light would show it, so it asks for less)
-  if (!D.boxes.length){ SC.editsSeen = SC_EDITS; return true; }   // (only merges, which change nothing on screen)
   _rd.copy(sun.position).sub(sun.target.position).normalize();   // toward the sun
   if (_rd.y < .12) return SC.rectWhy = 'the sun is low', false;
   scCamera();
@@ -387,7 +390,11 @@ SC.frame = function(){
       SC.fill = null; SC.R = { x0: SC.ox, x1: SC.ox + SC.w, y0: SC.oy, y1: SC.oy + SC.h }; }
     else now = 'view left the cache'; }
   else if ((scDelta(soft, SC.soft) > SC_BIG || LIGHT_JUMP) && GLIDE.phase !== 'prep') now = 'the light jumped';   // (a glide's in-between suns are drawn as a drift: GLIDE)
-  else if (SC_EDITS !== SC.editsSeen && !scEditRect(px, py, shk, soft)) now = 'an edit: ' + SC.rectWhy;
+  // (while the shadows glide, a change the city makes by itself (a garden growing, a merge) waits for the glide to end; one the player makes, a click
+  //  or a key in the last moment, is drawn now and the glide waits to go on: GLIDE)
+  const deferEdit = GLIDE.busy() && performance.now() - GLIDE.actAt > GLIDE.ACT_MS;
+  let editDrawn = false;
+  if (!now && SC_EDITS !== SC.editsSeen && !deferEdit){ const real = SC_DIRTY.boxes.length > 0 || SC_DIRTY.unknown; if (!scEditRect(px, py, shk, soft)) now = 'an edit: ' + SC.rectWhy; else editDrawn = real; }
   // Still changing from frame to frame (a turn or zoom easing in, the lights switching at dusk): the cache would be drawn again every
   // frame, which costs more than the old way, so the old way draws. Once the inputs hold still, the new picture is drawn in strips
   // (SC.K of them, one a frame, into the second target) while the old way still draws the frame, and it takes over when complete.
@@ -433,7 +440,7 @@ SC.frame = function(){
   else {
     SC.age++; SC.state = 'in use'; SC.why = '';
     // a newer cache in the background when the light has drifted, the shadow map has been swapped, or the view has used half the room
-    if (SC.job && (!scSame(hard, SC.job.hard) || sun.shadow.map !== SC.job.map || SC.job.edits !== SC_EDITS)){ SC.job = null; }   // (it was for something that's gone)
+    if (SC.job && (!scSame(hard, SC.job.hard) || sun.shadow.map !== SC.job.map || (SC.job.edits !== SC_EDITS && !deferEdit))){ SC.job = null; }   // (it was for something that's gone)
     if (!SC.job){
       let why = '';
       if (scDelta(soft, SC.soft) > SC_EPS) why = 'light drifted';
@@ -451,7 +458,7 @@ SC.frame = function(){
   if (!now && !SC.fill && !PH.tests.noRing && !scExtend(px, py)){   // the strip that keeps the view inside the ring; a pan too fast for it: the whole picture
     scFull(px, py, hard, soft, shk, 'pan too fast for the ring');
   }
-  if (GLIDE.phase !== 'idle'){ const why = now ? 'the picture was drawn again: ' + now : SC.fill ? 'a turn or zoom' : px !== GLIDE.px || py !== GLIDE.py ? 'the view moved' : SC_EDITS !== GLIDE.edits ? 'an edit' : '';
+  if (GLIDE.busy()){ const why = now ? 'the picture was drawn again: ' + now : SC.fill ? 'a turn or zoom' : px !== GLIDE.px || py !== GLIDE.py ? 'the view moved' : editDrawn ? 'an edit' : '';
     if (why) GLIDE.abort(why); }
   // the window of it into the frame, then the live set on top
   renderer.setRenderTarget(rtC); renderer.setClearColor(0x000000, 1);
@@ -526,24 +533,43 @@ SC.line = function(){
 // bytes. 'fade' is the same with no in-between: the old picture fades into the new. Anything that redraws the picture (a turn, a pan, an edit, the old
 // way drawing a frame) lets the glide go: the shadows are then as the newest picture has them, as before. Plants, people and cars are drawn live, so
 // their shadows follow the sun's steps as the in-between maps are made.
-const GLIDE = { mode: 'glide3', dur: 10, fadeDur: 1.5, phase: 'idle', last: null, h0: 0, h1: 0, n: 0, k: 0, keys: [], lastShk: null, px: 0, py: 0, edits: 0, t0: 0, why: '' };
+// If the glide can't run when a step comes (the view turning or panning, the city's lights switching on, the old way drawing) or is
+// cut off part way, the shadows no longer jump to the new step: the sun waits where the picture on screen has it ('wait', the shown hour),
+// and the glide starts once the view has held still a moment, from there to the step the clock has reached (over more than one step if
+// need be). So whatever happens, the shadows only ever move by gliding. (Nov 6: the owner's log showed the glide let go or never started
+// most steps, each a jump.) A jump of more than two hours (the clock set by hand) is still taken at once.
+const GLIDE = { mode: 'glide3', dur: 10, fadeDur: 1.5, phase: 'idle', shown: null, h0: 0, h1: 0, span: 0, n: 0, k: 0, keys: [], lastShk: null, px: 0, py: 0, edits: 0, t0: 0, why: '', stillT: 0, logged: false };
 GLIDE.frames = () => GLIDE.mode === 'glide6' ? 6 : GLIDE.mode === 'glide3' ? 3 : 0;
+GLIDE.ACT_MS = 10000;   // (a click or key this recent: the player is at work, and what changes is drawn at once)
+GLIDE.actAt = -1e9; for (const ev of ['pointerdown', 'keydown']) addEventListener(ev, () => { GLIDE.actAt = performance.now(); }, { passive: true, capture: true });
+GLIDE.busy = () => GLIDE.phase === 'prep' || GLIDE.phase === 'play';
+GLIDE.STILL_MS = 600;   // (how long the view must hold still, the cache in use, before a waiting glide starts)
+const _gWrap = x => x >= 24 ? x - 24 : x < 0 ? x + 24 : x;
 // the hour the sun stands at (sky.js sunHour, day cycle running)
 GLIDE.hour = h => {
-  const G = GLIDE, base = Math.floor(h/SUN_STEP)*SUN_STEP;
-  if (G.last === null) G.last = base;
-  if (base !== G.last){
-    const fwd = Math.abs(((base - G.last + 24) % 24) - SUN_STEP) < 1e-6, was = G.last; G.last = base;
-    if (G.phase !== 'idle') G.abort('the next step came first');
-    else if (fwd && G.mode !== 'snap' && G.can()) G.start(was);
-    else if (fwd && G.mode !== 'snap'){ G.log.push(new Date().toTimeString().slice(0, 8) + ' not started: the cache was ' + SC.state + (SC.why ? ' (' + SC.why + ')' : '') + ', zoom ' + zoom.toFixed(1)); if (G.log.length > 8) G.log.shift(); }
-  }
-  if (G.phase === 'prep'){ const x = G.h0 + SUN_STEP*G.k/(G.n + 1); return x >= 24 ? x - 24 : x; }
-  return base;
+  const G = GLIDE, base = Math.floor(h/SUN_STEP)*SUN_STEP, now = performance.now();
+  if (G.phase === 'prep') return _gWrap(G.h0 + G.span*G.k/(G.n + 1));
+  if (G.phase === 'play') return G.h1;
+  if (G.shown === null) G.shown = base;
+  const ahead = (base - G.shown + 48) % 24;
+  if (ahead < 1e-6){ G.phase = 'idle'; return G.shown; }
+  if (G.mode === 'snap' || ahead > 2 + 1e-6){ G.shown = base; G.phase = 'idle'; return base; }   // (snap, or the clock set by hand: at once)
+  // a step to make: glide now if the view is still and drawn from the cache, else wait (the sun stays where the picture has it). While the view
+  // turns or zooms the step is taken at once: everything on screen is moving then, and a glide would only wait and be cut off again by the next
+  // turn (the auto spin turns every few seconds)
+  if (typeof SD !== 'undefined' && typeof PM !== 'undefined' && PM.frame - SD.turnAt <= 1){ G.shown = base; G.phase = 'idle'; G.why = 'stepped during a turn'; return base; }
+  if (!G.can()) G.stillT = now;
+  if (now - G.stillT >= G.STILL_MS){ G.start(G.shown, base); return _gWrap(G.h0 + G.span*G.k/(G.n + 1)); }
+  if (G.phase !== 'wait'){ G.phase = 'wait'; G.logged = false; }
+  if (!G.logged && !G.can()){ G.logged = true; G.log.push(new Date().toTimeString().slice(0, 8) + ' waiting: the cache was ' + SC.state + (SC.why ? ' (' + SC.why + ')' : '') + ', zoom ' + zoom.toFixed(1)); if (G.log.length > 8) G.log.shift(); }
+  return G.shown;
 };
 GLIDE.can = () => SC.mode === 'reuse' && SC.ok && (SC.state === 'in use' || SC.state.startsWith('redrawing')) && !SC.fill && !PH.tests.noStatic && !(PH.tests.copyByBlit || window.__COPY_BLIT) && MRT;
-GLIDE.start = h0 => {
-  const G = GLIDE; G.n = G.frames(); G.h0 = h0; G.k = 1; G.phase = 'prep'; G.t0 = performance.now(); G.why = '';
+GLIDE.start = (h0, h1) => {
+  const G = GLIDE; G.h0 = h0; G.h1 = h1; G.span = (h1 - h0 + 48) % 24;
+  const steps = Math.max(1, Math.round(G.span/SUN_STEP));
+  G.n = G.frames() ? Math.min(12, G.frames()*steps + steps - 1) : 0;   // (the in-between pictures: as many per step as the setting asks, for a glide that has waited across steps too)
+  G.k = 1; G.phase = 'prep'; G.t0 = performance.now(); G.why = '';
   G.px = Math.round(camPix.x); G.py = Math.round(camPix.y); G.edits = SC_EDITS; G.lastShk = SC.shk ? SC.shk.slice() : null;
   // the pictures: the view's size, the old one and one for each in-between and the last
   const need = G.n + 2;
@@ -560,23 +586,29 @@ GLIDE.swapped = job => {
   glideKeep(job.rt, job.ox, job.oy, G.keys[G.k]); G.lastShk = job.shk.slice();
   if (++G.k > G.n + 1){ G.phase = 'play'; G.t0 = performance.now();
     // (on a slow frame rate the drawing can take a while: the glide is shortened to end before the next step comes, so it isn't cut off part way)
-    const left = ((G.h0 + 2*SUN_STEP - S.hour + 48) % 24)*150/Math.max(.01, (typeof FF !== 'undefined' && FF.clock) || 1);   // (real seconds to the next step: a game hour is 150 real seconds)
+    const left = ((G.h1 + SUN_STEP - S.hour + 48) % 24)*150/Math.max(.01, (typeof FF !== 'undefined' && FF.clock) || 1);   // (real seconds to the next step: a game hour is 150 real seconds)
     G.playDur = Math.max(2, Math.min(G.n ? G.dur : G.fadeDur, left - 1)); }
 };
 GLIDE.log = [];   // (the last few glides let go and why: GLIDE.log in the console, and the overlay's line)
-GLIDE.abort = why => { const G = GLIDE; if (G.phase !== 'idle'){ G.log.push(new Date().toTimeString().slice(0, 8) + ' ' + why + ' (' + G.phase + ' ' + G.k + '/' + (G.n + 1) + ', zoom ' + zoom.toFixed(1) + ', ' + W + 'x' + H + ')'); if (G.log.length > 8) G.log.shift(); } G.phase = 'idle'; G.why = why; };
+// Let a glide go: the sun goes back to (or stays at) the last picture that was on screen, and waits to glide on from there. Nothing jumps.
+GLIDE.abort = (why, reset) => { const G = GLIDE;
+  if (G.busy()){ G.log.push(new Date().toTimeString().slice(0, 8) + ' ' + why + ' (' + G.phase + ' ' + G.k + '/' + (G.n + 1) + ', zoom ' + zoom.toFixed(1) + ', ' + W + 'x' + H + '): waiting to go on'); if (G.log.length > 8) G.log.shift();
+    let i = 0;   // (the picture on screen: in prep still the first, the old one; playing, the in-between nearest to where it was)
+    if (G.phase === 'play'){ const t = Math.max(0, Math.min(1, (performance.now() - G.t0)/(1000*(G.playDur || (G.n ? G.dur : G.fadeDur))))); i = Math.round(t*(G.n + 1)); }
+    G.shown = _gWrap(G.h0 + G.span*i/(G.n + 1)); G.stillT = performance.now(); }
+  G.phase = reset ? 'idle' : 'wait'; G.logged = true; G.why = why; if (reset) G.shown = null; };
 // what the view shows: null (the cache as it is), or two pictures and how far between them
 GLIDE.show = () => {
   const G = GLIDE;
   if (G.phase === 'prep') return { a: G.keys[0], b: G.keys[0], f: 0 };
   if (G.phase !== 'play') return null;
   const t = Math.max(0, Math.min(1, (performance.now() - G.t0)/(1000*(G.playDur || (G.n ? G.dur : G.fadeDur)))));
-  if (t >= 1){ G.phase = 'idle'; G.why = 'done'; return null; }
+  if (t >= 1){ G.phase = 'idle'; G.why = 'done'; G.shown = G.h1; return null; }
   if (!G.n) return { a: G.keys[0], b: G.keys[1], f: t*t*(3 - 2*t) };
   const x = t*(G.n + 1), i = Math.min(G.n, Math.floor(x));
   return { a: G.keys[i], b: G.keys[i + 1], f: x - i };
 };
-GLIDE.line = () => GLIDE.phase === 'prep' ? 'glide: drawing ' + GLIDE.k + ' of ' + (GLIDE.n + 1) : GLIDE.phase === 'play' ? 'glide: playing' : GLIDE.why ? 'glide: ' + GLIDE.why : '';
+GLIDE.line = () => GLIDE.phase === 'prep' ? 'glide: drawing ' + GLIDE.k + ' of ' + (GLIDE.n + 1) : GLIDE.phase === 'play' ? 'glide: playing' : GLIDE.phase === 'wait' ? 'glide: waiting for the view to hold still' : GLIDE.why ? 'glide: ' + GLIDE.why : '';
 // the view's window of a cache picture (ring addressing, as scCopyDraw) into one of the glide's pictures
 let _gkMat = null, _gkScene = null;
 function glideKeep(src, ox, oy, dst){

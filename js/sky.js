@@ -33,7 +33,7 @@ const SUN_DIR = new THREE.Vector3(0, 1, 0), _sunC = new THREE.Vector3();
 const SUN_STEP = .25;
 // (with the day cycle running, each step can glide (staticcache.js GLIDE): the sun is walked through the in-between hours while their pictures are drawn
 //  in the background, then the pictures are played in order)
-const sunHour = h => S.cycle ? (typeof GLIDE !== 'undefined' ? GLIDE.hour(h) : Math.floor(h/SUN_STEP)*SUN_STEP) : (typeof GLIDE !== 'undefined' && GLIDE.phase !== 'idle' && GLIDE.abort('the day cycle stopped'), h);
+const sunHour = h => S.cycle ? (typeof GLIDE !== 'undefined' ? GLIDE.hour(h) : Math.floor(h/SUN_STEP)*SUN_STEP) : (typeof GLIDE !== 'undefined' && GLIDE.shown !== null && GLIDE.abort('the day cycle stopped', true), h);
 const SUN_BACK = 260;
 // Stable shadows: the box only ever moves by whole shadow-map texels, measured along the sun's own view axes, so
 // when it moves and the shadows are redrawn they land on exactly the same grid as before and nothing changes on
@@ -110,7 +110,10 @@ function shadowFrame(){
   let jump = shHavePrev && shPrevDir.distanceToSquared(shNeed.dir) > SH_SUN && !gp && !(PH.tests.slowShadowJump || window.__SLOW_SHADOW_JUMP);
   let held = false; if (jump && drag && ++shDragN % 4 !== 0){ jump = false; held = true; } else if (jump) shDragN = 0;
   if (!held) shPrevDir.copy(shNeed.dir); shHavePrev = true; LIGHT_JUMP = jump;   // (held: measured from the last map drawn, so the next frame still counts as a jump)
-  let now = shadowDirty || jump || !shFront || shSlack(shFront) < 0; shadowDirty = false;
+  // (while the shadows glide, a redraw the city asks for by itself (a plot finished building in the background, the walkers' paths synced) waits
+  //  for the glide to end: drawn at once it lets the static cache go for a frame, and the glide with it. One after the player's own click or key goes now.)
+  const defer = typeof GLIDE !== 'undefined' && GLIDE.busy() && performance.now() - GLIDE.actAt > GLIDE.ACT_MS;
+  let now = (shadowDirty && !defer) || jump || !shFront || shSlack(shFront) < 0; if (!defer) shadowDirty = false;
   if (!now){
     // time to start the next map? (the sun moved, the box size changed, or the view has used up 40% of the room; a map
     // under way is only started again if the sun has jumped, the box size changed or the view would leave it)

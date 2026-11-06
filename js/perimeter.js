@@ -130,7 +130,10 @@ function wallBody(st, F, za, zb, y0, h, green){
 function wallPost(st, F, z, y0, h){
   const t = WALL_T + .14;
   if (st === 'low'){ box(M.pmPost, F, 0, y0 + h/2 + .05, z, t, h + .1, t); box(M.pmSolar, F, 0, y0 + h + .2, z, t + .1, .04, t + .1); box(M.pmBio, F, t/2 + .005, y0 + 1.0, z, .02, .12, .2); }
-  else if (st === 'ind'){ box(M.piSteel, F, 0, y0 + h/2 + .05, z, t, h + .1, t); for (const [a, b] of [[1, 1], [-1, -1]]) cyl(M.metalDark, F, a*(t/2 + .05), y0 + h/2, z + b*(t/2 + .05), .06, h);
+  else if (st === 'ind'){ box(M.piSteel, F, 0, y0 + h/2 + .05, z, t, h + .1, t);
+    // (two corner guards, square and square to the post: they were round pipes half sunk in its corners, whose few facets and the line where they
+    //  met the post caught the light differently at every angle, a grey strip that jumped about on the post as the view turned: owner, Nov 7)
+    for (const [a, b] of [[1, 1], [-1, -1]]) box(M.metalDark, F, a*(t/2 + .025), y0 + h/2, z + b*(t/2 + .025), .11, h, .11);
     box(M.piNeon, F, 0, y0 + h + .18, z, .14, .16, .14); glow(F, 0, y0 + h + .2, z, 'orange', 1.1); }
   else if (st === 'mid'){ box(M.pcPlinth, F, 0, y0 + h/2 + .05, z, t, h + .1, t); box(M.pcLed, F, t/2 + .005, y0 + 1.4, z, .02, .5, .26); box(M.neonAmber, F, 0, y0 + h + .14, z, .1, .1, .1); glow(F, 0, y0 + h + .16, z, 'amber', .8); }
   else { box(M.plMarble2, F, 0, y0 + h/2 + .05, z, t, h + .1, t); box(M.plGold, F, 0, y0 + h + .12, z, t + .08, .08, t + .08); box(M.plHolo, F, t/2 + .005, y0 + 1.2, z, .02, .3, .2); glow(F, t/2 + .1, y0 + 1.2, z, 'platinum', .9); }
@@ -153,7 +156,7 @@ function wallGate(st, F, y0, h, sp){
     for (const [z, d] of sides) scanner(z, M.pmBio, 'green');
   } else if (st === 'ind'){
     box(M.piSteel, F, 0, top + .16, zc, t + .1, .32, gw + (jm ? 0 : pw) + (jp ? 0 : pw)); for (const s of [-1, 1]) for (let z = za + .12; z < zb - .1; z += .36) box(M.hazard, F, s*(t/2 + .06), top + .16, z + .09, .02, .14, .17);
-    for (const [z] of sides) for (const s of [-1, 1]) cyl(M.metalDark, F, s*(t/2 - .02), y0 + h/2, z + (z < zc ? -1 : 1)*(pw/2 - .06), .07, h);
+    for (const [z] of sides) for (const s of [-1, 1]) box(M.metalDark, F, s*(t/2 - .02), y0 + h/2, z + (z < zc ? -1 : 1)*(pw/2 - .06), .13, h, .13);   // (square: see wallPost)
     for (const [z] of sides) scanner(z, M.piNeon, 'orange');
     box(M.piNeon, F, 0, top + .4, zc, .14, .14, .14); glow(F, 0, top + .44, zc, 'amber', 1.0);
     for (let z = za + .3; z < zb - .2; z += .6) box(M.piDark, F, 0, top + .01, z, t - .1, .02, .3);   // the rail of a shutter rolled up

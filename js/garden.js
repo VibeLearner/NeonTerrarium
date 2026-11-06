@@ -617,7 +617,11 @@ function gdBirdbath(P, x, z){
   for (let k = 0; k < 16; k++){ const a = k*TAU/16; box(tiles[k % 4], P, x + Math.cos(a)*.29, .665, z + Math.sin(a)*.29, .07, .02, .04, -a); }
   for (let k = 0; k < 4; k++) box(tiles[(k + 1) % 4], P, x + (k % 2 ? .092 : 0)*(k > 1 ? -1 : 1), .3, z + (k % 2 ? 0 : .092)*(k > 1 ? -1 : 1), .04, .12, .04, k*PI/2);
   for (let k = 0; k < 6; k++){ const a = k*TAU/6 + rnd(-.2, .2), r = rnd(.42, .5); blob(pick([GM.coral, GM.cream, GM.iris]), P, x + Math.cos(a)*r, .14, z + Math.sin(a)*r, rnd(.06, .09)); }
-  KEEP_LIGHT = true; glow(P, x, .7, z, 'warm', .8); KEEP_LIGHT = false;
+  // its light: a little lantern on a brass stem rising from the middle of the bowl, the glow at the lantern (it sat in the water itself and lit the
+  // bowl from inside, the halo cutting through the stone: owner Nov 6)
+  cyl(GM.gold, P, x, .78, z, .012, .22); box(GM.woodDark, P, x, .9, z, .07, .015, .07);
+  KEEP_LIGHT = true; box(M.bulb, P, x, .94, z, .05, .07, .05); glow(P, x, .95, z, 'warm', .55); KEEP_LIGHT = false;
+  put(U.cone, GM.roof, under(P, T(x, 1.0, z, 0, .1, .05, .1)));
 }
 // a vine-covered arch walkway over a straight path: four arches, fiber-optic strands glowing in the vines and blossom
 function gdArch(P, alongZ, taken){
@@ -1001,44 +1005,63 @@ if (!self.IN_RECIPE_WORKER && typeof canvas !== 'undefined' && canvas.addEventLi
 //  - The view is the frame's own (its projection copied, so it zooms, turns and steps by whole pixels with it); people, trees, lights all show.
 //  - Only what stands within two plots of a pond is drawn in it (owner Nov 6: the whole view near the ponds cost too much): gdMirFilter.
 const GD_MIR_Y = GD_WATER_Y + .003;
-const GD_MIR = { rt: null, cam: null, skip: null, on: false, M: { value: new THREE.Matrix4() }, tex: { value: null }, use: { value: 0 }, res: { value: new THREE.Vector2(1, 1) } };
+const GD_MIR = { rt: null, cam: null, on: false, M: { value: new THREE.Matrix4() }, tex: { value: null }, use: { value: 0 }, res: { value: new THREE.Vector2(1, 1) } };
 const gdMirWanted = () => !self.IN_RECIPE_WORKER && !(typeof TOUCH !== 'undefined' && TOUCH.on) && typeof renderer !== 'undefined' && renderer.capabilities.isWebGL2 && !window.__NO_POND_MIRROR;
 const _gmV = new THREE.Vector3(), _gmT = new THREE.Vector3(), _gmU = new THREE.Vector3(), _gmN = new THREE.Vector3(0, 1, 0), _gm4 = new THREE.Vector4(), _gmQ = new THREE.Vector4();
 const _gmP = new THREE.Matrix4(), _gmI = new THREE.Matrix4(), _gmS = new THREE.Matrix4(), _gmB = new THREE.Matrix4().set(.5, 0, 0, .5, 0, .5, 0, .5, 0, 0, .5, .5, 0, 0, 0, 1);
 const _gmCol = new THREE.Color();
-// What the mirror leaves out: everything whose bounds lie wholly more than two plots from every pond plot. Still things (whose matrices never change)
-// are sorted once, again only when the city or the ponds change (or now and then, for blocks merged since); moving ones are looked at each frame.
-// Things drawn whatever the view (frustumCulled off: people, the instanced crowds) are always drawn.
-const GD_MIRF = { key: '', n: 0, far: [], moving: [], near: new Set(), hid: [] };
-const _gfS = new THREE.Sphere();
-function gdMirNearSphere(sp){
-  const r = sp.radius, i0 = Math.round((sp.center.x - r)/LOT), i1 = Math.round((sp.center.x + r)/LOT), j0 = Math.round((sp.center.z - r)/LOT), j1 = Math.round((sp.center.z + r)/LOT);
-  if ((i1 - i0 + 1)*(j1 - j0 + 1) > 1600) return true;   // (something huge: the clouds' ring and the like)
-  for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) if (GD_MIRF.near.has(ckey(i, j))) return true;
+// What the mirror leaves out: everything that lies wholly more than two plots from every pond plot. Kept cheap (it runs every frame the mirror
+// draws): which plots count as near is a small grid of bytes over the ponds' surroundings, looked up by plot number (no strings);
+//  - still things (their matrices never change: the plots, the merged blocks) are sorted once, and again only when the city or the ponds change;
+//  - moving things are looked at whole, by their topmost moving group (a car, a drone, a plant batch), not part by part: their place and a size
+//    measured once. The scene's and the city's own top level is gone through each frame (a few hundred at most), moving groups found deeper inside
+//    still ones are listed with the still things;
+//  - things drawn whatever the view (frustumCulled off: the people's crowds) are always drawn.
+const GD_MIRF = { key: '', far: [], deep: [], hid: [], g: null, i0: 0, j0: 0, w: 0, h: 0, rad: new WeakMap() };
+const _gfS = new THREE.Sphere(), _gfB = new THREE.Box3(), _gfV = new THREE.Vector3();
+function gdMirNear(cx, cz, r){
+  const F = GD_MIRF; if (!F.g) return false;
+  const i0 = Math.max(F.i0, Math.round((cx - r)/LOT)), i1 = Math.min(F.i0 + F.w - 1, Math.round((cx + r)/LOT));
+  const j0 = Math.max(F.j0, Math.round((cz - r)/LOT)), j1 = Math.min(F.j0 + F.h - 1, Math.round((cz + r)/LOT));
+  for (let j = j0; j <= j1; j++){ const row = (j - F.j0)*F.w - F.i0; for (let i = i0; i <= i1; i++) if (F.g[row + i]) return true; }
   return false;
 }
-function gdMirObjSphere(o){
-  const g = o.geometry; if (!g) return null;
-  if (!g.boundingSphere) g.computeBoundingSphere(); if (!g.boundingSphere) return null;
-  return _gfS.copy(g.boundingSphere).applyMatrix4(o.matrixWorld);
+function gdMirMeshNear(o){
+  const g = o.geometry; if (!g) return true;
+  if (!g.boundingSphere) g.computeBoundingSphere(); if (!g.boundingSphere) return true;
+  _gfS.copy(g.boundingSphere).applyMatrix4(o.matrixWorld); return gdMirNear(_gfS.center.x, _gfS.center.z, _gfS.radius);
 }
+// a moving group: its place now, and its size (measured once, round its own origin)
+function gdMirRootNear(o){
+  if (o.isMesh || o.isPoints || o.isLine) return !o.frustumCulled || gdMirMeshNear(o);
+  let r = GD_MIRF.rad.get(o);
+  if (r === undefined){ _gfB.setFromObject(o); _gfV.setFromMatrixPosition(o.matrixWorld);
+    r = _gfB.isEmpty() ? 0 : Math.max(_gfB.min.distanceTo(_gfV), _gfB.max.distanceTo(_gfV)); GD_MIRF.rad.set(o, r); }
+  const e = o.matrixWorld.elements; return gdMirNear(e[12], e[14], r);
+}
+const gdStill = o => o.matrixAutoUpdate === false;
 function gdMirFilter(){
-  const F = GD_MIRF, wk = GD_FX.wcells.map(c => c.i + ',' + c.j).join(';');
-  const key = (typeof SC_EDITS !== 'undefined' ? SC_EDITS : 0) + '|' + world.children.length + '|' + wk;
-  if (key !== F.key || ++F.n > 600){
-    F.key = key; F.n = 0; F.far.length = 0; F.moving.length = 0; F.near.clear();
-    for (const c of GD_FX.wcells) for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) F.near.add(ckey(c.i + a, c.j + b));
+  const F = GD_MIRF, wc = GD_FX.wcells;
+  const key = (typeof SC_EDITS !== 'undefined' ? SC_EDITS : 0) + '|' + world.children.length + '|' + (world.children.length ? world.children[world.children.length - 1].id : 0) + '|' + wc.length + '|' + (wc.length ? wc[0].i + ',' + wc[0].j + ',' + wc[wc.length - 1].i + ',' + wc[wc.length - 1].j : '');
+  if (key !== F.key){
+    F.key = key; F.far.length = 0; F.deep.length = 0;
+    let i0 = 1e9, j0 = 1e9, i1 = -1e9, j1 = -1e9;
+    for (const c of wc){ i0 = Math.min(i0, c.i - 2); i1 = Math.max(i1, c.i + 2); j0 = Math.min(j0, c.j - 2); j1 = Math.max(j1, c.j + 2); }
+    F.i0 = i0; F.j0 = j0; F.w = i1 - i0 + 1; F.h = j1 - j0 + 1; F.g = new Uint8Array(F.w*F.h);
+    for (const c of wc) for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) F.g[(c.j + b - j0)*F.w + (c.i + a - i0)] = 1;
+    // the still things, part by part (a merged block's meshes each cover the block anyway), and the moving groups inside them
     scene.updateMatrixWorld();
-    scene.traverse(o => {
-      if (!(o.isMesh || o.isPoints || o.isLine) || !o.frustumCulled || o === GD_MIR.skip) return;
-      let still = true; for (let q = o; q; q = q.parent) if (q.matrixAutoUpdate !== false && q !== scene){ still = false; break; }
-      if (!still){ F.moving.push(o); return; }
-      const sp = gdMirObjSphere(o); if (sp && !gdMirNearSphere(sp)) F.far.push(o);
-    });
+    const walk = o => {
+      for (const ch of o.children){
+        if (!gdStill(ch)){ if (o !== scene && o !== world && !ch.isLight && !ch.isCamera) F.deep.push(ch); continue; }   // (a moving one: the top levels are gone through each frame)
+        if ((ch.isMesh || ch.isPoints || ch.isLine) && ch.frustumCulled && !gdMirMeshNear(ch)) F.far.push(ch);
+        walk(ch); } };
+    walk(scene);
   }
   const hid = F.hid; hid.length = 0;
   for (const o of F.far) if (o.visible){ o.visible = false; hid.push(o); }
-  for (const o of F.moving) if (o.visible){ const sp = gdMirObjSphere(o); if (sp && !gdMirNearSphere(sp)){ o.visible = false; hid.push(o); } }
+  const tops = [scene.children, world.children, F.deep];
+  for (const L of tops) for (const o of L) if (o.visible && !gdStill(o) && o !== world && !o.isLight && !o.isCamera && !gdMirRootNear(o)){ o.visible = false; hid.push(o); }   // (never a light: switching one off changes every shader)
   return hid;
 }
 function gardenMirror(){

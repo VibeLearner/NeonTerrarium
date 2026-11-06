@@ -14,6 +14,14 @@ NV.off = () => !!window.__NV_OFF;
 // Tests: "never-seen: one view a draw (as before)" (PH.tests.nvPerView, window.__NV_PER_VIEW: round 9's first part, a view at a time with the box shrunk) and "never-seen: whole boxes (as before)" (nvOld: round 8's job).
 NV.blk = 32; NV.maxRt = 4096; NV.mask = true;
 NV.gen = (document.currentScript && /[?&]v=([^&]+)/.exec(document.currentScript.src || '') || [0, 'dev'])[1];   // (the scripts' version: a result kept by recipe is only as good as the builders that made the recipe's geometry)
+// (Nov 6: that was this file's own version only, so a change to the builders that kept a plot's triangle count but changed their order (a new
+//  material for the street lamps' bulbs regroups the plot's triangles) found the old result under the same key, and hid the wrong triangles:
+//  holes in the ground and walls all over a loaded city. The key now carries every builder script's version and the material list's signature.)
+NV.genKey = () => NV._gk || (NV._gk = (() => {
+  const names = ['matreg', 'core', 'spritegen', 'artgen', 'peoplegen', 'sprites', 'buildings', 'ground', 'vehicles', 'sky', 'world', 'garden', 'perimeter', 'mega', 'people', 'highway', 'metro', 'recipe', 'neverseen'];
+  const src = [...document.scripts].map(s => s.src || ''), t = names.map(n => { const u = src.find(x => x.includes('/js/' + n + '.js')), m = u && /[?&]v=([^&]+)/.exec(u); return m ? m[1] : '-'; }).join(',') + '|' + (typeof MATREG !== 'undefined' ? MATREG.sig : '');
+  let h1 = 2166136261 >>> 0, h2 = 5381; for (let i = 0; i < t.length; i++){ const k = t.charCodeAt(i); h1 = Math.imul(h1 ^ k, 16777619) >>> 0; h2 = (Math.imul(h2, 33) + k) >>> 0; }
+  return h1.toString(36) + h2.toString(36); })());
 // Several views in one target are not exact and are off: a tile away from the corner adds a whole number to the window coordinates, which rounds in coarser steps than the corner view's, and a razor-thin triangle then
 // covers a pixel centre or not (2 of 7,000 triangles on one of four plots). The viewport shift of one view alone only ever subtracts, which is exact. Test "never-seen: several views in one target (not exact)" turns tiles on.
 NV.multi = () => !!(PH.tests.nvTiles || window.__NV_TILES);
@@ -71,7 +79,7 @@ function nvRecSig(c, g, tri){
   const t = JSON.stringify(rec.r, nvNoDraws); let h1 = 2166136261 >>> 0, h2 = 5381;
   for (let i = 0; i < t.length; i++){ const k = t.charCodeAt(i); h1 = Math.imul(h1 ^ k, 16777619) >>> 0; h2 = (Math.imul(h2, 33) + k) >>> 0; }
   const cut = g.userData.cut;
-  return 'r:' + h1.toString(36) + h2.toString(36) + ':' + t.length + ':' + tri.length + ':' + cut.A + '.' + cut.H + '.' + cut.S + ':' + NV.ver + ':' + NV.gen;
+  return 'r:' + h1.toString(36) + h2.toString(36) + ':' + t.length + ':' + tri.length + ':' + cut.A + '.' + cut.H + '.' + cut.S + ':' + NV.ver + ':' + NV.genKey();
 }
 // a plot's kept result, if there is one: by recipe first (no vertex array read), then by geometry (only while results kept by geometry before round 9 may exist, and once: the answer is kept by recipe, a miss too)
 function nvLookup(c, g, tri){

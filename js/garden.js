@@ -999,12 +999,48 @@ if (!self.IN_RECIPE_WORKER && typeof canvas !== 'undefined' && canvas.addEventLi
 //  - Only the part of the frame the ponds cover is drawn (the mirrored camera's view cut down to it: what's outside is never drawn).
 //  - Nothing under the water is drawn (an oblique near plane: the mirrored camera's view starts at the surface), nor the water and the lily pads.
 //  - The view is the frame's own (its projection copied, so it zooms, turns and steps by whole pixels with it); people, trees, lights all show.
+//  - Only what stands within two plots of a pond is drawn in it (owner Nov 6: the whole view near the ponds cost too much): gdMirFilter.
 const GD_MIR_Y = GD_WATER_Y + .003;
-const GD_MIR = { rt: null, cam: null, on: false, M: { value: new THREE.Matrix4() }, tex: { value: null }, use: { value: 0 }, res: { value: new THREE.Vector2(1, 1) } };
+const GD_MIR = { rt: null, cam: null, skip: null, on: false, M: { value: new THREE.Matrix4() }, tex: { value: null }, use: { value: 0 }, res: { value: new THREE.Vector2(1, 1) } };
 const gdMirWanted = () => !self.IN_RECIPE_WORKER && !(typeof TOUCH !== 'undefined' && TOUCH.on) && typeof renderer !== 'undefined' && renderer.capabilities.isWebGL2 && !window.__NO_POND_MIRROR;
 const _gmV = new THREE.Vector3(), _gmT = new THREE.Vector3(), _gmU = new THREE.Vector3(), _gmN = new THREE.Vector3(0, 1, 0), _gm4 = new THREE.Vector4(), _gmQ = new THREE.Vector4();
 const _gmP = new THREE.Matrix4(), _gmI = new THREE.Matrix4(), _gmS = new THREE.Matrix4(), _gmB = new THREE.Matrix4().set(.5, 0, 0, .5, 0, .5, 0, .5, 0, 0, .5, .5, 0, 0, 0, 1);
 const _gmCol = new THREE.Color();
+// What the mirror leaves out: everything whose bounds lie wholly more than two plots from every pond plot. Still things (whose matrices never change)
+// are sorted once, again only when the city or the ponds change (or now and then, for blocks merged since); moving ones are looked at each frame.
+// Things drawn whatever the view (frustumCulled off: people, the instanced crowds) are always drawn.
+const GD_MIRF = { key: '', n: 0, far: [], moving: [], near: new Set(), hid: [] };
+const _gfS = new THREE.Sphere();
+function gdMirNearSphere(sp){
+  const r = sp.radius, i0 = Math.round((sp.center.x - r)/LOT), i1 = Math.round((sp.center.x + r)/LOT), j0 = Math.round((sp.center.z - r)/LOT), j1 = Math.round((sp.center.z + r)/LOT);
+  if ((i1 - i0 + 1)*(j1 - j0 + 1) > 1600) return true;   // (something huge: the clouds' ring and the like)
+  for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) if (GD_MIRF.near.has(ckey(i, j))) return true;
+  return false;
+}
+function gdMirObjSphere(o){
+  const g = o.geometry; if (!g) return null;
+  if (!g.boundingSphere) g.computeBoundingSphere(); if (!g.boundingSphere) return null;
+  return _gfS.copy(g.boundingSphere).applyMatrix4(o.matrixWorld);
+}
+function gdMirFilter(){
+  const F = GD_MIRF, wk = GD_FX.wcells.map(c => c.i + ',' + c.j).join(';');
+  const key = (typeof SC_EDITS !== 'undefined' ? SC_EDITS : 0) + '|' + world.children.length + '|' + wk;
+  if (key !== F.key || ++F.n > 600){
+    F.key = key; F.n = 0; F.far.length = 0; F.moving.length = 0; F.near.clear();
+    for (const c of GD_FX.wcells) for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) F.near.add(ckey(c.i + a, c.j + b));
+    scene.updateMatrixWorld();
+    scene.traverse(o => {
+      if (!(o.isMesh || o.isPoints || o.isLine) || !o.frustumCulled || o === GD_MIR.skip) return;
+      let still = true; for (let q = o; q; q = q.parent) if (q.matrixAutoUpdate !== false && q !== scene){ still = false; break; }
+      if (!still){ F.moving.push(o); return; }
+      const sp = gdMirObjSphere(o); if (sp && !gdMirNearSphere(sp)) F.far.push(o);
+    });
+  }
+  const hid = F.hid; hid.length = 0;
+  for (const o of F.far) if (o.visible){ o.visible = false; hid.push(o); }
+  for (const o of F.moving) if (o.visible){ const sp = gdMirObjSphere(o); if (sp && !gdMirNearSphere(sp)){ o.visible = false; hid.push(o); } }
+  return hid;
+}
 function gardenMirror(){
   GD_MIR.on = false; GD_MIR.use.value = 0;
   if (!gdMirWanted() || !GD_FX.water || !GD_FX.wcells || !GD_FX.wcells.length) return;
@@ -1052,13 +1088,16 @@ function gardenMirror(){
   renderer.getClearColor(_gmCol);
   const pads = GD_FX.mesh ? [GD_FX.mesh.pad, GD_FX.mesh.sol, GD_FX.mesh.blo] : [], padVis = pads.map(m => m.visible);
   GD_WATER_MAT.visible = false; pads.forEach(m => m.visible = false); renderer.shadowMap.needsUpdate = false;
+  let hid = [];
   const res0 = FOL_UNI.res.value.clone(); FOL_UNI.res.value.set(px1 - px0, py1 - py0);   // (the plants snap to whole pixels of the picture being drawn: this rectangle)
   try {
+    hid = gdMirFilter();
     rt.viewport.set(px0, py0, px1 - px0, py1 - py0); rt.scissor.set(px0, py0, px1 - px0, py1 - py0); rt.scissorTest = true;
     renderer.setRenderTarget(rt); renderer.setClearColor(0x000000, 0); renderer.autoClear = false; renderer.clear(true, true, false);
     renderer.render(scene, vc);
     GD_MIR.on = true; GD_MIR.use.value = 1;
   } finally {
+    for (const o of hid) o.visible = true; hid.length = 0;
     FOL_UNI.res.value.copy(res0); GD_WATER_MAT.visible = true; pads.forEach((m, i) => m.visible = padVis[i]); renderer.shadowMap.needsUpdate = shUp;
     rt.scissorTest = false; renderer.setRenderTarget(prevRT); renderer.setClearColor(_gmCol, prevAlpha); renderer.autoClear = prevAuto;
   }

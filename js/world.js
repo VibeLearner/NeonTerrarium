@@ -979,7 +979,10 @@ function* stackRunGen(c, secs, y, tag, first){
     LUX = sec.zone === 'high' ? luxPalette(hash('lux', c.i, c.j, k, sec.seed)) : sec.zone === 'ind' ? indPalette(hash('ind', c.i, c.j, k, sec.seed)) : null;   // each district's own light colours
     const lot = { x: c.x, z: c.z, cls: sec.zone, elev: 0, base: y, signs: 0, occupied: true, height: 0, floors: 0 };
     lot.aloft = !upper && tag === '' && !!c.lift;   // (a floating section too)   // the bottom of a side pod: it stands on a scaffold deck, not the street
-    lot.padOK = tag === 'b' ? (R(), false) : last && R() < .3;   // (under a pod: the same draw whatever's on top, so adding a section never re-rolls the one below it)
+    // (a car pad on the roof, top section only: drawn from its own numbers, not R, so being the top or not never shifts the draws the section's
+    //  builder makes after it. It was `last && R() < .3`, a draw only on the top, so stacking a floor re-rolled the section that had been the
+    //  top: a building a couple of floors shorter, as if Space took one away, and a side pod on it left hanging: owner, Nov 6)
+    lot.padOK = tag !== 'b' && last && mulberry32(hash('pad', c.i, c.j, sec.kh ?? k, sec.zone, sec.seed))() < .3;
     if (upper){   // a deck for the new section to stand on
       box(M.concDD, T(c.x, y, c.z), 0, .05, 0, SIDE - .1, .1, SIDE - .1);
       box(pick(st.neonMats), T(c.x, y, c.z), 0, .02, (SIDE - .1)/2 + .015, SIDE - .1, .03, .03);

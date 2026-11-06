@@ -89,7 +89,7 @@ const TITLE = (() => {
     stage.style.translate = (x*S0/2).toFixed(2) + 'px ' + (y*S0/2).toFixed(2) + 'px'; stage.style.rotate = r.toFixed(3) + 'deg'; stage.style.scale = '1.03';
   }
   // the hour: the city's own, in four looks
-  const econNight = () => typeof ECON !== 'undefined' && ECON.on;   // (an Economy city is always night: the room is lit for it too, economy.js)
+  const econNight = () => typeof NT_MODE === 'function' && !!NT_MODE();   // (an Economy or Planner city is always night: the room is lit for it too, economy.js, placement.js)
   function pickTime(h){ if (econNight()) return 'night'; return h >= 5.5 && h < 10 ? 'morning' : h >= 10 && h < 16.5 ? 'day' : h >= 16.5 && h < 19.5 ? 'evening' : 'night'; }
 
   /* ---------- the things that move, drawn live ---------- */

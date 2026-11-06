@@ -30,7 +30,7 @@ self.onmessage = e => {
     } else if (m.t === 'world'){
       world = recipeWorldOf(m.hw, m.mt);
     } else if (m.t === 'gen'){
-      PH.tests.leanRound = m.far.lean; PH.tests.thinSticks = m.far.sticks;
+      PH.tests.leanRound = m.far.lean; PH.tests.thinSticks = m.far.sticks; PLAN_HEIGHTS = !!m.far.plan;   // (Planner's level heights: world.js)
       for (const [k, e] of m.rb){ rbCache.set(k, rbUnpack(e)); rbKnown.add(k); }   // (the page's shapes win: see recipe.js)
       rs = m.rs === undefined ? null : m.rs; calls = 0;
       let out; const over0 = FX_OVER;

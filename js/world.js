@@ -925,6 +925,38 @@ const SECTION_TYPES = {
   high: { ground: [[buildTower,1]], upper: [[slabTower,2],[glassHotelTower,1.5],[glassHotelPodium,1],[roundTower,1],[twistTower,1],[gardenTower,1],[domeTower,1],[shellTower,1],[cascadeTerraces,.8]] },
   ind:  { ground: [[hall,1],[silos,1],[stiltFactory,1],[tankYard,1],[scrapShed,1],[gearWorkshop,1],[repairsBlock,1],[partsWarehouse,1],[lubeShed,.8],[stackedWorks,2.6],[decoWorks,1.1],[brutalTower,1.1]], upper: [[hall,2],[silos,1],[scrapShed,1],[repairsBlock,1],[partsWarehouse,1],[brutalTower,.6]] },
 };
+// Planner mode (placement.js) counts a building's levels, so there every design is placed by how tall it really is (measured: 40 builds of
+// each, against the median Planner stack of 1 to 5 levels in its zone, about 3 floors a level). A design about one level tall is a choice for
+// a building's first level (the short ones too: that variety is fine); the levels above are built only from designs close to 3 floors (the
+// tenement, the sign shop and the luxury slab held to 3). A design about as tall as 2, 3 or 4 levels is a whole building of that many: a
+// building of 3 Commercial levels may be drawn as one glass tower instead of three stacked shops. Designs that miss their band too often
+// (under 60% of builds) are left out unless capped to fit: the uncapped tenement, the luxury base tower, the cascade terraces. Clicks still
+// add one level, and the rules still count levels. The page sets PLAN_HEIGHTS; the plot worker is told with each plot (recipe.js).
+let PLAN_HEIGHTS = false;
+const PLAN_TYPES = {
+  low:  { ground: [[buildTenement,6],[podHouse,1.5],[octoHouse,1.2],[deckHouse,1.3]], upper: [[buildTenement,5],[podHouse,2],[octoHouse,1.2]] },
+  mid:  { ground: [[signShop,3.4],[tiledShop,1.8],[foodDeck,1.2],[foodTower,1.4],[stallMarket,1.4],[domeMarket,.8],[foodPlaza,.8],[cornerMarket,1]], upper: [[signShop,2.6],[tiledShop,1.4]] },
+  high: { ground: [[slabTower,2],[glassHotelPodium,1]], upper: [[slabTower,1]] },
+  ind:  { ground: [[hall,1],[silos,1],[stiltFactory,1],[tankYard,1],[scrapShed,1.2],[gearWorkshop,1],[repairsBlock,1],[partsWarehouse,1],[lubeShed,.8]], upper: [[silos,1],[scrapShed,1.2],[partsWarehouse,.5]] },
+};
+const PLAN_CAP = new Set([buildTenement, signShop, slabTower]);   // (held to 3 floors as a level)
+// whole buildings, by level count: [design, weight, floors cap or 0]
+const PLAN_WHOLE = {
+  low:  { 2: [[buildTenement, 1, 6]] },
+  mid:  { 2: [[pagodaHall, 1, 0], [billboardLot, 1, 0], [buildShophouse, 1, 0], [containerStack, 1, 0], [spiralTower, 1, 0]], 3: [[glassTower, 1.5, 0], [platformTower, 1, 0]], 4: [[arcologyTower, 1, 0]] },
+  high: { 2: [[slabTower, 1, 6], [domeTower, 1, 0]], 3: [[slabTower, 1, 9], [glassHotelTower, 1, 0], [roundTower, 1, 0], [twistTower, 1, 0], [gardenTower, 1, 0], [shellTower, 1, 0]] },
+  ind:  { 2: [[stackedWorks, 1, 0], [decoWorks, 1, 0], [brutalTower, 1, 0]] },
+  corp: { 2: [[brutalTower, 2, 0], [decoWorks, 1.5, 0], [stackedWorks, 1, 0]] },
+};
+// a building drawn as one design: only on the ground, all of one kind, nothing built into a gap; half the time when its level count has designs
+function planWhole(c, secs){
+  const z = secs[0].zone, corp = !!secs[0].corp;
+  for (const s of secs) if (s.zone !== z || !!s.corp !== corp || s.mf || s.at !== undefined) return null;
+  const list = (PLAN_WHOLE[corp ? 'corp' : z] || {})[secs.length]; if (!list) return null;
+  if (hash('whole', c.i, c.j, secs.length, secs[0].seed) % 100 >= 50) return null;
+  const r = (hash('wholePick', c.i, c.j, secs.length, secs[0].seed) % 10000)/10000, tot = list.reduce((a, d) => a + d[1], 0);
+  let x = r*tot; for (const d of list){ if ((x -= d[1]) <= 0) return { b: d[0], cap: d[2] }; } return { b: list[0][0], cap: list[0][2] };
+}
 function pickWeighted(list){ const tot = list.reduce((s,[,w]) => s + w, 0); let r = R()*tot; for (const [f,w] of list){ if ((r -= w) <= 0) return f; } return list[0][0]; }
 // The white garden-city towers only stack with each other: on a white luxury section only another white one goes
 // up, and a white one only goes up on ground or on another white section (the other luxury types look jarring
@@ -963,6 +995,25 @@ function* buildStackGen(c){
 function* stackRunGen(c, secs, y, tag, first){
   let prevWhite = false, prevDeck = false;
   c.sectionTops = [];
+  const W = PLAN_HEIGHTS && tag === '' && first && !c.lift && secs.length >= 2 ? planWhole(c, secs) : null;
+  if (W){   // (Planner: the whole stack as one design about as tall as its levels; its levels' tops are spaced evenly up it)
+    const sec = secs[0], y0 = y;
+    R = mulberry32(hash('sec', c.i, c.j, sec.kh ?? 0, sec.zone, sec.seed, 'whole', secs.length));
+    const st = STY[sec.zone];
+    LUX = sec.zone === 'high' ? luxPalette(hash('lux', c.i, c.j, 0, sec.seed)) : sec.zone === 'ind' ? indPalette(hash('ind', c.i, c.j, 0, sec.seed)) : null;
+    const lot = { x: c.x, z: c.z, cls: sec.zone, elev: 0, base: y, signs: 0, occupied: true, height: 0, floors: 0 };
+    lot.aloft = false; lot.padOK = R() < .3; if (W.cap) lot.mf = W.cap;
+    const P0 = T(c.x + rnd(-.1,.1), y, c.z + rnd(-.1,.1), rnd(-st.yaw, st.yaw));
+    NO_ROOF = false; POD_LOG = c._pods || (c._pods = []); POD_SEC = { k: 0, t: tag }; SIGN_RES = c._signRes || (c._signRes = []);
+    try { withStyle(sec.style, () => W.b(lot, st, P0)); } finally { LUX = null; POD_LOG = null; POD_SEC = null; SIGN_RES = null; }
+    y += Math.max(lot.height, FH);
+    for (let k = 1; k <= secs.length; k++) c.sectionTops.push(y0 + (y - y0)*k/secs.length);
+    c.firstFloors = lot.floors || 2;
+    if (!lot.hasCarPad && R() < .7 && !hwAt(c.i, c.j).length && !mtAt(c.i, c.j).length) addPerch({ x: c.x, z: c.z, height: y });
+    c._topLot = lot;
+    yield;
+    return y;
+  }
   for (let k = 0; k < secs.length; k++){ const sec = secs[k];
     R = mulberry32(hash('sec', c.i, c.j, sec.kh ?? k, sec.zone, sec.seed));   // (the same whether a building stands under a pod or not, so it keeps its look)
     // a bracketed pod's stack can have gaps: a section with .at starts up there, on brackets of its own (another pod on the same side)
@@ -978,14 +1029,15 @@ function* stackRunGen(c, secs, y, tag, first){
       box(pick(st.neonMats), T(c.x, y, c.z), 0, .02, (SIDE - .1)/2 + .015, SIDE - .1, .03, .03);
     }
     const P0 = T(c.x + rnd(-.1,.1), y + (upper ? .1 : 0), c.z + rnd(-.1,.1), rnd(-st.yaw, st.yaw));
-    let types = SECTION_TYPES[sec.zone][upper ? 'upper' : 'ground'];
-    if (upper && sec.zone === 'high') types = types.filter(([f]) => WHITE_TYPES.has(f) === prevWhite);
-    if (upper && sec.zone === 'mid' && prevDeck) types = [[foodDeck, 5]].concat(types);   // decks of stalls like to pile up
+    let types = (PLAN_HEIGHTS ? PLAN_TYPES : SECTION_TYPES)[sec.zone][upper ? 'upper' : 'ground'];
+    if (upper && sec.zone === 'high' && !PLAN_HEIGHTS) types = types.filter(([f]) => WHITE_TYPES.has(f) === prevWhite);
+    if (upper && sec.zone === 'mid' && prevDeck && !PLAN_HEIGHTS) types = [[foodDeck, 5]].concat(types);   // decks of stalls like to pile up
     let builder = pickWeighted(types);
     if (lot.aloft && sec.zone === 'mid' && ![signShop, tiledShop, glassTower].includes(builder)) builder = pickWeighted([[signShop, 3], [tiledShop, 2], [glassTower, 1]]);   // on a pod's deck: a building that keeps to it
     if (lot.aloft && sec.zone === 'high' && ![slabTower, roundTower, twistTower, gardenTower, domeTower, shellTower].includes(builder)) builder = pickWeighted([[slabTower, 3], [roundTower, 2], [twistTower, 1], [gardenTower, 1], [domeTower, 1], [shellTower, 1]]);   // (a tower that keeps to the platform)
     if (lot.aloft && sec.zone === 'ind' && ![hall, partsWarehouse].includes(builder)) builder = pickWeighted([[hall, 3], [partsWarehouse, 2]]);   // (a works that keeps to the deck)
-    if (sec.corp && sec.zone === 'ind' && !sec.mf) builder = pickWeighted(upper ? [[brutalTower, 2], [stackedWorks, 1]] : [[brutalTower, 2], [decoWorks, 1.5], [stackedWorks, 1]]);   // (economy mode's corps: the office blocks of the industrial set, economy.js)
+    if (sec.corp && sec.zone === 'ind' && !sec.mf && !PLAN_HEIGHTS) builder = pickWeighted(upper ? [[brutalTower, 2], [stackedWorks, 1]] : [[brutalTower, 2], [decoWorks, 1.5], [stackedWorks, 1]]);   // (economy mode's corps: the office blocks of the industrial set, economy.js)
+    if (PLAN_HEIGHTS && !sec.mf && PLAN_CAP.has(builder)) lot.mf = 3;   // (Planner: a level about 3 floors tall)
     if (sec.mf){ lot.mf = sec.mf; if (sec.zone === 'low') builder = buildTenement; else if (sec.zone === 'mid') builder = signShop; else if (sec.zone === 'ind') builder = hall; else if (sec.zone === 'high') builder = slabTower; }   // built into a gap: a tenement (or shop) short enough to fit
     // most commercial buildings stand on a ring of market stalls opening onto the street (the stall streets, decks
     // and plazas are stalls already, so they stand on the ground)
@@ -1752,7 +1804,7 @@ function steamVent(c){
 
 // About one building in seventy stands on a dark street: almost no light, and what's left flickers (see DARK in core.js)
 // (economy mode, economy.js: a building with no power has its lights off, and one not yet full has the floors above its residents unlit)
-const isDarkPlot = c => { if (typeof ECON !== 'undefined' && ECON.on){ const d = ECON.dark(c); if (d !== null) return d; } return !!c.sections.length && !c.mega && hash('dark', c.i, c.j) % 70 === 0; };
+const isDarkPlot = c => { const md = typeof NT_MODE === 'function' ? NT_MODE() : null; if (md){ const d = md.dark(c); if (d !== null) return d; } return !!c.sections.length && !c.mega && hash('dark', c.i, c.j) % 70 === 0; };
 /* ---------- rebuilding ---------- */
 // Pieces are batched in regions of REG x REG grid cells; an edit only re-batches the regions it touched.
 const REG = 5, regions = new Map(), dirtyRegions = new Set();

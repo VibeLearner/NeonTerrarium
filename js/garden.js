@@ -1028,18 +1028,30 @@ function gdMirNear(cx, cz, r){
 }
 function gdMirMeshNear(o){
   const g = o.geometry; if (!g) return true;
-  if (!g.boundingSphere) g.computeBoundingSphere(); if (!g.boundingSphere) return true;
+  if (!g.boundingSphere){ const p = g.attributes && g.attributes.position; if (!p || !p.array) return true; g.computeBoundingSphere(); } if (!g.boundingSphere) return true;   // (arrays let go, no sphere kept: drawn)
   _gfS.copy(g.boundingSphere).applyMatrix4(o.matrixWorld); return gdMirNear(_gfS.center.x, _gfS.center.z, _gfS.radius);
 }
 // a moving group: where its bounds are now. Their middle and size are measured in the group's own frame and kept, measured again when its parts
 // change in number, when it was empty, and every second or so (a building rising in its build animation, a group filled over a few frames: measured
 // once, while still empty, it was taken as nothing at its origin and left out of the mirror, owner Nov 6: reflections not catching up with building)
 const _gfL = new THREE.Vector3(), _gfI = new THREE.Matrix4();
+// (the bounds of a group, as Box3.setFromObject, but from each geometry's kept box or sphere: a merged plot's geometry can have let its arrays go
+//  (round 9 item 4), and three then reads a null array to measure it: a TypeError every frame that stopped the pond mirror, owner Nov 6)
+const _gbB = new THREE.Box3(), _gbS = new THREE.Sphere();
+function gdBoundsOf(o, out){
+  out.makeEmpty(); o.updateWorldMatrix(false, true);
+  o.traverse(c => { const g = c.geometry; if (!g) return;
+    if (g.boundingBox){ _gbB.copy(g.boundingBox).applyMatrix4(c.matrixWorld); out.union(_gbB); return; }
+    if (g.boundingSphere){ _gbS.copy(g.boundingSphere).applyMatrix4(c.matrixWorld); _gbS.getBoundingBox(_gbB); out.union(_gbB); return; }
+    const p = g.attributes && g.attributes.position; if (!p || !p.array) return;   // (its arrays let go and no bounds kept: left out)
+    g.computeBoundingBox(); if (g.boundingBox){ _gbB.copy(g.boundingBox).applyMatrix4(c.matrixWorld); out.union(_gbB); } });
+  return out;
+}
 function gdMirRootNear(o){
   if (o.isMesh || o.isPoints || o.isLine) return !o.frustumCulled || gdMirMeshNear(o);
   let m = GD_MIRF.rad.get(o);
   if (!m || !m.r || m.n !== o.children.length || ++m.t > 60){
-    _gfB.setFromObject(o);
+    gdBoundsOf(o, _gfB);
     if (_gfB.isEmpty()) m = { r: 0, n: o.children.length, t: 0, c: new THREE.Vector3() };
     else { _gfB.getCenter(_gfL); const r = _gfB.min.distanceTo(_gfB.max)/2;
       m = { r, n: o.children.length, t: 0, c: _gfL.clone().applyMatrix4(_gfI.copy(o.matrixWorld).invert()) }; }

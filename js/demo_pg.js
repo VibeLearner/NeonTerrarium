@@ -23,9 +23,9 @@ const DEMOPG = (() => {
   const CAP = !!window.__TR_CAPTURE;   // the picture pass: the recorder steps the clock and films each frame
   const AUTO = !!window.__DM_AUDIO;    // the sound pass: real time, nothing drawn, only what makes a sound
   const FPS = +window.__DM_FPS || 60;
-  // every edit made at once (not spread over frames or handed to the worker), in every pass: the city is small, and the plan has to see each
-  // building's real height the moment it is placed
-  window.__STAGE_NOW = window.__SYNC_NOW = true;
+  // every edit made at once (not spread over frames or handed to the worker): the plan has to see each building's real height the moment it is
+  // placed. (Not in the sound pass: it builds nothing at all, see act)
+  if (!AUTO) window.__STAGE_NOW = window.__SYNC_NOW = true;
   const say = (...a) => { D.log.push(a.join(' ')); if (D.log.length > 600) D.log.shift(); console.log('[demo]', ...a); };
   const warn = (what, e) => { D.log.push('! ' + what + ': ' + (e && e.message || e)); console.warn('[demo] ' + what, e && e.stack ? e.stack.split('\n').slice(0, 3).join(' | ') : e); };
   const safe = (what, f) => { try { return f(); } catch (e) { warn(what, e); return null; } };
@@ -171,6 +171,10 @@ const DEMOPG = (() => {
   // one click, as a player makes it (each with its own seed: the same building every time)
   function act(a){
     if (a.kind === 'btn' || a.kind === 'key'){ zoneTo(a.v); return true; }
+    // the sound pass plays real time, and the Grid's music is scheduled only a tenth of a second ahead: a click that rebuilt the city there (a
+    // garden plot can take a good while) froze the page long enough for the music to fall behind, glitch and stop. So nothing is built there:
+    // each click only makes its sound, at its moment (the same sounds the builds make: world.js startAnim, cycleGreen)
+    if (AUTO){ safe('sound', () => sfx.play(a.kind === 'del' ? 'remove' : 'place')); return true; }
     const T = targetOf2(a); if (!T) return false;
     if (a.kind === 'del'){ const n0 = T.c.sections.length; removeAt({ c: T.c, kind: 'bld', p: new THREE.Vector3(T.at.x, T.at.y, T.at.z) }); return T.c.sections.length < n0; }
     const before = JSON.stringify(stateOf(a));
@@ -447,9 +451,11 @@ const DEMOPG = (() => {
     overlay();
     status('working out the city');
     await until(() => typeof pplReady !== 'undefined' && pplReady, 300).catch(e => warn('people', e));
-    plan();
-    status('back to one bare plot');
-    city(); settleAll();
+    if (!AUTO){   // (the sound pass builds nothing, so it needs no plan)
+      plan();
+      status('back to one bare plot');
+      city(); settleAll();
+    }
     timeline();
     status('the Grid tuning in');
     await until(() => music.on && music.level > .98, AUTO ? 40 : 600).catch(e => warn('music', 'the Grid is not playing (' + (e && e.message) + ')'));
@@ -457,7 +463,7 @@ const DEMOPG = (() => {
     status('night falling');
     S.hour = HOUR; await wait(.3); LIGHTS_ON.value = LIGHTS_GOAL;
     await until(() => Math.abs(LIGHTS_ON.value - LIGHTS_GOAL) < .01, 40).catch(e => warn('lights', e));
-    PLAN.K = undefined; D.t = 0; camAt(0); camGoal.set(CAMP.x, CAMP.y, CAMP.z); camT.copy(camGoal); yaw = yawT = CAMP.yaw; zoom = zoomT = CAMP.zoom; PITCH = pitchT = CAMP.pitch;
+    PLAN.K = undefined; D.t = 0; if (!AUTO) camAt(0); camGoal.set(CAMP.x, CAMP.y, CAMP.z); camT.copy(camGoal); yaw = yawT = CAMP.yaw; zoom = zoomT = CAMP.zoom; PITCH = pitchT = CAMP.pitch;
     D.ready = true;
     await wait(1);
     D.info.deck = DECK ? DECK.length + ' moments from the sound pass' : AUTO ? 'recording' : 'live (no sound pass yet)';

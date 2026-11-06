@@ -578,13 +578,17 @@ const comp = new THREE.ShaderMaterial({
           vec2 uv = cp.xy*0.5 + 0.5;
           if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) break;
           float sd = texture2D(tDepth, uv).x, qd = cp.z*0.5 + 0.5;
-          if (qd > sd + 0.0003*DK && qd - sd < 0.015*DK){ huv = uv; hit = 1.0; break; }
+          if (qd > sd + 0.0003*DK && qd - sd < 0.015*DK){
+          // (a pond passes over something a pixel or two wide that the ray goes behind on both sides: a pole, a stem. Its reflection was a 1-pixel streak
+          //  that shimmered, owner Nov 6: on the water only things of some size reflect)
+          if (watPx && texture2D(tDepth, uv - vec2(1.5/res.x, 0.0)).x > qd && texture2D(tDepth, uv + vec2(1.5/res.x, 0.0)).x > qd) continue;
+          huv = uv; hit = 1.0; break; }
         }
         if (hit > 0.5){
           // smear the reflection downward a few pixels: the streaky look of lights on wet asphalt
           vec2 st = vec2(0.0, -1.0/res.y);
-          if (watPx) huv.x += floor(sin(wp.z*9.0 + wp.x*3.0 + time*1.7)*1.5 + 0.5)/res.x;   // (on a pond the reflection shivers sideways a pixel or so)
-          hitCol = texture2D(tColor, huv).rgb*0.4 + texture2D(tColor, huv+st*2.0).rgb*0.3 + texture2D(tColor, huv+st*4.0).rgb*0.2 + texture2D(tColor, huv+st*6.0).rgb*0.1;
+          // (a pond: just what was hit, no sideways shiver or downward smear: they sampled past thin things to what's behind them, a shimmering streak)
+          hitCol = watPx ? texture2D(tColor, huv).rgb : texture2D(tColor, huv).rgb*0.4 + texture2D(tColor, huv+st*2.0).rgb*0.3 + texture2D(tColor, huv+st*4.0).rgb*0.2 + texture2D(tColor, huv+st*6.0).rgb*0.1;
           float lum = dot(hitCol, vec3(0.3, 0.59, 0.11));
           float bright = smoothstep(0.35, 0.95, lum);                       // only lights really reflect
           float k = watPx ? clamp(bright*0.95 + 0.18, 0.0, 1.0) : wet * mix(bright*0.9, 0.7, pud);   // puddles reflect everything, pavement only the lights; a pond the lights strongly and the rest faintly
@@ -830,12 +834,16 @@ const SOFT_WET = SOFT_HEAD + `
         vec2 uv = cp.xy*0.5 + 0.5;
         if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) break;
         float sd = texture2D(tDepth, uv).x, qd = cp.z*0.5 + 0.5;
-        if (qd > sd + 0.0003*DK && qd - sd < 0.015*DK){ huv = uv; hit = 1.0; break; }
+        if (qd > sd + 0.0003*DK && qd - sd < 0.015*DK){
+          // (a pond passes over something a pixel or two wide that the ray goes behind on both sides: a pole, a stem. Its reflection was a 1-pixel streak
+          //  that shimmered, owner Nov 6: on the water only things of some size reflect)
+          if (watPx && texture2D(tDepth, uv - vec2(1.5/res.x, 0.0)).x > qd && texture2D(tDepth, uv + vec2(1.5/res.x, 0.0)).x > qd) continue;
+          huv = uv; hit = 1.0; break; }
       }
       if (hit > 0.5){
         vec2 st = vec2(0.0, -1.0/res.y);
-        if (watPx) huv.x += floor(sin(wp.z*9.0 + wp.x*3.0 + time*1.7)*1.5 + 0.5)/res.x;
-        hitCol = texture2D(tColor, huv).rgb*0.4 + texture2D(tColor, huv+st*2.0).rgb*0.3 + texture2D(tColor, huv+st*4.0).rgb*0.2 + texture2D(tColor, huv+st*6.0).rgb*0.1;
+        // (a pond: just what was hit, no sideways shiver or downward smear: they sampled past thin things to what's behind them, a shimmering streak)
+        hitCol = watPx ? texture2D(tColor, huv).rgb : texture2D(tColor, huv).rgb*0.4 + texture2D(tColor, huv+st*2.0).rgb*0.3 + texture2D(tColor, huv+st*4.0).rgb*0.2 + texture2D(tColor, huv+st*6.0).rgb*0.1;
         float lum = dot(hitCol, vec3(0.3, 0.59, 0.11));
         float bright = smoothstep(0.35, 0.95, lum);
         float k = watPx ? clamp(bright*0.95 + 0.18, 0.0, 1.0) : wet * mix(bright*0.9, 0.7, pud);

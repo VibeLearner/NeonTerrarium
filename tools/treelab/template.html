@@ -1,0 +1,194 @@
+<title>Tree Crown Lab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,750&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen&display=swap">
+<style>
+/* Layout: a greenhouse bench. A grove strip on top to judge how kinds sit together, then one row per kind with its variants laid out like seed trays. */
+:root {
+  --bg: #e9ede3; --surface: #f6f8f1; --sunk: #dfe5d7; --ink: #1c2a21; --muted: #586a5d; --line: #c6d0bf;
+  --accent: #a9582c; --keep: #3d7f2a; --drop: #a8433a; --maybe: #8a7a2a;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --pixel: "Silkscreen", ui-monospace, "Courier New", monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #111916; --surface: #18221d; --sunk: #0e1512; --ink: #e2e8dc; --muted: #93a297; --line: #2b3a31;
+  --accent: #e0905a; --keep: #7cc24f; --drop: #e07a6e; --maybe: #d9c060; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #111916; --surface: #18221d; --sunk: #0e1512; --ink: #e2e8dc; --muted: #93a297; --line: #2b3a31;
+  --accent: #e0905a; --keep: #7cc24f; --drop: #e07a6e; --maybe: #d9c060; color-scheme: dark }
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--body); }
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 28px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 24px; }
+header { display: grid; gap: 6px; }
+.eyebrow { font: 11px/1 var(--pixel); letter-spacing: .08em; color: var(--accent); }
+h1 { font: 750 clamp(30px, 5vw, 44px)/1.05 var(--display); margin: 0; text-wrap: balance; }
+.lede { margin: 0; max-width: 66ch; color: var(--muted); }
+.bar { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.group { display: flex; align-items: center; gap: 8px; }
+.group > span { font: 10px/1 var(--pixel); letter-spacing: .06em; color: var(--muted); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; background: transparent; color: var(--ink); font: 500 13px var(--body); padding: 6px 10px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.submit { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.btn { border: 1px solid var(--accent); background: var(--accent); color: var(--surface); font: 600 14px var(--body); padding: 8px 14px; border-radius: 8px; cursor: pointer; }
+.btn.ghost { background: transparent; color: var(--accent); }
+.status { font-size: 13px; color: var(--muted); }
+.tally { font: 11px/1 var(--pixel); color: var(--muted); letter-spacing: .04em; }
+.grove { display: grid; gap: 10px; }
+.grove-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+h2 { font: 600 20px/1.2 var(--display); margin: 0; }
+.grove canvas { width: 100%; height: auto; image-rendering: pixelated; border-radius: 10px; border: 1px solid var(--line); display: block; background: var(--sunk); }
+.kinds { display: grid; gap: 14px; }
+.kind { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 12px; }
+.kind[data-d="keep"] { border-color: color-mix(in srgb, var(--keep) 55%, var(--line)); }
+.kind[data-d="drop"] { opacity: .62; }
+.kind-head { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.kind-name { font: 600 17px/1.2 var(--display); }
+.tag { font: 10px/1 var(--pixel); color: var(--muted); letter-spacing: .05em; background: var(--sunk); padding: 4px 6px; border-radius: 4px; }
+.kind-desc { color: var(--muted); font-size: 14px; flex: 1 1 260px; min-width: 0; }
+.decide { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.decide button { border: 0; background: transparent; color: var(--ink); font: 500 13px var(--body); padding: 6px 12px; cursor: pointer; }
+.decide button + button { border-left: 1px solid var(--line); }
+.decide button[data-v="keep"][aria-pressed="true"] { background: var(--keep); color: var(--surface); }
+.decide button[data-v="maybe"][aria-pressed="true"] { background: var(--maybe); color: var(--surface); }
+.decide button[data-v="drop"][aria-pressed="true"] { background: var(--drop); color: var(--surface); }
+.tray { display: flex; flex-wrap: wrap; gap: 8px; }
+.cell { position: relative; border: 1px solid var(--line); border-radius: 8px; padding: 6px; background: var(--sunk); cursor: pointer; display: grid; place-items: center; }
+.cell canvas { image-rendering: pixelated; display: block; max-width: 100%; }
+.cell .v { position: absolute; left: 5px; top: 4px; font: 9px/1 var(--pixel); color: var(--muted); }
+.cell[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
+.cell[aria-pressed="true"] .v { color: var(--accent); }
+.note { width: 100%; box-sizing: border-box; border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 8px; padding: 7px 10px; font: 14px var(--body); }
+.hint { font-size: 13px; color: var(--muted); margin: 0; }
+@media (max-width: 640px) { .submit { margin-left: 0; width: 100%; } .bar { position: static; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">NEON TERRARIUM · GARDENS</div>
+    <h1>Tree Crown Lab</h1>
+    <p class="lede">Every tree top the game draws, straight from its sprite code. In the park each crown is shown as four crossed copies on a real trunk; here you see the flat sprite. Mark each kind Keep, Maybe or Drop, star any variants you especially like, then Submit picks. Round 1 is in: the game now draws only the variants you starred, shown here numbered afresh.</p>
+  </header>
+
+  <div class="bar" role="toolbar" aria-label="View settings">
+    <div class="group"><span>ZOOM</span><div class="seg" id="zoom"><button data-z="2">2x</button><button data-z="3" aria-pressed="true">3x</button><button data-z="4">4x</button></div></div>
+    <div class="group"><span>BACKDROP</span><div class="seg" id="bg"><button data-b="lawn" aria-pressed="true">Lawn</button><button data-b="night">Night</button><button data-b="plain">Plain</button></div></div>
+    <div class="submit"><span class="tally" id="tally"></span><span class="status" id="status" aria-live="polite">Loading saved picks…</span><button class="btn" id="submitBtn" type="button">Submit picks</button></div>
+  </div>
+
+  <section class="grove" aria-labelledby="groveTitle">
+    <div class="grove-head"><h2 id="groveTitle">Grove check</h2><button class="btn ghost" id="reroll" type="button">New grove</button></div>
+    <p class="hint">A random mix of the kinds you haven't dropped, side by side at game size, to check that any two can stand together.</p>
+    <canvas id="grove" width="480" height="120" aria-label="A mixed grove of tree crowns"></canvas>
+  </section>
+
+  <section class="kinds" id="kinds" aria-label="Tree kinds"></section>
+</div>
+
+<script>
+/*SPRITEGEN*/
+</script>
+<script>
+(() => {
+const SIZES = /*SIZES*/{}, COUNT = /*COUNT*/8;
+const INFO = {
+  tc_round: ['Round leafy', 'An oak or lime: the everyday park tree.'],
+  tc_oval: ['Tall oval', 'A hornbeam shape, for avenues and tight spots.'],
+  tc_willow: ['Weeping willow', 'A light crown with a hanging curtain; it swings from the crown in the wind.'],
+  tc_pine: ['Tiered conifer', 'Stacked drooping skirts, a cooler green.'],
+  tc_cypress: ['Cypress', 'A narrow flame, good for rows and gates.'],
+  tc_blossom: ['Cherry blossom', 'Pink and cream crowns, one in three still green with blossom dots.'],
+  tc_maple: ['Maple', 'Amber and coral leaves, muted to sit with the greens.'],
+  tc_umbrella: ['Umbrella', 'A wide flat-topped crown on a tall trunk.'],
+  tc_palm: ['Palm', 'Fronds all round, drooping at the tips.'],
+  tc_airy: ['Birch', 'A sparse, light crown with sky between the clumps.'],
+  tc_wisteria: ['Wisteria', 'A green crown with violet (or pink) racemes hanging below.'],
+  tc_puff: ['Small clump', 'The little crown at the end of a limb, under a bigger one.'],
+};
+const kinds = Object.keys(SIZES);
+const state = { zoom: 3, bg: 'lawn', picks: {} };   // picks[kind] = { d: 'keep'|'maybe'|'drop'|'', favs: [v], note }
+kinds.forEach(k => state.picks[k] = { d: '', favs: [], note: '' });
+const BG = { lawn: ['#5f8f3e', '#4f7a34'], night: ['#16222a', '#1d2c34'], plain: ['#7a8478', '#6e786c'] };
+const sprite = {}; for (const k of kinds){ sprite[k] = []; for (let v = 0; v < (SG.COUNT[k] || COUNT); v++){ const [w, h] = SIZES[k], px = SG.draw(k, w, h, v), c = document.createElement('canvas'); c.width = w; c.height = h; SG.blit(c.getContext('2d'), px, 0, 0); sprite[k].push(c); } }
+// ---- the kind rows ----
+const host = document.getElementById('kinds');
+function cellBg(ctx, w, h){ const [a, b] = BG[state.bg]; ctx.fillStyle = a; ctx.fillRect(0, 0, w, h); ctx.fillStyle = b; for (let y = 0; y < h; y += 4) for (let x = (y/4) % 2 ? 2 : 0; x < w; x += 4) ctx.fillRect(x, y, 1, 1); }
+function drawCell(cv, k, v){ const [w, h] = SIZES[k], z = state.zoom; cv.width = (w + 6)*z; cv.height = (h + 6)*z; const g = cv.getContext('2d'); g.imageSmoothingEnabled = false;
+  g.save(); g.scale(z, z); cellBg(g, w + 6, h + 6); g.drawImage(sprite[k][v], 3, 3); g.restore(); }
+function renderKinds(){
+  host.textContent = '';
+  for (const k of kinds){
+    const p = state.picks[k], [name, desc] = INFO[k] || [k, ''], row = document.createElement('article'); row.className = 'kind'; row.dataset.d = p.d;
+    const head = document.createElement('div'); head.className = 'kind-head';
+    const nm = document.createElement('div'); nm.className = 'kind-name'; nm.textContent = name;
+    const tag = document.createElement('span'); tag.className = 'tag'; tag.textContent = k + ' · ' + SIZES[k].join('×') + ' PX';
+    const ds = document.createElement('div'); ds.className = 'kind-desc'; ds.textContent = desc;
+    const dec = document.createElement('div'); dec.className = 'decide'; dec.setAttribute('role', 'group'); dec.setAttribute('aria-label', 'Decision for ' + name);
+    for (const [v, label] of [['keep', 'Keep'], ['maybe', 'Maybe'], ['drop', 'Drop']]){ const b = document.createElement('button'); b.type = 'button'; b.dataset.v = v; b.textContent = label; b.setAttribute('aria-pressed', String(p.d === v));
+      b.onclick = () => { p.d = p.d === v ? '' : v; save(k); renderKinds(); drawGrove(); }; dec.append(b); }
+    head.append(nm, tag, ds, dec);
+    const tray = document.createElement('div'); tray.className = 'tray';
+    for (let v = 0; v < (SG.COUNT[k] || COUNT); v++){ const cell = document.createElement('button'); cell.type = 'button'; cell.className = 'cell'; cell.setAttribute('aria-pressed', String(p.favs.includes(v))); cell.setAttribute('aria-label', name + ' variant ' + (v + 1) + (p.favs.includes(v) ? ', starred' : ''));
+      const cv = document.createElement('canvas'); drawCell(cv, k, v); const lb = document.createElement('span'); lb.className = 'v'; lb.textContent = (p.favs.includes(v) ? '★ ' : '') + (v + 1);
+      cell.append(cv, lb); cell.onclick = () => { p.favs = p.favs.includes(v) ? p.favs.filter(x => x !== v) : p.favs.concat(v).sort((a, b) => a - b); save(k); renderKinds(); }; tray.append(cell); }
+    const note = document.createElement('input'); note.className = 'note'; note.id = 'note-' + k; note.placeholder = 'Note for this kind (optional): too dark, more blossom…'; note.value = p.note;
+    let t = null; note.oninput = () => { p.note = note.value; clearTimeout(t); t = setTimeout(() => save(k), 700); };
+    row.append(head, tray, note); host.append(row);
+  }
+  const n = { keep: 0, maybe: 0, drop: 0 }; for (const k of kinds) if (state.picks[k].d) n[state.picks[k].d]++;
+  document.getElementById('tally').textContent = n.keep + ' KEEP · ' + n.maybe + ' MAYBE · ' + n.drop + ' DROP';
+}
+// ---- the grove ----
+let groveSeed = 1;
+function drawGrove(){
+  const cv = document.getElementById('grove'), g = cv.getContext('2d'), W = cv.width, H = cv.height; g.imageSmoothingEnabled = false;
+  const sky = state.bg === 'night' ? ['#141d26', '#1c2833'] : state.bg === 'plain' ? ['#8a948a', '#808a80'] : ['#a9c7c9', '#b8d3d1'];
+  g.fillStyle = sky[0]; g.fillRect(0, 0, W, H); g.fillStyle = sky[1]; g.fillRect(0, 0, W, H*.4);
+  const ground = H - 22; g.fillStyle = BG[state.bg === 'night' ? 'night' : 'lawn'][0]; g.fillRect(0, ground, W, H - ground);
+  g.fillStyle = state.bg === 'night' ? '#2a3a2a' : '#4f7a34'; for (let x = 0; x < W; x += 3) g.fillRect(x, ground, 1, 1);
+  const pool = kinds.filter(k => state.picks[k].d !== 'drop' && k !== 'tc_puff'); if (!pool.length) return;
+  const R = SG.rng(groveSeed*7919), trees = [];
+  for (let x = 14; x < W - 10; x += R.i(28, 44)) trees.push(((k) => ({ k, v: R.i(0, (SG.COUNT[k] || COUNT) - 1), x, y: ground + R.i(0, 14) }))(R.pick(pool)));
+  trees.sort((a, b) => a.y - b.y);
+  for (const t of trees){ const [w, h] = SIZES[t.k], th = t.k === 'tc_palm' ? 34 : t.k === 'tc_umbrella' ? 28 : t.k === 'tc_pine' || t.k === 'tc_cypress' ? 6 : 18, cy = t.y - th - h*.35;
+    g.fillStyle = t.k === 'tc_airy' ? '#d8d0c0' : t.k === 'tc_palm' ? '#9a7a52' : '#5a3e2a'; g.fillRect(Math.round(t.x - 1), Math.round(cy + h*.3), 3, Math.round(t.y - (cy + h*.3)));
+    g.drawImage(sprite[t.k][t.v], Math.round(t.x - w/2), Math.round(cy - h/2)); }
+}
+document.getElementById('reroll').onclick = () => { groveSeed++; drawGrove(); };
+// ---- view settings ----
+function segment(id, attr, key, num){ const el = document.getElementById(id); el.querySelectorAll('button').forEach(b => b.onclick = () => {
+  el.querySelectorAll('button').forEach(o => o.setAttribute('aria-pressed', String(o === b))); state[key] = num ? +b.dataset[attr] : b.dataset[attr]; renderKinds(); drawGrove(); }); }
+segment('zoom', 'z', 'zoom', true); segment('bg', 'b', 'bg', false);
+// ---- picks, kept in the page's store (Claude reads them from there) ----
+const status = document.getElementById('status'); let db = null; const ROUND = 2;
+const writing = {};
+async function save(k){
+  if (!db){ status.textContent = 'Picks are kept on this page only (the store is not available here).'; return; }
+  if (writing[k]){ writing[k].again = true; return; }
+  writing[k] = { again: false };
+  try { do { writing[k].again = false; const p = state.picks[k]; await db.doc('kept2/' + k).set({ round: ROUND, kind: k, decision: p.d, favs: p.favs, note: p.note, at: new Date().toISOString() }); } while (writing[k].again);
+    status.textContent = 'Saved'; }
+  catch (e){ status.textContent = 'Could not save that pick. Check your connection and try again.'; }
+  finally { delete writing[k]; }
+}
+document.getElementById('submitBtn').onclick = async () => {
+  if (!db){ status.textContent = 'Submitting needs the page open on claude.ai while signed in.'; return; }
+  const sum = {}; for (const k of kinds) sum[k] = state.picks[k];
+  try { await db.collection('rounds').add({ round: ROUND, at: new Date().toISOString(), picks: sum }); status.textContent = 'Submitted. Tell Claude your picks are in.'; }
+  catch (e){ status.textContent = 'Could not submit. Check your connection and try again.'; }
+};
+renderKinds(); drawGrove();
+(async () => {
+  const timer = setTimeout(() => { if (!db) status.textContent = 'Picks will save once the page connects.'; }, 10000);
+  try { db = window.claude ? await window.claude.use('db') : null; } catch (e){ db = null; }
+  if (!db){ clearTimeout(timer); status.textContent = 'Picks are kept on this page only (the store is not available here).'; return; }
+  try { const snap = await db.collection('kept2').get(); for (const d of snap.docs){ const v = d.data(); if (v && state.picks[v.kind]) state.picks[v.kind] = { d: v.decision || '', favs: Array.isArray(v.favs) ? v.favs : [], note: v.note || '' }; }
+    status.textContent = snap.empty ? 'No picks yet' : 'Saved picks loaded'; }
+  catch (e){ status.textContent = 'Could not load saved picks. New picks still save.'; }
+  clearTimeout(timer); renderKinds(); drawGrove();
+})();
+})();
+</script>

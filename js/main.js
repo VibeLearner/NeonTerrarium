@@ -93,6 +93,7 @@ function frameBody(now){
   PH.subBegin(); updateVehicleShadows(); PH.sub('vehicle shadows');
   updateAnims(dt); PH.sub('build animations');
   updateMegaFx(dt, now/1000);
+  if (typeof gardenFx === 'function') gardenFx(dt);   // (the ponds' rings and floating lily pads: garden.js)
   PH.lap('megastructures, animations');
   updatePeople(dt*FF.ppl, FF.peopleTime(rdt, now/1000));   // (fast forward: the people's own clock runs quicker too)
   STORY.tick(rdt);   // story moments, the shape of the day, the monitor's log (story.js)

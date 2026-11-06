@@ -250,7 +250,7 @@ const comp = new THREE.ShaderMaterial({
     near:{value:NEAR}, far:{value:FAR}, camDist:{value:CAM_DIST}, skyTop:{value:new THREE.Color()}, skyBot:{value:new THREE.Color()}, haze:{value:new THREE.Color()},
     night:{value:0}, smoothLook: SMOOTH_LOOK, lodLines: LOD.lines, pxK:{value:1}, starOff:{value:new THREE.Vector2()}, skyYaw:{value:0}, rainOff:{value:new THREE.Vector2()}, windR:{value:1}, outlines:{value:1}, palOn:{value:0}, time:{value:0},
     pal:{value: PAL_HEX.map(h => { const c=new THREE.Color(h); return new THREE.Vector3(c.r,c.g,c.b); })},
-    tCloud:{value:null}, VP:{value:new THREE.Matrix4()}, upView:{value:new THREE.Vector3(0,1,0)}, wet:{value:.2}, rainOn:{value:0}, rainAmt:{value:0}, rainVis:{value:1}, rainDens:{value:1}, rainT:{value:0}, starVis:{value:0}, skyMid:{value:new THREE.Color()}, skyMidOn:{value:0}, hazeK:{value:.35}, mistTint:{value:new THREE.Color(1,1,1)}, sparkle:{value:0},
+    tCloud:{value:null}, VP:{value:new THREE.Matrix4()}, upView:{value:new THREE.Vector3(0,1,0)}, wet:{value:.2}, waterOn:{value:0}, rainOn:{value:0}, rainAmt:{value:0}, rainVis:{value:1}, rainDens:{value:1}, rainT:{value:0}, starVis:{value:0}, skyMid:{value:new THREE.Color()}, skyMidOn:{value:0}, hazeK:{value:.35}, mistTint:{value:new THREE.Color(1,1,1)}, sparkle:{value:0},
     invVP:{value:new THREE.Matrix4()}, shadowMap:{value:null}, shadowMat:{value:new THREE.Matrix4()},
     sunDir:{value:new THREE.Vector3(0,1,0)}, sunCol:{value:new THREE.Color()}, cityGlow:{value:new THREE.Color(0xff4fa3)}, glowC:{value:new THREE.Vector2()},
     cloudOn:{value:1}, raysOn:{value:1}, rayI:{value:1}, rainDark:{value:0},
@@ -271,7 +271,7 @@ const comp = new THREE.ShaderMaterial({
     uniform float night; uniform float smoothLook; uniform float lodLines; uniform float pxK; uniform vec2 starOff; uniform float skyYaw; uniform vec2 rainOff; uniform vec2 glowC; uniform float windR; uniform float outlines; uniform float palOn; uniform float time;
     uniform vec3 pal[${PAL_HEX.length}];
     uniform mat4 invVP; uniform sampler2D shadowMap; uniform mat4 shadowMat;
-    uniform mat4 VP; uniform vec3 upView; uniform float wet; uniform float rainOn; uniform sampler2D tCloud;
+    uniform mat4 VP; uniform vec3 upView; uniform float wet; uniform float waterOn; uniform float rainOn; uniform sampler2D tCloud;
     uniform float rainAmt; uniform float rainVis; uniform float rainDens; uniform float rainT; uniform float starVis; uniform vec3 skyMid; uniform float skyMidOn; uniform float hazeK; uniform vec3 mistTint; uniform float sparkle;   // (the looks: js/looks.js)
     uniform vec3 sunDir; uniform vec3 sunCol; uniform vec3 cityGlow;
     uniform float cloudOn; uniform float raysOn; uniform float rayI; uniform float rainDark;
@@ -537,7 +537,8 @@ const comp = new THREE.ShaderMaterial({
 #if SOFT_HALF
       #define SOFT_TAPS if (!haveTaps){ sw = softTaps(gl_FragCoord.xy, near + rd*(far - near), sx, sy); haveTaps = true; }
       ivec4 sx, sy; vec4 sw = vec4(0.0); bool haveTaps = false;
-      if (FX_WET > 0 && rd < 0.99999 && wet > 0.0 && dot(n, upView) > 0.93){
+      // (garden ponds, garden.js: their water marks its pixels in the normal image's alpha, and always reflects, wet weather or not)
+      if (FX_WET > 0 && rd < 0.99999 && (wet > 0.0 || (waterOn > 0.0 && texture2D(tNormal, vUv).a < 0.75)) && dot(n, upView) > 0.93){
         SOFT_TAPS
         float Wt = 0.0, Kh = 0.0, Cs = 0.0; vec3 Ch = vec3(0.0);
         for (int k = 0; k < 4; k++){
@@ -554,9 +555,10 @@ const comp = new THREE.ShaderMaterial({
         }
       }
 #else
-      if (FX_WET > 0 && rd < 0.99999 && wet > 0.0 && dot(n, upView) > 0.93){
+      bool watPx = waterOn > 0.0 && texture2D(tNormal, vUv).a < 0.75;   // (a garden pond's pixel: garden.js)
+      if (FX_WET > 0 && rd < 0.99999 && (wet > 0.0 || watPx) && dot(n, upView) > 0.93){
         vec3 wp = ro + rdir*tEnd;
-        float pud = step(0.6, fbm(vec3(floor(wp.xz*6.0)/6.0*0.8, 0.0)));        // crisp-edged puddle patches
+        float pud = watPx ? 0.0 : step(0.6, fbm(vec3(floor(wp.xz*6.0)/6.0*0.8, 0.0)));        // crisp-edged puddle patches
         pud *= 0.35 + 0.65*rainAmt;
         vec3 rr = reflect(rdir, vec3(0.0, 1.0, 0.0));
         vec3 hitCol = vec3(0.0); float hit = 0.0, t = 0.03; vec2 huv = vec2(0.0);
@@ -572,10 +574,11 @@ const comp = new THREE.ShaderMaterial({
         if (hit > 0.5){
           // smear the reflection downward a few pixels: the streaky look of lights on wet asphalt
           vec2 st = vec2(0.0, -1.0/res.y);
+          if (watPx) huv.x += floor(sin(wp.z*9.0 + wp.x*3.0 + time*1.7)*1.5 + 0.5)/res.x;   // (on a pond the reflection shivers sideways a pixel or so)
           hitCol = texture2D(tColor, huv).rgb*0.4 + texture2D(tColor, huv+st*2.0).rgb*0.3 + texture2D(tColor, huv+st*4.0).rgb*0.2 + texture2D(tColor, huv+st*6.0).rgb*0.1;
           float lum = dot(hitCol, vec3(0.3, 0.59, 0.11));
           float bright = smoothstep(0.35, 0.95, lum);                       // only lights really reflect
-          float k = wet * mix(bright*0.9, 0.7, pud);                         // puddles reflect everything, pavement only the lights
+          float k = watPx ? clamp(bright*0.95 + 0.18, 0.0, 1.0) : wet * mix(bright*0.9, 0.7, pud);   // puddles reflect everything, pavement only the lights; a pond the lights strongly and the rest faintly
           k = floor(k*5.0 + 0.5)/5.0;                                        // stepped, to stay pixel art
           col = mix(col, max(col, hitCol*0.9), clamp(k, 0.0, 0.8));
         } else if (pud > 0.0){
@@ -746,7 +749,7 @@ function compVariant(){
   if (T.compFloor) for (const f of COMP_FX) on[f] = false;
   else if (!T.compAll){
     on.SHIM = u.nLifts.value > .5 || u.mtN.value > 0; on.OUTLINE = u.outlines.value > 0; on.AO = u.aoI.value > 0; on.NL = NL_UNI.lightI.value > 0;
-    on.RIM = u.rimI.value > .01; on.WET = u.wet.value > 0; on.CLOUDS = u.cloudOn.value > .5; on.MIST = u.mistI.value > 0 && u.nVents.value > 0;
+    on.RIM = u.rimI.value > .01; on.WET = u.wet.value > 0 || u.waterOn.value > 0; on.CLOUDS = u.cloudOn.value > .5; on.MIST = u.mistI.value > 0 && u.nVents.value > 0;
     on.RAYS = u.raysOn.value > .5 && u.rayI.value > .01; on.RAIN = u.rainOn.value > .5; on.PAL = u.palOn.value > .5; on.SPARK = u.sparkle.value > 0 && u.wet.value > 0;
   }
   if (!T.compFloor && !T.compAll) compWeatherOn(on);
@@ -800,11 +803,12 @@ const SOFT_HEAD = `
   vec4 outv = vec4(0.0);
 `;
 const SOFT_WET = SOFT_HEAD + `
-  if (FX_WET > 0 && rd < 0.99999 && wet > 0.0){
-    vec3 n = N(uvR);
-    if (dot(n, upView) > 0.93){
+  if (FX_WET > 0 && rd < 0.99999 && (wet > 0.0 || waterOn > 0.0)){
+    vec4 n4 = texture2D(tNormal, uvR); vec3 n = n4.rgb*2.0 - 1.0;
+    bool watPx = waterOn > 0.0 && n4.a < 0.75;   // (a garden pond's pixel: garden.js)
+    if ((wet > 0.0 || watPx) && dot(n, upView) > 0.93){
       vec3 wp = ro + rdir*tEnd;
-      float pud = step(0.6, fbm(vec3(floor(wp.xz*6.0)/6.0*0.8, 0.0)));        // crisp-edged puddle patches
+      float pud = watPx ? 0.0 : step(0.6, fbm(vec3(floor(wp.xz*6.0)/6.0*0.8, 0.0)));        // crisp-edged puddle patches
       pud *= 0.35 + 0.65*rainAmt;
       vec3 rr = reflect(rdir, vec3(0.0, 1.0, 0.0));
       vec3 hitCol = vec3(0.0); float hit = 0.0, t = 0.03; vec2 huv = vec2(0.0);
@@ -819,10 +823,11 @@ const SOFT_WET = SOFT_HEAD + `
       }
       if (hit > 0.5){
         vec2 st = vec2(0.0, -1.0/res.y);
+        if (watPx) huv.x += floor(sin(wp.z*9.0 + wp.x*3.0 + time*1.7)*1.5 + 0.5)/res.x;
         hitCol = texture2D(tColor, huv).rgb*0.4 + texture2D(tColor, huv+st*2.0).rgb*0.3 + texture2D(tColor, huv+st*4.0).rgb*0.2 + texture2D(tColor, huv+st*6.0).rgb*0.1;
         float lum = dot(hitCol, vec3(0.3, 0.59, 0.11));
         float bright = smoothstep(0.35, 0.95, lum);
-        float k = wet * mix(bright*0.9, 0.7, pud);
+        float k = watPx ? clamp(bright*0.95 + 0.18, 0.0, 1.0) : wet * mix(bright*0.9, 0.7, pud);
         outv = vec4(hitCol, 0.02 + clamp(k, 0.0, 1.0)*0.48);
       } else if (pud > 0.0) outv = vec4(0.0, 0.0, 0.0, 0.52 + clamp(0.35*pud*wet*2.0/0.7, 0.0, 1.0)*0.48);
       else outv = vec4(0.0, 0.0, 0.0, 0.02);
@@ -908,7 +913,7 @@ function softEffects(px, py){
   const u = comp.uniforms, par = v => ((v % 2) + 2) % 2;
   u.softPar.value.set(par(px - (W >> 1)), par(py - (H >> 1))); u.softSig.value = Math.max(6*2*zoom/H, .02);
   const on = [comp.defines.FX_WET, comp.defines.FX_MIST, comp.defines.FX_RAYS];
-  const want = [u.wet.value > 0, u.mistI.value > 0, u.rayI.value > .01 && u.raysOn.value > .5];   // (a pass whose effect is at nothing this frame is skipped: the composite multiplies it by that strength)
+  const want = [u.wet.value > 0 || u.waterOn.value > 0, u.mistI.value > 0, u.rayI.value > .01 && u.raysOn.value > .5];   // (a pass whose effect is at nothing this frame is skipped: the composite multiplies it by that strength)
   if (softAll && !PH.tests.softApart && !window.__SOFT_APART){   // one pass, three targets
     const w = [0, 1, 2].map(i => !!(on[i] && want[i])); if (!w[0] && !w[1] && !w[2]) return;
     const gl = renderer.getContext(), r0 = rtSoft[0];

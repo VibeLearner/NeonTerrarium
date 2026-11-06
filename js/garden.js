@@ -50,15 +50,19 @@ const GM = {
 // The depth rides in the surface's height (GD_WATER_Y plus up to GD_WATER_K at the deepest, a few millimetres): one material for every pond, no
 // textures. It moves, so it is drawn live (userData.live: not folded into the buildings' one material, not kept in the static cache).
 const GD_WATER_Y = .04, GD_WATER_K = .006;
+// The rings on the water (the cursor drawn over it, a tap on a phone): each one where it started, when (on the plants' clock, FOL_UNI.time), and how
+// strong (from how fast the cursor went). Eight at a time on a computer, four on a phone (GD_RIP.n); the oldest gives way to a new one.
+const GD_RIP = { rips: { value: Array.from({ length: 8 }, () => new THREE.Vector4(0, 0, -99, 0)) }, n: { value: 8 } };
+const GD_RIP_LIFE = 2.6;
 const GD_WATER_MAT = (() => {
   const m = toon(0x5d9294); m.userData.live = true; m.userData.noCast = true;
   m.customProgramCacheKey = () => 'gdwater';
   m.onBeforeCompile = sh => {
-    sh.uniforms.gTime = FOL_UNI.time; sh.uniforms.gLights = LIGHTS_ON;
+    sh.uniforms.gTime = FOL_UNI.time; sh.uniforms.gLights = LIGHTS_ON; sh.uniforms.gRips = GD_RIP.rips; sh.uniforms.gRipN = GD_RIP.n;
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWP;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
-varying vec3 vWP; uniform float gTime; uniform float gLights;
+varying vec3 vWP; uniform float gTime; uniform float gLights; uniform vec4 gRips[8]; uniform float gRipN;
 float gh(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x*p.y); }
 float gBayer(vec2 p){ vec2 q = mod(floor(p), 4.0); vec2 a = mod(q, 2.0), b = floor(q/2.0); return ((a.x*2.0 + a.y*3.0 - 2.0*a.x*a.y)*4.0 + (b.x*2.0 + b.y*3.0 - 2.0*b.x*b.y))/16.0; }
 float gSwell(vec2 q){ return 0.07*sin(q.x*0.9 + gTime*0.55)*sin(q.y*1.1 - gTime*0.45) + 0.035*sin(q.x*2.3 - q.y*1.7 + gTime*0.9); }
@@ -66,15 +70,30 @@ float gCaus(vec2 p){ vec2 i = floor(p), f = fract(p); float f1 = 8.0, f2 = 8.0;
   for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++){ vec2 o = vec2(float(x), float(y)), c = i + o;
     vec2 r = o + vec2(gh(c), gh(c + 7.3))*0.8 + 0.12*sin(gTime*0.5 + 6.28*vec2(gh(c + 3.1), gh(c + 5.7))) - f; float d = dot(r, r);
     if (d < f1){ f2 = f1; f1 = d; } else if (d < f2) f2 = d; }
-  return sqrt(f2) - sqrt(f1); }`)
+  return sqrt(f2) - sqrt(f1); }
+// the rings: each a little train of three crests running out from where it started, fading as it spreads and as it ages
+float gRings(vec2 p){ float s = 0.0;
+  for (int i = 0; i < 8; i++){ if (float(i) >= gRipN) break; vec4 r = gRips[i]; float age = gTime - r.z;
+    if (age < 0.0 || age > ${GD_RIP_LIFE.toFixed(1)}) continue;
+    float d = length(p - r.xy), x = d - (0.12 + age*0.8);
+    if (x > 0.05 || x < -0.62) continue;
+    float fade = 1.0 - age/${GD_RIP_LIFE.toFixed(1)};
+    s += min(r.w, 1.0)*fade*fade*cos(x*31.4)*smoothstep(-0.62, -0.2, x)*(1.0 - smoothstep(-0.01, 0.05, x))/(1.0 + d*1.2); }
+  return s; }`)
       .replace('#include <color_fragment>', `#include <color_fragment>
 vec2 gp = vWP.xz; float gD0 = clamp((vWP.y - ${GD_WATER_Y.toFixed(3)})/${GD_WATER_K.toFixed(4)}, 0.0, 1.0), gDi = gBayer(gl_FragCoord.xy) - 0.5;
 vec2 gRip = vec2(sin(gp.x*1.7 + gp.y*0.9 + gTime*0.6), sin(gp.y*1.9 - gp.x*0.7 - gTime*0.5))*0.035;
-float gDq = floor((gD0 + gRip.x + gDi*0.09)*5.0 + 0.5)/5.0;
+float gRg = gRings(gp) + gDi*0.05;
+float gDq = floor((gD0 + gRip.x + gRg*0.05 + gDi*0.09)*5.0 + 0.5)/5.0;
 vec3 gE = vec3(0.48, 0.66, 0.64), gS = vec3(0.365, 0.573, 0.58), gM = vec3(0.2, 0.396, 0.478), gDp = vec3(0.133, 0.286, 0.353);
 vec3 gW = gDq < 0.2 ? mix(gE, gS, gDq/0.2) : gDq < 0.6 ? mix(gS, gM, (gDq - 0.2)/0.4) : mix(gM, gDp, clamp((gDq - 0.6)/0.4, 0.0, 1.0));
 float gC = gCaus(gp*2.2 + gRip*6.0), gCl = gC < 0.07 ? 1.0 : gC < 0.13 ? 0.4 : 0.0;
 gW += gCl*(1.0 - smoothstep(0.0, 0.6, gD0 + gDi*0.15))*vec3(0.1, 0.1, 0.07)*(1.0 - gLights);
+// the rings' crests a step lighter, their troughs a step darker (two steps each, pixel-art fashion)
+gW *= 1.0 + (gRg > 0.24 ? 0.15 : gRg > 0.11 ? 0.065 : gRg < -0.24 ? -0.1 : gRg < -0.11 ? -0.045 : 0.0);
+// the water lapping at the banks: a pale lip that creeps up the shallows and draws back, unevenly along the bank, a darker wet line just past it
+float gLap = 0.13 + 0.05*sin(gTime*1.25 + gp.x*1.7 + gp.y*1.1) + 0.02*sin(gTime*2.1 - gp.x*0.6 + gp.y*2.3), gLd = gD0 + gDi*0.04;
+if (gLd < gLap) gW = mix(gW, vec3(0.62, 0.78, 0.74), 0.5); else if (gLd < gLap + 0.035) gW *= 0.93;
 diffuseColor.rgb = gW;
 `)
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
@@ -88,7 +107,9 @@ diffuseColor.rgb = gW;
   float fr = (dot(fv, gL) - dot(uv0, gL))*(0.35 + 0.65*gD0) + gDi*0.012;
   diffuseColor.rgb *= fr < -0.05 ? 0.88 : fr < -0.018 ? 0.95 : fr > 0.05 ? 1.1 : fr > 0.018 ? 1.04 : 1.0;
   #endif
-}`)
+}`);
+    // (its pixels marked in the normal image's alpha, which nothing else uses: the composite gives them the wet ground's reflections, strongly, sky.js)
+    if (typeof MRT !== 'undefined' && MRT) sh.fragmentShader = sh.fragmentShader.replace('#include <dithering_fragment>', '#include <dithering_fragment>\npc_fragNormal.a = 0.5;');
   };
   return m;
 })();
@@ -211,7 +232,7 @@ function gardenUpdate(){
   const before = new Map(), keep = new Map();
   for (const c of cells.values()) if (c.gd){ before.set(c, gdSig(c.gd)); keep.set(c, gdKeep(c.gd)); }
   const changed = [];
-  if (!gardenOn()){ for (const c of before.keys()){ c.gd = null; if (before.get(c)) changed.push(c); } return changed; }
+  if (!gardenOn()){ for (const c of before.keys()){ c.gd = null; if (before.get(c)) changed.push(c); } GD_FX.dirty = true; return changed; }
   // a plot that's no longer an empty lawn has no garden; a new lawn plot gets its seed (and waits for a garden)
   for (const c of cells.values()){
     if (c.gd && !gdGround(c)) c.gd = null;
@@ -283,6 +304,7 @@ function gardenUpdate(){
   }
   // (a piece rolled or changed is saved with the city, so a reload shows the same garden)
   if (assigned && !self.IN_RECIPE_WORKER && typeof save === 'function') setTimeout(() => { try { save(); } catch (e) {} }, 0);
+  GD_FX.dirty = true;
   return changed;
 }
 // The bridges. A bridge is a straight run of water plots marked with its axis (gd.b: 1 along x, 2 along z; 3 and 4 the same for an island's walkway),
@@ -659,8 +681,8 @@ function gdGrotto(P, x, clear, k){
   clear.push([0, 0, 1.7]);
 }
 // A water plot: the pond a little below the lawn; a stone and pebble rim with a soft gold line inside it on every side that isn't water (on a side
-// away from the garden, a strip of grass outside the rim: a pond always has its grass border); lily pads, some with glowing solar cells; koi in
-// a pond of six or more; and a bridge where the water is one plot wide.
+// away from the garden, a strip of grass outside the rim: a pond always has its grass border); and a bridge where
+// the water is one plot wide. (The lily pads, now and then, float: drawn live so the waves can push them about, gardenFx.)
 function gdWater(P, gd, x){
   const e = x.e || [0, 0, 0, 0], br = x.br || 0;
   // the surface: one sheet, a little finer than a grid of 10 x 10, whose corners carry how far each is from the nearest bank (as a few millimetres of height:
@@ -694,11 +716,7 @@ function gdWater(P, gd, x){
   // inner corners (water on both sides, grass on the corner): a few stones
   (x.cw || []).forEach((v, k) => { if (!v) return; const [sx, sz] = GD_CORNERS[k];
     for (let q = 0; q < 3; q++) blob(pick([GM.stone, GM.pebble]), P, sx*(LOT/2 - rnd(.05, .25)), .08, sz*(LOT/2 - rnd(.05, .25)), rnd(.1, .14), .85); });
-  const free = (px, pz) => !(br === 1 && Math.abs(pz) < .7) && !(br === 2 && Math.abs(px) < .7);
-  // a lily pad or two, now and then (some with a little solar cell that glows at night)
-  if ((x.pd || 1) >= 2 && chance(.18)) for (let q = 0; q < irand(1, 2); q++){ const px = rnd(-1.2, 1.2), pz = rnd(-1.2, 1.2); if (!free(px, pz)) continue;
-    put(U.cyl16, GM.pad, under(P, T(px, .05, pz, 0, rnd(.24, .32), .012, rnd(.24, .32))));
-    if (chance(.35)) box(GM.solar, P, px, .058, pz, .1, .008, .1); else if (chance(.4)) blob(pick([GM.coral, GM.cream]), P, px, .07, pz, .04, .7); }
+  // (the lily pads float: drawn live, gardenFx)
   if (br){ const F = br === 1 ? under(P, T(0, 0, 0, PI/2)) : P; if (x.bw) gdWalkway(F); else gdBridge(F, x.bi || 0, x.bn || 1); }
 }
 // One plot of a bridge along its frame's z, edge to edge: a deck low enough to walk on, copper rails rising in one gentle arch over the whole span
@@ -731,4 +749,128 @@ function gdReflect(F, x, z){
   KEEP_LIGHT = true;
   for (let q = 0; q < 6; q++) box(q < 3 ? GM.reflect : GM.reflect2, F, x + (q % 2 ? .02 : -.02), .05, z - q*.12, .1 - q*.012, .004, .09);
   KEEP_LIGHT = false;
+}
+
+/* ---------- the living water: rings and lily pads ---------- */
+// Drawn over the plots, in the page only (the plot worker never runs this).
+//  - Rings: the cursor drawn over a pond leaves rings on it (a ring each half plot or so it travels, stronger the faster it goes); on a phone, a tap
+//    on the water starts one. They are worked out in the water's own shader (GD_RIP: eight at a time, four on a phone), nothing else is drawn.
+//  - Lily pads: now and then a pond plot has one or two (some with a little solar cell that glows at night, some with a flower). They float: a strong
+//    ring (a fast sweep of the cursor, a tap) pushes them along as its crests pass, they keep where it left them and drift slowly back home over half
+//    a minute or so, and never leave the water (the rim, the bridges' line, an island hold them off). One batch for the pads, one each for the cells
+//    and the flowers; their positions go up to the graphics card only while one of them is moving.
+const GD_FX = { dirty: true, water: 0, pads: [], mesh: null, moved: false, last: null, lastRing: null };
+const GD_PAD_N = 96;
+const _gdO = new THREE.Object3D(), _gdC = new THREE.Color();
+function gdPadMeshes(){
+  if (GD_FX.mesh) return GD_FX.mesh;
+  const disk = new THREE.CircleGeometry(.5, 14, .4, PI*2 - .8); disk.rotateX(-PI/2);   // a disc with its notch
+  const mat = o => { const m = new THREE.MeshToonMaterial(Object.assign({ gradientMap: gradTex }, o)); m.userData.live = true; return m; };
+  const mk = (geo, m) => { const im = new THREE.InstancedMesh(geo, m, GD_PAD_N); im.count = 0; im.frustumCulled = false; im.receiveShadow = true; im.castShadow = false;
+    im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); im.userData.live = true; scene.add(im); return im; };
+  const solM = mat({ color: 0x24363a, emissive: new THREE.Color(0x9ff0d0), emissiveIntensity: 0 });
+  const blo = mk(U.blob, mat({ color: 0xffffff }));
+  for (let i = 0; i < GD_PAD_N; i++) blo.setColorAt(i, _gdC.setHex(0xffffff));   // (made now, so its shader is built with the colors from the start)
+  GD_FX.mesh = { pad: mk(disk, mat({ color: 0x4f9a3a })), sol: mk(U.box, solM), blo, solM };
+  return GD_FX.mesh;
+}
+// whether a pad (about .15 across its middle) can float here: on a pond plot, clear of its rim, its inner corners and its bridge
+function gdPadOk(x, z){
+  const c = cells.get(ckey(Math.round(x/LOT), Math.round(z/LOT)));
+  if (!c || !c.gd || !c.gd.p || !c.gd.w || !c.gd.x) return false;
+  const X = c.gd.x, e = X.e || [0, 0, 0, 0], lx = x - c.x, lz = z - c.z, m = LOT/2 - .55;
+  if ((e[0] !== 2 && lx > m) || (e[1] !== 2 && lx < -m) || (e[2] !== 2 && lz > m) || (e[3] !== 2 && lz < -m)) return false;
+  if ((X.br === 1 && Math.abs(lz) < .7) || (X.br === 2 && Math.abs(lx) < .7)) return false;
+  const cw = X.cw || [0, 0, 0, 0];
+  for (let k = 0; k < 4; k++) if (cw[k] && Math.hypot(lx - GD_CORNERS[k][0]*LOT/2, lz - GD_CORNERS[k][1]*LOT/2) < .7) return false;
+  return true;
+}
+// the pads, from the gardens (each rolled from its plot's seed, so it comes back where it was; one already floating keeps where it is)
+function gdPadsBuild(){
+  GD_FX.dirty = false;
+  const old = new Map(GD_FX.pads.map(p => [p.k, p])), pads = []; let water = 0;
+  if (gardenOn()) for (const c of cells.values()){
+    const gd = c.gd; if (!gd || !gd.p || !gd.w || !gd.x) continue; water++;
+    if ((gd.x.pd || 1) < 2 || gdRoll(gd, 'pad') >= .1) continue;   // (rare: one plot of a pond in ten, owner Nov 6)
+    for (let q = 0, n = gdRoll(gd, 'padn') < .75 ? 1 : 2; q < n && pads.length < GD_PAD_N; q++){
+      const hx = c.x + gdRoll(gd, 'px', q)*2.4 - 1.2, hz = c.z + gdRoll(gd, 'pz', q)*2.4 - 1.2;
+      if (!gdPadOk(hx, hz)) continue;
+      const k = c.i + ',' + c.j + ',' + gd.s + ',' + q, o = old.get(k), r = gdRoll(gd, 'pk', q);
+      pads.push(o && gdPadOk(o.x, o.z) ? o : { k, hx, hz, x: hx, z: hz, vx: 0, vz: 0, a: gdRoll(gd, 'pa', q)*PI*2, va: 0, s: .24 + gdRoll(gd, 'ps', q)*.08,
+        kind: r < .35 ? 1 : r < .61 ? 2 : 0, col: gdRoll(gd, 'pc', q) < .5 ? 0xff8f6b : 0xfff1d6, sg: gdRoll(gd, 'sg', q) < .5 ? -1 : 1 });
+    }
+  }
+  GD_FX.pads = pads; GD_FX.water = water; GD_FX.moved = true;
+}
+// a new ring on the water, in the oldest slot (none if every slot's ring is still very young: a burst of them would cut the others short)
+function gdRing(x, z, w){
+  const R = GD_RIP.rips.value, N = GD_RIP.n.value, t = FOL_UNI.time.value;
+  let best = 0, bAge = -1;
+  for (let i = 0; i < N; i++){ const age = t - R[i].z, a = age < 0 || age > GD_RIP_LIFE ? 1e9 : age; if (a > bAge){ bAge = a; best = i; } }
+  if (bAge < .16) return false;
+  R[best].set(x, z, t, w); GD_FX.lastRing = { x, z, t: performance.now()/1000 }; return true;
+}
+// every frame (main.js): the pads' floating, the rings' count, whether the composite should look for water to reflect in
+function gardenFx(dt){
+  if (self.IN_RECIPE_WORKER) return;
+  if (GD_FX.dirty) gdPadsBuild();
+  GD_RIP.n.value = typeof TOUCH !== 'undefined' && TOUCH.on ? 4 : 8;
+  if (typeof comp !== 'undefined' && comp.uniforms.waterOn) comp.uniforms.waterOn.value = GD_FX.water > 0 ? 1 : 0;
+  const pads = GD_FX.pads; if (!pads.length && !GD_FX.mesh) return;
+  const MS = gdPadMeshes(); MS.solM.emissiveIntensity = .55*LIGHTS_ON.value;
+  if (!pads.length){ if (MS.pad.count) MS.pad.count = MS.sol.count = MS.blo.count = 0; return; }
+  dt = Math.min(dt, .05);
+  const t = FOL_UNI.time.value, R = GD_RIP.rips.value, N = GD_RIP.n.value, damp = Math.exp(-1.6*dt), dampA = Math.exp(-2.2*dt);
+  let moving = GD_FX.moved; GD_FX.moved = false;
+  for (const p of pads){
+    let ax = (p.hx - p.x)*.05, az = (p.hz - p.z)*.05;   // the slow drift home
+    for (let i = 0; i < N; i++){ const r = R[i], age = t - r.z; if (age < 0 || age > GD_RIP_LIFE || r.w < .55) continue;   // (a gentle ring only rocks the light)
+      const dx = p.x - r.x, dz = p.z - r.y, d = Math.hypot(dx, dz) || 1e-3, off = d - (.12 + age*.8);
+      if (off < -.3 || off > .15) continue;
+      const f = 1.3*Math.min(r.w - .5, 1)*(1 - age/GD_RIP_LIFE)*(1 - Math.abs(off + .075)/.225); if (f <= 0) continue;
+      ax += f*dx/d; az += f*dz/d; p.va += f*.8*p.sg*dt; }
+    p.vx = (p.vx + ax*dt)*damp; p.vz = (p.vz + az*dt)*damp; p.va *= dampA;
+    if (Math.abs(p.vx) + Math.abs(p.vz) + Math.abs(p.va) < 4e-4 && Math.abs(p.hx - p.x) + Math.abs(p.hz - p.z) < .01){ p.vx = p.vz = p.va = 0; continue; }
+    const nx = p.x + p.vx*dt, nz = p.z + p.vz*dt;
+    if (gdPadOk(nx, nz)){ p.x = nx; p.z = nz; }
+    else if (gdPadOk(nx, p.z)){ p.x = nx; p.vz *= -.3; }   // (along the rim, bumped back off it)
+    else if (gdPadOk(p.x, nz)){ p.z = nz; p.vx *= -.3; }
+    else { p.vx *= -.3; p.vz *= -.3; }
+    p.a += p.va*dt; moving = true;
+  }
+  if (!moving) return;
+  let ns = 0, nb = 0;
+  pads.forEach((p, n) => {
+    const ca = Math.cos(p.a), sa = Math.sin(p.a), at = (ox, oz) => [p.x + ox*ca + oz*sa, p.z - ox*sa + oz*ca];
+    _gdO.position.set(p.x, .051, p.z); _gdO.rotation.set(0, p.a, 0); _gdO.scale.set(p.s, 1, p.s); _gdO.updateMatrix(); MS.pad.setMatrixAt(n, _gdO.matrix);
+    if (p.kind === 1){ const [x, z] = at(.02, -.02); _gdO.position.set(x, .056, z); _gdO.scale.set(.1, .008, .1); _gdO.updateMatrix(); MS.sol.setMatrixAt(ns++, _gdO.matrix); }
+    else if (p.kind === 2){ const [x, z] = at(-.03, .02); _gdO.position.set(x, .068, z); _gdO.scale.set(.055, .04, .055); _gdO.updateMatrix(); MS.blo.setMatrixAt(nb, _gdO.matrix); MS.blo.setColorAt(nb++, _gdC.setHex(p.col)); }
+  });
+  MS.pad.count = pads.length; MS.sol.count = ns; MS.blo.count = nb;
+  MS.pad.instanceMatrix.needsUpdate = MS.sol.instanceMatrix.needsUpdate = MS.blo.instanceMatrix.needsUpdate = true;
+  if (MS.blo.instanceColor) MS.blo.instanceColor.needsUpdate = true;
+}
+// where the pointer is over a pond, on the water's surface (or null)
+const _gdRay = new THREE.Raycaster(), _gdNdc = new THREE.Vector2(), _gdHit = new THREE.Vector3(), _gdPl = new THREE.Plane(new THREE.Vector3(0, 1, 0), -(GD_WATER_Y + .003));
+function gdWaterAt(cx, cy){
+  const r = viewRect(); _gdNdc.set((cx - r.left)/r.width*2 - 1, -((cy - r.top)/r.height)*2 + 1); _gdRay.setFromCamera(_gdNdc, cam);
+  if (!_gdRay.ray.intersectPlane(_gdPl, _gdHit)) return null;
+  const c = cells.get(ckey(Math.round(_gdHit.x/LOT), Math.round(_gdHit.z/LOT)));
+  return c && c.gd && c.gd.p && c.gd.w ? _gdHit : null;
+}
+if (!self.IN_RECIPE_WORKER && typeof canvas !== 'undefined' && canvas.addEventListener){
+  // the cursor over the water (a mouse or a pen, not pressed: dragging pans the view): a ring each half plot or so, stronger the faster it moves
+  canvas.addEventListener('pointermove', e => {
+    if (e.pointerType === 'touch' || e.buttons || !GD_FX.water){ GD_FX.last = null; return; }
+    const h = gdWaterAt(e.clientX, e.clientY), now = performance.now()/1000; if (!h){ GD_FX.last = null; return; }
+    const L = GD_FX.last, d = L ? Math.hypot(h.x - L.x, h.z - L.z) : 0, sp = L ? L.sp*.6 + .4*d/Math.max(now - L.t, 1/120) : 0;
+    GD_FX.last = { x: h.x, z: h.z, t: now, sp };
+    const R = GD_FX.lastRing, far = !R || Math.hypot(h.x - R.x, h.z - R.z) > .5, idle = R && now - R.t > .7 && d > .02;
+    if (far || idle) gdRing(h.x, h.z, Math.min(1.6, Math.max(.3, .3 + sp/14)));
+  }, { passive: true });
+  // a tap on the water (a phone): one ring, strong enough to nudge the pads
+  canvas.addEventListener('pointerdown', e => {
+    if (e.pointerType !== 'touch' || !GD_FX.water) return;
+    const h = gdWaterAt(e.clientX, e.clientY); if (h) gdRing(h.x, h.z, 1.0);
+  }, { passive: true });
 }

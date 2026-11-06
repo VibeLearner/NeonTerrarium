@@ -70,7 +70,7 @@ h2 { font: 600 20px/1.2 var(--display); margin: 0; }
   <header>
     <div class="eyebrow">NEON TERRARIUM · GARDENS</div>
     <h1>Tree Crown Lab</h1>
-    <p class="lede">Every tree top the game draws, straight from its sprite code. In the park each crown is shown as four crossed copies on a real trunk; here you see the flat sprite. Mark each kind Keep, Maybe or Drop, star any variants you especially like, then Submit picks.</p>
+    <p class="lede">Every tree top the game draws, straight from its sprite code. In the park each crown is shown as four crossed copies on a real trunk; here you see the flat sprite. Mark each kind Keep, Maybe or Drop, star any variants you especially like, then Submit picks. Round 1 is in: the game now draws only the variants you starred, shown here numbered afresh.</p>
   </header>
 
   <div class="bar" role="toolbar" aria-label="View settings">
@@ -112,7 +112,7 @@ const kinds = Object.keys(SIZES);
 const state = { zoom: 3, bg: 'lawn', picks: {} };   // picks[kind] = { d: 'keep'|'maybe'|'drop'|'', favs: [v], note }
 kinds.forEach(k => state.picks[k] = { d: '', favs: [], note: '' });
 const BG = { lawn: ['#5f8f3e', '#4f7a34'], night: ['#16222a', '#1d2c34'], plain: ['#7a8478', '#6e786c'] };
-const sprite = {}; for (const k of kinds){ sprite[k] = []; for (let v = 0; v < COUNT; v++){ const [w, h] = SIZES[k], px = SG.draw(k, w, h, v), c = document.createElement('canvas'); c.width = w; c.height = h; SG.blit(c.getContext('2d'), px, 0, 0); sprite[k].push(c); } }
+const sprite = {}; for (const k of kinds){ sprite[k] = []; for (let v = 0; v < (SG.COUNT[k] || COUNT); v++){ const [w, h] = SIZES[k], px = SG.draw(k, w, h, v), c = document.createElement('canvas'); c.width = w; c.height = h; SG.blit(c.getContext('2d'), px, 0, 0); sprite[k].push(c); } }
 // ---- the kind rows ----
 const host = document.getElementById('kinds');
 function cellBg(ctx, w, h){ const [a, b] = BG[state.bg]; ctx.fillStyle = a; ctx.fillRect(0, 0, w, h); ctx.fillStyle = b; for (let y = 0; y < h; y += 4) for (let x = (y/4) % 2 ? 2 : 0; x < w; x += 4) ctx.fillRect(x, y, 1, 1); }
@@ -131,7 +131,7 @@ function renderKinds(){
       b.onclick = () => { p.d = p.d === v ? '' : v; save(k); renderKinds(); drawGrove(); }; dec.append(b); }
     head.append(nm, tag, ds, dec);
     const tray = document.createElement('div'); tray.className = 'tray';
-    for (let v = 0; v < COUNT; v++){ const cell = document.createElement('button'); cell.type = 'button'; cell.className = 'cell'; cell.setAttribute('aria-pressed', String(p.favs.includes(v))); cell.setAttribute('aria-label', name + ' variant ' + (v + 1) + (p.favs.includes(v) ? ', starred' : ''));
+    for (let v = 0; v < (SG.COUNT[k] || COUNT); v++){ const cell = document.createElement('button'); cell.type = 'button'; cell.className = 'cell'; cell.setAttribute('aria-pressed', String(p.favs.includes(v))); cell.setAttribute('aria-label', name + ' variant ' + (v + 1) + (p.favs.includes(v) ? ', starred' : ''));
       const cv = document.createElement('canvas'); drawCell(cv, k, v); const lb = document.createElement('span'); lb.className = 'v'; lb.textContent = (p.favs.includes(v) ? '★ ' : '') + (v + 1);
       cell.append(cv, lb); cell.onclick = () => { p.favs = p.favs.includes(v) ? p.favs.filter(x => x !== v) : p.favs.concat(v).sort((a, b) => a - b); save(k); renderKinds(); }; tray.append(cell); }
     const note = document.createElement('input'); note.className = 'note'; note.id = 'note-' + k; note.placeholder = 'Note for this kind (optional): too dark, more blossom…'; note.value = p.note;
@@ -151,7 +151,7 @@ function drawGrove(){
   g.fillStyle = state.bg === 'night' ? '#2a3a2a' : '#4f7a34'; for (let x = 0; x < W; x += 3) g.fillRect(x, ground, 1, 1);
   const pool = kinds.filter(k => state.picks[k].d !== 'drop' && k !== 'tc_puff'); if (!pool.length) return;
   const R = SG.rng(groveSeed*7919), trees = [];
-  for (let x = 14; x < W - 10; x += R.i(28, 44)) trees.push({ k: R.pick(pool), v: R.i(0, COUNT - 1), x, y: ground + R.i(0, 14) });
+  for (let x = 14; x < W - 10; x += R.i(28, 44)) trees.push(((k) => ({ k, v: R.i(0, (SG.COUNT[k] || COUNT) - 1), x, y: ground + R.i(0, 14) }))(R.pick(pool)));
   trees.sort((a, b) => a.y - b.y);
   for (const t of trees){ const [w, h] = SIZES[t.k], th = t.k === 'tc_palm' ? 34 : t.k === 'tc_umbrella' ? 28 : t.k === 'tc_pine' || t.k === 'tc_cypress' ? 6 : 18, cy = t.y - th - h*.35;
     g.fillStyle = t.k === 'tc_airy' ? '#d8d0c0' : t.k === 'tc_palm' ? '#9a7a52' : '#5a3e2a'; g.fillRect(Math.round(t.x - 1), Math.round(cy + h*.3), 3, Math.round(t.y - (cy + h*.3)));
@@ -163,13 +163,13 @@ function segment(id, attr, key, num){ const el = document.getElementById(id); el
   el.querySelectorAll('button').forEach(o => o.setAttribute('aria-pressed', String(o === b))); state[key] = num ? +b.dataset[attr] : b.dataset[attr]; renderKinds(); drawGrove(); }); }
 segment('zoom', 'z', 'zoom', true); segment('bg', 'b', 'bg', false);
 // ---- picks, kept in the page's store (Claude reads them from there) ----
-const status = document.getElementById('status'); let db = null;
+const status = document.getElementById('status'); let db = null; const ROUND = 2;
 const writing = {};
 async function save(k){
   if (!db){ status.textContent = 'Picks are kept on this page only (the store is not available here).'; return; }
   if (writing[k]){ writing[k].again = true; return; }
   writing[k] = { again: false };
-  try { do { writing[k].again = false; const p = state.picks[k]; await db.doc('kept/' + k).set({ kind: k, decision: p.d, favs: p.favs, note: p.note, at: new Date().toISOString() }); } while (writing[k].again);
+  try { do { writing[k].again = false; const p = state.picks[k]; await db.doc('kept2/' + k).set({ round: ROUND, kind: k, decision: p.d, favs: p.favs, note: p.note, at: new Date().toISOString() }); } while (writing[k].again);
     status.textContent = 'Saved'; }
   catch (e){ status.textContent = 'Could not save that pick. Check your connection and try again.'; }
   finally { delete writing[k]; }
@@ -177,7 +177,7 @@ async function save(k){
 document.getElementById('submitBtn').onclick = async () => {
   if (!db){ status.textContent = 'Submitting needs the page open on claude.ai while signed in.'; return; }
   const sum = {}; for (const k of kinds) sum[k] = state.picks[k];
-  try { await db.collection('rounds').add({ at: new Date().toISOString(), picks: sum }); status.textContent = 'Submitted. Tell Claude your picks are in.'; }
+  try { await db.collection('rounds').add({ round: ROUND, at: new Date().toISOString(), picks: sum }); status.textContent = 'Submitted. Tell Claude your picks are in.'; }
   catch (e){ status.textContent = 'Could not submit. Check your connection and try again.'; }
 };
 renderKinds(); drawGrove();
@@ -185,7 +185,7 @@ renderKinds(); drawGrove();
   const timer = setTimeout(() => { if (!db) status.textContent = 'Picks will save once the page connects.'; }, 10000);
   try { db = window.claude ? await window.claude.use('db') : null; } catch (e){ db = null; }
   if (!db){ clearTimeout(timer); status.textContent = 'Picks are kept on this page only (the store is not available here).'; return; }
-  try { const snap = await db.collection('kept').get(); for (const d of snap.docs){ const v = d.data(); if (v && state.picks[v.kind]) state.picks[v.kind] = { d: v.decision || '', favs: Array.isArray(v.favs) ? v.favs : [], note: v.note || '' }; }
+  try { const snap = await db.collection('kept2').get(); for (const d of snap.docs){ const v = d.data(); if (v && state.picks[v.kind]) state.picks[v.kind] = { d: v.decision || '', favs: Array.isArray(v.favs) ? v.favs : [], note: v.note || '' }; }
     status.textContent = snap.empty ? 'No picks yet' : 'Saved picks loaded'; }
   catch (e){ status.textContent = 'Could not load saved picks. New picks still save.'; }
   clearTimeout(timer); renderKinds(); drawGrove();

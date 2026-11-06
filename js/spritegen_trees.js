@@ -7,10 +7,15 @@
 // spritegen.js):
 //   tc_round 36x30   round leafy (an oak or a lime)        tc_oval 26x36     tall oval (a hornbeam)          tc_willow 40x38   weeping willow
 //   tc_pine 28x40    tiered conifer                         tc_cypress 14x40  narrow flame                    tc_blossom 38x30  cherry blossom
-//   tc_maple 36x30   amber and coral leaves                 tc_umbrella 44x22 wide flat-topped crown          tc_palm 40x30     palm fronds
+//   tc_maple 36x30   amber and coral leaves                 tc_palm 40x30     palm fronds
 //   tc_airy 30x32    sparse and light (a birch)             tc_wisteria 38x34 green crown, violet racemes     tc_puff 22x18     a small clump, for a limb's own crown
 // tools/treelab/ builds the lab page that shows them all (every kind, every variant) to keep or drop.
 (() => {
+  // The owner's picks from the Tree Crown Lab (Nov 6, round 1: the umbrella dropped, every other kind kept): the variants each kind keeps, by the lab's
+  // numbering (0 to 7). Variant slot v in the game draws kept variant TC_KEEP[kind][v]; SG.COUNT (spritegen.js) holds how many each kind keeps.
+  const TC_KEEP = { tc_airy: [0, 1, 2, 3, 4, 5, 6, 7], tc_blossom: [0, 1, 3, 4, 6, 7], tc_cypress: [1, 3, 4, 5, 6, 7], tc_maple: [0, 2, 3, 4, 5, 6, 7], tc_oval: [0, 2, 4, 5, 7], tc_palm: [0, 1, 2, 3, 4, 6, 7], tc_pine: [0, 1, 2, 3, 4, 5, 6, 7], tc_puff: [0, 1, 2, 4, 5, 6, 7], tc_round: [0, 1, 3, 6, 7], tc_willow: [1, 2, 4, 5, 7], tc_wisteria: [0, 2, 3, 4, 5, 6, 7] };
+  const reg0 = SG.reg, reg = (kind, fn) => reg0(kind, (px, R, v, w, h, sg) => { const k = TC_KEEP[kind] ? TC_KEEP[kind][v % TC_KEEP[kind].length] : v; return fn(px, SG.rng(SG.seedOf(kind, k)), k, w, h, sg); });
+  SG.TC_KEEP = TC_KEEP;
   const ramp = (...l) => l.map(SG.hex);
   const TP = {
     leaf:    ramp('#14301a', '#1f4a22', '#2f6a2a', '#468a32', '#62a83c', '#86c454', '#b0dc78'),
@@ -43,13 +48,13 @@
     const c = rp[R.i(lo, rp.length - 1)]; px.set(x, y, c); px.set(x + 1, y, rp[Math.max(0, lo - 1)]); if (R.chance(.5)) px.set(x, y + 1, rp[Math.min(rp.length - 1, lo + 1)]); } }
   const done = px => { SG.despeckle(px); SG.edge(px, 'br', .45); };
   // ---- the kinds ----
-  SG.reg('tc_round', function (px, R, v, w, h){
+  reg('tc_round', function (px, R, v, w, h){
     const rp = tint(TP.leaf, v), rx = w*R.r(.4, .47), ry = h*R.r(.38, .45);
     crown(px, R, w/2, h/2 + 1, rx, ry, rp, { n: R.i(6, 9) });
     if (v % 4 === 3) dots(px, R, 6, TP.blossom, 3);
     done(px);
   });
-  SG.reg('tc_oval', function (px, R, v, w, h){
+  reg('tc_oval', function (px, R, v, w, h){
     const rp = tint(R.chance(.5) ? TP.leaf : TP.deep, v);
     // one tall mass, then lobes up its height (not stacked balls)
     SG.cluster(px, w/2, h*.55, w*.46, h*.44, rp, R, { bumps: 9, lo: 0, hi: .5 });
@@ -57,7 +62,7 @@
       SG.cluster(px, x, y, w*R.r(.18, .28), h*R.r(.1, .15), rp, R, { bumps: 3, lo: lit ? .4 : .15, hi: lit ? 1 : .75 }); }
     done(px);
   });
-  SG.reg('tc_willow', function (px, R, v, w, h){
+  reg('tc_willow', function (px, R, v, w, h){
     const rp = tint(TP.airy, v, .1), top = h*.3;
     // the hanging curtain first (behind the crown): strands of leaves in loose bunches, longest at the sides, gaps between bunches
     let x = 2;
@@ -75,7 +80,7 @@
     crown(px, R, w/2, top, w*.4, h*.22, rp, { n: 6, twigs: false });
     done(px);
   });
-  SG.reg('tc_pine', function (px, R, v, w, h){
+  reg('tc_pine', function (px, R, v, w, h){
     const rp = tint(TP.deep, v), tiers = R.i(5, 7);
     // tiers from the bottom up, each a dense drooping skirt that overlaps the one below; darker underneath, lit from the left
     for (let k = 0; k < tiers; k++){ const t = k/(tiers - 1), y = h*(.95 - t*.78), half = w*(.49 - t*.4)*R.r(.92, 1.05), th = h*(.2 - t*.06);
@@ -85,13 +90,13 @@
     for (let y = 0; y < 3; y++) px.set(w/2, y, rp[3]);
     done(px);
   });
-  SG.reg('tc_cypress', function (px, R, v, w, h){
+  reg('tc_cypress', function (px, R, v, w, h){
     const rp = tint(TP.deep, v, .06);
     for (let y = 1; y < h - 1; y++){ const t = y/h, half = Math.max(1, w*.5*Math.sin(Math.min(1, t*1.25)*Math.PI*.5)*(t > .85 ? (1 - t)*6 : 1)) + (y % 5 === 0 ? 1 : 0);
       for (let x = -half; x <= half; x++){ const lt = .55 - x/half*.35 + ((y + Math.round(x)) % 4 === 0 ? .15 : 0); px.set(Math.round(w/2 + x), y, SG.rampAt(rp, lt, x, y, true)); } }
     done(px);
   });
-  SG.reg('tc_blossom', function (px, R, v, w, h){
+  reg('tc_blossom', function (px, R, v, w, h){
     const leafy = v % 3 === 2;
     if (leafy){ crown(px, R, w/2, h/2 + 1, w*.45, h*.4, tint(TP.leaf, v), { n: R.i(7, 10) }); dots(px, R, 22, TP.blossom, 2); }
     else {
@@ -101,17 +106,12 @@
       dots(px, R, 8, TP.blossom, 4); }
     done(px);
   });
-  SG.reg('tc_maple', function (px, R, v, w, h){
+  reg('tc_maple', function (px, R, v, w, h){
     const rp = [TP.maple, tint(TP.amber, v), TP.maple.map((c, i) => SG.mix(c, TP.amber[Math.min(i, 4)], .5)), tint(TP.leaf, v)][v % 4];
     crown(px, R, w/2, h/2 + 1, w*R.r(.4, .46), h*R.r(.38, .44), rp, { n: R.i(7, 10) });
     done(px);
   });
-  SG.reg('tc_umbrella', function (px, R, v, w, h){
-    const rp = tint(R.chance(.5) ? TP.leaf : TP.airy, v), layers = R.i(2, 3);
-    for (let k = 0; k < layers; k++){ const y = h*(.62 - k*.2), rx = w*(.47 - k*.08); crown(px, R, w/2 + R.r(-2, 2), y, rx, h*.2, rp, { n: 6, bumps: 9, twigs: k ? false : 3 }); }
-    done(px);
-  });
-  SG.reg('tc_palm', function (px, R, v, w, h){
+  reg('tc_palm', function (px, R, v, w, h){
     const rp = tint(TP.palm, v), cx = w/2, cy = h*.34, n = R.i(10, 13);
     // fronds all round the crown, back ones first (darker): a rib arching up and out and drooping at the tip, with a fringe of leaflets either side of it
     const fr = []; for (let k = 0; k < n; k++) fr.push({ a: k/n*TAU + R.r(-.2, .2), len: R.r(.4, .5)*w });
@@ -125,7 +125,7 @@
     SG.cluster(px, cx, cy + 1, 3.5, 2.5, TP.amber, R, { bumps: 2, lo: .1, hi: .55 });
     done(px);
   });
-  SG.reg('tc_airy', function (px, R, v, w, h){
+  reg('tc_airy', function (px, R, v, w, h){
     const rp = tint(TP.airy, v), n = R.i(12, 16);
     // a loose, light crown: many small clumps with sky between them, a few pale twigs only near the bottom
     for (let k = 0; k < 2; k++){ const x0 = w/2 + R.r(-2, 2), y0 = h*.98, x1 = w/2 + R.r(-w*.25, w*.25), y1 = h*R.r(.55, .7); SG.line(px, x0, y0, x1, y1, SG.hex('#cfc6b4')); }
@@ -133,7 +133,7 @@
       SG.cluster(px, x, y, R.r(3.5, 5.5), R.r(3, 4.5), rp, R, { bumps: 3, lo: lit ? .4 : .12, hi: lit ? 1 : .72 }); }
     done(px);
   });
-  SG.reg('tc_wisteria', function (px, R, v, w, h){
+  reg('tc_wisteria', function (px, R, v, w, h){
     const rp = tint(TP.leaf, v), top = h*.32;
     crown(px, R, w/2, top, w*.42, h*.26, rp, { n: 6, twigs: false });
     const wr = v % 3 === 1 ? TP.blossom : TP.wist;
@@ -141,7 +141,7 @@
       for (let y = 0; y < len; y++){ const t = y/len, half = (1 - t)*1.6; for (let q = -half; q <= half; q++) px.set(x + q, y0 + y, SG.rampAt(wr, .9 - t*.6 - (q > 0 ? .15 : 0), x + q, y0 + y, true)); } }
     done(px);
   });
-  SG.reg('tc_puff', function (px, R, v, w, h){
+  reg('tc_puff', function (px, R, v, w, h){
     const rp = tint([TP.leaf, TP.leaf, TP.airy, TP.deep][v % 4], v);
     crown(px, R, w/2, h/2 + .5, w*.44, h*.42, rp, { n: 4, twigs: 1 });
     if (v % 5 === 4) dots(px, R, 4, TP.blossom, 3);

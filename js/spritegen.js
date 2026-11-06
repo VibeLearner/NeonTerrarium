@@ -123,7 +123,7 @@ const SG = (() => {
     set(SG.COUNT, ['g_clover','g_cover','g_spread1','g_spread2','g_moss2','moss','g_flowers','fern','g_fern2','g_fern3','bush','bushFlower','bonsai','bamboo','succulent'], 6);
     set(SG.COUNT, ['vines','pothos','h_ivy','h_vine3','h_curtain1','h_curtain2','h_curtain3','h_heart','l_mossroots','w_tangle'], 4);
     set(SG.COUNT, ['l_tee_blue','l_tee_peach','l_tee_rose','l_tee_sage','l_tee_butter','l_tee_lilac','l_jeans','l_socks','l_towel_cream','l_towel_green','l_shirt_pink','l_shirt_blue'], 3);
-    set(SG.COUNT, ['tc_round','tc_oval','tc_willow','tc_pine','tc_cypress','tc_blossom','tc_maple','tc_umbrella','tc_palm','tc_airy','tc_wisteria','tc_puff'], 8);   // (tree tops: spritegen_trees.js)
+    Object.assign(SG.COUNT, { tc_airy: 8, tc_blossom: 6, tc_cypress: 6, tc_maple: 7, tc_oval: 5, tc_palm: 7, tc_pine: 8, tc_puff: 7, tc_round: 5, tc_willow: 5, tc_wisteria: 7 });   // (tree tops: spritegen_trees.js, the variants kept in the Tree Crown Lab)
     SG.COUNT.grass = 1; SG.COUNT.grassFar = 1;   // (the lawn tile sheet, 48 x 16: spritegen_lawn.js)
     set(SG.FCOUNT, ['f_moss1','f_moss2','f_weeds','f_crack','f_vine','f_mossmat','f_sprouts','f_seam','f_ivy','f_leaves','f_grass1','f_grass2'], 4); })();
   // the variant of a thing at a world position: a hash of the position, never a random draw (so the same plots come out whatever the variants are)

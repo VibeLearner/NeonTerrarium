@@ -259,12 +259,11 @@ const TREE_SP = {
   cypress:  { k: 'tc_cypress', h: [.25, .35], ck: [.9, 1.1], limbs: [0, 0], straight: 1 },
   blossom:  { k: 'tc_blossom', h: [.9, 1.15], ck: [.8, .95], limbs: [1, 2] },
   maple:    { k: 'tc_maple', h: [.95, 1.2], ck: [.85, 1.0], limbs: [1, 2] },
-  umbrella: { k: 'tc_umbrella', h: [1.45, 1.75], ck: [.85, 1.0], limbs: [2, 3], fan: 1 },
   palm:     { k: 'tc_palm', h: [1.7, 2.1], ck: [.85, 1.0], palm: 1 },
   airy:     { k: 'tc_airy', h: [1.0, 1.3], ck: [.85, 1.0], limbs: [1, 2], bark: 'birch' },
   wisteria: { k: 'tc_wisteria', h: [.95, 1.15], ck: [.85, 1.0], limbs: [1, 2], low: 1 },
 };
-const GD_TREES = [['round', 3], ['oval', 2], ['airy', 1.4], ['blossom', 1.2], ['maple', 1], ['willow', 1], ['umbrella', .8], ['pine', .8], ['wisteria', .7], ['cypress', .6], ['palm', .5]];
+const GD_TREES = [['round', 3], ['oval', 2], ['airy', 1.4], ['blossom', 1.2], ['maple', 1], ['willow', 1], ['pine', .8], ['wisteria', .7], ['cypress', .6], ['palm', .5]];
 const gdSpecies = () => gdPickW(GD_TREES, R());
 function treeAt(P, x, z, s = 1, sp = 'round'){
   const D = TREE_SP[sp] || TREE_SP.round, h = rnd(D.h[0], D.h[1])*s, ck = rnd(D.ck[0], D.ck[1])*s, ch = SPR.size[D.k][1]/PX*ck;

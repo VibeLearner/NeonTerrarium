@@ -63,7 +63,7 @@ function frameBody(now){
   // brings the slowness back is the ceiling for the next two minutes, so it no longer swings between sharp-and-slow and soft-and-smooth
   // (not while the shadows glide (staticcache.js GLIDE): a change of resolution remakes the pictures it plays, so it had to let the glide go and the
   //  shadows snapped, most often zoomed out over a big city, where the resolution moves most; and its background drawing isn't the city's own cost)
-  { const ms = now - last; if (ms < 250 && now >= PERF.quietUntil && GLIDE.phase === 'idle'){ PERF.ema += (ms - PERF.ema)*.05; PERF.t += ms; if (ms > 4 && ms < PERF.vs*1.3) PERF.vs += (ms - PERF.vs)*.02; }
+  { const ms = now - last; if (ms < 250 && now >= PERF.quietUntil && !GLIDE.busy()){ PERF.ema += (ms - PERF.ema)*.05; PERF.t += ms; if (ms > 4 && ms < PERF.vs*1.3) PERF.vs += (ms - PERF.vs)*.02; }
     if (PERF.t > 2000){ PERF.t = 0;
       const slowMs = Math.max(PERF.vs*1.35, 21), quickMs = PERF.vs*1.1 + .5;
       if (now > PERF.ceilUntil) PERF.ceil = Infinity;
@@ -156,7 +156,7 @@ function frameBody(now){
   const pt = PH.tests;   // (the overlay's tests: perfhud.js)
   if (pt.quarter) rtC.viewport.set(0, 0, W >> 1, H >> 1);   // (plain shading: see renderBufferDirect in sky.js)
   if (pt.quarter || !SC.frame()){   // (the static cache draws the frame when it can: staticcache.js)
-    if (GLIDE.phase !== 'idle') GLIDE.abort('drawn the old way');   // (a frame not from the cache: the glide's pictures no longer match it)
+    if (GLIDE.busy()) GLIDE.abort('drawn the old way' + (SC.why ? ' (' + SC.why + ')' : SC.state ? ' (' + SC.state + ')' : ''));   // (a frame not from the cache: the glide's pictures no longer match it)
     renderer.setRenderTarget(rtC); renderer.setClearColor(0x000000, 1);
     if (MRT) mrtBegin();   // the normal image is drawn along with the colors (core.js, sky.js)
     sdApply();   // the old way's frames: plots that move fast on screen lose their smallest triangles (world.js, speed-based detail)

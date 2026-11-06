@@ -1027,6 +1027,21 @@ function liftSnap(c, y, y0){
   if (ly > c.height - .5) ly = c.height - .5;
   return ly;
 }
+// Where a scaffold's legs stand on the roof below: a square lined up with the plot (so the legs rise straight and
+// parallel, not leaning in like a pyramid when the roof is small or turned), as big as fits wholly on the roof with
+// `inset` to spare, and no bigger than `cap`. Centered on the plot if that leaves it near full size, else on the roof.
+// Returns the four feet in plot-local [x, z], in QS order (-,-) (+,-) (+,+) (-,+).
+function roofFeet(c, rc, inset, cap){
+  const cx = rc.reduce((a, p) => a + p[0], 0)/rc.length - c.x, cz = rc.reduce((a, p) => a + p[2], 0)/rc.length - c.z;
+  const poly = rc.map(p => [p[0] - c.x, p[2] - c.z]).sort((a, b) => Math.atan2(a[1] - cz, a[0] - cx) - Math.atan2(b[1] - cz, b[0] - cx));
+  const inside = (x, z) => { let sg = 0; for (let k = 0; k < poly.length; k++){ const [ax, az] = poly[k], [bx, bz] = poly[(k + 1) % poly.length];
+    const cr = (bx - ax)*(z - az) - (bz - az)*(x - ax); if (Math.abs(cr) < 1e-9) continue; const s = Math.sign(cr); if (sg && s !== sg) return false; sg = s; } return true; };
+  const fit = (ox, oz) => { let lo = 0, hi = cap + inset; if (!inside(ox, oz)) return 0;
+    for (let it = 0; it < 18; it++){ const m = (lo + hi)/2; if (inside(ox - m, oz - m) && inside(ox + m, oz - m) && inside(ox + m, oz + m) && inside(ox - m, oz + m)) lo = m; else hi = m; }
+    return Math.max(.12, Math.min(cap, lo - inset)); };
+  const s0 = fit(0, 0), s1 = fit(cx, cz), [ox, oz, s] = s0 >= s1*.85 ? [0, 0, s0] : [cx, cz, s1];
+  return [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sz]) => [ox + sx*s, oz + sz*s]);
+}
 // neighbours a pod at deck height y0 can tie into: a building that rises past the deck (a pod too, if it hangs lower)
 function liftSupports(c, y0){
   const out = [];
@@ -1100,9 +1115,7 @@ function liftScaffoldCom(c, y0){
   let feet = QS.map(([sx, sz]) => [sx*E, sz*E]);
   if (onRoof){
     const rc = c.liftRoof || QS.map(([sx, sz]) => [c.x + sx*.75, base, c.z + sz*.75]);
-    const cx = rc.reduce((a, p) => a + p[0], 0)/4, cz = rc.reduce((a, p) => a + p[2], 0)/4;
-    feet = QS.map(([sx, sz]) => { let best = rc[0], bd = -Infinity; for (const p of rc){ const d = sx*(p[0] - cx) + sz*(p[2] - cz); if (d > bd){ bd = d; best = p; } }
-      const k = tw*.75 + rnd(0, .08), dx = cx - best[0], dz = cz - best[2], l = Math.hypot(dx, dz) || 1; return [best[0] - c.x + dx/l*k, best[2] - c.z + dz/l*k]; });
+    feet = roofFeet(c, rc, tw*.6, E);
   }
   for (const [x, z] of feet){ trussCol(P, x, z, base, y0 - .24, tw, mat()); box(M.concDD, P, x, base + .03, z, .5, .06, .5); }
   const edges = feet.map((f, k) => [f[0], f[1], feet[(k + 1) % 4][0], feet[(k + 1) % 4][1]]);
@@ -1216,9 +1229,7 @@ function liftScaffoldInd(c, y0){
   let feet = cols.map(([x, z]) => [x, z]);
   if (onRoof){
     const rc = c.liftRoof || cols.map(([sx, sz]) => [c.x + Math.sign(sx)*.75, base, c.z + Math.sign(sz)*.75]);
-    const cx = rc.reduce((a, p) => a + p[0], 0)/4, cz = rc.reduce((a, p) => a + p[2], 0)/4;
-    feet = cols.map(([sx, sz]) => { let best = rc[0], bd = -Infinity; for (const p of rc){ const d = sx*(p[0] - cx) + sz*(p[2] - cz); if (d > bd){ bd = d; best = p; } }
-      const k = .22 + rnd(0, .08), dx = cx - best[0], dz = cz - best[2], l = Math.hypot(dx, dz) || 1; return [best[0] - c.x + dx/l*k, best[2] - c.z + dz/l*k]; });
+    feet = roofFeet(c, rc, .2, E);
   }
   for (const [x, z] of feet){ if (!onRoof) box(M.concM, P, x, base + .3, z, .5, .6, .5); else box(M.concDD, P, x, base + .03, z, .34, .06, .34); iBeam(rust(), P, x, z, base + (onRoof ? .06 : .6), y0 - .37); }
   const edges = feet.map((f, k) => [f[0], f[1], feet[(k + 1) % 4][0], feet[(k + 1) % 4][1]]);
@@ -1362,10 +1373,7 @@ function liftPlatformLux(c, y0){
   let feet = QS.map(([sx, sz]) => [sx*.92, sz*.92]);
   if (onRoof){
     const rc = c.liftRoof || QS.map(([sx, sz]) => [c.x + sx*.75, base, c.z + sz*.75]);
-    const cx = rc.reduce((a, p) => a + p[0], 0)/4, cz = rc.reduce((a, p) => a + p[2], 0)/4;
-    feet = QS.map(([sx, sz]) => { let best = rc[0], bd = -Infinity; for (const p of rc){ const d = sx*(p[0] - cx) + sz*(p[2] - cz); if (d > bd){ bd = d; best = p; } }
-      const k = .2, dx = cx - best[0], dz = cz - best[2], l = Math.hypot(dx, dz) || 1;
-      return [clamp(best[0] - c.x + dx/l*k, -H + .2, H - .2), clamp(best[2] - c.z + dz/l*k, -H + .2, H - .2)]; });
+    feet = roofFeet(c, rc, .18, Math.min(.92, H - .2));
   }
   for (const [x, z] of feet){
     box(LUX_STONE2, P, x, base + .08, z, .3, .16, .3); box(M.idGold, P, x, base + .165, z, .26, .02, .26);
@@ -1589,16 +1597,14 @@ function liftScaffold(c, y0){
   // roof (taken inward a little, at random, so no two rigs stand alike); with nothing below, the street under the deck.
   // Each leg runs from its deck corner to its foot, leaning in or splaying out as the roof is narrower or turned, so it
   // always lands on the roof. Ledgers and braces join the legs along their actual lines.
-  const QS = [[-1, -1], [1, -1], [1, 1], [-1, 1]], top = QS.map(([sx, sz]) => [sx*E, y0 - .1, sz*E]);
-  let feet;
+  const QS = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+  let top = QS.map(([sx, sz]) => [sx*E, y0 - .1, sz*E]), feet;
   if (onRoof){
+    // on a roof: the legs stand on a square lined up with the plot that fits on the roof, and rise straight up to the
+    // deck's underside from there (the deck overhangs them), so they never lean in like a pyramid
     const rc = c.liftRoof || QS.map(([sx, sz]) => [c.x + sx*.6, base, c.z + sz*.6]);   // (no corners recorded: a safe square well inside)
-    const cx = rc.reduce((a, p) => a + p[0], 0)/4, cz = rc.reduce((a, p) => a + p[2], 0)/4;
-    feet = QS.map(([sx, sz]) => {   // the roof corner lying furthest toward this deck corner
-      let best = rc[0], bd = -Infinity; for (const p of rc){ const d = sx*(p[0] - cx) + sz*(p[2] - cz); if (d > bd){ bd = d; best = p; } }
-      const k = rnd(.08, .2), dx = cx - best[0], dz = cz - best[2], l = Math.hypot(dx, dz) || 1;
-      return [best[0] - c.x + dx/l*k, base, best[2] - c.z + dz/l*k];
-    });
+    const sq = roofFeet(c, rc, .1, E);
+    feet = sq.map(([x, z]) => [x, base, z]); top = sq.map(([x, z]) => [x, y0 - .1, z]);
   } else feet = top.map(([x, , z]) => [x + wobble(), base, z + wobble()]);
   const legAt = (k, y) => { const a = feet[k], b = top[k], u = Math.max(0, Math.min(1, (y - a[1])/(b[1] - a[1]))); return [a[0] + (b[0] - a[0])*u, a[2] + (b[2] - a[2])*u]; };
   for (let k = 0; k < 4; k++){

@@ -109,7 +109,7 @@ const gdBit = k => 1 << k, gdPop = m => (m & 1) + ((m >> 1) & 1) + ((m >> 2) & 1
 const GD_CORNERS = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
 // what of a garden plot changes how it is drawn (a plot still waiting for its garden draws as a plain lawn, whatever its seed)
 const gdSig = gd => gd && gd.p ? JSON.stringify(gd) : '';
-const gdKeep = gd => gd && gd.p ? [gd.p, gd.w | 0, gd.o | 0, gd.s, gd.m | 0].join() : '';
+const gdKeep = gd => gd && gd.p ? [gd.p, gd.w | 0, gd.o | 0, gd.s, gd.m | 0, gd.b | 0].join() : '';
 // a garden plot a new path may run into: not water, not a piece set off the paths, not an arch (its path is straight), not a picnic lawn that has its path already
 const gdJoinable = n => !!n && !!n.gd && !!n.gd.p && !n.gd.w && !GD_OFF.has(n.gd.p) && n.gd.p !== 'arch' && !(n.gd.p === 'lawn' && gdPop(n.gd.m | 0) >= 1);
 // a plot a gate can open onto: there, and not part of a megastructure
@@ -161,9 +161,6 @@ function gdAssign(c, g, comp){
   // the paths that run into this plot are taken up
   let m = 0;
   S.forEach((s, k) => { if (s.t === 'g' && ((s.n.gd.m | 0) & gdBit(k ^ 1))) m |= gdBit(k); });
-  // and one waiting across a narrow channel of water (the bridge will join them)
-  S.forEach((s, k) => { if (s.t !== 'w') return; const [a, b] = SIDES4[k], far = gdAt(c, 2*a, 2*b);
-    if (far && comp.get(far) === g && far.gd.p && !far.gd.w && ((far.gd.m | 0) & gdBit(k ^ 1)) && u('cross' + k) < .9) m |= gdBit(k); });
   const mand = m;
   // a bigger piece set off the paths: only where at most one path comes in (it becomes the spur leading to it)
   const ponds = gdPondsBy(c), big = ponds.reduce((q, p) => Math.max(q, p.n), 0), off = [];
@@ -243,6 +240,8 @@ function gardenUpdate(){
     if (!c.gd || !c.gd.p || c.gd.w || comp.get(c).n < 3) continue;
     if (!gdValid(c)){ c.gd.p = 'grove'; c.gd.o = 0; }
   }
+  // the bridges: kept where they still span, new ones where the water leaves people a long way round
+  gdPlanBridges(comp);
   // what each plot needs of its neighbours to be drawn: the water first (its bridges depend on the paths beside it), then the grass
   const pondN = new Map(), info = new Map();
   const nbAt = (c, k) => { const [a, b] = SIDES4[k], n = gdAt(c, a, b); return n && comp.get(n) === comp.get(c) && n.gd.p ? n : null; };
@@ -256,10 +255,12 @@ function gardenUpdate(){
     if (!pondN.has(c)){ const pond = gdPond(c); for (const q of pond) pondN.set(q, pond.size); }
     x.pd = pondN.get(c);
     x.cw = GD_CORNERS.map(([a, b]) => { const n = gdAt(c, a, b); return x.e[a > 0 ? 0 : 1] === 2 && x.e[b > 0 ? 2 : 3] === 2 && !(n && n.gd && n.gd.w) ? 1 : 0; });
-    // a bridge: water one plot wide, with a path on each bank pointing at it
-    const wants = k => { const n = nbAt(c, k); return !!n && !n.gd.w && !!((n.gd.m | 0) & gdBit(k ^ 1)); };
-    if (x.e[0] === 1 && x.e[1] === 1 && x.e[2] !== 1 && x.e[3] !== 1 && wants(0) && wants(1)) x.br = 1;
-    else if (x.e[2] === 1 && x.e[3] === 1 && x.e[0] !== 1 && x.e[1] !== 1 && wants(2) && wants(3)) x.br = 2;
+    // part of a bridge (or an island's walkway): its axis, and where along it this plot is (the rails arch over the whole span)
+    if (gd.b){ x.br = (gd.b - 1) % 2 + 1; if (gd.b > 2) x.bw = 1;
+      const [a, b] = x.br === 1 ? [1, 0] : [0, 1]; let bi = 0, q = gdAt(c, -a, -b);
+      while (q && q.gd && q.gd.w && q.gd.b === gd.b){ bi++; q = gdAt(q, -a, -b); }
+      let bn = bi + 1; q = gdAt(c, a, b); while (q && q.gd && q.gd.w && q.gd.b === gd.b){ bn++; q = gdAt(q, a, b); }
+      x.bi = bi; x.bn = bn; }
   }
   for (const c of cells.values()){
     const gd = c.gd, x = info.get(c); if (!x){ continue; }
@@ -287,14 +288,77 @@ function gardenUpdate(){
   if (assigned && !self.IN_RECIPE_WORKER && typeof save === 'function') setTimeout(() => { try { save(); } catch (e) {} }, 0);
   return changed;
 }
-// saving: [piece, water, open, seed, paths] or 0
-const gdSave = c => c.gd && c.gd.p ? [c.gd.p, c.gd.w | 0, c.gd.o | 0, c.gd.s, c.gd.m | 0] : 0;
+// The bridges. A bridge is a straight run of water plots marked with its axis (gd.b: 1 along x, 2 along z; 3 and 4 the same for an island's walkway),
+// landing on garden grass at both ends. They are planned from how people would walk inside the garden (the streets round it never count: the park
+// always has its own crossings), treating water as uncrossable except by the bridges already there:
+//  1. a bridge stays while it still spans (water all along, grass at both ends); one that no longer does is taken down;
+//  2. every straight crossing of the water between two grass plots is a candidate. One is needed when walking round from one end to the other is more
+//     than GD_DETOUR times as far as going straight across (or there is no way round at all);
+//  3. of the needed ones, the shortest crossing is built first (so narrow pockets of a pond get short bridges, and a long bridge only goes where the
+//     water is wide all the way), then the walks are worked out again with it, and so on. A second bridge alongside the first is never needed (the
+//     first is right there), so a wide pond gets one bridge, and a long one more only where people would still walk a long way round;
+//  4. a bridge lands only where a path can come in (not on a piece set off the paths, an arch or a picnic lawn with its path): if the best crossing's
+//     landing is taken, the next best is used. The landings' paths are run onto the bridge.
+// An island's gazebo is reached the same way, by a straight walkway that looks unlike a bridge.
+const GD_DETOUR = 3;
+const gdAxisStep = v => (v - 1) % 2 ? [0, 1] : [1, 0];   // (a bridge mark's direction: 1 and 3 along x, 2 and 4 along z)
+function gdPlanBridges(comp){
+  const gardens = new Set(); for (const g of comp.values()) if (g.n >= 3 && g.cells.some(q => q.gd.w)) gardens.add(g);
+  for (const g of gardens){
+    const isW = q => !!q && comp.get(q) === g && !!q.gd.w, isG = q => !!q && comp.get(q) === g && !!q.gd.p && !q.gd.w;
+    const isle = q => isG(q) && gdTier(g.n) >= 4 && SIDES4.every(([a, b]) => isW(gdAt(q, a, b)));
+    // 1. the bridges there now
+    for (const q of g.cells) if (q.gd.b && !q.gd.w) q.gd.b = 0;
+    const seen = new Set();
+    for (const c of g.cells){
+      if (!c.gd.w || !c.gd.b || seen.has(c)) continue;
+      const v = c.gd.b, [a, b] = gdAxisStep(v);
+      let s0 = c; for (let n = gdAt(s0, -a, -b); isW(n) && n.gd.b === v; n = gdAt(s0, -a, -b)) s0 = n;
+      const run = [s0]; for (let n = gdAt(s0, a, b); isW(n) && n.gd.b === v; n = gdAt(n, a, b)) run.push(n);
+      for (const q of run) seen.add(q);
+      if (!(isG(gdAt(s0, -a, -b)) && isG(gdAt(run[run.length - 1], a, b)))) for (const q of run) q.gd.b = 0;
+    }
+    // 2. walking inside the garden: over the grass, and along the bridges (on a bridge only along it)
+    const along = (q, a, b) => { const [x, z] = gdAxisStep(q.gd.b); return (x && a) || (z && b); };
+    const steps = q => { const out = [];
+      for (const [a, b] of SIDES4){ const n = gdAt(q, a, b); if (!n || comp.get(n) !== g || !n.gd.p) continue;
+        if (q.gd.w && !along(q, a, b)) continue;
+        if (n.gd.w && (!n.gd.b || !along(n, a, b))) continue;
+        out.push(n); }
+      return out; };
+    const walk = from => { const d = new Map([[from, 0]]), st = [from]; for (let i = 0; i < st.length; i++){ const q = st[i]; for (const n of steps(q)) if (!d.has(n)){ d.set(n, d.get(q) + 1); st.push(n); } } return d; };
+    // 3. the crossings
+    const cands = [];
+    for (const A of g.cells){ if (!isG(A)) continue;
+      for (const [a, b, ax] of [[1, 0, 1], [0, 1, 2]]){ const run = []; let n = gdAt(A, a, b);
+        while (isW(n) && !n.gd.b){ run.push(n); n = gdAt(n, a, b); }
+        if (run.length && isG(n)) cands.push({ A, B: n, run, ax, kA: ax === 1 ? 0 : 2 }); } }
+    const land = (q, k) => isle(q) || !!((q.gd.m | 0) & gdBit(k)) || gdJoinable(q);
+    for (let it = 0; it < 40; it++){
+      const memo = new Map(), D = q => memo.get(q) || (memo.set(q, walk(q)), memo.get(q));
+      let best = null, bs = null;
+      for (const cd of cands){
+        if (cd.run.some(q => q.gd.b) || !land(cd.A, cd.kA) || !land(cd.B, cd.kA ^ 1)) continue;
+        const d = D(cd.A).get(cd.B), need = d === undefined ? Infinity : d/(cd.run.length + 1);
+        if (need <= GD_DETOUR) continue;
+        const sc = [cd.run.length, -Math.min(need, 1e6), gdRoll(cd.A.gd, 'bridge', cd.ax)];
+        if (!bs || sc[0] < bs[0] || (sc[0] === bs[0] && (sc[1] < bs[1] || (sc[1] === bs[1] && sc[2] < bs[2])))){ best = cd; bs = sc; }
+      }
+      if (!best) break;
+      const v = best.ax + (isle(best.A) || isle(best.B) ? 2 : 0);
+      for (const q of best.run) q.gd.b = v;
+      best.A.gd.m = (best.A.gd.m | 0) | gdBit(best.kA); best.B.gd.m = (best.B.gd.m | 0) | gdBit(best.kA ^ 1);
+    }
+  }
+}
+// saving: [piece, water, open, seed, paths, bridge] or 0
+const gdSave = c => c.gd && c.gd.p ? [c.gd.p, c.gd.w | 0, c.gd.o | 0, c.gd.s, c.gd.m | 0, c.gd.b | 0] : 0;
 function gdLoad(c, v){
   if (!Array.isArray(v) || c.green !== 'grass') return;
   const p = GD_PIECES.includes(v[0]) ? v[0] : 'grove';   // (a piece from before the paths: a grove in its place)
   c.gd = { s: v[3] | 0, p, w: v[1] ? 1 : 0, o: v[2] ? 1 : 0, m: (v[4] | 0) & 15 };
   if (c.gd.p === 'water' && !c.gd.w) c.gd.p = 'lawn';
-  if (c.gd.w){ c.gd.p = 'water'; c.gd.m = 0; }
+  if (c.gd.w){ c.gd.p = 'water'; c.gd.m = 0; if (v[5] >= 1 && v[5] <= 4) c.gd.b = v[5] | 0; }
 }
 
 /* ---------- trees: real trunks and limbs, sprite crowns ---------- */
@@ -640,22 +704,32 @@ function gdWater(P, gd, x){
   if ((x.pd || 0) >= 6) for (let q = 0; q < irand(2, 4); q++){ const px = rnd(-1.3, 1.3), pz = rnd(-1.3, 1.3), ry = rnd(0, TAU); if (!free(px, pz)) continue;
     const Pk = under(P, T(px, .054, pz, ry)), m = chance(.6) ? GM.koi : GM.koiW;
     box(m, Pk, 0, 0, 0, .05, .014, .17); box(m, Pk, 0, 0, -.11, .07, .01, .05); if (m === GM.koiW) box(GM.koi, Pk, 0, .006, .03, .03, .006, .05); }
-  if (br) gdBridge(br === 1 ? under(P, T(0, 0, 0, PI/2)) : P);
+  if (br){ const F = br === 1 ? under(P, T(0, 0, 0, PI/2)) : P; if (x.bw) gdWalkway(F); else gdBridge(F, x.bi || 0, x.bn || 1); }
 }
-// A bridge along its frame's z, edge to edge: a deck low enough to walk on, copper rails rising in a gentle arch, lanterns at its four corners,
-// stone piers under it in the water
-function gdBridge(F){
+// One plot of a bridge along its frame's z, edge to edge: a deck low enough to walk on, copper rails rising in one gentle arch over the whole span
+// (bi: this plot's place in it, from 0; bn: how many plots it spans), stone piers under it in the water, lanterns at its two ends.
+function gdBridge(F, bi, bn){
   box(GM.wood, F, 0, .09, 0, .9, .05, LOT);
   for (let t = -1.8; t <= 1.81; t += .2) box(GM.woodDark, F, 0, .117, t, .9, .006, .015);
   for (const t of [-.9, .9]) put(U.cyl16, GM.stone2, under(F, T(0, .03, t, 0, .5, .06, .5)));
-  const yr = t => .45 + .1*(1 - (t/1.9)**2);
+  const half = bn*LOT/2, rise = Math.min(.1 + .05*(bn - 1), .3), yr = t => { const g = (bi - (bn - 1)/2)*LOT + t; return .45 + rise*(1 - (g/half)**2); };
   for (const s of [-1, 1]){
-    for (let t = -1.8; t <= 1.81; t += .45) cyl(GM.wood, F, s*.47, (yr(t) + .1)/2, t, .025, yr(t) - .1);
-    for (let t = -1.8; t < 1.8; t += .45) strut(GM.wood, F, s*.47, yr(t), t, s*.47, yr(t + .45), t + .45, .035);
-    strut(GM.woodDark, F, s*.47, .2, -1.8, s*.47, .2, 1.8, .025);
+    for (let k = 0; k <= 8; k++){ const t = -LOT/2 + k*LOT/8;
+      if (k < 8) strut(GM.wood, F, s*.47, yr(t), t, s*.47, yr(t + LOT/8), t + LOT/8, .035);
+      if (k % 2 === 0) cyl(GM.wood, F, s*.47, (yr(t) + .1)/2, t, .025, yr(t) - .1); }
+    strut(GM.woodDark, F, s*.47, .2, -LOT/2, s*.47, .2, LOT/2, .025);
   }
-  KEEP_LIGHT = true; for (const s of [-1, 1]) for (const t of [-1.75, 1.75]){ box(M.bulb, F, s*.47, yr(t) + .09, t, .07, .08, .07); glow(F, s*.47, yr(t) + .09, t, 'warm', 1.1); } KEEP_LIGHT = false;
-  for (const s of [-1, 1]) for (const t of [-1.3, 1.3]){ const F2 = under(F, T(s*.72, 0, t, PI/2)); gdReflect(F2, 0, 0); }
+  const ends = (bi === 0 ? [-1.75] : []).concat(bi === bn - 1 ? [1.75] : []);
+  KEEP_LIGHT = true; for (const s of [-1, 1]) for (const t of ends){ box(M.bulb, F, s*.47, yr(t) + .09, t, .07, .08, .07); glow(F, s*.47, yr(t) + .09, t, 'warm', 1.1); } KEEP_LIGHT = false;
+  for (const s of [-1, 1]) for (const t of ends){ const F2 = under(F, T(s*.72, 0, t*.75, PI/2)); gdReflect(F2, 0, 0); }
+}
+// One plot of a walkway out to an island's gazebo: flat cream slabs on short stone piers just above the water, a low dark edge either side, no rails
+// and no lanterns, so it reads as a path across the water rather than a bridge
+function gdWalkway(F){
+  for (let k = 0; k < 8; k++){ const t = -LOT/2 + (k + .5)*LOT/8;
+    box(k % 2 ? GM.stone2 : GM.stone, F, 0, .1, t, .82, .03, LOT/8 - .04);
+    if (k % 2 === 0) for (const s of [-1, 1]) cyl(GM.stone2, F, s*.3, .05, t, .06, .09); }
+  for (const s of [-1, 1]) box(GM.woodDark, F, s*.44, .16, 0, .05, .07, LOT);
 }
 // a lantern's reflection on the water: a short broken streak, warm once the lights come on (the water's own color by day)
 function gdReflect(F, x, z){

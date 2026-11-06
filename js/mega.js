@@ -1009,7 +1009,7 @@ function foodBowl(P, x, y, z, r = .07){ put(U.cyl16, pick([M.white2, M.awn3, M.p
 // skewers standing in a rack
 function skewers(P, x, y, z){ box(M.wood, P, x, y + .02, z, .18, .04, .08); for (let k=0; k<5; k++){ const sx = x - .07 + k*.035; cyl(M.wood, P, sx, y + .12, z, .004, .2); for (let q=0; q<3; q++) box(food(), P, sx, y + .1 + q*.035, z, .028, .028, .028); } }
 // a pot on a burner, steaming
-function steamPot(P, x, y, z){ put(U.cyl16, M.metalDark, under(P, T(x, y + .03, z, 0, .2, .06, .2))); put(U.cyl16, M.metal, under(P, T(x, y + .12, z, 0, .18, .14, .18))); put(U.cyl16, food(), under(P, T(x, y + .19, z, 0, .15, .01, .15))); emitters.push(new THREE.Vector3(x, y + .22, z).applyMatrix4(P)); }
+function steamPot(P, x, y, z, ceil = y + .7){ put(U.cyl16, M.metalDark, under(P, T(x, y + .03, z, 0, .2, .06, .2))); put(U.cyl16, M.metal, under(P, T(x, y + .12, z, 0, .18, .14, .18))); put(U.cyl16, food(), under(P, T(x, y + .19, z, 0, .15, .01, .15))); steamUnder(P, x, y + .22, z, ceil); }
 // hanging food: sausages, roast ducks, lanterns of buns
 function hangingFood(P, x, y, z){ for (let k=0; k<4; k++){ const hx = x + (k - 1.5)*.07; cyl(M.frame, P, hx, y - .04, z, .003, .08); box(pick([FOOD[0], FOOD[4], FOOD[2]]), P, hx, y - .14, z, .045, .12, .04); } }
 // lights near the pond, collected while the square is generated, for the water to reflect: [x, y, z, r, g, b]
@@ -1044,7 +1044,7 @@ function menuCart(P, neon){
   box(M.metalDark, P, .05, 1.98, -.05, .55, .38, .32); box(M.screen2, P, .05, 2.0, .12, .46, .28, .02); box(neon, P, .05, 2.19, -.05, .6, .03, .36);
   glow(P, 0, 1.55, .3, neon === M.neonPink ? 'pink' : 'cyan', 1.2); glow(P, 0, 1.1, .2, 'warm', 1.0);
   // the food: trays on the counter, a steaming pot, skewers, buns hanging under the canopy
-  foodTray(P, -.3, .62, .1); foodTray(P, 0, .62, .12); steamPot(P, .3, .62, -.05); skewers(P, .32, .62, .17);
+  foodTray(P, -.3, .62, .1); foodTray(P, 0, .62, .12); steamPot(P, .3, .62, -.05, 1.15); skewers(P, .32, .62, .17);
   for (let k=0; k<3; k++) foodBowl(P, -.36 + k*.18, .62, -.14);
   hangingFood(P, -.25, 1.2, .25);
 }
@@ -1053,7 +1053,7 @@ function hawkerStall(P){
   box(M.metal, P, 0, .5, 0, 1.3, .06, .6); box(M.metalDark, P, 0, .28, 0, 1.24, .4, .54);
   for (let k=0; k<5; k++) foodTray(P, -.5 + k*.2, .53, .15, .17, .2);                       // a front row of trays
   for (let k=0; k<4; k++) foodBowl(P, -.45 + k*.2, .53, -.08, .075);
-  steamPot(P, .45, .53, -.15); steamPot(P, .2, .53, -.2);
+  steamPot(P, .45, .53, -.15, 1.15); steamPot(P, .2, .53, -.2, 1.15);
   for (const [x, z] of [[-.66,-.32],[.66,-.32],[-.66,.4],[.66,.4]]) cyl(M.frame, P, x, .7, z, .015, 1.4 + (z > 0 ? -.2 : 0));
   box(pick([M.tarp1, M.tarp2, M.tarp3]), P, 0, 1.33, .04, 1.5, .03, .9, 0, -.2);
   hangingFood(P, -.3, 1.2, .3); hangingFood(P, .15, 1.22, .3);

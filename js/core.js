@@ -143,6 +143,7 @@ const M = {
   glassDark: toon(0x2c3a52), glassTeal: toon(0x2b4a55),
   winLit: toon(0x5a4630,{em:0xFFCF7A, kind:'window'}),
   bulb: toon(0x5a4630,{em:0xFFCF7A, kind:'bulb'}),
+  lampBulb: toon(0x5a4630,{em:0xD8A866, kind:'bulb'}),   // the street and park lamps' bulbs: a little dimmer, so they bloom less
   neonPink: toon(0x5a1d3a,{em:0xFF4FA3, kind:'neon'}), neonCyan: toon(0x145452,{em:0x38E8E0, kind:'neon'}), neonAmber: toon(0x5a3e18,{em:0xFFB347, kind:'neon'}),
   trimCyan: toon(0x2a5452,{em:0x7FE8E0, kind:'trim'}),
   thruster: toon(0x1a3050,{em:0x5ab8ff, kind:'thruster'}),
@@ -374,6 +375,9 @@ function sph(mat,P,x,y,z,r,sy=1){ put(U.sph, mat, under(P, T(x,y,z,0,2*r,2*r*sy,
 function blob(mat,P,x,y,z,r,sy=1){ put(U.blob, mat, under(P, T(x,y,z,rnd(0,TAU),2*r,2*r*sy,2*r,rnd(0,1)))); }
 
 let city = null, glowGroup = null, emitters = [];
+// a steam source under a roof (a stall's canopy, the slab over a shopfront, a building's floor above): its puffs rise
+// only as far as `ceil` (local height in F) and fade out there, instead of drifting up through the roof and the floors
+function steamUnder(F, x, y, z, ceil){ const v = new THREE.Vector3(x, y, z).applyMatrix4(F); v.roofY = new THREE.Vector3(x, ceil, z).applyMatrix4(F).y; emitters.push(v); return v; }
 // Places where people can stand or sit (bench seats, stall keepers' and customers' spots), noted while a piece is
 // generated: world position, which way they face, and what kind of spot it is. See people.js.
 let curSpots = null;

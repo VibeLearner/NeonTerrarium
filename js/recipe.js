@@ -107,7 +107,7 @@ function recipePack(raw, geoOnly){
     if (id !== undefined && out.has(v)) return { $r: id };
     if (open.has(v)) throw new Error('recipePack: a cycle');
     let o;
-    if (v.isVector3) o = { $v3: [v.x, v.y, v.z] };
+    if (v.isVector3) o = { $v3: typeof v.roofY === "number" ? [v.x, v.y, v.z, v.roofY] : [v.x, v.y, v.z] };   // (a steam source's ceiling rides along)
     else if (v.isVector2) o = { $v2: [v.x, v.y] };
     else if (v.isMatrix4) o = { $m4: v.elements.slice() };
     else if (v.isColor) o = { $c: [v.r, v.g, v.b] };
@@ -147,7 +147,7 @@ function recipeUnpack(m){
     if (v === null || typeof v !== 'object' || ArrayBuffer.isView(v)) return v;
     if (v.$r !== undefined) return table.get(v.$r);
     if (v.$i !== undefined){ const o = up(v.v); table.set(v.$i, o); return o; }
-    if (v.$v3) return new THREE.Vector3(v.$v3[0], v.$v3[1], v.$v3[2]);
+    if (v.$v3){ const o = new THREE.Vector3(v.$v3[0], v.$v3[1], v.$v3[2]); if (v.$v3.length > 3) o.roofY = v.$v3[3]; return o; }
     if (v.$v2) return new THREE.Vector2(v.$v2[0], v.$v2[1]);
     if (v.$m4){ const x = new THREE.Matrix4(); x.elements = v.$m4; return x; }
     if (v.$c) return new THREE.Color(v.$c[0], v.$c[1], v.$c[2]);

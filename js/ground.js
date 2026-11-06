@@ -135,7 +135,7 @@ function buildPromenade(lots){
     const P = T(x, .04, z, Math.atan2(Math.cos(a), Math.sin(a)));
     const v = R();
     if (v < .3){ box(M.wood, P, 0, .14, 0, .5, .04, .15); box(M.frame, P, 0, .07, 0, .42, .14, .1); box(M.wood, P, 0, .25, -.07, .5, .12, .03); }
-    else if (v < .5){ cyl(M.metalDark, P, 0, .6, 0, .03, 1.2); box(M.bulb, P, 0, 1.22, 0, .1, .06, .1); glow(P, 0, 1.18, 0, 'warm', 1.2); }
+    else if (v < .5){ cyl(M.metalDark, P, 0, .6, 0, .03, 1.2); box(M.lampBulb, P, 0, 1.22, 0, .1, .06, .1); LAMP_GLOW = true; glow(P, 0, 1.18, 0, 'warm', 1.2); LAMP_GLOW = false; }
     else if (v < .75){ box(M.concD, P, 0, .12, 0, .5, .24, .3); for (let q=0;q<2;q++) plant(pick(['bush','bushFlower','g_spread1','g_fern3']), P, rnd(-.15,.15), .24, 0, rnd(.6,.8)); }
     else if (v < .87){ cyl(pick([M.corrBlue, M.teal2]), P, 0, .13, 0, .08, .26); }
     else { vending(P, 0, 0); }
@@ -377,7 +377,7 @@ function buildStreets(lots){
     } else if (roll < .6){
       // curved street lamp
       cyl(M.metalDark,P,0,.65,0,.03,1.3); box(M.metalDark,P,.12,1.3,0,.26,.03,.03);
-      box(M.bulb,P,.24,1.26,0,.12,.05,.1); glow(P,.24,1.2,0,'warm',1.4);
+      box(M.lampBulb,P,.24,1.26,0,.12,.05,.1); LAMP_GLOW = true; glow(P,.24,1.2,0,'warm',1.4); LAMP_GLOW = false;
     } else if (roll < .75){
       // standing street sign on a post
       cyl(M.frame,P,0,.55,0,.03,1.1);

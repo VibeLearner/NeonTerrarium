@@ -667,13 +667,20 @@ function folFar(loss){
 // as one batch of points. (Thousands of individual sprites used to cost one draw call each.)
 let glowList = null;
 const _gv = new THREE.Vector3();
+// Street and park lamps (LAMP_GLOW set round their glow call): the same pool of light on the ground, but a smaller,
+// fainter halo round the bulb, so they don't bloom out across the street. Stored under '<kind>_lamp', which draws its
+// halo at LAMP_HALO of the size; the night-light pass still lights the ground at the full size.
+let LAMP_GLOW = false;
+const LAMP_HALO = .55;
+const glowBase = k => k.endsWith('_lamp') ? k.slice(0, -5) : k;
 function glow(P,x,y,z,kind,s=1){
   if (LUX && LUX.haloAll) s *= LUX.haloAll;   // a district whose halos run smaller (the works)
   if (LUX && LUX.glows[kind]){ s *= LUX.haloK || 1; kind = LUX.glows[kind]; }
   if (DARK === true && !KEEP_LIGHT && GLOW_FLK[kind]){ _gv.set(x,y,z).applyMatrix4(P); if (posHash(_gv.x, _gv.y, _gv.z) < 80) return; }
   if (DARK > 0 && !KEEP_LIGHT && GLOW_FLK[kind]){ _gv.set(x,y,z).applyMatrix4(P); if (_gv.y > DARK) return; }   // (economy mode: the halos of the unlit levels go too)
   if (DARK === true && GLOW_FLK[kind]) s = -s;   // marks a halo that flickers hard (see glowPoints)
-  if (!glowList){ if (LIGHT_ONLY[kind]) return; const sp = new THREE.Sprite(GLOW[kind]); sp.position.set(x,y,z).applyMatrix4(P); sp.scale.set(Math.abs(s),Math.abs(s),1); sp.layers.set(1); glowGroup.add(sp); return; }
+  if (!glowList){ if (LIGHT_ONLY[kind]) return; const sp = new THREE.Sprite(GLOW[kind]); sp.position.set(x,y,z).applyMatrix4(P); const hs = Math.abs(s)*(LAMP_GLOW ? LAMP_HALO : 1); sp.scale.set(hs,hs,1); sp.layers.set(1); glowGroup.add(sp); return; }
+  if (LAMP_GLOW && !LIGHT_ONLY[kind]) kind += '_lamp';
   _gv.set(x,y,z).applyMatrix4(P); (glowList[kind] || (glowList[kind] = [])).push(_gv.x, _gv.y, _gv.z, s);
 }
 const GLOW_PTS_UNI = { scale:{ value: 20 } };
@@ -681,7 +688,7 @@ const GLOW_PTS_UNI = { scale:{ value: 20 } };
 const GLOW_NIGHT = { value: 1 };
 const GLOW_PTS = new THREE.ShaderMaterial({
   uniforms: { map:{ value: glowTex }, nightOp: GLOW_NIGHT, scale: GLOW_PTS_UNI.scale, time: FOL_UNI.time, lightsOn: LIGHTS_ON },
-  vertexShader: 'attribute float size; attribute vec4 aCol; attribute float aFlk; attribute float aOn; uniform float scale; uniform float nightOp; uniform float time; uniform float lightsOn; varying vec4 vCol;' + FLK_GLSL + BLINK_GLSL + LIT_GLSL + ' void main(){ float op = aCol.a < -1.5 ? mix(0.04, 1.0, blink(position.y, time)) : (aCol.a < 0.0 ? nightOp*litOn(aOn, lightsOn, time) : aCol.a); vCol = vec4(aCol.rgb, op * flicker(aFlk, time)); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_PointSize = size * scale; }',
+  vertexShader: 'attribute float size; attribute float aHalo; attribute vec4 aCol; attribute float aFlk; attribute float aOn; uniform float scale; uniform float nightOp; uniform float time; uniform float lightsOn; varying vec4 vCol;' + FLK_GLSL + BLINK_GLSL + LIT_GLSL + ' void main(){ float op = aCol.a < -1.5 ? mix(0.04, 1.0, blink(position.y, time)) : (aCol.a < 0.0 ? nightOp*litOn(aOn, lightsOn, time) : aCol.a); vCol = vec4(aCol.rgb, op * flicker(aFlk, time) * (aHalo < 1.0 ? .7 : 1.0)); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_PointSize = size * scale * aHalo; }',
   fragmentShader: 'uniform sampler2D map; varying vec4 vCol; void main(){ float a = texture2D(map, gl_PointCoord).a; gl_FragColor = vec4(vCol.rgb, a * vCol.a); }',
   transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
 });
@@ -692,7 +699,7 @@ const GLOW_FLK = { pink: 'neon', cyan: 'neon', amber: 'neon', warm: 'bulb', oran
 const LIGHT_ONLY = { spill: true, spill2: true };
 function glowPoints(gl){
   const lo = {}, vis = {};
-  for (const k in gl) (LIGHT_ONLY[k] ? lo : vis)[k] = gl[k];
+  for (const k in gl) (LIGHT_ONLY[glowBase(k)] ? lo : vis)[k] = gl[k];
   if (!Object.keys(lo).length) return glowPointsOf(gl);
   const g = new THREE.Group();
   if (Object.keys(vis).length) g.add(glowPointsOf(vis));
@@ -701,18 +708,18 @@ function glowPoints(gl){
 }
 function glowPointsOf(gl){
   let n = 0; for (const k in gl) n += gl[k].length/4;
-  const pos = new Float32Array(n*3), size = new Float32Array(n), col = new Float32Array(n*4), flk = new Float32Array(n), ons = new Float32Array(n);
+  const pos = new Float32Array(n*3), size = new Float32Array(n), col = new Float32Array(n*4), flk = new Float32Array(n), ons = new Float32Array(n), halo = new Float32Array(n);
   let i = 0;
   for (const k in gl){
-    const arr = gl[k], c = GLOW[k].color, op = k === 'blink' ? -2 : GLOW_FIXED[k] !== undefined ? GLOW_FIXED[k] : -1;
+    const b = glowBase(k), hk = b === k ? 1 : LAMP_HALO, arr = gl[k], c = GLOW[b].color, op = b === 'blink' ? -2 : GLOW_FIXED[b] !== undefined ? GLOW_FIXED[b] : -1;
     for (let q=0;q<arr.length;q+=4, i++){
       pos[i*3] = arr[q]; pos[i*3+1] = arr[q+1]; pos[i*3+2] = arr[q+2]; size[i] = Math.abs(arr[q+3]);
       col[i*4] = c.r; col[i*4+1] = c.g; col[i*4+2] = c.b; col[i*4+3] = op;
-      flk[i] = arr[q+3] < 0 ? heavyFlickerId() : flickerId(GLOW_FLK[k]); ons[i] = litOrder(arr[q], arr[q+1], arr[q+2])/255;
+      flk[i] = arr[q+3] < 0 ? heavyFlickerId() : flickerId(GLOW_FLK[b]); halo[i] = hk; ons[i] = litOrder(arr[q], arr[q+1], arr[q+2])/255;
     }
   }
   const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('size', new THREE.BufferAttribute(size, 1)); g.setAttribute('aCol', new THREE.BufferAttribute(col, 4)); g.setAttribute('aFlk', new THREE.BufferAttribute(flk, 1)); g.setAttribute('aOn', new THREE.BufferAttribute(ons, 1));
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('size', new THREE.BufferAttribute(size, 1)); g.setAttribute('aCol', new THREE.BufferAttribute(col, 4)); g.setAttribute('aFlk', new THREE.BufferAttribute(flk, 1)); g.setAttribute('aHalo', new THREE.BufferAttribute(halo, 1)); g.setAttribute('aOn', new THREE.BufferAttribute(ons, 1));
   g.computeBoundingSphere();
   const pts = new THREE.Points(g, GLOW_PTS); pts.layers.set(1); pts.layers.enable(4); pts.frustumCulled = false; return pts;   // layer 4: the night-light pass (sky.js)
 }

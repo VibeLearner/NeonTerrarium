@@ -872,7 +872,8 @@ function buildPlatformBody(c){
   else if (c.sections.length) groundLot({ x, z, cls: c.sections[0].zone, elev: 0, base: CURB, deck: false, cross: cells.has(ckey(c.i, c.j + 1)) });
   else {
     box(G.asph, P, 0, .012, 0, LOT, .025, LOT);
-    if (c.green === 'grass'){   // laid to lawn, edge to edge, with grass growing up out of it
+    if (c.green === 'grass' && c.gd && c.gd.p) gardenTile(c, P);   // part of a garden: its piece, its pond (garden.js)
+    else if (c.green === 'grass'){   // laid to lawn, edge to edge, with grass growing up out of it
       lawn(P, 4);
       // a garden lawn: one kind of short grass, packed in an even overlapping grid so it reads as a single carpet
       const n = 20, st = LOT/n;
@@ -884,9 +885,10 @@ function buildPlatformBody(c){
     }
     else { const n = 7, st = LOT/n;
       for (let i=0;i<n;i++) for (let j=0;j<n;j++) if (!chance(.04)) box(pick(TILES.mid), P, (i-(n-1)/2)*st, .03, (j-(n-1)/2)*st, st - .05, .045, st - .05); }
-    for (let k=0;k<(chance(.75) ? 1 : 0) + (chance(.2) ? 1 : 0);k++) plant(pick(['bush','bushFlower','g_fern3','bonsai']), P, rnd(-1.3,1.3), .05, rnd(-1.3,1.3), rnd(.7,.95));
+    const gdn = c.green === 'grass' && c.gd && c.gd.p;   // (a garden plot dresses itself: no stray bushes or bench on top)
+    if (!gdn) for (let k=0;k<(chance(.75) ? 1 : 0) + (chance(.2) ? 1 : 0);k++) plant(pick(['bush','bushFlower','g_fern3','bonsai']), P, rnd(-1.3,1.3), .05, rnd(-1.3,1.3), rnd(.7,.95));
     if (c.green !== 'grass') for (let k=0;k<irand(3,5);k++) floorBig(P, rnd(-1.3,1.3), .056, rnd(-1.3,1.3), rnd(.8,1.15));   // moss and vines grown over the paving
-    if (chance(.4)){ const Pb = under(P, T(rnd(-.9,.9), .05, rnd(-.9,.9), pick([0, PI/2]))); box(M.wood, Pb, 0, .14, 0, .5, .04, .15); box(M.frame, Pb, 0, .07, 0, .42, .14, .1);
+    if (!gdn && chance(.4)){ const Pb = under(P, T(rnd(-.9,.9), .05, rnd(-.9,.9), pick([0, PI/2]))); box(M.wood, Pb, 0, .14, 0, .5, .04, .15); box(M.frame, Pb, 0, .07, 0, .42, .14, .1);
       for (const sx of [-.13, .13]) spotAt(Pb, sx, .16, 0, 'seat', null, [0, 1]); }
   }
   const lamp = ([sx,sz]) => { const Pl = T(x + sx*(LOT/2 - .25), 0, z + sz*(LOT/2 - .25), Math.atan2(-sz, sx));   // (its arm reaches out over the crossing)
@@ -904,7 +906,9 @@ function buildPlatformBody(c){
   // spacing along every street whatever gets built (each crossing's lamp belongs to the plot on its -x,-z side, on that
   // plot's corner, its arm out over the crossing). (They used to be a coin toss per plot on a random corner: bunched up in
   // places, missing for blocks in others, none at all along the shops.) A dark street's lamp is its failing one.
-  if (!c.sections.length && c.park){ if ((c.i + c.j) % 2 === 0) parkLamp(); }
+  // a garden lights itself (its lanterns, gazebos, bridges): only its open lawns keep the park lamps, and no street lamps stand in it
+  if (!c.sections.length && c.green === 'grass' && c.gd && c.gd.p){ if (c.gd.p === 'lawn' && c.park && (c.i + c.j) % 2 === 0) parkLamp(); }
+  else if (!c.sections.length && c.park){ if ((c.i + c.j) % 2 === 0) parkLamp(); }
   else if (((c.i + c.j) % 2 + 2) % 2 === 0) lamp([1, 1]);
 }
 
@@ -2562,7 +2566,7 @@ function parkCells(){
 }
 // the plots an edit to these must rebuild (the plots themselves, a park's, an air-filter hologram's tower, a side pod hanging on them), the pods last
 function refreshTodo(list, megaList = []){
-  list = list.concat(parkCells());
+  list = list.concat(typeof gardenUpdate === 'function' ? gardenUpdate() : [], parkCells());   // (the gardens first: a plot's garden comes and goes with its lawn, garden.js)
   // an air-filter hologram hangs over the plots in front of its tower, so a change next door rebuilds the tower too
   for (const a of airCells){
     if (cells.get(ckey(a.i, a.j)) !== a){ airCells.delete(a); continue; }
@@ -2993,7 +2997,7 @@ const SAVE_KEY = 'neonIsland.v2';
 const MEGA_SAVE_KEY = 'neonIsland.megas';
 function save(){
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify([...cells.values()].map(c => [c.i, c.j, c.sections, c.style || DEFAULT_STYLE, c.green || 'some', c.lift ? c.lift.y : 0, c.lift && c.below ? c.below : 0, c.lift && c.lift.v === 2 ? (c.lift.sc ? [c.lift.d[0], c.lift.d[1], 1] : c.lift.d) : 0, c.wall ? { z: c.wall.zone, n: c.wall.n || 0, g: c.wall.gate ? 1 : 0, s: c.wall.seed } : 0])));   // (the last: a bracketed side pod, the way to the wall it hangs from)
+    localStorage.setItem(SAVE_KEY, JSON.stringify([...cells.values()].map(c => [c.i, c.j, c.sections, c.style || DEFAULT_STYLE, c.green || 'some', c.lift ? c.lift.y : 0, c.lift && c.below ? c.below : 0, c.lift && c.lift.v === 2 ? (c.lift.sc ? [c.lift.d[0], c.lift.d[1], 1] : c.lift.d) : 0, c.wall ? { z: c.wall.zone, n: c.wall.n || 0, g: c.wall.gate ? 1 : 0, s: c.wall.seed } : 0, typeof gdSave === 'function' ? gdSave(c) : 0])));   // (a bracketed side pod, the way to the wall it hangs from; then the wall; then the plot's garden piece, garden.js)
     localStorage.setItem(MEGA_SAVE_KEY, JSON.stringify([...megas.values()].map(m => ({ id: m.id, kind: m.kind, i: m.i, j: m.j, w: m.w, h: m.h, levels: m.levels, seed: m.seed, centre: m.centre || undefined, rot: m.rot, si: m.si, sj: m.sj }))));
   } catch (e) {}
   hwSave(); mtSave();
@@ -3002,7 +3006,7 @@ function load(){
   try {
     const d = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
     if (!Array.isArray(d) || !d.length) return false;
-    for (const [i,j,secs,st,gr,lf,bl,lv,wl] of d){ const c = newCell(i, j, (secs || []).filter(s => s && ZONES[s.zone])); c.style = st || DEFAULT_STYLE; c.green = GREEN_MODES.includes(gr) ? gr : 'some'; if (lf > 0 && c.sections.length){ c.lift = Array.isArray(lv) ? Object.assign({ y: lf, v: 2, d: [lv[0], lv[1]] }, lv[2] === 1 ? { sc: 1 } : {}) : { y: lf }; if (Array.isArray(bl)){ const b2 = bl.filter(s => s && ZONES[s.zone]); if (b2.length) c.below = b2; } } if (wl && wl.z && ZONES[wl.z] && !c.sections.length) c.wall = { zone: wl.z, n: Math.max(0, wl.n | 0), gate: !!wl.g, seed: wl.s | 0 }; cells.set(ckey(i,j), c); }
+    for (const [i,j,secs,st,gr,lf,bl,lv,wl,gdv] of d){ const c = newCell(i, j, (secs || []).filter(s => s && ZONES[s.zone])); c.style = st || DEFAULT_STYLE; c.green = GREEN_MODES.includes(gr) ? gr : 'some'; if (lf > 0 && c.sections.length){ c.lift = Array.isArray(lv) ? Object.assign({ y: lf, v: 2, d: [lv[0], lv[1]] }, lv[2] === 1 ? { sc: 1 } : {}) : { y: lf }; if (Array.isArray(bl)){ const b2 = bl.filter(s => s && ZONES[s.zone]); if (b2.length) c.below = b2; } } if (wl && wl.z && ZONES[wl.z] && !c.sections.length) c.wall = { zone: wl.z, n: Math.max(0, wl.n | 0), gate: !!wl.g, seed: wl.s | 0 }; if (gdv && !c.sections.length && !c.wall && typeof gdLoad === 'function') gdLoad(c, gdv); cells.set(ckey(i,j), c); }
     hwLoad(); mtLoad();   // (before the plots are built: the highways' and the metro's pillars stand on them)
     if (typeof renderBmenu === 'function') renderBmenu();   // (a city with highways or a metro has Transit, whatever its megastructures: it was hidden when they loaded after the menu was drawn)
     try { for (const m of JSON.parse(localStorage.getItem(MEGA_SAVE_KEY) || '[]')) { const mm = placeMega(m.kind, m.i, m.j, m.seed, m.w, m.h, m.levels, m.id || null); if (mm && m.centre) mm.centre = m.centre; if (mm && Number.isInteger(m.rot)) mm.rot = ((m.rot % 4) + 4) % 4; if (mm && Number.isInteger(m.si) && Number.isInteger(m.sj)){ mm.si = m.si; mm.sj = m.sj; } } } catch (e) {}

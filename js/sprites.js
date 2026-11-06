@@ -8,6 +8,9 @@ const SPR = {"size":{"bush":[20,17],"bushFlower":[20,17],"moss":[16,13],"bonsai"
 // lawn grass: tufts, clumps and reeds cut from the overgrown-tile sheet (gt0-4 tufts, gt5 reeds, gt6-9 thick clumps)
 Object.assign(SPR.size, { gt0:[16,15], gt1:[15,9], gt2:[10,8], gt3:[13,8], gt4:[14,12], gt5:[16,16], gt6:[16,15], gt7:[16,16], gt8:[16,16], gt9:[16,15] });
 for (let k = 0; k < 10; k++) SPR.anchor['gt' + k] = 0;
+// tree tops (drawn in code: spritegen_trees.js), hung from their middle; four crossed copies each (garden.js canopy)
+Object.assign(SPR.size, { tc_round:[36,30], tc_oval:[26,36], tc_willow:[40,38], tc_pine:[28,40], tc_cypress:[14,40], tc_blossom:[38,30], tc_maple:[36,30], tc_umbrella:[44,22], tc_palm:[40,30], tc_airy:[30,32], tc_wisteria:[38,34], tc_puff:[22,18] });
+for (const k in SPR.size) if (k.startsWith('tc_')) SPR.anchor[k] = .5;
 SPR.img = {}; for (const k in SPR.size) SPR.img[k] = 'assets/sprites/' + k + '.png';
 const PX = 18; // sprite pixels per world unit at the default 480p zoom, so one sprite pixel is about one screen pixel
 const FOL_UNI = { tint:{ value:new THREE.Color(1,1,1) }, time:{ value:0 }, normalMode:{ value:0 }, neonI:{ value:1 }, res:{ value:new THREE.Vector2(480,270) }, wind:{ value:1 },
@@ -35,7 +38,8 @@ const texLoader = new THREE.TextureLoader();
 function swayTypeFor(kind){
   if (kind.startsWith('sign_') || kind.startsWith('glyph_') || kind.startsWith('graf_') || kind === 'w_tangle') return 0;
   if (kind.startsWith('l_') && kind !== 'l_mossroots') return 1;
-  if (/^gt\d$/.test(kind)) return 4;   // lawn grass: bends as a whole, in waves rolling across the lawn
+  if (/^gt\d$/.test(kind)) return 4;
+  if (kind === 'tc_willow' || kind === 'tc_wisteria') return 2;   // tree tops with hanging strands swing from the crown   // lawn grass: bends as a whole, in waves rolling across the lawn
   if (kind === 'vines' || kind === 'pothos' || kind === 'l_mossroots' || kind.startsWith('h_')) return 2;
   return 3;
 }

@@ -35,7 +35,7 @@ then open http://localhost:8000.
 | Pick a zone | Zone A to D buttons, or 1 to 4 (Esc or 0 to deselect) | Zone buttons |
 | Build | Click the sky to grow the platform; with a zone picked, click to build, click a roof to stack a section | Tap |
 | Change a plot's greenery | With no zone picked, click an empty plot: cycles some plants, bare, lawn (the choice becomes the default for new plots) | Tap |
-| Grow a garden | Lay three or more lawn plots side by side: the garden grows its own pieces, bigger ones as it grows. A lawn laid beside its pond has about a two in three chance of widening the pond | Tap |
+| Grow a garden | Lay three or more lawn plots side by side: the garden grows into a park with its own paths and pieces, bigger ones as it grows. A pond only ever appears on the plot you just laid: from six plots it can open there, and a lawn laid beside the pond has about a two in three chance of widening it | Tap |
 | Remove the top section | Right-click | Press and hold |
 | Delete mode | X, or the delete button by the zones: drag to select a block of plots, click inside it to delete everything there (buildings, platform and any megastructure reaching into it), click outside to drop the selection. X or Esc to leave | Delete button |
 | Place a megastructure | Pick it in the Buildings menu, click to put it down, R turns it, right-click or Esc cancels | Tap |
@@ -71,7 +71,8 @@ js/audio.js             sound effects (Web Audio), volume setting
 js/mega.js              megastructures: unlocking, placing, removing, their live parts (koi, police drone and hoverbikes, club lights)
 js/people.js            people: residents, jobs, daily routines, the sidewalk network, walking door to door, delivery drones, muggings and police, the Neon Dome's nights
 js/world.js             the game world: cells, building stacks, batching, edits, build and remove animations, saving
-js/garden.js            gardens: three or more lawn plots side by side grow benches, trees, ponds, bridges, gazebos and more (sandbox only)
+js/garden.js            gardens: three or more lawn plots side by side grow into a park (paths, groves, ponds, bridges, gazebos and more; sandbox only), and the tree builder (real trunks, sprite crowns)
+js/spritegen_trees.js   the tree tops, drawn in code (tools/treelab/ builds the Tree Crown Lab page that shows them all)
 js/input.js             camera, mouse / touch / keyboard, settings panel
 js/main.js              start-up and the frame loop
 js/furnish.js           Furnish pod: picking a pod, gathering the city round it, the apartment overlay, saving its recipe with the city

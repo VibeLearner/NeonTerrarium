@@ -1,0 +1,488 @@
+<title>Tree Crown Lab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,750&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen&display=swap">
+<style>
+/* Layout: a greenhouse bench. A grove strip on top to judge how kinds sit together, then one row per kind with its variants laid out like seed trays. */
+:root {
+  --bg: #e9ede3; --surface: #f6f8f1; --sunk: #dfe5d7; --ink: #1c2a21; --muted: #586a5d; --line: #c6d0bf;
+  --accent: #a9582c; --keep: #3d7f2a; --drop: #a8433a; --maybe: #8a7a2a;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --pixel: "Silkscreen", ui-monospace, "Courier New", monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #111916; --surface: #18221d; --sunk: #0e1512; --ink: #e2e8dc; --muted: #93a297; --line: #2b3a31;
+  --accent: #e0905a; --keep: #7cc24f; --drop: #e07a6e; --maybe: #d9c060; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #111916; --surface: #18221d; --sunk: #0e1512; --ink: #e2e8dc; --muted: #93a297; --line: #2b3a31;
+  --accent: #e0905a; --keep: #7cc24f; --drop: #e07a6e; --maybe: #d9c060; color-scheme: dark }
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--body); }
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 28px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 24px; }
+header { display: grid; gap: 6px; }
+.eyebrow { font: 11px/1 var(--pixel); letter-spacing: .08em; color: var(--accent); }
+h1 { font: 750 clamp(30px, 5vw, 44px)/1.05 var(--display); margin: 0; text-wrap: balance; }
+.lede { margin: 0; max-width: 66ch; color: var(--muted); }
+.bar { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.group { display: flex; align-items: center; gap: 8px; }
+.group > span { font: 10px/1 var(--pixel); letter-spacing: .06em; color: var(--muted); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; background: transparent; color: var(--ink); font: 500 13px var(--body); padding: 6px 10px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.submit { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.btn { border: 1px solid var(--accent); background: var(--accent); color: var(--surface); font: 600 14px var(--body); padding: 8px 14px; border-radius: 8px; cursor: pointer; }
+.btn.ghost { background: transparent; color: var(--accent); }
+.status { font-size: 13px; color: var(--muted); }
+.tally { font: 11px/1 var(--pixel); color: var(--muted); letter-spacing: .04em; }
+.grove { display: grid; gap: 10px; }
+.grove-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+h2 { font: 600 20px/1.2 var(--display); margin: 0; }
+.grove canvas { width: 100%; height: auto; image-rendering: pixelated; border-radius: 10px; border: 1px solid var(--line); display: block; background: var(--sunk); }
+.kinds { display: grid; gap: 14px; }
+.kind { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 12px; }
+.kind[data-d="keep"] { border-color: color-mix(in srgb, var(--keep) 55%, var(--line)); }
+.kind[data-d="drop"] { opacity: .62; }
+.kind-head { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.kind-name { font: 600 17px/1.2 var(--display); }
+.tag { font: 10px/1 var(--pixel); color: var(--muted); letter-spacing: .05em; background: var(--sunk); padding: 4px 6px; border-radius: 4px; }
+.kind-desc { color: var(--muted); font-size: 14px; flex: 1 1 260px; min-width: 0; }
+.decide { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.decide button { border: 0; background: transparent; color: var(--ink); font: 500 13px var(--body); padding: 6px 12px; cursor: pointer; }
+.decide button + button { border-left: 1px solid var(--line); }
+.decide button[data-v="keep"][aria-pressed="true"] { background: var(--keep); color: var(--surface); }
+.decide button[data-v="maybe"][aria-pressed="true"] { background: var(--maybe); color: var(--surface); }
+.decide button[data-v="drop"][aria-pressed="true"] { background: var(--drop); color: var(--surface); }
+.tray { display: flex; flex-wrap: wrap; gap: 8px; }
+.cell { position: relative; border: 1px solid var(--line); border-radius: 8px; padding: 6px; background: var(--sunk); cursor: pointer; display: grid; place-items: center; }
+.cell canvas { image-rendering: pixelated; display: block; max-width: 100%; }
+.cell .v { position: absolute; left: 5px; top: 4px; font: 9px/1 var(--pixel); color: var(--muted); }
+.cell[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
+.cell[aria-pressed="true"] .v { color: var(--accent); }
+.note { width: 100%; box-sizing: border-box; border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 8px; padding: 7px 10px; font: 14px var(--body); }
+.hint { font-size: 13px; color: var(--muted); margin: 0; }
+@media (max-width: 640px) { .submit { margin-left: 0; width: 100%; } .bar { position: static; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">NEON TERRARIUM · GARDENS</div>
+    <h1>Tree Crown Lab</h1>
+    <p class="lede">Every tree top the game draws, straight from its sprite code. In the park each crown is shown as four crossed copies on a real trunk; here you see the flat sprite. Mark each kind Keep, Maybe or Drop, star any variants you especially like, then Submit picks.</p>
+  </header>
+
+  <div class="bar" role="toolbar" aria-label="View settings">
+    <div class="group"><span>ZOOM</span><div class="seg" id="zoom"><button data-z="2">2x</button><button data-z="3" aria-pressed="true">3x</button><button data-z="4">4x</button></div></div>
+    <div class="group"><span>BACKDROP</span><div class="seg" id="bg"><button data-b="lawn" aria-pressed="true">Lawn</button><button data-b="night">Night</button><button data-b="plain">Plain</button></div></div>
+    <div class="submit"><span class="tally" id="tally"></span><span class="status" id="status" aria-live="polite">Loading saved picks…</span><button class="btn" id="submitBtn" type="button">Submit picks</button></div>
+  </div>
+
+  <section class="grove" aria-labelledby="groveTitle">
+    <div class="grove-head"><h2 id="groveTitle">Grove check</h2><button class="btn ghost" id="reroll" type="button">New grove</button></div>
+    <p class="hint">A random mix of the kinds you haven't dropped, side by side at game size, to check that any two can stand together.</p>
+    <canvas id="grove" width="480" height="120" aria-label="A mixed grove of tree crowns"></canvas>
+  </section>
+
+  <section class="kinds" id="kinds" aria-label="Tree kinds"></section>
+</div>
+
+<script>
+// Neon Terrarium: sprites drawn in code (procedural foliage plan, items 2 to 4). The plants, grass, vines, laundry and floor decals used to be Retro Diffusion pictures (AI art, shrunk to true pixel size);
+// these are drawn at load from seeds, in the same pixel-art style, and fill the sprite atlas (sprites.js) instead of the PNGs. This file is the core: the pixel buffer, the seeded random numbers, the palette,
+// the drawing primitives and the registry. The families (spritegen_*.js) register one generator per kind. Nothing here touches the game or three.js, so a page with just these scripts can draw and show them
+// (tools/procfol/sprites_dump.py).
+//
+// STYLE RULES (every generator follows them; the owner judges by eye against the old sprites):
+//  * True pixel size: one sprite pixel is one screen pixel at the default 480p zoom (PX = 18 sprite pixels a world unit). No anti-aliasing, no blur, no half-transparent pixel (alpha is 0 or 255).
+//  * Light from the upper left. Each material has a ramp of 3 to 5 values, hue-shifted: shadows cooler and more saturated, highlights warmer. No pure black, no pure gray.
+//  * Silhouette first: a kind reads as a flat dark shape at 1x. Clusters of leaves, not single pixels; no isolated pixel except a deliberate highlight (a flower, a dew spot).
+//  * Outlines: a darker shade of the local color, only where the shape meets empty space (selective: bottom and right, `edge(px, 'br')`, or all round as the old sprites had them, `edge(px, 'all')`).
+//    The shape keeps its size: the edge is recolored, nothing is added outside.
+//  * Dithering only in a few places, in regular 2 x 2 patterns (`dither2`), never random speckle.
+//  * Colors from the shared foliage palette below, sampled from the old sprites (k-means over their pixels: tools/procfol/palette.py), so the city's tone does not shift; the looks system's grade and
+//    palette blend work on top as before.
+//  * Variants: a kind gets SG.COUNT[kind] seeds side by side in the atlas (SG.FCOUNT for floor decals); a plant picks its variant from a hash of its position (sprites.js), never from fxRand or Math.random.
+//
+// A generator is `function (px, R, v, w, h, SG)`: px the pixel buffer of exactly w x h (the kind's size, unchanged), R a seeded random stream (R.f(), R.r(a, b), R.i(a, b), R.pick(a), R.chance(p)), v the
+// variant number. Drawing the same (kind, variant) twice gives the same pixels. No generator may use Math.random.
+const SG = (() => {
+  const SG = { VERSION: 1, gens: {} };
+  // ---------- colors: 0xRRGGBB integers ----------
+  const hex = s => parseInt(s.slice(1), 16);
+  const rgb = c => [(c >> 16) & 255, (c >> 8) & 255, c & 255];
+  const pack = (r, g, b) => (Math.max(0, Math.min(255, Math.round(r))) << 16) | (Math.max(0, Math.min(255, Math.round(g))) << 8) | Math.max(0, Math.min(255, Math.round(b)));
+  const mix = (a, b, t) => { const p = rgb(a), q = rgb(b); return pack(p[0] + (q[0] - p[0])*t, p[1] + (q[1] - p[1])*t, p[2] + (q[2] - p[2])*t); };
+  // a darker (t < 0) or lighter (t > 0) shade of c, hue-shifted: darker goes cooler and more saturated, lighter goes warmer
+  const shade = (c, t) => { const [r, g, b] = rgb(c); const L = (r + g + b)/3;
+    if (t < 0){ const k = -t; return pack(r*(1 - k*.62) - 3*k, g*(1 - k*.5), b*(1 - k*.34) + 6*k + (L < 90 ? 0 : 4*k)); }
+    return pack(r + (255 - r)*t*.62 + 8*t, g + (255 - g)*t*.5 + 4*t, b + (255 - b)*t*.34 - 5*t); };
+  SG.hex = hex; SG.rgb = rgb; SG.pack = pack; SG.mix = mix; SG.shade = shade;
+  // ---------- the shared foliage palette (dark -> light ramps; from the old sprites, hue-shifted where the old ones were flat) ----------
+  const ramp = (...l) => l.map(hex);
+  SG.PAL = {
+    olive:  ramp('#122010', '#223a1c', '#4e722e', '#6b8a3a', '#8fa04a', '#b2bf5a'),   // ground cover, hanging greenery, ivy (the old sprites' main green)
+    leaf:   ramp('#1e472a', '#264e1e', '#39762b', '#5d932e', '#7ab747', '#9acd58'),   // bushes
+    bright: ramp('#033a32', '#162d09', '#20841e', '#326c19', '#499c1f', '#7cc83c'),   // pothos, bright climbers
+    cool:   ramp('#27323b', '#30504d', '#3c714c', '#5f9942', '#78cc76', '#a8e090'),   // grass tufts, reeds
+    fern:   ramp('#1f4a35', '#368545', '#51a754', '#64b665', '#78cc76', '#a0dc8c'),
+    pine:   ramp('#06240f', '#0c4a1c', '#16702a', '#2f9a38', '#58b94a'),              // bonsai pads
+    bamboo: ramp('#095719', '#2a6d24', '#367625', '#529331', '#6baf3c', '#9cd462'),
+    moss:   ramp('#00360b', '#0a611a', '#2f8a26', '#5b9439', '#8cc060'),
+    pot:    ramp('#772c01', '#a64209', '#c95f22', '#e08a4a'),
+    bark:   ramp('#1c140a', '#2c2b09', '#4a3a1c', '#6b5230'),
+    pink:   ramp('#b84a78', '#ff96be', '#ffd0e0'),
+    yellow: ramp('#c08a16', '#ffd23f', '#fff2a0'),
+    white:  ramp('#b8c4d8', '#eef4ff'),
+    violet: ramp('#6a4ab0', '#b18cff', '#dccaff'),
+    red:    ramp('#a83a30', '#e0584a', '#ffa090'),
+    // flat floor decals: narrow middle values (they take the scene's light like the paving)
+    fMoss:  ramp('#1d3015', '#3b5621', '#59752f'), fCrack: ramp('#233519', '#4e6829', '#656f57'), fGrass: ramp('#06220f', '#103c11', '#214810', '#305312'), fLeaf: ramp('#1f2f14', '#3a5424', '#53762c'),
+    // cloth (from the old laundry)
+    clothBlue: ramp('#91b6ee', '#b3cbfe'), clothButter: ramp('#d9c670', '#fde899'), clothRose: ramp('#b37589', '#f4a6b3'), clothCream: ramp('#dee4d4', '#fdedd2'), clothJeans: ramp('#517092', '#5e819e', '#8cacb8'),
+    clothSage: ramp('#8aa07a', '#b4c8a0'), clothLilac: ramp('#a890d8', '#cdadf8'), clothPeach: ramp('#d89a7e', '#fdbfa4'), clothShirt: ramp('#7a9cb6', '#a8c4cf'), clothSock: ramp('#c4be94', '#fbdcb6'),
+  };
+  // ---------- the pixel buffer: RGBA, alpha 0 or 255 ----------
+  class Px {
+    constructor(w, h){ this.w = w; this.h = h; this.d = new Uint8ClampedArray(w*h*4); this.n = 0; }
+    inside(x, y){ return x >= 0 && y >= 0 && x < this.w && y < this.h; }
+    set(x, y, c){ x = Math.round(x); y = Math.round(y); if (x < 0 || y < 0 || x >= this.w || y >= this.h) return; const o = (y*this.w + x)*4; if (!this.d[o + 3]) this.n++; this.d[o] = (c >> 16) & 255; this.d[o + 1] = (c >> 8) & 255; this.d[o + 2] = c & 255; this.d[o + 3] = 255; }
+    clear(x, y){ if (x < 0 || y < 0 || x >= this.w || y >= this.h) return; const o = (y*this.w + x)*4; if (this.d[o + 3]){ this.d[o + 3] = 0; this.n--; } }
+    has(x, y){ return x >= 0 && y >= 0 && x < this.w && y < this.h && this.d[(y*this.w + x)*4 + 3] > 0; }
+    get(x, y){ if (!this.has(x, y)) return -1; const o = (y*this.w + x)*4; return (this.d[o] << 16) | (this.d[o + 1] << 8) | this.d[o + 2]; }
+  }
+  SG.Px = Px;
+  // ---------- seeded random numbers (never Math.random) ----------
+  function mulberry(a){ return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  const strHash = s => { let h = 2166136261; for (let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+  SG.rng = seed => { const f = mulberry(seed >>> 0);
+    return { f, r: (a, b) => a + (b - a)*f(), i: (a, b) => a + Math.floor(f()*(b - a + 1)), pick: l => l[Math.floor(f()*l.length)], chance: p => f() < p, gauss: () => (f() + f() + f() - 1.5)/.75 }; };
+  SG.seedOf = (kind, v) => (strHash(kind) ^ Math.imul(v + 1, 0x9E3779B1) ^ Math.imul(SG.VERSION, 0x85EBCA6B)) >>> 0;
+  // ---------- drawing primitives ----------
+  // light from the upper left: the direction a surface normal is compared with
+  const LX = -.55, LY = -.8;
+  SG.light = { x: LX, y: LY };
+  // a value 0..1 from a normal (nx, ny) on a round form, plus a little of the form's height: 1 lit, 0 in shadow
+  const lit = (nx, ny) => { const nz = Math.sqrt(Math.max(0, 1 - nx*nx - ny*ny)); return Math.max(0, Math.min(1, .5 + .5*(nx*LX + ny*LY) + .25*(nz - .5))); };
+  SG.lit = lit;
+  // 2 x 2 ordered dither: true when pixel (x, y) is "on" at level 0..4 (0 never, 4 always, 2 a checkerboard): regular, never speckle
+  SG.dither2 = (x, y, level) => { const m = [[0, 2], [3, 1]][y & 1][x & 1]; return level > m; };
+  // pick a color of a ramp at t (0 dark .. 1 light); `d` (0..1) pushes through a dither between two neighbouring values in a band
+  SG.rampAt = (r, t, x, y, dith) => { const k = (r.length - 1)*Math.max(0, Math.min(.9999, t)), i = Math.floor(k), f = k - i; return (dith && SG.dither2(x, y, Math.round(f*4))) ? r[i + 1] : r[i]; };
+  // a filled ellipse, each pixel colored by fn(x, y, nx, ny, edgeDist) (return a color, or -1 to skip)
+  SG.ellipse = (px, cx, cy, rx, ry, fn) => {
+    for (let y = Math.floor(cy - ry); y <= Math.ceil(cy + ry); y++) for (let x = Math.floor(cx - rx); x <= Math.ceil(cx + rx); x++){
+      const nx = (x + .5 - cx)/rx, ny = (y + .5 - cy)/ry, d = nx*nx + ny*ny; if (d > 1) continue;
+      const c = fn(x, y, nx, ny, 1 - Math.sqrt(d)); if (c >= 0) px.set(x, y, c); } };
+  // a shaded round cluster of leaves: `bumps` overlapping lobes (a scalloped edge), lit from the upper left on the ramp, a dither only on the band boundaries when dith is set
+  SG.cluster = (px, cx, cy, rx, ry, rampc, R, o = {}) => {
+    const bumps = o.bumps || 5, lobes = [[cx, cy, rx, ry]];
+    for (let k = 0; k < bumps; k++){ const a = R.r(0, 6.283), rr = R.r(.45, .75); lobes.push([cx + Math.cos(a)*rx*rr, cy + Math.sin(a)*ry*rr*.85, rx*R.r(.35, .55), ry*R.r(.35, .55)]); }
+    const lo = o.lo === undefined ? 0 : o.lo, hi = o.hi === undefined ? 1 : o.hi;
+    for (const [lx, ly, lrx, lry] of lobes) SG.ellipse(px, lx, ly, Math.max(1, lrx), Math.max(1, lry), (x, y, nx, ny) => {
+      // the lobe's own light; the cluster's overall light too, so lobes read as parts of one canopy
+      const t = lit(nx, ny)*.6 + lit((x + .5 - cx)/rx, (y + .5 - cy)/ry)*.4;
+      return SG.rampAt(rampc, lo + (hi - lo)*t, x, y, o.dither); });
+  };
+  // a line (Bresenham), one value, optional width in pixels (a plus-shaped brush for 2)
+  SG.line = (px, x0, y0, x1, y1, c, wd = 1) => {
+    x0 = Math.round(x0); y0 = Math.round(y0); x1 = Math.round(x1); y1 = Math.round(y1);
+    const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1; let e = dx + dy;
+    for (;;){ px.set(x0, y0, c); if (wd > 1){ px.set(x0 + 1, y0, c); } if (x0 === x1 && y0 === y1) break; const e2 = 2*e; if (e2 >= dy){ e += dy; x0 += sx; } if (e2 <= dx){ e += dx; y0 += sy; } } };
+  // a quadratic curve from (x0, y0) through the control point (cx, cy) to (x1, y1): a polyline of Bresenham pieces
+  SG.curve = (px, x0, y0, cx, cy, x1, y1, c, wd = 1) => { let lx = x0, ly = y0; const n = Math.max(6, Math.ceil(Math.hypot(x1 - x0, y1 - y0)));
+    for (let k = 1; k <= n; k++){ const t = k/n, u = 1 - t, x = u*u*x0 + 2*u*t*cx + t*t*x1, y = u*u*y0 + 2*u*t*cy + t*t*y1; SG.line(px, lx, ly, x, y, c, wd); lx = x; ly = y; } };
+  // the points of such a curve (to hang leaves on it)
+  SG.curvePts = (x0, y0, cx, cy, x1, y1, n) => { const o = []; for (let k = 0; k <= n; k++){ const t = k/n, u = 1 - t; o.push([u*u*x0 + 2*u*t*cx + t*t*x1, u*u*y0 + 2*u*t*cy + t*t*y1]); } return o; };
+  // selective outline: every opaque pixel with empty space on the chosen sides is recolored to a darker shade of itself (sides: 'br' bottom and right, 'all', 'b' bottom only, 'bl', 'r')
+  SG.edge = (px, sides = 'br', amount = .5) => {
+    const pts = []; const has = (x, y) => px.has(x, y);
+    for (let y = 0; y < px.h; y++) for (let x = 0; x < px.w; x++){ if (!has(x, y)) continue;
+      const e = (sides === 'all' && (!has(x - 1, y) || !has(x + 1, y) || !has(x, y - 1) || !has(x, y + 1)))
+        || (sides.includes('b') && !has(x, y + 1)) || (sides.includes('r') && !has(x + 1, y)) || (sides.includes('l') && !has(x - 1, y)) || (sides.includes('t') && !has(x, y - 1));
+      if (e) pts.push(x, y); }
+    for (let k = 0; k < pts.length; k += 2) px.set(pts[k], pts[k + 1], shade(px.get(pts[k], pts[k + 1]), -amount));
+  };
+  // remove isolated pixels (no neighbour in the 4 directions): the style rule, applied after drawing
+  SG.despeckle = px => { const kill = []; for (let y = 0; y < px.h; y++) for (let x = 0; x < px.w; x++) if (px.has(x, y) && !px.has(x - 1, y) && !px.has(x + 1, y) && !px.has(x, y - 1) && !px.has(x, y + 1)) kill.push(x, y); for (let k = 0; k < kill.length; k += 2) px.clear(kill[k], kill[k + 1]); };
+  // ---------- which kinds are drawn in code, and how many variants each has (a plain table: the plot worker reads it to lay out the floor decals' uvs, and draws nothing) ----------
+  // Kinds not listed keep one slot and their picture (signs and glyphs are already drawn in code by sprites.js). Sizes and anchors stay in sprites.js (SPR, FLOOR_SPR) and do not change.
+  SG.COUNT = {}; SG.FCOUNT = {};
+  (function(){ const set = (t, list, n) => { for (const k of list) t[k] = n; };
+    set(SG.COUNT, ['gt0','gt1','gt2','gt3','gt4','gt5','gt6','gt7','gt8','gt9'], 8);
+    set(SG.COUNT, ['g_clover','g_cover','g_spread1','g_spread2','g_moss2','moss','g_flowers','fern','g_fern2','g_fern3','bush','bushFlower','bonsai','bamboo','succulent'], 6);
+    set(SG.COUNT, ['vines','pothos','h_ivy','h_vine3','h_curtain1','h_curtain2','h_curtain3','h_heart','l_mossroots','w_tangle'], 4);
+    set(SG.COUNT, ['l_tee_blue','l_tee_peach','l_tee_rose','l_tee_sage','l_tee_butter','l_tee_lilac','l_jeans','l_socks','l_towel_cream','l_towel_green','l_shirt_pink','l_shirt_blue'], 3);
+    set(SG.COUNT, ['tc_round','tc_oval','tc_willow','tc_pine','tc_cypress','tc_blossom','tc_maple','tc_umbrella','tc_palm','tc_airy','tc_wisteria','tc_puff'], 8);   // (tree tops: spritegen_trees.js)
+    SG.COUNT.grass = 1; SG.COUNT.grassFar = 1;   // (the lawn tile sheet, 48 x 16: spritegen_lawn.js)
+    set(SG.FCOUNT, ['f_moss1','f_moss2','f_weeds','f_crack','f_vine','f_mossmat','f_sprouts','f_seam','f_ivy','f_leaves','f_grass1','f_grass2'], 4); })();
+  // the variant of a thing at a world position: a hash of the position, never a random draw (so the same plots come out whatever the variants are)
+  SG.vAt = (n, x, y, z) => { if (n < 2) return 0;
+   
+    let h = Math.imul(Math.round(x*20) | 0, 0x27d4eb2d) ^ Math.imul(Math.round(y*20) | 0, 0x165667b1) ^ Math.imul(Math.round(z*20) | 0, 0x9E3779B1);
+    h ^= h >>> 15; h = Math.imul(h, 0x85EBCA6B); h ^= h >>> 13; return (h >>> 0) % n; };
+  // ---------- registry ----------
+  // SG.reg(kind, fn): the generator of one kind (its variant count is in SG.COUNT). A kind with no generator keeps its picture in assets/ (sprites.js loads it).
+  SG.reg = (kind, fn) => { SG.gens[kind] = fn; };
+  SG.has = kind => !!SG.gens[kind];
+  // the pixels of one kind and variant, w x h; the buffer is cleared of anything outside it by construction
+  SG.draw = (kind, w, h, v = 0) => { const px = new Px(w, h), R = SG.rng(SG.seedOf(kind, v)); SG.gens[kind](px, R, v, w, h, SG); return px; };
+  // into a canvas 2d context at (x, y)
+  SG.blit = (g, px, x, y) => { g.putImageData(new ImageData(px.d, px.w, px.h), x, y); };
+  return SG;
+})();
+
+// Neon Terrarium: tree tops drawn in code (Nov 2026). Runs after spritegen.js and shares its rules (true pixel size, light from the upper left, ramps hue-shifted,
+// clusters not speckle, selective outline). Only the crowns are sprites: trunks and limbs are real geometry (garden.js treeAt), and a crown is drawn as four
+// copies crossed round its middle (canopy()) so it reads full from every angle the camera turns to.
+//
+// Every kind shares one family of ramps (palette B's lush greens, its coral and cream blossom, a muted amber and a soft violet), the same light and the same
+// outline, so any two kinds can stand side by side in a grove without one looking out of place. Kinds and sizes (SPR.size in sprites.js, variants SG.COUNT in
+// spritegen.js):
+//   tc_round 36x30   round leafy (an oak or a lime)        tc_oval 26x36     tall oval (a hornbeam)          tc_willow 40x38   weeping willow
+//   tc_pine 28x40    tiered conifer                         tc_cypress 14x40  narrow flame                    tc_blossom 38x30  cherry blossom
+//   tc_maple 36x30   amber and coral leaves                 tc_umbrella 44x22 wide flat-topped crown          tc_palm 40x30     palm fronds
+//   tc_airy 30x32    sparse and light (a birch)             tc_wisteria 38x34 green crown, violet racemes     tc_puff 22x18     a small clump, for a limb's own crown
+// tools/treelab/ builds the lab page that shows them all (every kind, every variant) to keep or drop.
+(() => {
+  const ramp = (...l) => l.map(SG.hex);
+  const TP = {
+    leaf:    ramp('#14301a', '#1f4a22', '#2f6a2a', '#468a32', '#62a83c', '#86c454', '#b0dc78'),
+    deep:    ramp('#0e2a20', '#183f2e', '#24573a', '#357046', '#4f8c54', '#73ab68'),
+    airy:    ramp('#24421e', '#3c6428', '#5a8a36', '#7aaa46', '#9cc460', '#c2dc86'),
+    blossom: ramp('#7a3050', '#b2547a', '#e2829e', '#f8aabe', '#ffd2dc', '#fff0f2'),
+    maple:   ramp('#4a2016', '#7a3420', '#ae4e2c', '#d8723e', '#f09a58', '#ffc282'),
+    amber:   ramp('#4e3216', '#7a5222', '#a87430', '#d09a40', '#ecc062'),
+    wist:    ramp('#2e2458', '#4a3c8a', '#6e58b8', '#9a82dc', '#c4b0f2', '#e6dcff'),
+    palm:    ramp('#15301a', '#244c22', '#386c2a', '#538c34', '#76ac46', '#a2cc66'),
+    bark:    ramp('#1e140c', '#33241a', '#4a3626'),
+  };
+  // a variant's own temperature: the same ramp nudged a little warmer or cooler, so variants of a kind differ but stay in the family
+  const tint = (r, v, k = .08) => { const t = ((v*37) % 7)/6 - .5; return r.map(c => t > 0 ? SG.mix(c, SG.shade(c, .3), t*k*2) : SG.mix(c, SG.shade(c, -.3), -t*k*2)); };
+  const TAU = Math.PI*2;
+  // a crown: one mass in shadow, lobes round it in the middle values, lit lobes toward the upper left; a few branch pixels peeking through low down
+  function crown(px, R, cx, cy, rx, ry, rp, o = {}){
+    const n = o.n || 7;
+    SG.cluster(px, cx, cy + ry*.06, rx, ry, rp, R, { bumps: o.bumps || 7, lo: 0, hi: .5 });
+    for (let k = 0; k < n; k++){ const a = R.r(0, TAU), d = R.r(.25, .62);
+      SG.cluster(px, cx + Math.cos(a)*rx*d, cy + Math.sin(a)*ry*d*.85, rx*R.r(.32, .5), ry*R.r(.32, .5), rp, R, { bumps: 4, lo: .18, hi: .82 }); }
+    for (let k = 0; k < Math.ceil(n/2); k++){ const a = R.r(Math.PI*1.02, Math.PI*1.55), d = R.r(.1, .48);
+      SG.cluster(px, cx + Math.cos(a)*rx*d, cy + Math.sin(a)*ry*d, rx*R.r(.24, .38), ry*R.r(.24, .38), rp, R, { bumps: 3, lo: .45, hi: 1 }); }
+    if (o.twigs !== false) for (let k = 0; k < (o.twigs || 2); k++){ const x0 = cx + R.r(-rx*.25, rx*.25), y0 = cy + ry*R.r(.35, .6);
+      const x1 = x0 + R.r(-rx*.3, rx*.3), y1 = y0 - ry*R.r(.25, .45); if (px.has(x0, y0)) SG.line(px, x0, y0, x1, y1, R.pick(TP.bark.slice(1))); }
+  }
+  // dots of blossom or fruit over a crown, in small clusters (never single pixels)
+  function dots(px, R, n, rp, lo = 2){ for (let k = 0; k < n; k++){ const x = R.i(1, px.w - 3), y = R.i(1, px.h - 3);
+    if (!px.has(x, y) || !px.has(x + 1, y) || !px.has(x, y + 1)) continue;
+    const c = rp[R.i(lo, rp.length - 1)]; px.set(x, y, c); px.set(x + 1, y, rp[Math.max(0, lo - 1)]); if (R.chance(.5)) px.set(x, y + 1, rp[Math.min(rp.length - 1, lo + 1)]); } }
+  const done = px => { SG.despeckle(px); SG.edge(px, 'br', .45); };
+  // ---- the kinds ----
+  SG.reg('tc_round', function (px, R, v, w, h){
+    const rp = tint(TP.leaf, v), rx = w*R.r(.4, .47), ry = h*R.r(.38, .45);
+    crown(px, R, w/2, h/2 + 1, rx, ry, rp, { n: R.i(6, 9) });
+    if (v % 4 === 3) dots(px, R, 6, TP.blossom, 3);
+    done(px);
+  });
+  SG.reg('tc_oval', function (px, R, v, w, h){
+    const rp = tint(R.chance(.5) ? TP.leaf : TP.deep, v);
+    // one tall mass, then lobes up its height (not stacked balls)
+    SG.cluster(px, w/2, h*.55, w*.46, h*.44, rp, R, { bumps: 9, lo: 0, hi: .5 });
+    for (let k = 0; k < 9; k++){ const y = h*R.r(.18, .88), x = w/2 + R.r(-w*.22, w*.22), lit = x < w/2 && y < h*.6;
+      SG.cluster(px, x, y, w*R.r(.18, .28), h*R.r(.1, .15), rp, R, { bumps: 3, lo: lit ? .4 : .15, hi: lit ? 1 : .75 }); }
+    done(px);
+  });
+  SG.reg('tc_willow', function (px, R, v, w, h){
+    const rp = tint(TP.airy, v, .1), top = h*.3;
+    // the hanging curtain first (behind the crown): strands of leaves in loose bunches, longest at the sides, gaps between bunches
+    let x = 2;
+    while (x < w - 2){
+      const bunch = R.i(2, 4), gap = R.i(1, 3);
+      for (let b = 0; b < bunch && x < w - 2; b++, x++){
+        const e = Math.abs(x - w/2)/(w/2), len = h*(.3 + .45*e)*R.r(.65, 1.05), y0 = top + h*R.r(.02, .14), sway = R.r(-2, 2), side = x < w/2;
+        for (let y = 0; y < len; y++){ const xx = x + sway*(y/len)**2, t = 1 - y/len;
+          if (y % 4 === 3 && R.chance(.35)) continue;   // a break in the strand now and then
+          px.set(xx, y0 + y, SG.rampAt(rp, (side ? .35 : .2) + .45*t, xx, y0 + y, false));
+          if (y % 3 === 1 && R.chance(.45)) px.set(xx + (side ? -1 : 1), y0 + y, rp[side ? 4 : 2]); }
+      }
+      x += gap;
+    }
+    crown(px, R, w/2, top, w*.4, h*.22, rp, { n: 6, twigs: false });
+    done(px);
+  });
+  SG.reg('tc_pine', function (px, R, v, w, h){
+    const rp = tint(TP.deep, v), tiers = R.i(5, 7);
+    // tiers from the bottom up, each a dense drooping skirt that overlaps the one below; darker underneath, lit from the left
+    for (let k = 0; k < tiers; k++){ const t = k/(tiers - 1), y = h*(.95 - t*.78), half = w*(.49 - t*.4)*R.r(.92, 1.05), th = h*(.2 - t*.06);
+      for (let x = -Math.ceil(half); x <= half; x++){ const e = Math.abs(x)/half, drop = e*e*th*.55, top = y - th*(1 - e*.75), bot = y + drop;
+        for (let yy = Math.floor(top); yy <= bot; yy++){ const q = (yy - top)/(bot - top + .001), lt = .78 - q*.55 + (x < 0 ? .12 : -.05) - e*.12;
+          px.set(w/2 + x, yy, SG.rampAt(rp, lt, w/2 + x, yy, true)); } } }
+    for (let y = 0; y < 3; y++) px.set(w/2, y, rp[3]);
+    done(px);
+  });
+  SG.reg('tc_cypress', function (px, R, v, w, h){
+    const rp = tint(TP.deep, v, .06);
+    for (let y = 1; y < h - 1; y++){ const t = y/h, half = Math.max(1, w*.5*Math.sin(Math.min(1, t*1.25)*Math.PI*.5)*(t > .85 ? (1 - t)*6 : 1)) + (y % 5 === 0 ? 1 : 0);
+      for (let x = -half; x <= half; x++){ const lt = .55 - x/half*.35 + ((y + Math.round(x)) % 4 === 0 ? .15 : 0); px.set(Math.round(w/2 + x), y, SG.rampAt(rp, lt, x, y, true)); } }
+    done(px);
+  });
+  SG.reg('tc_blossom', function (px, R, v, w, h){
+    const leafy = v % 3 === 2;
+    if (leafy){ crown(px, R, w/2, h/2 + 1, w*.45, h*.4, tint(TP.leaf, v), { n: R.i(7, 10) }); dots(px, R, 22, TP.blossom, 2); }
+    else {
+      // green underneath, mostly hidden: blossom over it, so the leaves show only as a soft shadow at the bottom
+      SG.cluster(px, w/2, h*.6, w*.42, h*.32, tint(TP.leaf, v), R, { bumps: 6, lo: .05, hi: .4 });
+      crown(px, R, w/2, h/2, w*.45, h*.38, v % 2 ? TP.blossom : SG.mix ? TP.blossom.map(c => SG.mix(c, SG.hex('#fff4ec'), .35)) : TP.blossom, { n: R.i(7, 10), twigs: 1 });
+      dots(px, R, 8, TP.blossom, 4); }
+    done(px);
+  });
+  SG.reg('tc_maple', function (px, R, v, w, h){
+    const rp = [TP.maple, tint(TP.amber, v), TP.maple.map((c, i) => SG.mix(c, TP.amber[Math.min(i, 4)], .5)), tint(TP.leaf, v)][v % 4];
+    crown(px, R, w/2, h/2 + 1, w*R.r(.4, .46), h*R.r(.38, .44), rp, { n: R.i(7, 10) });
+    done(px);
+  });
+  SG.reg('tc_umbrella', function (px, R, v, w, h){
+    const rp = tint(R.chance(.5) ? TP.leaf : TP.airy, v), layers = R.i(2, 3);
+    for (let k = 0; k < layers; k++){ const y = h*(.62 - k*.2), rx = w*(.47 - k*.08); crown(px, R, w/2 + R.r(-2, 2), y, rx, h*.2, rp, { n: 6, bumps: 9, twigs: k ? false : 3 }); }
+    done(px);
+  });
+  SG.reg('tc_palm', function (px, R, v, w, h){
+    const rp = tint(TP.palm, v), cx = w/2, cy = h*.34, n = R.i(10, 13);
+    // fronds all round the crown, back ones first (darker): a rib arching up and out and drooping at the tip, with a fringe of leaflets either side of it
+    const fr = []; for (let k = 0; k < n; k++) fr.push({ a: k/n*TAU + R.r(-.2, .2), len: R.r(.4, .5)*w });
+    fr.sort((p, q) => Math.sin(p.a) - Math.sin(q.a));
+    for (const f of fr){ const ca = Math.cos(f.a), sa = Math.sin(f.a), back = sa < 0;
+      const ex = cx + ca*f.len, ey = cy + sa*f.len*.3 + h*R.r(.3, .45), mx = cx + ca*f.len*.55, my = cy + sa*f.len*.2 - h*R.r(.1, .2);
+      const pts = SG.curvePts(cx, cy, mx, my, ex, ey, 18), base = (back ? .25 : .5) + (ca < 0 ? .2 : 0);
+      pts.forEach(([x, y], i) => { if (i < 2) return; const t = i/18, fl = Math.max(1, Math.round((1 - Math.abs(t - .45)*1.4)*5));
+        for (let q = 1; q <= fl; q++){ px.set(x - q*.5, y + q, SG.rampAt(rp, base - q*.05, x, y + q, true)); px.set(x + q*.5, y + q, SG.rampAt(rp, base - .15 - q*.05, x, y + q, true)); }
+        px.set(x, y, SG.rampAt(rp, base + .3 - t*.2, x, y, false)); }); }
+    SG.cluster(px, cx, cy + 1, 3.5, 2.5, TP.amber, R, { bumps: 2, lo: .1, hi: .55 });
+    done(px);
+  });
+  SG.reg('tc_airy', function (px, R, v, w, h){
+    const rp = tint(TP.airy, v), n = R.i(12, 16);
+    // a loose, light crown: many small clumps with sky between them, a few pale twigs only near the bottom
+    for (let k = 0; k < 2; k++){ const x0 = w/2 + R.r(-2, 2), y0 = h*.98, x1 = w/2 + R.r(-w*.25, w*.25), y1 = h*R.r(.55, .7); SG.line(px, x0, y0, x1, y1, SG.hex('#cfc6b4')); }
+    for (let k = 0; k < n; k++){ const a = R.r(0, TAU), d = Math.sqrt(R.f())*.85, x = w/2 + Math.cos(a)*w*.38*d, y = h*.46 + Math.sin(a)*h*.4*d, lit = y < h*.5 && x < w*.55;
+      SG.cluster(px, x, y, R.r(3.5, 5.5), R.r(3, 4.5), rp, R, { bumps: 3, lo: lit ? .4 : .12, hi: lit ? 1 : .72 }); }
+    done(px);
+  });
+  SG.reg('tc_wisteria', function (px, R, v, w, h){
+    const rp = tint(TP.leaf, v), top = h*.32;
+    crown(px, R, w/2, top, w*.42, h*.26, rp, { n: 6, twigs: false });
+    const wr = v % 3 === 1 ? TP.blossom : TP.wist;
+    for (let k = 0; k < R.i(8, 12); k++){ const x = R.i(4, w - 5), y0 = top + R.i(0, Math.round(h*.18)), len = R.i(6, 12);
+      for (let y = 0; y < len; y++){ const t = y/len, half = (1 - t)*1.6; for (let q = -half; q <= half; q++) px.set(x + q, y0 + y, SG.rampAt(wr, .9 - t*.6 - (q > 0 ? .15 : 0), x + q, y0 + y, true)); } }
+    done(px);
+  });
+  SG.reg('tc_puff', function (px, R, v, w, h){
+    const rp = tint([TP.leaf, TP.leaf, TP.airy, TP.deep][v % 4], v);
+    crown(px, R, w/2, h/2 + .5, w*.44, h*.42, rp, { n: 4, twigs: 1 });
+    if (v % 5 === 4) dots(px, R, 4, TP.blossom, 3);
+    done(px);
+  });
+})();
+
+</script>
+<script>
+(() => {
+const SIZES = {"tc_round": [36, 30], "tc_oval": [26, 36], "tc_willow": [40, 38], "tc_pine": [28, 40], "tc_cypress": [14, 40], "tc_blossom": [38, 30], "tc_maple": [36, 30], "tc_umbrella": [44, 22], "tc_palm": [40, 30], "tc_airy": [30, 32], "tc_wisteria": [38, 34], "tc_puff": [22, 18]}, COUNT = 8;
+const INFO = {
+  tc_round: ['Round leafy', 'An oak or lime: the everyday park tree.'],
+  tc_oval: ['Tall oval', 'A hornbeam shape, for avenues and tight spots.'],
+  tc_willow: ['Weeping willow', 'A light crown with a hanging curtain; it swings from the crown in the wind.'],
+  tc_pine: ['Tiered conifer', 'Stacked drooping skirts, a cooler green.'],
+  tc_cypress: ['Cypress', 'A narrow flame, good for rows and gates.'],
+  tc_blossom: ['Cherry blossom', 'Pink and cream crowns, one in three still green with blossom dots.'],
+  tc_maple: ['Maple', 'Amber and coral leaves, muted to sit with the greens.'],
+  tc_umbrella: ['Umbrella', 'A wide flat-topped crown on a tall trunk.'],
+  tc_palm: ['Palm', 'Fronds all round, drooping at the tips.'],
+  tc_airy: ['Birch', 'A sparse, light crown with sky between the clumps.'],
+  tc_wisteria: ['Wisteria', 'A green crown with violet (or pink) racemes hanging below.'],
+  tc_puff: ['Small clump', 'The little crown at the end of a limb, under a bigger one.'],
+};
+const kinds = Object.keys(SIZES);
+const state = { zoom: 3, bg: 'lawn', picks: {} };   // picks[kind] = { d: 'keep'|'maybe'|'drop'|'', favs: [v], note }
+kinds.forEach(k => state.picks[k] = { d: '', favs: [], note: '' });
+const BG = { lawn: ['#5f8f3e', '#4f7a34'], night: ['#16222a', '#1d2c34'], plain: ['#7a8478', '#6e786c'] };
+const sprite = {}; for (const k of kinds){ sprite[k] = []; for (let v = 0; v < COUNT; v++){ const [w, h] = SIZES[k], px = SG.draw(k, w, h, v), c = document.createElement('canvas'); c.width = w; c.height = h; SG.blit(c.getContext('2d'), px, 0, 0); sprite[k].push(c); } }
+// ---- the kind rows ----
+const host = document.getElementById('kinds');
+function cellBg(ctx, w, h){ const [a, b] = BG[state.bg]; ctx.fillStyle = a; ctx.fillRect(0, 0, w, h); ctx.fillStyle = b; for (let y = 0; y < h; y += 4) for (let x = (y/4) % 2 ? 2 : 0; x < w; x += 4) ctx.fillRect(x, y, 1, 1); }
+function drawCell(cv, k, v){ const [w, h] = SIZES[k], z = state.zoom; cv.width = (w + 6)*z; cv.height = (h + 6)*z; const g = cv.getContext('2d'); g.imageSmoothingEnabled = false;
+  g.save(); g.scale(z, z); cellBg(g, w + 6, h + 6); g.drawImage(sprite[k][v], 3, 3); g.restore(); }
+function renderKinds(){
+  host.textContent = '';
+  for (const k of kinds){
+    const p = state.picks[k], [name, desc] = INFO[k] || [k, ''], row = document.createElement('article'); row.className = 'kind'; row.dataset.d = p.d;
+    const head = document.createElement('div'); head.className = 'kind-head';
+    const nm = document.createElement('div'); nm.className = 'kind-name'; nm.textContent = name;
+    const tag = document.createElement('span'); tag.className = 'tag'; tag.textContent = k + ' · ' + SIZES[k].join('×') + ' PX';
+    const ds = document.createElement('div'); ds.className = 'kind-desc'; ds.textContent = desc;
+    const dec = document.createElement('div'); dec.className = 'decide'; dec.setAttribute('role', 'group'); dec.setAttribute('aria-label', 'Decision for ' + name);
+    for (const [v, label] of [['keep', 'Keep'], ['maybe', 'Maybe'], ['drop', 'Drop']]){ const b = document.createElement('button'); b.type = 'button'; b.dataset.v = v; b.textContent = label; b.setAttribute('aria-pressed', String(p.d === v));
+      b.onclick = () => { p.d = p.d === v ? '' : v; save(k); renderKinds(); drawGrove(); }; dec.append(b); }
+    head.append(nm, tag, ds, dec);
+    const tray = document.createElement('div'); tray.className = 'tray';
+    for (let v = 0; v < COUNT; v++){ const cell = document.createElement('button'); cell.type = 'button'; cell.className = 'cell'; cell.setAttribute('aria-pressed', String(p.favs.includes(v))); cell.setAttribute('aria-label', name + ' variant ' + (v + 1) + (p.favs.includes(v) ? ', starred' : ''));
+      const cv = document.createElement('canvas'); drawCell(cv, k, v); const lb = document.createElement('span'); lb.className = 'v'; lb.textContent = (p.favs.includes(v) ? '★ ' : '') + (v + 1);
+      cell.append(cv, lb); cell.onclick = () => { p.favs = p.favs.includes(v) ? p.favs.filter(x => x !== v) : p.favs.concat(v).sort((a, b) => a - b); save(k); renderKinds(); }; tray.append(cell); }
+    const note = document.createElement('input'); note.className = 'note'; note.id = 'note-' + k; note.placeholder = 'Note for this kind (optional): too dark, more blossom…'; note.value = p.note;
+    let t = null; note.oninput = () => { p.note = note.value; clearTimeout(t); t = setTimeout(() => save(k), 700); };
+    row.append(head, tray, note); host.append(row);
+  }
+  const n = { keep: 0, maybe: 0, drop: 0 }; for (const k of kinds) if (state.picks[k].d) n[state.picks[k].d]++;
+  document.getElementById('tally').textContent = n.keep + ' KEEP · ' + n.maybe + ' MAYBE · ' + n.drop + ' DROP';
+}
+// ---- the grove ----
+let groveSeed = 1;
+function drawGrove(){
+  const cv = document.getElementById('grove'), g = cv.getContext('2d'), W = cv.width, H = cv.height; g.imageSmoothingEnabled = false;
+  const sky = state.bg === 'night' ? ['#141d26', '#1c2833'] : state.bg === 'plain' ? ['#8a948a', '#808a80'] : ['#a9c7c9', '#b8d3d1'];
+  g.fillStyle = sky[0]; g.fillRect(0, 0, W, H); g.fillStyle = sky[1]; g.fillRect(0, 0, W, H*.4);
+  const ground = H - 22; g.fillStyle = BG[state.bg === 'night' ? 'night' : 'lawn'][0]; g.fillRect(0, ground, W, H - ground);
+  g.fillStyle = state.bg === 'night' ? '#2a3a2a' : '#4f7a34'; for (let x = 0; x < W; x += 3) g.fillRect(x, ground, 1, 1);
+  const pool = kinds.filter(k => state.picks[k].d !== 'drop' && k !== 'tc_puff'); if (!pool.length) return;
+  const R = SG.rng(groveSeed*7919), trees = [];
+  for (let x = 14; x < W - 10; x += R.i(28, 44)) trees.push({ k: R.pick(pool), v: R.i(0, COUNT - 1), x, y: ground + R.i(0, 14) });
+  trees.sort((a, b) => a.y - b.y);
+  for (const t of trees){ const [w, h] = SIZES[t.k], th = t.k === 'tc_palm' ? 34 : t.k === 'tc_umbrella' ? 28 : t.k === 'tc_pine' || t.k === 'tc_cypress' ? 6 : 18, cy = t.y - th - h*.35;
+    g.fillStyle = t.k === 'tc_airy' ? '#d8d0c0' : t.k === 'tc_palm' ? '#9a7a52' : '#5a3e2a'; g.fillRect(Math.round(t.x - 1), Math.round(cy + h*.3), 3, Math.round(t.y - (cy + h*.3)));
+    g.drawImage(sprite[t.k][t.v], Math.round(t.x - w/2), Math.round(cy - h/2)); }
+}
+document.getElementById('reroll').onclick = () => { groveSeed++; drawGrove(); };
+// ---- view settings ----
+function segment(id, attr, key, num){ const el = document.getElementById(id); el.querySelectorAll('button').forEach(b => b.onclick = () => {
+  el.querySelectorAll('button').forEach(o => o.setAttribute('aria-pressed', String(o === b))); state[key] = num ? +b.dataset[attr] : b.dataset[attr]; renderKinds(); drawGrove(); }); }
+segment('zoom', 'z', 'zoom', true); segment('bg', 'b', 'bg', false);
+// ---- picks, kept in the page's store (Claude reads them from there) ----
+const status = document.getElementById('status'); let db = null;
+const writing = {};
+async function save(k){
+  if (!db){ status.textContent = 'Picks are kept on this page only (the store is not available here).'; return; }
+  if (writing[k]){ writing[k].again = true; return; }
+  writing[k] = { again: false };
+  try { do { writing[k].again = false; const p = state.picks[k]; await db.doc('kept/' + k).set({ kind: k, decision: p.d, favs: p.favs, note: p.note, at: new Date().toISOString() }); } while (writing[k].again);
+    status.textContent = 'Saved'; }
+  catch (e){ status.textContent = 'Could not save that pick. Check your connection and try again.'; }
+  finally { delete writing[k]; }
+}
+document.getElementById('submitBtn').onclick = async () => {
+  if (!db){ status.textContent = 'Submitting needs the page open on claude.ai while signed in.'; return; }
+  const sum = {}; for (const k of kinds) sum[k] = state.picks[k];
+  try { await db.collection('rounds').add({ at: new Date().toISOString(), picks: sum }); status.textContent = 'Submitted. Tell Claude your picks are in.'; }
+  catch (e){ status.textContent = 'Could not submit. Check your connection and try again.'; }
+};
+renderKinds(); drawGrove();
+(async () => {
+  const timer = setTimeout(() => { if (!db) status.textContent = 'Picks will save once the page connects.'; }, 10000);
+  try { db = window.claude ? await window.claude.use('db') : null; } catch (e){ db = null; }
+  if (!db){ clearTimeout(timer); status.textContent = 'Picks are kept on this page only (the store is not available here).'; return; }
+  try { const snap = await db.collection('kept').get(); for (const d of snap.docs){ const v = d.data(); if (v && state.picks[v.kind]) state.picks[v.kind] = { d: v.decision || '', favs: Array.isArray(v.favs) ? v.favs : [], note: v.note || '' }; }
+    status.textContent = snap.empty ? 'No picks yet' : 'Saved picks loaded'; }
+  catch (e){ status.textContent = 'Could not load saved picks. New picks still save.'; }
+  clearTimeout(timer); renderKinds(); drawGrove();
+})();
+})();
+</script>

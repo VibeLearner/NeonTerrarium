@@ -1645,7 +1645,7 @@ const PLAN = (() => {
       { say: 'Now place industry on the glowing tile.', sub: 'Pick Industrial.', mark: ['I1'], zone: 'ind', done: () => zoneAt(pt('I1')) === 'I',
         res: res('The home fills up.', 'Industry gives jobs to homes within 8 tiles. It also makes pollution, and the wind carries it one way.') },
       { say: 'Now a mistake, on purpose.', sub: 'Place a home right next to the industry, on the glowing tile.', mark: ['HB'], zone: 'low', done: () => zoneAt(pt('HB')) === 'R',
-        res: res('It struggles.', `${TOUCHY ? 'Tap' : 'Point at'} it: Clean air and Quiet are low. Industry is polluting and loud up close.`) },
+        resCard: 'HB', res: res('It struggles.', 'Its card is open: Clean air and Quiet are low. Industry is polluting and loud up close. You can check any building like this with no zone picked.') },
       { say: 'Open the Pollution view.', sub: `Views show what you can't see.${TOUCHY ? '' : ' Press V to cycle through them.'}`, target: lensBtn('air'), done: () => lens === 'air',
         res: res('Warm colors are heavy pollution.', 'The pulsing ring is where it comes from, and the arrows show the wind. Homes glow green (fine), amber or red. Taller industry blows its pollution over shorter buildings.') },
       { say: 'Now open the Noise view.', sub: 'The button next to Pollution.', target: lensBtn('noise'), done: () => lens === 'noise',
@@ -1658,10 +1658,10 @@ const PLAN = (() => {
         done: () => !!cellAt(pt('W1')) && !!cellAt(pt('W2')) && !zoneAt(pt('W1')) && !zoneAt(pt('W2')),
         res: res('Ground spreads your city out.', 'Farther from industry is cleaner and quieter. But jobs reach 8 tiles, shops 5, and power only as far as a core\'s grid.') },
       { say: 'Place a home on the farthest tile.', sub: 'Another mistake, on purpose.', mark: ['W2'], zone: 'low', done: () => zoneAt(pt('W2')) === 'R',
-        res: res('No power.', `It's outside the core's reach, so it stays dark. ${Tap} the core to see where its grid ends. A second core would power it, but every core makes some pollution.`) },
+        resCard: 'W2', res: res('No power.', `It's outside the core's reach, so it stays dark. ${Tap} the core to see where its grid ends. A second core would power it, but every core makes some pollution.`) },
       { say: 'Tall buildings block pollution.', sub: 'A building three levels or taller shields the homes up to 3 tiles behind it. But the people inside breathe what they block, and unhappy residents turn to crime, which spreads to the homes around them.', next: true },
       { say: 'Let\'s finish your starter district.', sub: 'Watch: the dark home goes, and two more homes, more industry and a second shop go up.', onShow: () => { base.auto = false; autoBuild(() => { base.auto = true; }); }, done: () => base.auto === true, min: 1500,
-        res: res('Your district is running.', `People are moving in. It's one home short of your first goal: that one is up to you. ${TOUCHY ? 'Tap' : 'Point at'} any building to see how it's doing.`) },
+        resNoZone: true, res: res('Your district is running.', `People are moving in. It's one home short of your first goal: that one is up to you. ${TOUCHY ? 'Tap' : 'Point at'} any building to see how it's doing.`) },
       { say: 'This is your city\'s balance.', sub: 'Homes filled: how many live in your homes, out of the room they have. Jobs and Things to do: short means build more of it, spare means there\'s room for more homes.', target: () => goalEl.querySelector('[data-bal]'), next: true },
       { say: `Your goal: ${TIERS[1].res} residents and ${TIERS[1].thr} thriving homes.`, sub: `${Tap} Thriving homes to see which homes miss what.`, target: () => goalEl.querySelector('[data-thr]'), done: () => thrN > base.thr,
         res: res('Check one need at a time.', 'Use the arrows: homes that pass glow green, the rest red. Replay these lessons from the ? on the goal card.'), last: true },
@@ -1758,6 +1758,12 @@ const PLAN = (() => {
       if (now() - shownAt < (b.min || 600) || !b.done || !b.done()){ refresh(); return; }
       phase = 'res'; unpulse(); MARK.set([]);
       if (b.onDone) try { b.onDone(); } catch (e) {}
+      // (a building to look at: the zone goes down, so pointing works, and its card opens on it, left of it, clear of the note)
+      if ((b.resCard || b.resNoZone) && typeof S !== 'undefined' && S.zone && typeof selectZone === 'function') try { selectZone(null); } catch (e) {}
+      if (b.resCard){ const k0 = U.k; let tries = 0; (function open(){ if (U.k !== k0) return; try { const c = cellAt(pt(b.resCard)); if (!c) return;
+        const p = screenOf(c.x, Math.max(CURB + 1, c.height || CURB + 3), c.z) || [innerWidth/2, innerHeight/2];
+        if (homeCard(c, TOUCHY ? undefined : Math.max(8, p[0] - 290), p[1] - 60)){ cardPinned = true; cardEl.classList.remove('hov'); return; } } catch (e) {}
+        if (++tries < 6) setTimeout(open, 500); })(); }   // (its numbers arrive within a second of building it)
       render(b, b.res.say, b.res.sub, b.last ? 'Got it' : 'Next'); noteEl.classList.add('done');
     }
     function advance(){ if (U.k === beats.length - 1){ finish(); return; } U.k++; if (mode === 'guided'){ st.tut.step = U.k; save(); } show(); }

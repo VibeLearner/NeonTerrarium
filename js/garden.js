@@ -141,12 +141,12 @@ diffuseColor.rgb = gW;
     // (its pixels marked in the normal image's alpha, which nothing else uses: the composite gives them the wet ground's reflections, strongly, sky.js)
     if (typeof MRT !== 'undefined' && MRT) sh.fragmentShader = sh.fragmentShader.replace('#include <dithering_fragment>', '#include <dithering_fragment>\npc_fragNormal.a = 0.5;');
     // the mirror (computers: gardenMirror): the mirrored picture where this point of the surface lies in it, shifted a pixel or so by the swell and
-    // the rings, over the water's own color: about a third of it, more for lights
+    // the rings, over the water's own color: half of it, more for lights (a third let the water show through a building's reflection, owner Nov 6)
     sh.fragmentShader = sh.fragmentShader.replace('#include <tonemapping_fragment>', `if (gMirOn > 0.5){
   vec4 gmc = gMirM*vec4(vWP.x, ${GD_MIR_Y.toFixed(3)}, vWP.z, 1.0); vec2 gmu = gmc.xy/gmc.w;
   gmu += vec2(floor(gWv*1.2 + gRg*3.0 + 0.5), floor(gRg*2.0 + 0.5))/gMirRes;
   vec4 gm = texture2D(gMir, gmu);
-  if (gm.a > 0.5){ float gml = dot(gm.rgb, vec3(0.3, 0.59, 0.11)); gl_FragColor.rgb = mix(gl_FragColor.rgb, gm.rgb, 0.36 + 0.4*smoothstep(0.55, 0.95, gml)); }
+  if (gm.a > 0.5){ float gml = dot(gm.rgb, vec3(0.3, 0.59, 0.11)); gl_FragColor.rgb = mix(gl_FragColor.rgb, gm.rgb, 0.5 + 0.3*smoothstep(0.55, 0.95, gml)); }
 }
 #include <tonemapping_fragment>`);
   };
@@ -1117,9 +1117,11 @@ function gardenMirror(){
     hid = gdMirFilter();
     rt.viewport.set(px0, py0, px1 - px0, py1 - py0); rt.scissor.set(px0, py0, px1 - px0, py1 - py0); rt.scissorTest = true;
     renderer.setRenderTarget(rt); renderer.setClearColor(0x000000, 0); renderer.autoClear = false; renderer.clear(true, true, false);
+    if (typeof CUT_UNDER !== 'undefined') CUT_UNDER = true;   // (the buildings' undersides too: world.js cutBefore)
     renderer.render(scene, vc);
     GD_MIR.on = true; GD_MIR.use.value = 1;
   } finally {
+    if (typeof CUT_UNDER !== 'undefined') CUT_UNDER = false;
     for (const o of hid) o.visible = true; hid.length = 0;
     FOL_UNI.res.value.copy(res0); GD_WATER_MAT.visible = true; pads.forEach((m, i) => m.visible = padVis[i]); renderer.shadowMap.needsUpdate = shUp;
     rt.scissorTest = false; renderer.setRenderTarget(prevRT); renderer.setClearColor(_gmCol, prevAlpha); renderer.autoClear = prevAuto;

@@ -240,8 +240,11 @@ function shadowRanges(o, g){
   SHADOW_STRIP.push([o, g]);
 }
 function shadowRangesDone(){ for (const [o, g] of SHADOW_STRIP){ o.userData.md = null; g.drawRange.start = 0; g.drawRange.count = cutRest(g.userData.cut); } SHADOW_STRIP = null; }
+// (CUT_UNDER: the ponds' mirror, garden.js, looks up from under the water: it draws the undersides too, the floors' and the overhangs' bottoms, which
+//  the camera never sees from above. Without them a building in the water was see-through, only its edges showing, owner Nov 6)
+let CUT_UNDER = false;
 function cutBefore(r, s, c, g){
-  const u = g.userData.cut, P = g.userData.pcs; g.drawRange.start = 0; g.drawRange.count = g.userData.full ? cutRest(u) : u.A;
+  const u = g.userData.cut, P = g.userData.pcs; g.drawRange.start = 0; g.drawRange.count = g.userData.full ? cutRest(u) : CUT_UNDER ? u.A + u.H : u.A;
   if (P && !g.userData.full && c === CULL.cam){ const t = multiRows(this, P, 0, 0); if (t !== false){ g.drawRange.start = 0; g.drawRange.count = t; } }
 }
 function cutAfter(r, s, c, g){ g.drawRange.start = 0; g.drawRange.count = cutRest(g.userData.cut); this.userData.md = null; }

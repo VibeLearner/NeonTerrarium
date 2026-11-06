@@ -272,6 +272,11 @@ const comp = new THREE.ShaderMaterial({
     uniform vec3 pal[${PAL_HEX.length}];
     uniform mat4 invVP; uniform sampler2D shadowMap; uniform mat4 shadowMat;
     uniform mat4 VP; uniform vec3 upView; uniform float wet; uniform float waterOn; uniform float rainOn; uniform sampler2D tCloud;
+    // (a garden pond's reflection search: how many steps, and how far apart on screen in render pixels; on a phone, fewer and longer: softLite)
+    #define WSTEPS 48
+    #define WSTEP_PX 1.6
+    #define WSTEPS_LITE 26
+    #define WSTEP_PX_LITE 2.8
     uniform float rainAmt; uniform float rainVis; uniform float rainDens; uniform float rainT; uniform float starVis; uniform vec3 skyMid; uniform float skyMidOn; uniform float hazeK; uniform vec3 mistTint; uniform float sparkle;   // (the looks: js/looks.js)
     uniform vec3 sunDir; uniform vec3 sunCol; uniform vec3 cityGlow;
     uniform float cloudOn; uniform float raysOn; uniform float rayI; uniform float rainDark;
@@ -562,8 +567,12 @@ const comp = new THREE.ShaderMaterial({
         pud *= 0.35 + 0.65*rainAmt;
         vec3 rr = reflect(rdir, vec3(0.0, 1.0, 0.0));
         vec3 hitCol = vec3(0.0); float hit = 0.0, t = 0.03; vec2 huv = vec2(0.0);
-        for (int i=0; i<22; i++){
-          t += 0.05 + t*0.14;
+        // (on a pond the search goes in even steps of about a render pixel and a half on screen, so thin things (lamps, rails) aren't stepped over at
+        //  some angles and caught at others: their reflections flashed in and out as the view turned, owner Nov 6)
+        float wst = 0.0; if (watPx){ vec4 a0 = VP*vec4(wp, 1.0), a1 = VP*vec4(wp + rr, 1.0); wst = WSTEP_PX/max(length((a1.xy/a1.w - a0.xy/a0.w)*0.5*res), 1e-3); t = 0.0; }
+        for (int i=0; i<WSTEPS; i++){
+          if (!watPx && i >= 22) break;
+          t += watPx ? wst : 0.05 + t*0.14;
           vec3 q = wp + rr*t;
           vec4 cp = VP * vec4(q, 1.0); cp.xyz /= cp.w;
           vec2 uv = cp.xy*0.5 + 0.5;
@@ -812,8 +821,10 @@ const SOFT_WET = SOFT_HEAD + `
       pud *= 0.35 + 0.65*rainAmt;
       vec3 rr = reflect(rdir, vec3(0.0, 1.0, 0.0));
       vec3 hitCol = vec3(0.0); float hit = 0.0, t = 0.03; vec2 huv = vec2(0.0);
-      for (int i=0; i<22; i++){
-        t += 0.05 + t*0.14;
+      float wst = 0.0; if (watPx){ vec4 a0 = VP*vec4(wp, 1.0), a1 = VP*vec4(wp + rr, 1.0); wst = WSTEP_PX/max(length((a1.xy/a1.w - a0.xy/a0.w)*0.5*res), 1e-3); t = 0.0; }   // (a pond: even steps, see the composite)
+      for (int i=0; i<WSTEPS; i++){
+        if (!watPx && i >= 22) break;
+        t += watPx ? wst : 0.05 + t*0.14;
         vec3 q = wp + rr*t;
         vec4 cp = VP * vec4(q, 1.0); cp.xyz /= cp.w;
         vec2 uv = cp.xy*0.5 + 0.5;
@@ -882,7 +893,7 @@ const SOFT_RAYS = SOFT_HEAD + `
   gl_FragColor = outv;`;
 // Phone mode (touch.js): the soft effects with fewer steps along each ray (the wet ground's reflection 12 longer steps instead of 22, the mist 5 instead of 8,
 // the light shafts 7 instead of 12): the same effects, a little coarser
-const softLite = b => !(self.PHONE && PHONE.on) ? b : b.replace('for (int i=0; i<22; i++){', 'for (int i=0; i<12; i++){').replace('t += 0.05 + t*0.14;', 't += (0.05 + t*0.14)*1.8;')
+const softLite = b => !(self.PHONE && PHONE.on) ? b : b.replace('if (!watPx && i >= 22) break;', 'if (!watPx && i >= 12) break;').replace('t += watPx ? wst : 0.05 + t*0.14;', 't += watPx ? wst : (0.05 + t*0.14)*1.8;').replace(/WSTEPS/g, 'WSTEPS_LITE').replace(/WSTEP_PX/g, 'WSTEP_PX_LITE')
   .replace('const int MS = 8;', 'const int MS = 5;').replace('const int RSTEPS = 12;', 'const int RSTEPS = 7;');
 const COMP_PRELUDE = comp.fragmentShader.slice(0, comp.fragmentShader.indexOf('void main(){'));
 const softMats = [SOFT_WET, SOFT_MIST, SOFT_RAYS].map(softLite).map(body => new THREE.ShaderMaterial({

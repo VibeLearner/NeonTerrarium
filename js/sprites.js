@@ -34,12 +34,16 @@ const FLK_GLSL = `
     return r < 0.42 ? 0.1 : (r < 0.58 ? 0.5 : 1.0);
   }`;
 const texLoader = new THREE.TextureLoader();
-// how each sprite moves in the wind: 0 still, 1 laundry flapping from its line, 2 hanging greenery swinging from the top, 3 plants leaning at the tips
+// how each sprite moves in the wind: 0 still, 1 laundry flapping from its line, 2 hanging greenery swinging from the top, 3 plants leaning at the tips,
+// 4 lawn grass, 5 a tree's crown (garden.js): the whole crown sways as one piece
 function swayTypeFor(kind){
   if (kind.startsWith('sign_') || kind.startsWith('glyph_') || kind.startsWith('graf_') || kind === 'w_tangle') return 0;
   if (kind.startsWith('l_') && kind !== 'l_mossroots') return 1;
   if (/^gt\d$/.test(kind)) return 4;
-  if (kind === 'tc_willow' || kind === 'tc_wisteria') return 2;   // tree tops with hanging strands swing from the crown   // lawn grass: bends as a whole, in waves rolling across the lawn
+  // A tree's crown is four copies of its sprite crossed at angles (so it reads from every side). Its rows sliding sideways moved each copy along its
+  // own plane, four different ways at once, so the crown seemed to swell and shrink, a pulse rather than a sway (owner Nov 6). It sways as one piece
+  // instead, every copy by the same amount the same way, in whole render pixels (the vertex shader)
+  if (kind.startsWith('tc_')) return 5;
   if (kind === 'vines' || kind === 'pothos' || kind === 'l_mossroots' || kind.startsWith('h_')) return 2;
   return 3;
 }
@@ -369,7 +373,7 @@ const FOL_SHADER = new THREE.ShaderMaterial({
         vec2 local = vec2(position.x*aVar.y, position.y + 0.5 - aVar.x);
         // sway happens in the fragment shader by sliding whole texel rows, so the quad itself never bends.
         // Widen it by 3 texels on each side so the shifted rows have room.
-        float pad = swayType > 0.5 ? (texSize.x + 6.0)/texSize.x : 1.0;
+        float pad = swayType > 0.5 && swayType < 4.5 ? (texSize.x + 6.0)/texSize.x : 1.0;   // (a crown, 5, moves whole: no room needed)
         local.x *= pad;
         vUv = vec2((uv.x - 0.5)*pad + 0.5, uv.y);
         vPhase = aVar.w;
@@ -386,6 +390,15 @@ const FOL_SHADER = new THREE.ShaderMaterial({
             wp.xz += vec2(.75, .45)*(.35 + .65*lean)*wind*.05*tip;
           }
           gl_Position = projectionMatrix * viewMatrix * wp;
+          if (swayType > 4.5){   // a tree's crown: a slow sway with the breeze (gusts rolling across the park, so neighbours move nearly together), the whole
+            // crown at once, the same way for all its copies, rounded to whole render pixels so it steps cleanly without its pixels swimming
+            vec3 base = (modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+            float sy = length(instanceMatrix[1].xyz);
+            float s = sin(time*0.9 - dot(base.xz, vec2(.09, .06))) + 0.3*sin(time*1.9 - dot(base.xz, vec2(.2, .11)));   // (by where it stands only: a tree's limb crowns move with its main one)
+            vec2 d = vec2(.75, .45)*s*wind*.03*sy;
+            vec4 c0 = projectionMatrix * viewMatrix * vec4(base, 1.0), c1 = projectionMatrix * viewMatrix * vec4(base + vec3(d.x, 0.0, d.y), 1.0);
+            gl_Position.xy += floor((c1.xy/c1.w - c0.xy/c0.w)*0.5*res + 0.5)/res*2.0*gl_Position.w;
+          }
           gl_Position.z -= DBIAS*gl_Position.w;
         } else {
           // free-standing: faces the camera, with its anchor and corners snapped to whole render pixels

@@ -84,19 +84,25 @@ let _cdMat = null, _cdScene = null;
 function scCopyDraw(colL, rowB){
   scCopyMat();
   const u = _cdMat.uniforms; u.tC.value = SC.rtS.texture; u.tN.value = SC.rtSN.texture; u.tD.value = SC.rtS.depthTexture;
+  const g = GLIDE.show(); u.useK.value = g ? 1 : 0; if (g){ u.kA.value = g.a.texture; u.kB.value = g.b.texture; u.kf.value = g.f; }
   u.off.value.set(scMod(colL - SC.ox, SC.w), scMod(rowB - SC.oy, SC.h)); u.size.value.set(SC.w, SC.h);
   renderer.render(_cdScene, compCam);
 }
 function scCopyMat(){
   if (!_cdMat){
     _cdMat = new THREE.RawShaderMaterial({ glslVersion: THREE.GLSL3, depthTest: true, depthWrite: true, depthFunc: THREE.AlwaysDepth, blending: THREE.NoBlending,
-      uniforms: { tC: { value: null }, tN: { value: null }, tD: { value: null }, off: { value: new THREE.Vector2() }, size: { value: new THREE.Vector2() } },
+      uniforms: { tC: { value: null }, tN: { value: null }, tD: { value: null }, off: { value: new THREE.Vector2() }, size: { value: new THREE.Vector2() },
+        kA: { value: null }, kB: { value: null }, kf: { value: 0 }, useK: { value: 0 } },
       vertexShader: 'in vec3 position; void main(){ gl_Position = vec4(position.xy, 0.0, 1.0); }',
       fragmentShader: `precision highp float; precision highp int; precision highp sampler2D;
         uniform sampler2D tC; uniform sampler2D tN; uniform sampler2D tD; uniform vec2 off; uniform vec2 size;
+        uniform sampler2D kA; uniform sampler2D kB; uniform float kf; uniform float useK;
         layout(location = 0) out highp vec4 oC; layout(location = 1) out highp vec4 oN;
         void main(){ ivec2 sz = ivec2(size), q = ivec2(gl_FragCoord.xy) + ivec2(off); q = ((q % sz) + sz) % sz;
-          oC = texelFetch(tC, q, 0); oN = texelFetch(tN, q, 0); gl_FragDepth = texelFetch(tD, q, 0).r; }` });
+          oC = texelFetch(tC, q, 0); oN = texelFetch(tN, q, 0); gl_FragDepth = texelFetch(tD, q, 0).r;
+          // a sun step gliding (GLIDE): the view's colour from the two pictures either side of where the glide is (only the shadows and the sun's light
+          //  differ between them: the depth and normals are the cache's, the same in all of them)
+          if (useK > 0.5){ ivec2 v = ivec2(gl_FragCoord.xy); oC = mix(texelFetch(kA, v, 0), texelFetch(kB, v, 0), kf); } }` });
     _cdMat.userData.mrt = true;
     const m = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), _cdMat); m.frustumCulled = false; _cdScene = new THREE.Scene(); _cdScene.add(m);
   }
@@ -310,6 +316,7 @@ function scJobStart(px, py, hard, soft, shk, why){
   SC.job = job;
 }
 function scJobSwap(job){   // the finished strips become the cache
+  GLIDE.swapped(job);
   const rt = SC.rtS, rn = SC.rtSN; SC.rtS = job.rt; SC.rtSN = job.rn; SC.next = { rt, rn }; SC.jobAt = performance.now();
   SC.lt = job; SC.editsSeen = job.edits;   // (a job's own fields are the lights it was drawn with)
   SC.hard = job.hard; SC.soft = job.soft; SC.shk = job.shk; SC.ox = job.ox; SC.oy = job.oy; SC.R = { x0: job.ox, x1: job.ox + SC.w, y0: job.oy, y1: job.oy + SC.h }; SC.age = 0; SC.rebuilds++; SC.job = null; SC.fill = null;
@@ -379,7 +386,7 @@ SC.frame = function(){
       const F = SC.fill; for (const st of F.strips) scDrawRect(st[0], st[1], st[2], st[3], F.px, F.py);
       SC.fill = null; SC.R = { x0: SC.ox, x1: SC.ox + SC.w, y0: SC.oy, y1: SC.oy + SC.h }; }
     else now = 'view left the cache'; }
-  else if (scDelta(soft, SC.soft) > SC_BIG || LIGHT_JUMP) now = 'the light jumped';
+  else if ((scDelta(soft, SC.soft) > SC_BIG || LIGHT_JUMP) && GLIDE.phase !== 'prep') now = 'the light jumped';   // (a glide's in-between suns are drawn as a drift: GLIDE)
   else if (SC_EDITS !== SC.editsSeen && !scEditRect(px, py, shk, soft)) now = 'an edit: ' + SC.rectWhy;
   // Still changing from frame to frame (a turn or zoom easing in, the lights switching at dusk): the cache would be drawn again every
   // frame, which costs more than the old way, so the old way draws. Once the inputs hold still, the new picture is drawn in strips
@@ -444,6 +451,8 @@ SC.frame = function(){
   if (!now && !SC.fill && !PH.tests.noRing && !scExtend(px, py)){   // the strip that keeps the view inside the ring; a pan too fast for it: the whole picture
     scFull(px, py, hard, soft, shk, 'pan too fast for the ring');
   }
+  if (GLIDE.phase !== 'idle'){ const why = now ? 'the picture was drawn again: ' + now : SC.fill ? 'a turn or zoom' : px !== GLIDE.px || py !== GLIDE.py ? 'the view moved' : SC_EDITS !== GLIDE.edits ? 'an edit' : '';
+    if (why) GLIDE.abort(why); }
   // the window of it into the frame, then the live set on top
   renderer.setRenderTarget(rtC); renderer.setClearColor(0x000000, 1);
   mrtBegin(rtC, rtN, true);
@@ -507,3 +516,76 @@ SC.line = function(){
   if (SC.mode === 'off' || PH.tests.noStatic) return 'static cache: off (switched off)';
   return 'static cache: ' + SC.state + (SC.why ? ' (' + SC.why + ')' : '') + (SC.ok ? '   frames since redrawn ' + SC.age + '   redrawn ' + SC.rebuilds + ' times   ring strips ' + SC.strips + '   edit rectangles ' + SC.rects + (SC.rectLast ? ' (last: x ' + SC.rectLast[0] + ' to ' + SC.rectLast[1] + ', y from bottom ' + SC.rectLast[2] + ' to ' + SC.rectLast[3] + ')' : '') : '');
 };
+
+// ---------- Shadows gliding from one sun step to the next (owner, Nov 6) ----------
+// With the day cycle running the sun moves in steps of a quarter hour (sky.js SUN_STEP), and each step used to swap the new shadows in at once.
+// Now, when a step comes and the view is drawn from the cache: the picture as it is is kept, the sun is walked through the in-between hours one at
+// a time, and for each the new shadow map and then the new picture are drawn in the background as before (a strip a frame), each picture's view kept
+// as it's finished. While they're drawn the old picture stays on screen. Then they're played in order over GLIDE.dur seconds, each fading into the next,
+// so the shadows glide. Only the colour of the view is kept for each (the depth and normals don't change with the sun), so a picture costs W x H x 4
+// bytes. 'fade' is the same with no in-between: the old picture fades into the new. Anything that redraws the picture (a turn, a pan, an edit, the old
+// way drawing a frame) lets the glide go: the shadows are then as the newest picture has them, as before. Plants, people and cars are drawn live, so
+// their shadows follow the sun's steps as the in-between maps are made.
+const GLIDE = { mode: 'glide3', dur: 10, fadeDur: 1.5, phase: 'idle', last: null, h0: 0, h1: 0, n: 0, k: 0, keys: [], lastShk: null, px: 0, py: 0, edits: 0, t0: 0, why: '' };
+GLIDE.frames = () => GLIDE.mode === 'glide6' ? 6 : GLIDE.mode === 'glide3' ? 3 : 0;
+// the hour the sun stands at (sky.js sunHour, day cycle running)
+GLIDE.hour = h => {
+  const G = GLIDE, base = Math.floor(h/SUN_STEP)*SUN_STEP;
+  if (G.last === null) G.last = base;
+  if (base !== G.last){
+    const fwd = Math.abs(((base - G.last + 24) % 24) - SUN_STEP) < 1e-6, was = G.last; G.last = base;
+    if (G.phase !== 'idle') G.abort('the next step came first');
+    else if (fwd && G.mode !== 'snap' && G.can()) G.start(was);
+  }
+  if (G.phase === 'prep'){ const x = G.h0 + SUN_STEP*G.k/(G.n + 1); return x >= 24 ? x - 24 : x; }
+  return base;
+};
+GLIDE.can = () => SC.mode === 'reuse' && SC.ok && (SC.state === 'in use' || SC.state.startsWith('redrawing')) && !SC.fill && !PH.tests.noStatic && !(PH.tests.copyByBlit || window.__COPY_BLIT) && MRT;
+GLIDE.start = h0 => {
+  const G = GLIDE; G.n = G.frames(); G.h0 = h0; G.k = 1; G.phase = 'prep'; G.t0 = performance.now(); G.why = '';
+  G.px = Math.round(camPix.x); G.py = Math.round(camPix.y); G.edits = SC_EDITS; G.lastShk = SC.shk ? SC.shk.slice() : null;
+  // the pictures: the view's size, the old one and one for each in-between and the last
+  const need = G.n + 2;
+  if (G.keys.length && (G.keys[0].width !== W || G.keys[0].height !== H)){ for (const k of G.keys) k.dispose(); G.keys = []; }
+  while (G.keys.length < need) G.keys.push(new THREE.WebGLRenderTarget(W, H, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, format: THREE.RGBAFormat, depthBuffer: false }));
+  while (G.keys.length > need) G.keys.pop().dispose();
+  glideKeep(SC.rtS, SC.ox, SC.oy, G.keys[0]);
+};
+// a picture finished (scJobSwap): one with new shadows is the next in-between
+GLIDE.swapped = job => {
+  const G = GLIDE; if (G.phase !== 'prep') return;
+  if (G.lastShk && scSame(job.shk, G.lastShk)) return;   // (the light drifting, the shadows the same: not a step of the glide)
+  if (scCol(G.px) < job.ox || scCol(G.px) + W > job.ox + SC.w || scRow(G.py) < job.oy || scRow(G.py) + H > job.oy + SC.h){ G.abort('the view left the picture'); return; }
+  glideKeep(job.rt, job.ox, job.oy, G.keys[G.k]); G.lastShk = job.shk.slice();
+  if (++G.k > G.n + 1){ G.phase = 'play'; G.t0 = performance.now(); }
+  else if (performance.now() - G.t0 > 25000 && !window.__GLIDE_NO_LIMIT) G.abort('too slow to draw');   // (at normal speed the next step is about 37 s away)
+};
+GLIDE.abort = why => { const G = GLIDE; G.phase = 'idle'; G.why = why; };
+// what the view shows: null (the cache as it is), or two pictures and how far between them
+GLIDE.show = () => {
+  const G = GLIDE;
+  if (G.phase === 'prep') return { a: G.keys[0], b: G.keys[0], f: 0 };
+  if (G.phase !== 'play') return null;
+  const t = Math.max(0, Math.min(1, (performance.now() - G.t0)/(1000*(G.n ? G.dur : G.fadeDur))));
+  if (t >= 1){ G.phase = 'idle'; G.why = 'done'; return null; }
+  if (!G.n) return { a: G.keys[0], b: G.keys[1], f: t*t*(3 - 2*t) };
+  const x = t*(G.n + 1), i = Math.min(G.n, Math.floor(x));
+  return { a: G.keys[i], b: G.keys[i + 1], f: x - i };
+};
+GLIDE.line = () => GLIDE.phase === 'prep' ? 'glide: drawing ' + GLIDE.k + ' of ' + (GLIDE.n + 1) : GLIDE.phase === 'play' ? 'glide: playing' : GLIDE.why ? 'glide: ' + GLIDE.why : '';
+// the view's window of a cache picture (ring addressing, as scCopyDraw) into one of the glide's pictures
+let _gkMat = null, _gkScene = null;
+function glideKeep(src, ox, oy, dst){
+  if (!_gkMat){
+    _gkMat = new THREE.RawShaderMaterial({ glslVersion: THREE.GLSL3, depthTest: false, depthWrite: false, blending: THREE.NoBlending,
+      uniforms: { t: { value: null }, off: { value: new THREE.Vector2() }, size: { value: new THREE.Vector2() } },
+      vertexShader: 'in vec3 position; void main(){ gl_Position = vec4(position.xy, 0.0, 1.0); }',
+      fragmentShader: `precision highp float; precision highp int; precision highp sampler2D; uniform sampler2D t; uniform vec2 off; uniform vec2 size; out highp vec4 o;
+        void main(){ ivec2 sz = ivec2(size), q = ivec2(gl_FragCoord.xy) + ivec2(off); q = ((q % sz) + sz) % sz; o = texelFetch(t, q, 0); }` });
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), _gkMat); m.frustumCulled = false; _gkScene = new THREE.Scene(); _gkScene.add(m);
+  }
+  const u = _gkMat.uniforms; u.t.value = src.texture;
+  u.off.value.set(scMod(scCol(GLIDE.px) - ox, SC.w), scMod(scRow(GLIDE.py) - oy, SC.h)); u.size.value.set(SC.w, SC.h);
+  const keep = renderer.getRenderTarget(), ac = renderer.autoClear; renderer.autoClear = false;
+  renderer.setRenderTarget(dst); renderer.render(_gkScene, compCam); renderer.setRenderTarget(keep); renderer.autoClear = ac;
+}

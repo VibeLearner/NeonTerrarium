@@ -39,14 +39,14 @@ const GM = {
   teal: toon(0x3f9a9a), gold: toon(0xd9963a), hammock: toon(0xf2e6cc),
   birch: toon(0xe2dccd), palmBark: toon(0x9a7a52),
   waterMid: toon(0x33657a), waterDeep: toon(0x22495a), glint: toon(0xc2dcda),
-  reflect: toon(0x22495a, { em: 0xe8c27a, kind: 'bulb' }),   // a lantern's reflection on the water: the water's own color by day, a warm streak once the lights are on
+  reflect: toon(0x22495a, { em: 0xffd890, kind: 'bulb' }), reflect2: toon(0x22495a, { em: 0xc89850, kind: 'bulb' }),   // a lantern's reflection on the water: the water's own color by day, a warm streak once the lights are on
 };
 
 /* ---------- the water ---------- */
 // The pond's water, after the coast's sea (coast.js): its color comes from how deep it is (shallow and pale at the banks, darkening toward the middle),
 // banded the way pixel art bands a gradient and dithered at the band edges; ripples wobble the bands; the slow swell is lit in flat facets (a coarse
-// triangle grid, each facet a little lighter turned toward the sun, a little darker turned away, in a few steps); caustics play over the shallows by day;
-// sun glints wink on and off. It gives off no light of its own: at night it goes dark with everything else and the lanterns' reflections show on it.
+// triangle grid, each facet a little lighter turned toward the sun, a little darker turned away, in a few steps); caustics play over the shallows by day.
+// It gives off no light of its own: at night it goes dark with everything else and the lanterns' reflections show on it.
 // The depth rides in the surface's height (GD_WATER_Y plus up to GD_WATER_K at the deepest, a few millimetres): one material for every pond, no
 // textures. It moves, so it is drawn live (userData.live: not folded into the buildings' one material, not kept in the static cache).
 const GD_WATER_Y = .04, GD_WATER_K = .006;
@@ -76,9 +76,7 @@ vec3 gW = gDq < 0.2 ? mix(gE, gS, gDq/0.2) : gDq < 0.6 ? mix(gS, gM, (gDq - 0.2)
 float gC = gCaus(gp*2.2 + gRip*6.0), gCl = gC < 0.07 ? 1.0 : gC < 0.13 ? 0.4 : 0.0;
 gW += gCl*(1.0 - smoothstep(0.0, 0.6, gD0 + gDi*0.15))*vec3(0.1, 0.1, 0.07)*(1.0 - gLights);
 diffuseColor.rgb = gW;
-vec3 gGlint = vec3(0.0);
-{ vec2 cell = floor(gp*6.0); float g = gh(cell + floor(gTime*2.0 + gh(cell)*7.0));
-  gGlint = step(0.9965, g)*smoothstep(0.15, 0.6, gD0)*vec3(0.62, 0.74, 0.72)*(1.0 - 0.85*gLights); }`)
+`)
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
 { // the swell lit in flat facets: a coarse grid of triangles over it, each lit by the sun as one, in a few steps (calmer in the shallows)
   const float CS = 0.6; vec2 cg = gp/CS, c0 = floor(cg), cf = cg - c0;
@@ -91,7 +89,6 @@ vec3 gGlint = vec3(0.0);
   diffuseColor.rgb *= fr < -0.05 ? 0.88 : fr < -0.018 ? 0.95 : fr > 0.05 ? 1.1 : fr > 0.018 ? 1.04 : 1.0;
   #endif
 }`)
-      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += gGlint;');
   };
   return m;
 })();
@@ -698,12 +695,10 @@ function gdWater(P, gd, x){
   (x.cw || []).forEach((v, k) => { if (!v) return; const [sx, sz] = GD_CORNERS[k];
     for (let q = 0; q < 3; q++) blob(pick([GM.stone, GM.pebble]), P, sx*(LOT/2 - rnd(.05, .25)), .08, sz*(LOT/2 - rnd(.05, .25)), rnd(.1, .14), .85); });
   const free = (px, pz) => !(br === 1 && Math.abs(pz) < .7) && !(br === 2 && Math.abs(px) < .7);
-  if ((x.pd || 1) >= 2) for (let q = 0; q < irand(3, 6); q++){ const px = rnd(-1.4, 1.4), pz = rnd(-1.4, 1.4); if (!free(px, pz)) continue;
-    put(U.cyl16, GM.pad, under(P, T(px, .05, pz, 0, rnd(.24, .34), .012, rnd(.24, .34))));
+  // a lily pad or two, now and then (some with a little solar cell that glows at night)
+  if ((x.pd || 1) >= 2 && chance(.18)) for (let q = 0; q < irand(1, 2); q++){ const px = rnd(-1.2, 1.2), pz = rnd(-1.2, 1.2); if (!free(px, pz)) continue;
+    put(U.cyl16, GM.pad, under(P, T(px, .05, pz, 0, rnd(.24, .32), .012, rnd(.24, .32))));
     if (chance(.35)) box(GM.solar, P, px, .058, pz, .1, .008, .1); else if (chance(.4)) blob(pick([GM.coral, GM.cream]), P, px, .07, pz, .04, .7); }
-  if ((x.pd || 0) >= 6) for (let q = 0; q < irand(2, 4); q++){ const px = rnd(-1.3, 1.3), pz = rnd(-1.3, 1.3), ry = rnd(0, TAU); if (!free(px, pz)) continue;
-    const Pk = under(P, T(px, .054, pz, ry)), m = chance(.6) ? GM.koi : GM.koiW;
-    box(m, Pk, 0, 0, 0, .05, .014, .17); box(m, Pk, 0, 0, -.11, .07, .01, .05); if (m === GM.koiW) box(GM.koi, Pk, 0, .006, .03, .03, .006, .05); }
   if (br){ const F = br === 1 ? under(P, T(0, 0, 0, PI/2)) : P; if (x.bw) gdWalkway(F); else gdBridge(F, x.bi || 0, x.bn || 1); }
 }
 // One plot of a bridge along its frame's z, edge to edge: a deck low enough to walk on, copper rails rising in one gentle arch over the whole span
@@ -734,6 +729,6 @@ function gdWalkway(F){
 // a lantern's reflection on the water: a short broken streak, warm once the lights come on (the water's own color by day)
 function gdReflect(F, x, z){
   KEEP_LIGHT = true;
-  for (let q = 0; q < 3; q++) box(GM.reflect, F, x + rnd(-.02, .02), .05, z - q*.13, .05 - q*.012, .004, .08);
+  for (let q = 0; q < 6; q++) box(q < 3 ? GM.reflect : GM.reflect2, F, x + (q % 2 ? .02 : -.02), .05, z - q*.12, .1 - q*.012, .004, .09);
   KEEP_LIGHT = false;
 }

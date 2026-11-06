@@ -78,10 +78,12 @@ const GD_WATER_MAT = (() => {
   m.customProgramCacheKey = () => 'gdwater';
   m.onBeforeCompile = sh => {
     sh.uniforms.gTime = FOL_UNI.time; sh.uniforms.gLights = LIGHTS_ON; sh.uniforms.gRips = GD_RIP.rips; sh.uniforms.gRipN = GD_RIP.n;
+    sh.uniforms.gMir = GD_MIR.tex; sh.uniforms.gMirM = GD_MIR.M; sh.uniforms.gMirOn = GD_MIR.use; sh.uniforms.gMirRes = GD_MIR.res;
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWP;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
 varying vec3 vWP; uniform float gTime; uniform float gLights; uniform vec4 gRips[8]; uniform float gRipN;
+uniform sampler2D gMir; uniform mat4 gMirM; uniform float gMirOn; uniform vec2 gMirRes;
 float gh(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x*p.y); }
 float gBayer(vec2 p){ vec2 q = mod(floor(p), 4.0); vec2 a = mod(q, 2.0), b = floor(q/2.0); return ((a.x*2.0 + a.y*3.0 - 2.0*a.x*a.y)*4.0 + (b.x*2.0 + b.y*3.0 - 2.0*b.x*b.y))/16.0; }
 float gSwell(vec2 q){ return 0.07*sin(q.x*0.9 + gTime*0.55)*sin(q.y*1.1 - gTime*0.45) + 0.035*sin(q.x*2.3 - q.y*1.7 + gTime*0.9); }
@@ -138,6 +140,15 @@ diffuseColor.rgb = gW;
 }`);
     // (its pixels marked in the normal image's alpha, which nothing else uses: the composite gives them the wet ground's reflections, strongly, sky.js)
     if (typeof MRT !== 'undefined' && MRT) sh.fragmentShader = sh.fragmentShader.replace('#include <dithering_fragment>', '#include <dithering_fragment>\npc_fragNormal.a = 0.5;');
+    // the mirror (computers: gardenMirror): the mirrored picture where this point of the surface lies in it, shifted a pixel or so by the swell and
+    // the rings, over the water's own color: about a third of it, more for lights
+    sh.fragmentShader = sh.fragmentShader.replace('#include <tonemapping_fragment>', `if (gMirOn > 0.5){
+  vec4 gmc = gMirM*vec4(vWP.x, ${GD_MIR_Y.toFixed(3)}, vWP.z, 1.0); vec2 gmu = gmc.xy/gmc.w;
+  gmu += vec2(floor(gWv*1.2 + gRg*3.0 + 0.5), floor(gRg*2.0 + 0.5))/gMirRes;
+  vec4 gm = texture2D(gMir, gmu);
+  if (gm.a > 0.5){ float gml = dot(gm.rgb, vec3(0.3, 0.59, 0.11)); gl_FragColor.rgb = mix(gl_FragColor.rgb, gm.rgb, 0.36 + 0.4*smoothstep(0.55, 0.95, gml)); }
+}
+#include <tonemapping_fragment>`);
   };
   return m;
 })();
@@ -867,6 +878,7 @@ function gdPadsBuild(){
     }
   }
   GD_FX.pads = pads; GD_FX.water = water; GD_FX.moved = true;
+  GD_FX.wcells = gardenOn() ? [...cells.values()].filter(c => c.gd && c.gd.p && c.gd.w) : [];
 }
 // a new ring on the water, in the oldest slot (none if every slot's ring is still very young: a burst of them would cut the others short)
 function gdRing(x, z, w){
@@ -914,7 +926,8 @@ function gardenFx(dt){
   if (GD_FX.dirty) gdPadsBuild();
   if (GD_PICK.wait || GD_PICK.req) try { gdPickPoll(); } catch (e){ GD_PICK.wait = GD_PICK.req = null; }
   GD_RIP.n.value = typeof TOUCH !== 'undefined' && TOUCH.on ? 4 : 8;
-  if (typeof comp !== 'undefined' && comp.uniforms.waterOn) comp.uniforms.waterOn.value = GD_FX.water > 0 ? 1 : 0;
+  // (the composite's reflections on the ponds: 1 on, 2 off since the mirror shows them instead: gardenMirror)
+  if (typeof comp !== 'undefined' && comp.uniforms.waterOn) comp.uniforms.waterOn.value = GD_FX.water > 0 ? (GD_MIR.on ? 2 : 1) : 0;
   const pads = GD_FX.pads; if (!pads.length && !GD_FX.mesh) return;
   const MS = gdPadMeshes(); MS.solM.emissiveIntensity = .55*LIGHTS_ON.value;
   if (!pads.length){ if (MS.pad.count) MS.pad.count = MS.sol.count = MS.blo.count = 0; return; }
@@ -975,4 +988,78 @@ if (!self.IN_RECIPE_WORKER && typeof canvas !== 'undefined' && canvas.addEventLi
     if (e.pointerType !== 'touch' || !GD_FX.water) return;
     const h = gdWaterAt(e.clientX, e.clientY); if (h) gdRingIfSeen(e.clientX, e.clientY, h.x, h.z, 1.0);
   }, { passive: true });
+}
+
+/* ---------- the ponds' mirror (computers) ---------- */
+// The ponds reflect like a mirror: before the frame's colors are drawn, the city near the ponds on screen is drawn once more from a camera mirrored
+// under the water's surface (GD_MIR.rt, at the frame's own size), and the water shows that picture where it lies (GD_WATER_MAT), rippled a pixel by
+// the swell. Unlike the composite's reflections (sky.js), which can only show what the camera itself sees, it holds as the view turns (a building's
+// side facing the water still shows when it faces away from you), and it's as sharp as the rest of the frame. (Owner Nov 6, computers only: it draws
+// what's round the ponds a second time each frame. On a touch screen the composite's reflections stay.)
+//  - Only the part of the frame the ponds cover is drawn (the mirrored camera's view cut down to it: what's outside is never drawn).
+//  - Nothing under the water is drawn (an oblique near plane: the mirrored camera's view starts at the surface), nor the water and the lily pads.
+//  - The view is the frame's own (its projection copied, so it zooms, turns and steps by whole pixels with it); people, trees, lights all show.
+const GD_MIR_Y = GD_WATER_Y + .003;
+const GD_MIR = { rt: null, cam: null, on: false, M: { value: new THREE.Matrix4() }, tex: { value: null }, use: { value: 0 }, res: { value: new THREE.Vector2(1, 1) } };
+const gdMirWanted = () => !self.IN_RECIPE_WORKER && !(typeof TOUCH !== 'undefined' && TOUCH.on) && typeof renderer !== 'undefined' && renderer.capabilities.isWebGL2 && !window.__NO_POND_MIRROR;
+const _gmV = new THREE.Vector3(), _gmT = new THREE.Vector3(), _gmU = new THREE.Vector3(), _gmN = new THREE.Vector3(0, 1, 0), _gm4 = new THREE.Vector4(), _gmQ = new THREE.Vector4();
+const _gmP = new THREE.Matrix4(), _gmI = new THREE.Matrix4(), _gmS = new THREE.Matrix4(), _gmB = new THREE.Matrix4().set(.5, 0, 0, .5, 0, .5, 0, .5, 0, 0, .5, .5, 0, 0, 0, 1);
+const _gmCol = new THREE.Color();
+function gardenMirror(){
+  GD_MIR.on = false; GD_MIR.use.value = 0;
+  if (!gdMirWanted() || !GD_FX.water || !GD_FX.wcells || !GD_FX.wcells.length) return;
+  const w = W, h = H;
+  if (!GD_MIR.rt || GD_MIR.rt.width !== w || GD_MIR.rt.height !== h){
+    if (GD_MIR.rt) GD_MIR.rt.dispose();
+    GD_MIR.rt = new THREE.WebGLRenderTarget(w, h, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, format: THREE.RGBAFormat });
+    GD_MIR.tex.value = GD_MIR.rt.texture; GD_MIR.res.value.set(w, h);
+  }
+  if (!GD_MIR.cam) GD_MIR.cam = new THREE.OrthographicCamera(-1, 1, 1, -1, cam.near, cam.far);
+  const vc = GD_MIR.cam;
+  // the camera mirrored in the water's surface (its place, where it looks, its up), as three's own Reflector does it
+  cam.updateMatrixWorld();
+  const camPos = _gmV.setFromMatrixPosition(cam.matrixWorld), dir = _gmT.set(0, 0, -1).transformDirection(cam.matrixWorld);
+  const look = dir.clone().multiplyScalar(100).add(camPos);
+  const mirror = v => { v.y = 2*GD_MIR_Y - v.y; return v; };
+  vc.position.copy(mirror(camPos.clone()));
+  _gmU.set(0, 1, 0).transformDirection(cam.matrixWorld).reflect(_gmN);
+  vc.up.copy(_gmU); vc.lookAt(mirror(look)); vc.updateMatrixWorld();
+  // its projection: the frame's own, with the near plane turned to lie along the water (Lengyel's oblique near plane: nothing under it is drawn)
+  _gmP.copy(cam.projectionMatrix);
+  { const c = _gm4.set(0, 1, 0, -GD_MIR_Y).applyMatrix4(_gmS.copy(vc.matrixWorld).transpose());   // (the plane in the camera's own frame)
+    _gmI.copy(_gmP).invert();
+    const cc = c.clone().applyMatrix4(_gmS.copy(_gmI).transpose());
+    _gmQ.set(Math.sign(cc.x), Math.sign(cc.y), 1, 1).applyMatrix4(_gmI);
+    const e = _gmP.elements, r4 = new THREE.Vector4(e[3], e[7], e[11], e[15]), a = 2*r4.dot(_gmQ)/c.dot(_gmQ);
+    e[2] = a*c.x - e[3]; e[6] = a*c.y - e[7]; e[10] = a*c.z - e[11]; e[14] = a*c.w - e[15]; }
+  // where the water shows in the mirrored picture: the ponds' plots on screen, in its pixels (a pixel or two to spare)
+  const VPm = _gmS.multiplyMatrices(_gmP, vc.matrixWorldInverse);
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for (const c of GD_FX.wcells) for (const sx of [-1, 1]) for (const sz of [-1, 1]){
+    _gm4.set(c.x + sx*LOT/2, GD_MIR_Y, c.z + sz*LOT/2, 1).applyMatrix4(VPm);
+    const u = (_gm4.x/_gm4.w*.5 + .5)*w, v = (_gm4.y/_gm4.w*.5 + .5)*h;
+    x0 = Math.min(x0, u); x1 = Math.max(x1, u); y0 = Math.min(y0, v); y1 = Math.max(y1, v); }
+  const px0 = Math.max(0, Math.floor(x0) - 2), py0 = Math.max(0, Math.floor(y0) - 2), px1 = Math.min(w, Math.ceil(x1) + 2), py1 = Math.min(h, Math.ceil(y1) + 2);
+  if (px1 - px0 < 2 || py1 - py0 < 2) return;   // (no pond on screen)
+  GD_MIR.M.value.multiplyMatrices(_gmB, VPm);   // (a point in the world to where it is in the mirrored picture, 0 to 1)
+  // the camera's view cut down to that rectangle (the rest is never drawn)
+  const nx0 = px0/w*2 - 1, nx1 = px1/w*2 - 1, ny0 = py0/h*2 - 1, ny1 = py1/h*2 - 1;
+  _gmI.set(2/(nx1 - nx0), 0, 0, -(nx1 + nx0)/(nx1 - nx0), 0, 2/(ny1 - ny0), 0, -(ny1 + ny0)/(ny1 - ny0), 0, 0, 1, 0, 0, 0, 0, 1);
+  vc.projectionMatrix.multiplyMatrices(_gmI, _gmP); vc.projectionMatrixInverse.copy(vc.projectionMatrix).invert();
+  vc.layers.enableAll(); vc.layers.disable(6);
+  // draw it (the water and the floating pads left out; the shadows not redrawn for it; the renderer's state put back)
+  const rt = GD_MIR.rt, prevRT = renderer.getRenderTarget(), prevAuto = renderer.autoClear, prevAlpha = renderer.getClearAlpha(), shUp = renderer.shadowMap.needsUpdate;
+  renderer.getClearColor(_gmCol);
+  const pads = GD_FX.mesh ? [GD_FX.mesh.pad, GD_FX.mesh.sol, GD_FX.mesh.blo] : [], padVis = pads.map(m => m.visible);
+  GD_WATER_MAT.visible = false; pads.forEach(m => m.visible = false); renderer.shadowMap.needsUpdate = false;
+  const res0 = FOL_UNI.res.value.clone(); FOL_UNI.res.value.set(px1 - px0, py1 - py0);   // (the plants snap to whole pixels of the picture being drawn: this rectangle)
+  try {
+    rt.viewport.set(px0, py0, px1 - px0, py1 - py0); rt.scissor.set(px0, py0, px1 - px0, py1 - py0); rt.scissorTest = true;
+    renderer.setRenderTarget(rt); renderer.setClearColor(0x000000, 0); renderer.autoClear = false; renderer.clear(true, true, false);
+    renderer.render(scene, vc);
+    GD_MIR.on = true; GD_MIR.use.value = 1;
+  } finally {
+    FOL_UNI.res.value.copy(res0); GD_WATER_MAT.visible = true; pads.forEach((m, i) => m.visible = padVis[i]); renderer.shadowMap.needsUpdate = shUp;
+    rt.scissorTest = false; renderer.setRenderTarget(prevRT); renderer.setClearColor(_gmCol, prevAlpha); renderer.autoClear = prevAuto;
+  }
 }

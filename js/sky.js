@@ -546,7 +546,8 @@ const comp = new THREE.ShaderMaterial({
       #define SOFT_TAPS if (!haveTaps){ sw = softTaps(gl_FragCoord.xy, near + rd*(far - near), sx, sy); haveTaps = true; }
       ivec4 sx, sy; vec4 sw = vec4(0.0); bool haveTaps = false;
       // (garden ponds, garden.js: their water marks its pixels in the normal image's alpha, and always reflects, wet weather or not)
-      if (FX_WET > 0 && rd < 0.99999 && (wet > 0.0 || (waterOn > 0.0 && texture2D(tNormal, vUv).a < 0.75)) && dot(n, upView) > 0.93){
+      // (waterOn 2: the ponds have their own mirror, garden.js gardenMirror: none of this on their pixels)
+      if (FX_WET > 0 && rd < 0.99999 && (wet > 0.0 || (waterOn > 0.0 && texture2D(tNormal, vUv).a < 0.75)) && !(waterOn > 1.5 && texture2D(tNormal, vUv).a < 0.75) && dot(n, upView) > 0.93){
         SOFT_TAPS
         float Wt = 0.0, Kh = 0.0, Cs = 0.0; vec3 Ch = vec3(0.0);
         for (int k = 0; k < 4; k++){
@@ -564,7 +565,7 @@ const comp = new THREE.ShaderMaterial({
       }
 #else
       bool watPx = waterOn > 0.0 && texture2D(tNormal, vUv).a < 0.75;   // (a garden pond's pixel: garden.js)
-      if (FX_WET > 0 && rd < 0.99999 && (wet > 0.0 || watPx) && dot(n, upView) > 0.93){
+      if (FX_WET > 0 && rd < 0.99999 && (wet > 0.0 || watPx) && !(watPx && waterOn > 1.5) && dot(n, upView) > 0.93){
         vec3 wp = ro + rdir*tEnd;
         float pud = watPx ? 0.0 : step(0.6, fbm(vec3(floor(wp.xz*6.0)/6.0*0.8, 0.0)));        // crisp-edged puddle patches
         pud *= 0.35 + 0.65*rainAmt;
@@ -823,7 +824,7 @@ const SOFT_WET = SOFT_HEAD + `
   if (FX_WET > 0 && rd < 0.99999 && (wet > 0.0 || waterOn > 0.0)){
     vec4 n4 = texture2D(tNormal, uvR); vec3 n = n4.rgb*2.0 - 1.0;
     bool watPx = waterOn > 0.0 && n4.a < 0.75;   // (a garden pond's pixel: garden.js)
-    if ((wet > 0.0 || watPx) && dot(n, upView) > 0.93){
+    if ((wet > 0.0 || watPx) && !(watPx && waterOn > 1.5) && dot(n, upView) > 0.93){
       vec3 wp = ro + rdir*tEnd;
       float pud = watPx ? 0.0 : step(0.6, fbm(vec3(floor(wp.xz*6.0)/6.0*0.8, 0.0)));        // crisp-edged puddle patches
       pud *= 0.35 + 0.65*rainAmt;
@@ -937,7 +938,7 @@ function softEffects(px, py){
   const u = comp.uniforms, par = v => ((v % 2) + 2) % 2;
   u.softPar.value.set(par(px - (W >> 1)), par(py - (H >> 1))); u.softSig.value = Math.max(6*2*zoom/H, .02);
   const on = [comp.defines.FX_WET, comp.defines.FX_MIST, comp.defines.FX_RAYS];
-  const want = [u.wet.value > 0 || u.waterOn.value > 0, u.mistI.value > 0, u.rayI.value > .01 && u.raysOn.value > .5];   // (a pass whose effect is at nothing this frame is skipped: the composite multiplies it by that strength)
+  const want = [u.wet.value > 0 || (u.waterOn.value > 0 && u.waterOn.value < 1.5), u.mistI.value > 0, u.rayI.value > .01 && u.raysOn.value > .5];   // (a pass whose effect is at nothing this frame is skipped: the composite multiplies it by that strength)
   if (softAll && !PH.tests.softApart && !window.__SOFT_APART){   // one pass, three targets
     const w = [0, 1, 2].map(i => !!(on[i] && want[i])); if (!w[0] && !w[1] && !w[2]) return;
     const gl = renderer.getContext(), r0 = rtSoft[0];

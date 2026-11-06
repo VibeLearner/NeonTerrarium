@@ -390,11 +390,11 @@ SC.frame = function(){
       SC.fill = null; SC.R = { x0: SC.ox, x1: SC.ox + SC.w, y0: SC.oy, y1: SC.oy + SC.h }; }
     else now = 'view left the cache'; }
   else if ((scDelta(soft, SC.soft) > SC_BIG || LIGHT_JUMP) && GLIDE.phase !== 'prep') now = 'the light jumped';   // (a glide's in-between suns are drawn as a drift: GLIDE)
-  // (while the shadows glide, a change the city makes by itself (a garden growing, a merge) waits for the glide to end; one the player makes, a click
-  //  or a key in the last moment, is drawn now and the glide waits to go on: GLIDE)
-  const deferEdit = GLIDE.busy() && performance.now() - GLIDE.actAt > GLIDE.ACT_MS;
+  // (an edit that draws something is always drawn at once; while the shadows glide, the glide then waits to go on (GLIDE). Holding such edits back
+  //  until the glide ended left the plots of a city still loading out of the picture, holes that filled in later: owner, Nov 6. Merges, with
+  //  nothing to draw, no longer touch the picture or the glide: scEditRect.)
   let editDrawn = false;
-  if (!now && SC_EDITS !== SC.editsSeen && !deferEdit){ const real = SC_DIRTY.boxes.length > 0 || SC_DIRTY.unknown; if (!scEditRect(px, py, shk, soft)) now = 'an edit: ' + SC.rectWhy; else editDrawn = real; }
+  if (!now && SC_EDITS !== SC.editsSeen){ const real = SC_DIRTY.boxes.length > 0 || SC_DIRTY.unknown; if (!scEditRect(px, py, shk, soft)) now = 'an edit: ' + SC.rectWhy; else editDrawn = real; }
   // Still changing from frame to frame (a turn or zoom easing in, the lights switching at dusk): the cache would be drawn again every
   // frame, which costs more than the old way, so the old way draws. Once the inputs hold still, the new picture is drawn in strips
   // (SC.K of them, one a frame, into the second target) while the old way still draws the frame, and it takes over when complete.
@@ -440,7 +440,7 @@ SC.frame = function(){
   else {
     SC.age++; SC.state = 'in use'; SC.why = '';
     // a newer cache in the background when the light has drifted, the shadow map has been swapped, or the view has used half the room
-    if (SC.job && (!scSame(hard, SC.job.hard) || sun.shadow.map !== SC.job.map || (SC.job.edits !== SC_EDITS && !deferEdit))){ SC.job = null; }   // (it was for something that's gone)
+    if (SC.job && (!scSame(hard, SC.job.hard) || sun.shadow.map !== SC.job.map || SC.job.edits !== SC_EDITS)){ SC.job = null; }   // (it was for something that's gone)
     if (!SC.job){
       let why = '';
       if (scDelta(soft, SC.soft) > SC_EPS) why = 'light drifted';

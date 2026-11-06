@@ -383,7 +383,7 @@ const FOL_SHADER = new THREE.ShaderMaterial({
         vec2 local = vec2(position.x*aVar.y, position.y + 0.5 - aVar.x);
         // sway happens in the fragment shader by sliding whole texel rows, so the quad itself never bends.
         // Widen it by 3 texels on each side so the shifted rows have room.
-        float pad = swayType > 0.5 && swayType < 4.5 ? (texSize.x + 6.0)/texSize.x : 1.0;   // (a crown, 5, moves whole: no room needed)
+        float pad = (swayType > 0.5 && swayType < 2.5) || (swayType > 3.5 && swayType < 4.5) ? (texSize.x + 6.0)/texSize.x : 1.0;   // (a standing plant, 3, and a crown, 5, move by their corners: no room needed)
         local.x *= pad;
         vUv = vec2((uv.x - 0.5)*pad + 0.5, uv.y);
         vPhase = aVar.w;
@@ -400,6 +400,16 @@ const FOL_SHADER = new THREE.ShaderMaterial({
             wp.xz += vec2(.75, .45)*(.35 + .65*lean)*wind*.05*tip;
           }
           gl_Position = projectionMatrix * viewMatrix * wp;
+          if (swayType > 2.5 && swayType < 3.5){
+            // a standing plant (a bush, a fern, a flower): its top leans with the breeze and its foot stays put. A free plant is two copies crossed in an X;
+            // their rows used to slide sideways, each copy along its own plane (and the second one mirrored), so the two moved different ways and the
+            // plant seemed to swell and shrink, a pulse (owner Nov 6). Now both copies' tops move the same way in the world, by whole render pixels
+            vec3 base = (modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+            float s = sin(time*1.6 + aVar.w) + 0.3*sin(time*3.3 + aVar.w*1.3);
+            vec2 d = vec2(.75, .45)*s*wind*1.3*length(instanceMatrix[1].xyz)/max(texSize.y, 1.0);   // (about a texel and a bit at the top, as the rows did)
+            vec4 c0 = projectionMatrix * viewMatrix * vec4(base, 1.0), c1 = projectionMatrix * viewMatrix * vec4(base + vec3(d.x, 0.0, d.y), 1.0);
+            gl_Position.xy += floor((c1.xy/c1.w - c0.xy/c0.w)*0.5*res + 0.5)/res*2.0*gl_Position.w*clamp(uv.y, 0.0, 1.0);
+          }
           if (swayType > 4.5 && swayBand < 0.5){   // a tree's crown: carried by its trunk's sway (TREE_SWAY_GLSL), all its copies together, as one piece,
             // moved by the trunk's sway where they meet (that height rides in the phase's whole part: canopy(), garden.js), rounded to whole render pixels
             // so its pixels never swim
@@ -451,8 +461,7 @@ const FOL_SHADER = new THREE.ShaderMaterial({
           sh = wind*(1.3*sin(time*2.0 + ph - hang*1.4) + 0.45*sin(time*4.1 + ph*1.7))*hang;
         else if (swayType > 1.5 && swayType < 2.5)  // hanging vines: a slow wave travelling down to the tips
           sh = wind*(1.6*sin(time*1.3 + ph - hang*1.6) + 0.5*sin(time*2.9 + ph*2.0))*pow(hang, 1.4);
-        else if (swayType > 2.5 && swayType < 3.5)  // standing plants: tips lean with the breeze
-          sh = wind*(1.0*sin(time*1.6 + ph) + 0.3*sin(time*3.3 + ph*1.3))*lean*lean;
+        // (standing plants, 3: they lean by their corners in the vertex shader)
         if (swayBand > 0.5){ float tpp = max(abs(dFdx(tx.x)), 0.05); tx.x -= floor(sh/tpp + 0.5)*tpp; }   // (tpp: texels a screen pixel)
         else tx.x -= floor(sh + 0.5);                 // whole texels only, so pixels never break up
         if (tx.x < 0.0 || tx.x >= texSize.x || tx.y < 0.0 || tx.y >= texSize.y) discard;

@@ -87,6 +87,8 @@ const DEMOPG = (() => {
   { const _rm = rebuildMega; rebuildMega = function (m){ return withSeed(h32('mega', m.kind, m.i, m.j, m.seed), () => _rm.apply(this, arguments)); }; }
   { const _bc = rebuildConnections; rebuildConnections = function (){ return withSeed(h32('links'), () => _bc.apply(this, arguments)); }; }
   { const _sa = syncAgents; syncAgents = function (){ return withSeed(h32('agents'), () => _sa.apply(this, arguments)); }; }
+  // the music only: every sound effect (builds, removals, the garden) is silent in this cut, in every pass (owner Nov 6)
+  safe('sfx', () => { sfx.play = () => {}; });
   updatePeople = function (){ pplMesh.geometry.instanceCount = 0; ddMesh.geometry.instanceCount = 0; };   // (nobody about: the city is being made)
   // a garden plot's seed (every roll it makes comes from it: garden.js) from the film's own salt, picked in the plan so the pond and its bridge
   // open on camera; the same seed for the same plot every run
@@ -174,7 +176,7 @@ const DEMOPG = (() => {
     // the sound pass plays real time, and the Grid's music is scheduled only a tenth of a second ahead: a click that rebuilt the city there (a
     // garden plot can take a good while) froze the page long enough for the music to fall behind, glitch and stop. So nothing is built there:
     // each click only makes its sound, at its moment (the same sounds the builds make: world.js startAnim, cycleGreen)
-    if (AUTO){ safe('sound', () => sfx.play(a.kind === 'del' ? 'remove' : 'place')); return true; }
+    if (AUTO) return true;   // (and no click sounds either, owner Nov 6: only the Grid's music is heard)
     const T = targetOf2(a); if (!T) return false;
     if (a.kind === 'del'){ const n0 = T.c.sections.length; removeAt({ c: T.c, kind: 'bld', p: new THREE.Vector3(T.at.x, T.at.y, T.at.z) }); return T.c.sections.length < n0; }
     const before = JSON.stringify(stateOf(a));

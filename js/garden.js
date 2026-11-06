@@ -35,11 +35,12 @@ const GM = {
   edge: toon(0x5a3e18, { em: 0xf2b14e, kind: 'trim' }),         // the soft copper-gold neon round the ponds and along the promenades
   bio: toon(0x2e6a52, { em: 0x5fe0b0, kind: 'trim' }),          // glowing moss and caps: teal-green, so the night garden isn't all warm
   fiber: toon(0x5a3e18, { em: 0xffd27a, kind: 'window' }),      // the fiber-optic strands in the arches' vines
-  glass: toon(0x3d6a66, { em: 0x6a3a52, kind: 'window' }),      // greenhouse panes: grow lights behind them at night
+  glass: toon(0x86b8b0),                                        // greenhouse panes (clear; glass2 smoky green; no light of their own)
   teal: toon(0x3f9a9a), gold: toon(0xd9963a), hammock: toon(0xf2e6cc),
   birch: toon(0xe2dccd), palmBark: toon(0x9a7a52),
   waterMid: toon(0x33657a), waterDeep: toon(0x22495a), glint: toon(0xc2dcda),
-  reflect: toon(0x22495a, { em: 0xffd890, kind: 'bulb' }), reflect2: toon(0x22495a, { em: 0xc89850, kind: 'bulb' }),   // a lantern's reflection on the water: the water's own color by day, a warm streak once the lights are on
+  reflect: toon(0x22495a, { em: 0xffd890, kind: 'bulb' }), reflect2: toon(0x22495a, { em: 0xc89850, kind: 'bulb' }),   // (unused since the ponds show the lamps' real reflections, Nov 6: kept so the materials keep their order)
+  glass2: toon(0x5f8f80), stripW: toon(0x5a4e3a, { em: 0xfff1d6, kind: 'trim' }),   // smoky glass; a warm white strip light
 };
 
 /* ---------- the water ---------- */
@@ -87,17 +88,18 @@ float gRg = gRings(gp) + gDi*0.05;
 // the waves: a long gentle swell rolling in from one side (about two metres between crests, half a metre a second) and a smaller one across it, their crests
 // wandering a little; the same everywhere in the world, so they run on from plot to plot. They lift the depth bands as they pass (the shallows breathe),
 // light their crests a step, and wash up the banks (gLap)
-float gWp = 0.8*sin(gp.x*0.55 + gp.y*0.35 + gTime*0.17);
-float gWv = 0.65*sin(dot(gp, vec2(0.85, 0.53))*3.6 - gTime*1.55 + gWp) + 0.35*sin(dot(gp, vec2(-0.38, 0.92))*5.2 - gTime*1.4 + gWp*1.3);
-float gDq = floor((gD0 + gRip.x + gWv*0.045 + gRg*0.05 + gDi*0.09)*5.0 + 0.5)/5.0;
+float gWp = 0.8*sin(gp.x*0.55 + gp.y*0.35 + gTime*0.17) + 0.45*sin(dot(gp, vec2(-0.38, 0.92))*2.1 - gTime*0.6);
+float gWv = sin(dot(gp, vec2(0.85, 0.53))*3.6 - gTime*1.55 + gWp);
+float gDq = floor((gD0 + gRip.x + gWv*0.02 + gRg*0.05 + gDi*0.09)*5.0 + 0.5)/5.0;
 vec3 gE = vec3(0.48, 0.66, 0.64), gS = vec3(0.365, 0.573, 0.58), gM = vec3(0.2, 0.396, 0.478), gDp = vec3(0.133, 0.286, 0.353);
 vec3 gW = gDq < 0.2 ? mix(gE, gS, gDq/0.2) : gDq < 0.6 ? mix(gS, gM, (gDq - 0.2)/0.4) : mix(gM, gDp, clamp((gDq - 0.6)/0.4, 0.0, 1.0));
 float gC = gCaus(gp*2.2 + gRip*6.0), gCl = gC < 0.07 ? 1.0 : gC < 0.13 ? 0.4 : 0.0;
 gW += gCl*(1.0 - smoothstep(0.0, 0.6, gD0 + gDi*0.15))*vec3(0.1, 0.1, 0.07)*(1.0 - gLights);
 // the rings' crests a step lighter, their troughs a step darker (two steps each, pixel-art fashion)
 gW *= 1.0 + (gRg > 0.24 ? 0.15 : gRg > 0.11 ? 0.065 : gRg < -0.24 ? -0.1 : gRg < -0.11 ? -0.045 : 0.0);
-// the swell's crests a step lighter and its troughs a touch darker, in open water (in the shallows they turn into the lapping instead)
-if (gD0 + gDi*0.12 > 0.16){ float gCr = gWv + gDi*0.14; gW *= 1.0 + (gCr > 0.66 ? 0.085 : gCr > 0.4 ? 0.035 : gCr < -0.7 ? -0.045 : 0.0); }
+// the swell's crests: thin lighter lines, broken into lengths, gliding across open water (in the shallows they turn into the lapping instead).
+// (Broad light and dark areas read as patches, owner Nov 6: only the crest itself is drawn.)
+if (gD0 + gDi*0.12 > 0.16 && gWv + gDi*0.05 > 0.93 && sin(dot(gp, vec2(-0.53, 0.85))*1.7 + gTime*0.3 + gWp*2.0) > -0.25) gW *= 1.075;
 // the water lapping at the banks: a pale lip that creeps up the shallows and draws back, unevenly along the bank, a darker wet line just past it
 // (each crest that reaches a bank pushes the lip up the shallows, then it draws back; it whitens a little as it peaks)
 float gLap = 0.12 + 0.07*gWv + 0.02*sin(gTime*2.1 - gp.x*0.6 + gp.y*2.3), gLd = gD0 + gDi*0.04;
@@ -113,7 +115,7 @@ diffuseColor.rgb = gW;
   #if NUM_DIR_LIGHTS > 0
   vec3 gL = directionalLights[0].direction, fv = normalize((viewMatrix*vec4(fn, 0.0)).xyz), uv0 = normalize((viewMatrix*vec4(0.0, 1.0, 0.0, 0.0)).xyz);
   float fr = (dot(fv, gL) - dot(uv0, gL))*(0.35 + 0.65*gD0) + gDi*0.012;
-  diffuseColor.rgb *= fr < -0.05 ? 0.88 : fr < -0.018 ? 0.95 : fr > 0.05 ? 1.1 : fr > 0.018 ? 1.04 : 1.0;
+  diffuseColor.rgb *= fr < -0.06 ? 0.97 : fr > 0.06 ? 1.03 : 1.0;   // (one faint step each way: more read as patches, owner Nov 6)
   #endif
 }`);
     // (its pixels marked in the normal image's alpha, which nothing else uses: the composite gives them the wet ground's reflections, strongly, sky.js)
@@ -592,9 +594,10 @@ function gdArch(P, alongZ, taken){
     for (const s of [-1, 1]) cyl(GM.woodDark, F, s*hw, top*.4, t, .03, top*.8);
     const pts = []; for (let k = 0; k <= 6; k++){ const a = PI - k*PI/6; pts.push([Math.cos(a)*hw, top*.8 + Math.sin(a)*.38]); }
     for (let k = 0; k < 6; k++) strut(GM.woodDark, F, pts[k][0], pts[k][1], t, pts[k + 1][0], pts[k + 1][1], t, .045);
-    for (let k = 0; k <= 6; k++){ blob(pick([GM.leaf, GM.leaf2, GM.leaf3]), F, pts[k][0], pts[k][1] + .04, t + rnd(-.12, .12), rnd(.12, .18), .8);
-      if (chance(.45)) blob(pick([GM.blossom, GM.coral, GM.cream]), F, pts[k][0] + rnd(-.08, .08), pts[k][1] + rnd(-.04, .08), t + rnd(-.1, .1), rnd(.05, .07));
+    // its greenery: leafy and flowering clumps along the arch, ivy hanging from the top (sprites, like the rest of the garden's plants)
+    for (let k = 0; k <= 6; k++){ plant(pick(['bush', 'bush', 'bushFlower', 'bushFlower', 'fern']), F, pts[k][0], pts[k][1] - .08, t + rnd(-.06, .06), rnd(.4, .52), 'c');
       if (k % 2) box(GM.fiber, F, pts[k][0], pts[k][1] - .06, t + rnd(-.08, .08), .02, .02, .02); }
+    for (const k of [2, 4]) if (chance(.6)) plant(pick(['h_ivy', 'h_vine3', 'h_curtain1']), F, pts[k][0]*.8, pts[k][1] + .02, t, rnd(.28, .36), 't');
     for (const s of [-1, 1]) if (chance(.6)) plant(pick(['pothos', 'vines']), F, s*hw*.85, top*.9, t, rnd(.55, .75), 't', true);
   }
   for (const t of [-.9, .9]) glow(F, 0, top*1.05, t, 'warm', 1.1);
@@ -624,29 +627,71 @@ function gdGazebo(P, x, z, clear, island){
   if (island) for (let k = 0; k < 8; k++){ const a = k*TAU/8 + rnd(-.2, .2), rr = rnd(1.35, 1.6); plant(pick(['bushFlower', 'g_fern3', 'fern']), P, Math.cos(a)*rr, .06, Math.sin(a)*rr, rnd(.55, .75)); }
   clear.push([x, z, r + .25]);
 }
-// a small greenhouse: copper frame, glass walls and gable roof (grow lights glowing through at night), a deck in front with pots. Its deck faces the
-// side its spur comes in by (k), else any way.
+// A small greenhouse, one of three kinds: a gabled glasshouse, a hooped tunnel house, or an eight-sided conservatory with a cupola. Its frame is copper
+// wood, white-painted or verdigris, its glass clear or smoky green, and its only light at night is a strip along its lines (warm white, teal or gold):
+// no glow from inside (the old grow lights lit it and the buildings round it pink, owner Nov 6). A deck in front with pots faces the side its spur
+// comes in by (k), else any way.
 function gdGreenhouse(P, clear, k){
   const face = k >= 0 ? Math.atan2(SIDES4[k][0], SIDES4[k][1]) : pick([0, PI/2, PI, -PI/2]);
-  const F = under(P, T(0, 0, 0, face)), w = 2.3, d = 1.4, h = .95, rh = .55, oz = -.3;
-  const G = under(F, T(0, 0, oz));
-  box(GM.stone2, G, 0, .05, 0, w + .1, .06, d + .1);
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) cyl(GM.wood, G, sx*w/2, h/2 + .05, sz*d/2, .035, h);
-  for (let q = -1; q <= 1; q++) for (const sz of [-1, 1]) cyl(GM.wood, G, q*w/3, h/2 + .05, sz*d/2, .025, h);
-  box(GM.glass, G, 0, h/2 + .08, -d/2, w - .04, h - .1, .02); box(GM.wood, G, 0, h + .06, -d/2, w + .04, .05, .05);
-  for (const sx of [-1, 1]) box(GM.glass, G, sx*w*.3, h/2 + .08, d/2, w*.38, h - .1, .02);   // (the front: glass either side of an open doorway)
-  box(GM.wood, G, 0, h + .06, d/2, w + .04, .05, .05);
-  for (const sx of [-1, 1]) box(GM.glass, G, sx*w/2, h/2 + .08, 0, .02, h - .1, d - .04);
-  const slope = Math.atan2(rh, d/2), len = Math.hypot(rh, d/2);
-  for (const sz of [-1, 1]){ box(GM.glass, G, 0, h + .06 + rh/2, sz*d/4, w, .02, len, 0, -sz*slope);
-    for (let q = -3; q <= 3; q++) box(GM.wood, G, q*w/6, h + .08 + rh/2, sz*d/4, .03, .03, len, 0, -sz*slope); }
-  box(GM.wood, G, 0, h + .06 + rh, 0, w + .1, .05, .05);
-  for (const sx of [-1, 1]) for (let q = 0; q < 3; q++){ const px = sx*rnd(.4, .95), pz = rnd(-.4, .3); box(GM.woodDark, G, px, .35, pz, .3, .04, .25); plant(pick(['bush', 'fern', 'succulent', 'bushFlower']), G, px, .38, pz, rnd(.45, .6)); }
-  KEEP_LIGHT = true; for (const sx of [-.55, .55]) glow(G, sx, .75, 0, 'rosegold', 2.2); KEEP_LIGHT = false;
-  box(GM.wood, G, 0, .07, d/2 + .42, w, .04, .7);
-  for (let q = -2; q <= 2; q++) box(GM.woodDark, G, q*w/5, .093, d/2 + .42, .015, .006, .7);
-  for (const px of [-.95, -.65, .65, .95]){ cyl(GM.stone2, G, px, .17, d/2 + .6, .09, .18); plant(pick(['bushFlower', 'fern', 'bonsai', 'succulent']), G, px, .26, d/2 + .6, rnd(.5, .65)); }
-  gdLamp(G, -1.3, d/2 + .45, .9, []);
+  const F = under(P, T(0, 0, 0, face)), G = under(F, T(0, 0, -.3));
+  const style = irand(0, 2), fr = pick([GM.wood, GM.cream, GM.verdigris]), gl = pick([GM.glass, GM.glass, GM.glass2]), st = pick([GM.stripW, GM.stripW, GM.bio, GM.edge]);
+  const pots = (xs, zs, Q = G) => { for (const [px, pz] of xs.map((x, q) => [x, zs[q]])){ box(GM.woodDark, Q, px, .35, pz, .3, .04, .25); plant(pick(['bush', 'fern', 'succulent', 'bushFlower']), Q, px, .38, pz, rnd(.45, .6)); } };
+  let front;
+  if (style === 0){   // gabled: glass walls and a pitched glass roof on a frame, an open doorway in front
+    const w = 2.3, d = 1.4, h = .95, rh = .55; front = d/2;
+    box(GM.stone2, G, 0, .05, 0, w + .1, .06, d + .1);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) cyl(fr, G, sx*w/2, h/2 + .05, sz*d/2, .035, h);
+    for (let q = -1; q <= 1; q++) for (const sz of [-1, 1]) cyl(fr, G, q*w/3, h/2 + .05, sz*d/2, .025, h);
+    box(gl, G, 0, h/2 + .08, -d/2, w - .04, h - .1, .02); box(fr, G, 0, h + .06, -d/2, w + .04, .05, .05);
+    for (const sx of [-1, 1]) box(gl, G, sx*w*.3, h/2 + .08, d/2, w*.38, h - .1, .02);
+    box(fr, G, 0, h + .06, d/2, w + .04, .05, .05);
+    for (const sx of [-1, 1]) box(gl, G, sx*w/2, h/2 + .08, 0, .02, h - .1, d - .04);
+    const slope = Math.atan2(rh, d/2), len = Math.hypot(rh, d/2);
+    for (const sz of [-1, 1]){ box(gl, G, 0, h + .06 + rh/2, sz*d/4, w, .02, len, 0, -sz*slope);
+      for (let q = -3; q <= 3; q++) box(fr, G, q*w/6, h + .08 + rh/2, sz*d/4, .03, .03, len, 0, -sz*slope); }
+    box(fr, G, 0, h + .06 + rh, 0, w + .1, .05, .05);
+    box(st, G, 0, h + .1 + rh, 0, w + .04, .018, .018);   // the strips: along the ridge and both eaves
+    for (const sz of [-1, 1]) box(st, G, 0, h + .02, sz*(d/2 + .035), w, .016, .016);
+    pots([-.95, -.6, -.4, .4, .65, .95], [-.3, .1, -.35, -.2, .2, -.35]);
+  } else if (style === 1){   // a tunnel house: glass on hoops, ends glazed in strips, the front one open in the middle (turned so that end faces the way in)
+    const G2 = under(G, T(0, 0, 0, -PI/2));
+    const w = 2.4, r = .78; front = r;
+    const arc = []; for (let q = 0; q <= 8; q++){ const a = q*PI/8; arc.push([Math.cos(a)*r, .08 + Math.sin(a)*r*1.15]); }
+    box(GM.stone2, G2, 0, .05, 0, w + .1, .06, 2*r + .1);
+    for (let q = 0; q < 8; q++){ const [az, ay] = arc[q], [bz, by] = arc[q + 1], len = Math.hypot(bz - az, by - ay);
+      box(gl, G2, 0, (ay + by)/2, (az + bz)/2, w, .02, len, 0, Math.atan2(by - ay, bz - az)); }
+    for (let x = -w/2; x <= w/2 + .01; x += w/4) for (let q = 0; q < 8; q++) strut(fr, G2, x, arc[q][1], arc[q][0], x, arc[q + 1][1], arc[q + 1][0], .03);
+    for (const sx of [-1, 1]) for (let q = -3; q <= 3; q++){ const z = q*r/3.5, hz = .08 + Math.sqrt(Math.max(0, r*r - z*z))*1.15;
+      if (sx > 0 && Math.abs(q) <= 1) continue;   // (the front's doorway)
+      box(gl, G2, sx*w/2, hz/2 + .04, z, .02, hz - .06, r/3.5 - .02); }
+    strut(st, G2, -w/2, arc[4][1] + .03, 0, w/2, arc[4][1] + .03, 0, .02);   // the strips: along the crown and both feet
+    for (const sz of [-1, 1]) box(st, G2, 0, .1, sz*(r + .03), w, .016, .016);
+    pots([-.9, -.5, .5, .9], [-.25, .2, -.25, .15], G2);
+    // (a tunnel's doorway is at its end: its deck goes there instead)
+    box(GM.wood, G2, w/2 + .45, .07, 0, .7, .04, 1.3); for (const pz of [-.5, .5]){ cyl(GM.stone2, G2, w/2 + .6, .17, pz, .09, .18); plant(pick(['bushFlower', 'fern', 'bonsai']), G2, w/2 + .6, .26, pz, rnd(.5, .65)); }
+    clear.push([0, 0, 1.7]); return;
+  } else {   // an eight-sided conservatory: glass walls between posts, a faceted glass roof up to a little cupola with a gold finial
+    const R = .95, h = .8, rise = .6, ap = R*Math.cos(PI/8), side = 2*R*Math.sin(PI/8), slope = Math.atan2(rise, ap), len = Math.hypot(rise, ap); front = R;
+    put(U.cyl16, GM.stone2, under(G, T(0, .05, 0, 0, 2*R + .15, .06, 2*R + .15)));
+    for (let j = 0; j < 8; j++){
+      const L = under(G, T(0, 0, 0, j*TAU/8)), Lp = under(G, T(0, 0, 0, j*TAU/8 + TAU/16));
+      if (j) box(gl, L, 0, h/2 + .08, ap, side - .03, h - .1, .02);   // (j 0: the doorway, in front)
+      cyl(fr, Lp, 0, h/2 + .05, R, .03, h);
+      box(fr, L, 0, h + .06, ap, side + .02, .045, .045);
+      box(gl, L, 0, h + .08 + rise*.25, ap*.75, side*.78, .02, len*.5, 0, -slope);   // the roof: two bands of panels, wide and then narrow
+      box(gl, L, 0, h + .08 + rise*.7, ap*.3, side*.38, .02, len*.42, 0, -slope);
+      strut(fr, Lp, 0, h + .08, R, 0, h + .08 + rise*.92, R*.1, .025);
+      box(st, L, 0, h + .02, ap + .035, side, .016, .016);   // the strip: round the wall tops
+    }
+    cyl(fr, G, 0, h + rise + .12, 0, .16, .16); put(U.cone, GM.roof, under(G, T(0, h + rise + .28, 0, 0, .42, .2, .42))); sph(GM.gold, G, 0, h + rise + .42, 0, .05);
+    put(U.cyl16, st, under(G, T(0, h + rise + .19, 0, 0, .35, .02, .35)));
+    cyl(GM.stone2, G, 0, .2, 0, .32, .24); plant(pick(['bonsai', 'bushFlower', 'fern']), G, 0, .33, 0, rnd(.6, .75));
+    for (let j = 1; j < 8; j += 2){ const a = j*TAU/8 + .3, rr = R*.6; plant(pick(['fern', 'succulent', 'bushFlower']), G, Math.sin(a)*rr, .08, Math.cos(a)*rr, rnd(.45, .6)); }
+  }
+  box(GM.wood, G, 0, .07, front + .42, 2.3, .04, .7);
+  for (let q = -2; q <= 2; q++) box(GM.woodDark, G, q*2.3/5, .093, front + .42, .015, .006, .7);
+  for (const px of [-.95, -.65, .65, .95]){ cyl(GM.stone2, G, px, .17, front + .6, .09, .18); plant(pick(['bushFlower', 'fern', 'bonsai', 'succulent']), G, px, .26, front + .6, rnd(.5, .65)); }
+  gdLamp(G, -1.3, front + .45, .9, []);
   clear.push([0, 0, 1.7]);
 }
 // a koi deck: copper planks out to the pond's edge with a low rail, a bench facing the water, lanterns at its ends
@@ -717,9 +762,9 @@ function gdWater(P, gd, x){
     if (gap){ for (const s of [-1, 1]) box(GM.edge, E, s*1.2, .05, -.42, 1.3, .015, .025); }
     else box(GM.edge, E, 0, .05, -.42, LOT - .1, .015, .025);
     if (chance(.5)) plant(pick(['g_fern3', 'bushFlower']), E, rnd(-1.4, 1.4), .06, -.2, rnd(.5, .65));
-    if (chance(.3)){ const t = pick([-1.3, 1.3]) + rnd(-.15, .15);   // a little stone lantern on the bank, and its reflection
+    if (chance(.3)){ const t = pick([-1.3, 1.3]) + rnd(-.15, .15);   // a little stone lantern on the bank (the pond reflects it: sky.js)
       cyl(GM.stone2, E, t, .14, -.22, .07, .28); box(GM.stone, E, t, .3, -.22, .14, .04, .14); KEEP_LIGHT = true; box(M.bulb, E, t, .36, -.22, .07, .07, .07); glow(E, t, .37, -.22, 'warm', 1.0); KEEP_LIGHT = false;
-      put(U.cone, GM.roof, under(E, T(t, .44, -.22, 0, .2, .08, .2))); gdReflect(E, t, -.6); }
+      put(U.cone, GM.roof, under(E, T(t, .44, -.22, 0, .2, .08, .2))); }
   });
   // inner corners (water on both sides, grass on the corner): a few stones
   (x.cw || []).forEach((v, k) => { if (!v) return; const [sx, sz] = GD_CORNERS[k];
@@ -742,7 +787,6 @@ function gdBridge(F, bi, bn){
   }
   const ends = (bi === 0 ? [-1.75] : []).concat(bi === bn - 1 ? [1.75] : []);
   KEEP_LIGHT = true; for (const s of [-1, 1]) for (const t of ends){ box(M.bulb, F, s*.47, yr(t) + .09, t, .07, .08, .07); glow(F, s*.47, yr(t) + .09, t, 'warm', 1.1); } KEEP_LIGHT = false;
-  for (const s of [-1, 1]) for (const t of ends){ const F2 = under(F, T(s*.72, 0, t*.75, PI/2)); gdReflect(F2, 0, 0); }
 }
 // One plot of a walkway out to an island's gazebo: flat cream slabs on short stone piers just above the water, a low dark edge either side, no rails
 // and no lanterns, so it reads as a path across the water rather than a bridge
@@ -752,13 +796,6 @@ function gdWalkway(F){
     if (k % 2 === 0) for (const s of [-1, 1]) cyl(GM.stone2, F, s*.3, .05, t, .06, .09); }
   for (const s of [-1, 1]) box(GM.woodDark, F, s*.44, .16, 0, .05, .07, LOT);
 }
-// a lantern's reflection on the water: a short broken streak, warm once the lights come on (the water's own color by day)
-function gdReflect(F, x, z){
-  KEEP_LIGHT = true;
-  for (let q = 0; q < 6; q++) box(q < 3 ? GM.reflect : GM.reflect2, F, x + (q % 2 ? .02 : -.02), .05, z - q*.12, .1 - q*.012, .004, .09);
-  KEEP_LIGHT = false;
-}
-
 /* ---------- the living water: rings and lily pads ---------- */
 // Drawn over the plots, in the page only (the plot worker never runs this).
 //  - Rings: the cursor drawn over a pond leaves rings on it (a ring each half plot or so it travels, stronger the faster it goes); on a phone, a tap
@@ -883,7 +920,7 @@ function gardenFx(dt){
   let ns = 0, nb = 0;
   pads.forEach((p, n) => {
     // riding the swell: a little to and fro along it, and a little turn, in step with the shader's main wave (gWv) where the pad is
-    const wp = .8*Math.sin(p.x*.55 + p.z*.35 + t*.17), ph = (p.x*.85 + p.z*.53)*3.6 - t*1.55 + wp, sw = .035*Math.cos(ph);
+    const wp = .8*Math.sin(p.x*.55 + p.z*.35 + t*.17) + .45*Math.sin((-.38*p.x + .92*p.z)*2.1 - t*.6), ph = (p.x*.85 + p.z*.53)*3.6 - t*1.55 + wp, sw = .035*Math.cos(ph);
     const X = p.x + .85*sw, Z = p.z + .53*sw, A = p.a + .07*Math.sin(ph + p.hx);
     const ca = Math.cos(A), sa = Math.sin(A), at = (ox, oz) => [X + ox*ca + oz*sa, Z - ox*sa + oz*ca];
     _gdO.position.set(X, .051, Z); _gdO.rotation.set(0, A, 0); _gdO.scale.set(p.s, 1, p.s); _gdO.updateMatrix(); MS.pad.setMatrixAt(n, _gdO.matrix);

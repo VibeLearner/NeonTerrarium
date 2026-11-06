@@ -19,6 +19,16 @@ const FOL_MAT = {}, FOL_LIST = {};
 // Flickering lights: a few neon tubes, signs, lamps and windows are on their way out. Each has its own id; most
 // of the time it burns steady, then every so often it stutters through a short episode of cutting out and
 // half-dropping, at its own rhythm. Everything else (id 0) never flickers. Used by buildings, signs and glows.
+// A garden tree in the wind (computers only: on a touch screen trees stand still, so their trunks stay in the static cache). The trunk bends from the
+// ground, more the higher up (with the square of the height), in slow gusts that roll across the park (neighbouring trees nearly together); its crown
+// doesn't move on its own, it rides on the trunk's top. One function for both: the bark's shader (garden.js) moves each corner of the trunk by it,
+// the plant shader moves the crown by it at the height where the crown meets its trunk (canopy(), garden.js). p: a point in the world.
+const TREE_SWAY_GLSL = `
+  vec2 treeSway(vec3 p, float t, float w){
+    float h = max(p.y - 0.06, 0.0);
+    float s = sin(t*0.9 - dot(p.xz, vec2(.09, .06))) + 0.3*sin(t*1.9 - dot(p.xz, vec2(.2, .11)));
+    return vec2(.75, .45)*s*w*0.018*h*h;
+  }`;
 const FLK_GLSL = `
   float flkH(float n){ return fract(fract(n*0.1031)*(n*0.1031 + 33.33)*(fract(n*0.1031) + 19.19)); }
   float flicker(float id, float t){
@@ -35,14 +45,14 @@ const FLK_GLSL = `
   }`;
 const texLoader = new THREE.TextureLoader();
 // how each sprite moves in the wind: 0 still, 1 laundry flapping from its line, 2 hanging greenery swinging from the top, 3 plants leaning at the tips,
-// 4 lawn grass, 5 a tree's crown (garden.js): the whole crown sways as one piece
+// 4 lawn grass, 5 a tree's crown (garden.js): still of its own, carried by its trunk's sway (computers only)
 function swayTypeFor(kind){
   if (kind.startsWith('sign_') || kind.startsWith('glyph_') || kind.startsWith('graf_') || kind === 'w_tangle') return 0;
   if (kind.startsWith('l_') && kind !== 'l_mossroots') return 1;
   if (/^gt\d$/.test(kind)) return 4;
   // A tree's crown is four copies of its sprite crossed at angles (so it reads from every side). Its rows sliding sideways moved each copy along its
-  // own plane, four different ways at once, so the crown seemed to swell and shrink, a pulse rather than a sway (owner Nov 6). It sways as one piece
-  // instead, every copy by the same amount the same way, in whole render pixels (the vertex shader)
+  // own plane, four different ways at once, so the crown seemed to swell and shrink, a pulse rather than a sway (owner Nov 6). The crown doesn't
+  // move of its own now: the trunk sways and carries it (the vertex shader; garden.js)
   if (kind.startsWith('tc_')) return 5;
   if (kind === 'vines' || kind === 'pothos' || kind === 'l_mossroots' || kind.startsWith('h_')) return 2;
   return 3;
@@ -358,8 +368,8 @@ const FOL_ATLAS = (() => {
 })();
 const FOL_SHADER = new THREE.ShaderMaterial({
     uniforms: { lightsOn: LIGHTS_ON, lodPlants: LOD.plants, map:{value:FOL_ATLAS.tex}, atlasSize:{value:FOL_ATLAS.size}, tint:FOL_UNI.tint, time:FOL_UNI.time, normalMode:FOL_UNI.normalMode, neonI:FOL_UNI.neonI, res:FOL_UNI.res, wind:FOL_UNI.wind, swayBand:FOL_UNI.swayBand },
-    vertexShader: `uniform vec2 res; uniform float time; uniform float lodPlants; uniform float lightsOn; uniform float wind; varying float vPhase; attribute vec4 aVar; attribute float aFixed; attribute vec4 aRect; attribute vec2 aKind; attribute float aOn;
-      varying vec2 vUv; varying float vShade; varying vec4 vRect; varying vec2 vKind; varying float vFlk; varying float vOn; varying float vFade;` + FLK_GLSL + LIT_GLSL + `
+    vertexShader: `uniform vec2 res; uniform float time; uniform float lodPlants; uniform float lightsOn; uniform float wind; uniform float swayBand; varying float vPhase; attribute vec4 aVar; attribute float aFixed; attribute vec4 aRect; attribute vec2 aKind; attribute float aOn;
+      varying vec2 vUv; varying float vShade; varying vec4 vRect; varying vec2 vKind; varying float vFlk; varying float vOn; varying float vFade;` + FLK_GLSL + LIT_GLSL + TREE_SWAY_GLSL + `
       // a plant lies on or against what it grows from (moss on the floor, ivy on a wall, a bush's foot on its pot), at the same depth: it's kept in front by a
       // fixed nudge toward the camera, about 0.06 of a unit (the view is orthographic, near 10 to far 900: 2/890 of clip depth a unit). The polygon
       // offset below did this alone, but how far it moves is up to each graphics chip: on some phones (a Pixel 7 in Chrome) it was too little, and the
@@ -390,12 +400,11 @@ const FOL_SHADER = new THREE.ShaderMaterial({
             wp.xz += vec2(.75, .45)*(.35 + .65*lean)*wind*.05*tip;
           }
           gl_Position = projectionMatrix * viewMatrix * wp;
-          if (swayType > 4.5){   // a tree's crown: a slow sway with the breeze (gusts rolling across the park, so neighbours move nearly together), the whole
-            // crown at once, the same way for all its copies, rounded to whole render pixels so it steps cleanly without its pixels swimming
+          if (swayType > 4.5 && swayBand < 0.5){   // a tree's crown: carried by its trunk's sway (TREE_SWAY_GLSL), all its copies together, as one piece,
+            // moved by the trunk's sway where they meet (that height rides in the phase's whole part: canopy(), garden.js), rounded to whole render pixels
+            // so its pixels never swim
             vec3 base = (modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
-            float sy = length(instanceMatrix[1].xyz);
-            float s = sin(time*0.9 - dot(base.xz, vec2(.09, .06))) + 0.3*sin(time*1.9 - dot(base.xz, vec2(.2, .11)));   // (by where it stands only: a tree's limb crowns move with its main one)
-            vec2 d = vec2(.75, .45)*s*wind*.03*sy;
+            vec2 d = treeSway(vec3(base.x, floor(aVar.w*5.17 + 0.001)*0.1, base.z), time, wind);
             vec4 c0 = projectionMatrix * viewMatrix * vec4(base, 1.0), c1 = projectionMatrix * viewMatrix * vec4(base + vec3(d.x, 0.0, d.y), 1.0);
             gl_Position.xy += floor((c1.xy/c1.w - c0.xy/c0.w)*0.5*res + 0.5)/res*2.0*gl_Position.w;
           }

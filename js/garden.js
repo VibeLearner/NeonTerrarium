@@ -43,6 +43,24 @@ const GM = {
   glass2: toon(0x5f8f80), stripW: toon(0x5a4e3a, { em: 0xfff1d6, kind: 'trim' }),   // smoky glass; a warm white strip light
 };
 
+/* ---------- the trees' sway ---------- */
+// On a computer the trunks bend in the wind (TREE_SWAY_GLSL, sprites.js) and carry their crowns: the bark is drawn live (not folded into the
+// buildings' one material, not kept in the static cache), every frame, a few hundred triangles a tree. On a touch screen trees stand still and
+// their bark stays static (owner Nov 6: desktop only).
+if (!self.IN_RECIPE_WORKER && !(typeof TOUCH !== 'undefined' && TOUCH.on) && typeof TREE_SWAY_GLSL !== 'undefined') for (const m of [GM.trunk, GM.birch, GM.palmBark]){
+  m.userData.live = true; m.customProgramCacheKey = () => 'gdbark';
+  m.onBeforeCompile = sh => {
+    sh.uniforms.gTime = FOL_UNI.time; sh.uniforms.gWind = FOL_UNI.wind;
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform float gTime; uniform float gWind;' + TREE_SWAY_GLSL)
+      .replace('#include <project_vertex>', `vec4 mvPosition = vec4(transformed, 1.0);
+#ifdef USE_INSTANCING
+mvPosition = instanceMatrix * mvPosition;
+#endif
+{ vec4 gw = modelMatrix * mvPosition; gw.xz += treeSway(gw.xyz, gTime, gWind); mvPosition = viewMatrix * gw; }
+gl_Position = projectionMatrix * mvPosition;`);
+  };
+}
+
 /* ---------- the water ---------- */
 // The pond's water, after the coast's sea (coast.js): its color comes from how deep it is (shallow and pale at the banks, darkening toward the middle),
 // banded the way pixel art bands a gradient and dithered at the band edges; ripples wobble the bands; the slow swell is lit in flat facets (a coarse
@@ -394,10 +412,13 @@ function gdLoad(c, v){
 // The crown is a tree-top sprite (spritegen_trees.js) drawn as four copies crossed round its middle, so from whichever way the camera turns it reads
 // full. Its sway phase is picked so it never thins out when zoomed out (the plant shader drops a share of the plants far out: a tree losing its crown
 // would leave a bare trunk). Kept generic so other builders can plant trees too (the luxury streets, later).
-function canopy(kind, P, x, y, z, k = 1, n = 4){
+function canopy(kind, P, x, y, z, k = 1, n = 4, at = y){
   if (NO_GREEN || !FOL_LIST[kind]) return;
   const s = SPR.size[kind], scale = new THREE.Matrix4().makeScale(s[0]/PX*k, s[1]/PX*k, 1);
-  const yaw = rnd(0, PI), shade = rnd(.9, 1.04), ph = (irand(0, 30) + rnd(.56, .96))/5.17;   // (fract(ph*5.17) over .55: see vFade in the plant shader)
+  // (the phase: its fraction (fract(ph*5.17) over .55) keeps it from thinning out zoomed out, see vFade in the plant shader; its whole part is the
+  //  height (tenths) where the crown meets its trunk, at: the plant shader carries the crown by the trunk's sway there, TREE_SWAY_GLSL)
+  irand(0, 30);   // (still drawn, so everything rolled after it lands as before)
+  const yaw = rnd(0, PI), shade = rnd(.9, 1.04), ph = (Math.max(0, Math.min(30, Math.round(at*10))) + rnd(.56, .96))/5.17;
   for (let q = 0; q < n; q++) FOL_LIST[kind].push({ m: under(P, T(x, y, z, yaw + q*PI/n)).multiply(scale), an: SPR.anchor[kind], flip: q % 2 ? -1 : 1, shade: shade*(q % 2 ? .95 : 1), phase: ph, fixed: 1 });
 }
 // the kinds of tree: the crown sprite, trunk height and crown scale ranges, limbs (each with a smaller crown of its own), bark
@@ -422,18 +443,18 @@ function treeAt(P, x, z, s = 1, sp = 'round'){
   if (D.palm){   // a slim trunk curving up and over in five pieces, the fronds at its top
     let px = x, py = .05, pz = z;
     for (let q = 1; q <= 5; q++){ const t = q/5, nx = x + ca*.35*s*t*t, nz = z + sa*.35*s*t*t, ny = .05 + h*t; strut(bark, P, px, py, pz, nx, ny, nz, .085*s*(1 - t*.3)); px = nx; py = ny; pz = nz; }
-    canopy(D.k, P, px, py + ch*.12, pz, ck); return;
+    canopy(D.k, P, px, py + ch*.12, pz, ck, 4, py); return;
   }
   const lv = D.straight ? 0 : rnd(.04, .12)*s, mx = x + ca*lv*.4, mz = z + sa*lv*.4, tx = x + ca*lv, tz = z + sa*lv;
   strut(bark, P, x, .05, z, mx, h*.55, mz, .14*s); strut(bark, P, mx, h*.55, mz, tx, h, tz, .1*s);
   for (let q = 0; q < 3; q++){ const a = lean + q*TAU/3 + rnd(-.3, .3); strut(bark, P, x, .14*s, z, x + Math.cos(a)*.17*s, .05, z + Math.sin(a)*.17*s, .06*s); }   // root flare
-  canopy(D.k, P, tx, h + ch*(D.low ? .18 : D.straight ? .45 : .3), tz, ck);
+  canopy(D.k, P, tx, h + ch*(D.low ? .18 : D.straight ? .45 : .3), tz, ck, 4, h);
   const nl = D.limbs ? irand(D.limbs[0], D.limbs[1]) : 0;
   for (let q = 0; q < nl; q++){
     const a = lean + (q + 1)*TAU/(nl + 1) + rnd(-.4, .4), r = rnd(.32, .5)*s*(D.fan ? 1.35 : 1), ly = h*rnd(.55, .8), ey = h*rnd(.85, 1.02);
     const ex = tx + Math.cos(a)*r, ez = tz + Math.sin(a)*r, sub = D.sub || D.k, sk = ck*rnd(.5, .62);
     strut(bark, P, x + (tx - x)*ly/h, ly, z + (tz - z)*ly/h, ex, ey, ez, .065*s);
-    canopy(sub, P, ex, ey + SPR.size[sub][1]/PX*sk*.25, ez, sk);
+    canopy(sub, P, ex, ey + SPR.size[sub][1]/PX*sk*.25, ez, sk, 4, ey);
   }
 }
 

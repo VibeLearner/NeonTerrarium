@@ -73,6 +73,15 @@ Times are at the top of `js/demo.js` (`MK`, `CLICK_T`), captions in `CAPS`, the 
 
 Its apartment steps are in `RL` and its times in `MK` at the top of `js/demo.js`; the sofa is `SOFA`.
 
+## The 19 s cut (wide and tall)
+
+`python3 tools/demo/record.py --mid --both` makes `out/neon-terrarium-demo-19s.mp4` (1920 x 1080) and `out/neon-terrarium-demo-19s-tall.mp4`
+(1080 x 1620), each filmed natively, plus a `-compressed.mp4` copy of each to post.
+
+- The long cut's apartment scene (the furnisher's sofa put back on camera, its color, the warm lamps, the work light off), at a quicker pace.
+- The 15 s clip's captions and Booth loop, with every caption on the right; the person cam sits top left for it.
+- 0 to 5 s the city and the walk home, 5 to 14.6 s the apartment, then the pull out and the title, ending at 19 s.
+
 ## The procedural generation cut (60 s)
 
 `python3 tools/demo/record.py --pg` makes `tools/demo/out/neon-terrarium-procgen.mp4` (code: `js/demo_pg.js`, opened with `index.html?full#demo&pg`).

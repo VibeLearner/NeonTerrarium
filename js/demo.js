@@ -16,13 +16,18 @@
 // Nothing is saved and none of the player's own city or settings are read (saveguard.js, NT_DEMO).
 'use strict';
 const DEMO = (() => {
-  const D = { on: !!window.NT_DEMO && !/[#&]pg\b/.test(location.hash), ready: false, playing: false, done: false, held: false, t: 0, frame: 0, drawn: 0, log: [], info: {}, failed: null, len: window.__DM_LONG ? 29 : 15 };
+  const D = { on: !!window.NT_DEMO && !/[#&]pg\b/.test(location.hash), ready: false, playing: false, done: false, held: false, t: 0, frame: 0, drawn: 0, log: [], info: {}, failed: null, len: window.__DM_LONG ? 29 : window.__DM_MID ? 19 : 15 };
   if (!D.on) return D;
   const CAP = !!window.__TR_CAPTURE;   // the picture pass: the recorder steps the clock and films each frame
   const AUTO = !!window.__DM_AUDIO;    // the sound pass: real time, nothing drawn, only what makes a sound
   const FPS = +window.__DM_FPS || 60;
   const LONG = !!window.__DM_LONG;     // the long cut (tools/demo/record.py --long): 29 s, no captions or badge, everything at an easy pace; in the
                                        // apartment the furnisher's own sofa is taken out beforehand and put back on camera (see SOFA)
+  // the 19 s cut (tools/demo/record.py --mid, Nov 7): the long cut's pictures (its sofa scene in the apartment, the warm lamps, the work light off),
+  // at a quicker pace, with captions (all on the right: the person cam moves to the left for it) and the Booth loop
+  const MID = !LONG && !!window.__DM_MID;
+  const SOFAS = LONG || MID;   // (the long cut's apartment: the sofa scene, not the bonsai)
+  const TALL = innerHeight > innerWidth;   // (filmed tall: 1080 x 1620, record.py --tall)
   const NOLAB = !!window.__DM_NOLAB;   // (checking only, never in a recording: the apartment left out, tools/demo/record.py --test --nolab)
   const say = (...a) => { D.log.push(a.join(' ')); if (D.log.length > 500) D.log.shift(); console.log('[demo]', ...a); };
   const warn = (what, e) => { D.log.push('! ' + what + ': ' + (e && e.message || e)); console.warn('[demo] ' + what, e && e.stack ? e.stack.split('\n').slice(0, 3).join(' | ') : e); };
@@ -48,19 +53,24 @@ const DEMO = (() => {
 
   /* ---------- the plan ---------- */
   const MK = LONG ? { person: 2.1, walk: 2.1, arrive: 6.0, inside: 6.5, furn: 6.5, room: 7.6, exit: 22.6, out: 23.05, title: 25.2 }
+           : MID ? { person: 1.6, walk: 1.6, arrive: 4.55, inside: 5.0, furn: 5.0, room: 6.05, exit: 14.6, out: 15.05, title: 16.9 }
                   : { person: 1.6, walk: 1.6, arrive: 4.55, inside: 5.0, furn: 5.0, room: 6.05, exit: 10.6, out: 11.05, title: 13.2 };
   // the apartment's steps, in seconds after the room is ready (R). The 15 s clip: [Plants, bonsai tile, over the table, set down, to close, close,
   // zoom from, zoom to, color menu, new color, let go]
   const RS = [.3, .9, 1.35, 1.65, 2.0, 2.25, 2.3, 3.1, 2.7, 3.1, 3.45];
   // the long cut: the sofa back in, in another color, then back to the furnisher's own; the view in and out again; the work light off
   // (each pick: the cursor goes to it, rests a moment, then presses)
-  const RL = { grp: .9, tab: 1.8, scroll: 2.1, tile: 3.3, aim: 3.65, place: 5.1, toClose: 5.6, close: 5.9, zFrom: 6.1, zTo: 7.5, swatch: 8.3, color: 9.4,
+  const RL = MID
+    ? { grp: .5, tab: 1.05, scroll: 1.25, scrollDur: .45, tile: 1.95, aim: 2.25, place: 3.15, toClose: 3.45, close: 3.65, zFrom: 3.8, zTo: 4.65, swatch: 5.05, color: 5.7,
+        letGo: 6.2, zBack0: 6.4, zBack1: 7.15, toWork: 7.4, work: 7.7, lead: .3 }   // (the 19 s cut: the same steps, quicker)
+    : { grp: .9, tab: 1.8, scroll: 2.1, scrollDur: .65, tile: 3.3, aim: 3.65, place: 5.1, toClose: 5.6, close: 5.9, zFrom: 6.1, zTo: 7.5, swatch: 8.3, color: 9.4,
     letGo: 10.4, zBack0: 10.8, zBack1: 12.1, toWork: 12.6, work: 13.0, lead: .4 };
   // [from, to, text, where]: top left over the city, top right in the apartment (its own panels are on the left)
-  const CAPS = LONG ? [] : [[.3, 1.6, 'Light up the night, tower by tower', 'tl'], [1.85, 4.95, 'Every window has a story', 'tl'], [6.6, 10.4, 'Make any home your own', 'tr']];
+  const CAPS = LONG ? [] : MID ? [[.3, 1.6, 'Light up the night, tower by tower', 'tr'], [1.85, 4.95, 'Every window has a story', 'tr'], [6.5, 13.6, 'Make any home your own', 'tr']]
+    : [[.3, 1.6, 'Light up the night, tower by tower', 'tl'], [1.85, 4.95, 'Every window has a story', 'tl'], [6.6, 10.4, 'Make any home your own', 'tr']];
   // the five buildings, in the order they go up; the first is a tenement (it has the apartment). Each block's clicks: a new building, then a floor each
   const BLOCKS = ['low', 'mid', 'high', 'ind', 'low'];
-  const CLICK_T = LONG ? [[.5, .95], [1.5, 1.9], [2.8, 3.25], [3.9], [4.6, 5.05]] : [[.4, .75], [1.1, 1.4], [2.1, 2.45], [2.95], [3.45, 3.8]];
+  const CLICK_T = LONG && !MID ? [[.5, .95], [1.5, 1.9], [2.8, 3.25], [3.9], [4.6, 5.05]] : [[.4, .75], [1.1, 1.4], [2.1, 2.45], [2.95], [3.45, 3.8]];
   // the Booth loop on the Grid from the first frame: 4 bars at 100 BPM (9.6 s a pass), a melody on the magic keys (pads 0 to 11, always in the
   // chord), its first bar missing two notes; the pass that starts at about 9.7 s is the first with them
   const LOOP_ID = window.DEMO_LOOP.id, MISSING = window.DEMO_LOOP.missing;   // (the loop itself: js/demo_loop.js, read by booth.js before this file loads)
@@ -286,6 +296,15 @@ const DEMO = (() => {
       html.dm-on #monitor{visibility:hidden!important}
       html.dm-on #monitor.tr-keep{visibility:visible!important;transform:scale(var(--monk,1.4));transform-origin:top right;top:3vh!important;right:2vh!important;max-height:calc(94vh/var(--monk,1.4))!important;overflow:hidden;transition:none!important;animation:none!important}
       html.dm-on #monitor.tr-keep *{transition:none!important;animation:none!important}
+      html.dm-on.dm-mid #monitor.tr-keep{transform-origin:top left;right:auto!important;left:2vh!important}
+      html.dm-tall #dmCap{width:100vw;height:auto;padding:6vh 6vw 3vh 0;background:radial-gradient(ellipse 85% 100% at 100% 0%,rgba(4,6,14,.8),rgba(4,6,14,.42) 50%,transparent 80%)}
+      html.dm-tall #dmCap b{font-size:6.4vw;white-space:normal;text-align:right;max-width:78vw}
+      html.dm-tall #dmCap i{width:9vw}
+      html.dm-tall #dmCap i::after{margin-left:calc(9vw + 8px)}
+      html.dm-tall #dmTag{padding:0 5vw 4vh 11vw}
+      html.dm-tall #dmTag span{font-size:1.9vw}
+      html.dm-tall #dmTag.tr{top:auto;bottom:0;padding:0 5vw 4vh 0}
+      html.dm-tall #dmTitle svg{width:86vw}
       html.dm-on #monitor.tr-keep #monPin, html.dm-on #monitor.tr-keep #monClose{visibility:hidden!important}
       html.dm-on #monitor.tr-keep #monTabs{display:none!important}
       html.dm-on .furnish-frame{transition:none!important}
@@ -341,7 +360,8 @@ const DEMO = (() => {
     D.el = { ov, black: q('#dmBlack'), shade: q('#dmShade'), sel: q('#dmSel'), cur: q('#dmCur'), ring: q('#dmRing'), cap: q('#dmCap'), capT: q('#dmCap b'), capL: q('#dmCap i'),
       tag: q('#dmTag'), title: q('#dmTitle'), msg: q('#dmMsg'), status: q('#dmStatus') };
     D.el.black.style.opacity = '1';
-    const monk = () => html.style.setProperty('--monk', (1.4*innerHeight/1080).toFixed(3)); monk(); addEventListener('resize', monk);
+    const monk = () => html.style.setProperty('--monk', (1.4*Math.min(innerWidth, innerHeight)/1080).toFixed(3));
+    if (MID) html.classList.add('dm-mid'); if (TALL) html.classList.add('dm-tall'); monk(); addEventListener('resize', monk);
     if (CAP || AUTO) D.el.msg.hidden = true;
   }
   async function title(){   // the trailer's SVG, both words the same height, cropped to what it draws so it sits in the middle (the stage's)
@@ -583,7 +603,7 @@ const DEMO = (() => {
   function labLetGo(){ const w = labWin(); safe('let go', () => w.PodBuilder.select(null)); }
   // the lab's view eases in on the bonsai once the catalog is closed (its own zoom, toward a point picked so the bonsai ends a little left of
   // the middle, clear of the inspector on the right): a zoom about P keeps P still, so the bonsai at Q ends at P + Z(Q - P)
-  const LZ = LONG ? { from: MK.room + RL.zFrom, to: MK.room + RL.zTo, max: 1.55, back0: MK.room + RL.zBack0, back1: MK.room + RL.zBack1 }
+  const LZ = SOFAS ? { from: MK.room + RL.zFrom, to: MK.room + RL.zTo, max: 1.55, back0: MK.room + RL.zBack0, back1: MK.room + RL.zBack1 }
                   : { from: MK.room + RS[6], to: MK.room + RS[7], max: 1.9 };
   function labZoom(t){
     if (NOLAB || AUTO || FU.id === undefined || !FU.at || t < LZ.from || FU.zoomDone) return;
@@ -810,7 +830,7 @@ const DEMO = (() => {
     const P = PLAN, y0 = P.cam.yaw, p0 = P.cam.pitch;
     const A = P.A || (P.A = fit(P.wide, y0 - .08, p0 + 2*DEG, 1.12, .1));
     const B = P.B || (P.B = fit(P.near, y0 + .06, p0, 1.3, .12));
-    const W = { x: -2*LOT, y: TARGET_Y, z: 0, yaw: y0 + .8, zoom: 32, pitch: 38*DEG };
+    const W = { x: -2*LOT, y: TARGET_Y, z: 0, yaw: y0 + .8, zoom: TALL ? 50 : 32, pitch: 38*DEG };   // (filmed tall: further out, so the city still spreads across)
     const mix = (a, b, u) => ({ x: lerp(a.x, b.x, u), y: lerp(a.y, b.y, u), z: lerp(a.z, b.z, u), yaw: a.yaw + wrapA(b.yaw - a.yaw)*u, zoom: elerp(a.zoom, b.zoom, u), pitch: lerp(a.pitch, b.pitch, u) });
     let c;
     // (wide on all five buildings until the last is up, drifting in a little; then in on the door as she reaches it)
@@ -844,13 +864,13 @@ const DEMO = (() => {
     if (!AUTO && !NOLAB){
       at(MK.furn, () => { CUR.want = 0; }, 'apartment');
       const R = MK.room;
-      if (LONG){
+      if (SOFAS){
         const L = RL.lead;
         at(R + RL.grp - L, () => { CUR.want = 1; labRail('furn', false); }, 'to Furniture');
         at(R + RL.grp, () => labRail('furn', true), 'Furniture');
         at(R + RL.tab - L, () => labTab('sofas', false), 'to Sofas');
         at(R + RL.tab, () => labTab('sofas', true), 'Sofas');
-        at(R + RL.scroll, () => sofaScroll(.65), 'down the Sofas to its tile');
+        at(R + RL.scroll, () => sofaScroll(RL.scrollDur), 'down the Sofas to its tile');
         at(R + RL.tile - L - .1, () => sofaTile(false), 'to the sofa\'s tile');
         at(R + RL.tile, () => sofaTile(true), 'the sofa picked: in hand');
         at(R + RL.aim, sofaAim, 'carried to where it stood');
@@ -876,7 +896,7 @@ const DEMO = (() => {
       at(R + RS[9], labColor, 'a new color');
       at(R + RS[10], labLetGo, 'let go of, so it shows clean');
       }
-      if (LONG) at(MK.exit - .5, () => { CUR.want = 1; }, 'cursor back');
+      if (SOFAS) at(MK.exit - .5, () => { CUR.want = 1; }, 'cursor back');
       at(MK.exit - .3, () => { const b = labEl('#ntExit'); if (b) aim(labCenter(b)); }, 'to Exit');
       at(MK.exit, labExit, 'Exit');
       at(MK.exit + .3, () => { CUR.want = 0; }, 'cursor away');
@@ -974,7 +994,7 @@ const DEMO = (() => {
     status('working out the city');
     await until(() => typeof pplReady !== 'undefined' && pplReady && STORY.on, 300).catch(e => warn('people', e));
     plan(); castUp(); monitorScript(); timeline();
-    if (LONG && STORY.sp && !STORY.sp.__dm) safe('warm home', () => { const _sp = STORY.sp, pod = PLAN.who.pod;
+    if (SOFAS && STORY.sp && !STORY.sp.__dm) safe('warm home', () => { const _sp = STORY.sp, pod = PLAN.who.pod;
       STORY.sp = function (p){ const r = _sp.apply(this, arguments); if (!r || !p || p.pod !== pod) return r;
         const tm = r.temper || { outgoing: .25, careful: .5, warm: .5 };
         return Object.assign({}, r, { temper: Object.assign({}, tm, { warm: Math.max(tm.warm || 0, .85) }) }); };
@@ -991,7 +1011,7 @@ const DEMO = (() => {
           if (w !== lastW){ lastW = w; say('the apartment lab:', w); } };
         await until(() => { rep(); return labReady(); }, window.__DM_TEST ? 7200 : 900).catch(e => warn('dry run', e));
         const B = labB(); D.info.pieces = B && B.inst ? B.inst.size : 0; D.info.tables = B && B.inst ? [...B.inst.values()].filter(i => i.rec && TABLES.has(i.rec.arch)).length : 0;
-        if (LONG){ safe('sofas', () => labWin().PodBuilder.openCat('sofas')); await wait(3);
+        if (SOFAS){ safe('sofas', () => labWin().PodBuilder.openCat('sofas')); await wait(3);
           await until(() => { const PB = labWin().PodBuilder; return PB.itemsDone && PB.itemsDone('sofas'); }, 120).catch(e => warn('sofas', e));
           await sofaOut().catch(e => warn('sofa', e)); safe('warm lamps', lampsWarm); await wait(1);
           // (the catalog remembers the last shelf per group: left on Chairs, so on camera Furniture opens there and the cursor goes on to Sofas)

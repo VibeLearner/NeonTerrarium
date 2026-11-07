@@ -24,7 +24,7 @@ const DEMOPG = (() => {
   // rises ring by ring on its own (Luxury towers in the middle, Commercial round them, homes outside, an Industrial quarter at the back, a few
   // towers of every zone, and two gardens), and the camera pulls out over it. Filmed wide (1920 x 1080) or tall (1080 x 1920) as the page is
   const CITY = /[#&]city\b/.test(location.hash);
-  if (CITY) D.len = 30;
+  if (CITY) D.len = 18;   // (Nov 7: 18 s)
   const CAP = !!window.__TR_CAPTURE;   // the picture pass: the recorder steps the clock and films each frame
   const AUTO = !!window.__DM_AUDIO;    // the sound pass: real time, nothing drawn, only what makes a sound
   const FPS = +window.__DM_FPS || 60;
@@ -83,7 +83,7 @@ const DEMOPG = (() => {
     const jit = (i, j, k) => (h32('j', i, j, k) % 1000)/1000;
     const pick = (r, w) => { let s = 0; for (const k in w){ s += w[k]; if (r < s) return k; } return Object.keys(w)[0]; };
     // the camera sits off toward these angles (atan2(j, i)) over the film; the Industrial quarter is at the far side, the garden at the near one
-    const FRONT = .45, ang = (a, c) => { let x = Math.abs(a - c); return Math.min(x, Math.PI*2 - x); };
+    const FRONT = .5, ang = (a, c) => { let x = Math.abs(a - c); return Math.min(x, Math.PI*2 - x); };
     const plots = [];
     for (let i = -6; i <= 6; i++) for (let j = -6; j <= 6; j++){
       const d = Math.hypot(i*.95, j), n = (jit(i, j, 0) - .5)*1.3;
@@ -93,9 +93,9 @@ const DEMOPG = (() => {
     for (const p of plots){
       const r = jit(p.i, p.j, 1), far = ang(p.a, FRONT + Math.PI) < .8 && p.d > 2.3;
       p.z = far ? pick(r, { ind: .42, low: .33, mid: .25 })
-        : p.d < 1.7 ? pick(r, { mid: .38, high: .3, low: .26, ind: .06 })
-        : p.d < 3.1 ? pick(r, { low: .38, mid: .36, high: .19, ind: .07 })
-        : pick(r, { low: .55, mid: .3, high: .1, ind: .05 });
+        : p.d < 1.7 ? pick(r, { mid: .52, low: .4, ind: .08 })
+        : p.d < 3.1 ? pick(r, { low: .48, mid: .44, ind: .08 })
+        : pick(r, { low: .6, mid: .35, ind: .05 });
       const r2 = jit(p.i, p.j, 4);
       p.n = { high: 2 + (r2*4 | 0), mid: 1 + (r2*4 | 0), low: 1 + (r2*3 | 0), ind: 1 + (r2*2 | 0) }[p.z] + (p.d < 2 ? 1 : 0);
     }
@@ -114,30 +114,32 @@ const DEMOPG = (() => {
       for (const g of [...garden]) for (const [di, dj] of [[1, 0], [0, 1], [-1, 0], [0, -1]]){ const p = at(g.i + di, g.j + dj);
         if (p && p.d > 3.2 && !p.lawn && garden.length < 16){ p.lawn = true; } }
     }
+    // Luxury: three plots in the whole city (the cursor's own and two more), each a single section, never stacked (Nov 7)
+    for (const [i, j] of [[-1, 0], [1, 1]]){ const p = at(i, j); if (p && !p.lawn){ p.z = 'high'; p.n = 1; p.lux = true; } }
     // a handful of towers of every zone stacked on each other, spread round the city
-    const MIX = ['low', 'mid', 'high', 'ind', 'mid', 'low', 'high'];
-    for (const [i, j] of [[-1, 1], [1, -1], [-2, 0], [2, 2], [-1, -2], [0, -3]]){ const p = at(i, j); if (p && !p.lawn){ p.mix = true; p.n = 5 + (jit(i, j, 5)*3 | 0); } }
+    const MIX = ['low', 'mid', 'ind', 'mid', 'low'];   // (never Luxury: Luxury is never stacked, Nov 7)
+    for (const [i, j] of [[-1, 1], [1, -1], [-2, 0], [2, 2], [-1, -2], [0, -3]]){ const p = at(i, j); if (p && !p.lawn && !p.lux){ p.mix = true; p.n = 4 + (jit(i, j, 5)*3 | 0); } }
     // the cursor's own: three plots, each a different zone (Commercial in the middle, homes and Luxury beside it)
-    const hand = { '0,0': ['mid', 3], '1,0': ['low', 2], '0,1': ['high', 2] };
-    for (const k in hand){ const [i, j] = k.split(',').map(Number), p = at(i, j); if (p){ p.z = hand[k][0]; p.mix = false; p.lawn = false; p.hand = hand[k][1]; p.n = Math.max(p.n, hand[k][1] + 1); } }
+    const hand = { '0,0': ['mid', 3], '1,0': ['low', 2], '0,1': ['high', 1] };
+    for (const k in hand){ const [i, j] = k.split(',').map(Number), p = at(i, j); if (p){ p.z = hand[k][0]; p.mix = false; p.lawn = false; p.hand = hand[k][1]; p.n = p.z === 'high' ? 1 : Math.max(p.n, hand[k][1] + 1); p.lux = p.z === 'high'; } }
     const out = [
-      [.9, 'btn', 'mid'],  [1.5, 'onto', [0, 0]], [1.95, 'up', [0, 0]], [2.4, 'up', [0, 0]],
-      [2.95, 'btn', 'low'], [3.5, 'sky', [1, 0]], [3.95, 'up', [1, 0]],
-      [4.35, 'btn', 'high'], [4.85, 'sky', [0, 1]], [5.25, 'up', [0, 1]],
+      [.55, 'btn', 'mid'],  [1.05, 'onto', [0, 0]], [1.4, 'up', [0, 0]], [1.75, 'up', [0, 0]],
+      [2.15, 'btn', 'low'], [2.6, 'sky', [1, 0]], [2.95, 'up', [1, 0]],
+      [3.3, 'btn', 'high'], [3.75, 'sky', [0, 1]],
     ];
     // the city rises on its own, ring by ring from the middle, each plot's floors stacking a beat after it appears (faster as it goes)
     const rest = plots.filter(p => !p.hand && !p.lawn).sort((a, b) => (a.d + jit(a.i, a.j, 3)*.9) - (b.d + jit(b.i, b.j, 3)*.9));
-    const T0 = 5.8, T1 = 17.6;
+    const T0 = 4.2, T1 = 10.6;
     rest.forEach((p, r) => {
       const tb = T0 + (T1 - T0)*Math.pow(r/Math.max(1, rest.length - 1), .85);
       const zs = k => p.mix ? MIX[(k + (jit(p.i, p.j, 6)*7 | 0)) % MIX.length] : p.z;
       out.push([tb, 'sky', [p.i, p.j], zs(0)]);
-      for (let k = 1; k < p.n; k++) out.push([Math.min(21.5, tb + k*(.26 + jit(p.i, p.j, 10 + k)*.18)), 'up', [p.i, p.j], zs(k)]);
+      for (let k = 1; k < p.n; k++) out.push([Math.min(12.8, tb + k*(.17 + jit(p.i, p.j, 10 + k)*.12)), 'up', [p.i, p.j], zs(k)]);
     });
-    for (const p of plots) if (p.hand) for (let k = p.hand; k < p.n; k++) out.push([6.4 + k*.45 + jit(p.i, p.j, 20 + k)*.3, 'up', [p.i, p.j], p.z]);
-    // then the garden, laid plot by plot from the city's edge outward (17.4 to 22.6 s), so it grows on camera at the rim
+    for (const p of plots) if (p.hand) for (let k = p.hand; k < p.n; k++) out.push([4.5 + k*.3 + jit(p.i, p.j, 20 + k)*.2, 'up', [p.i, p.j], p.z]);
+    // then the garden, laid plot by plot from the city's edge outward (10.3 to 13.6 s), so it grows on camera at the rim
     const lawns = [...plots.filter(p => p.lawn), ...garden].sort((a, b) => a.d - b.d + (jit(a.i, a.j, 7) - jit(b.i, b.j, 7))*.3);
-    lawns.forEach((p, k) => out.push([17.4 + 5.2*k/Math.max(1, lawns.length - 1), 'lawn', [p.i, p.j], null]));
+    lawns.forEach((p, k) => out.push([10.3 + 3.3*k/Math.max(1, lawns.length - 1), 'lawn', [p.i, p.j], null]));
     out.sort((a, b) => a[0] - b[0]);
     const zc = {}; for (const p of plots) if (!p.lawn) zc[p.mix ? 'mixed' : p.z] = (zc[p.mix ? 'mixed' : p.z] || 0) + 1;
     CITY_INFO.plots = plots.length; CITY_INFO.zones = zc; CITY_INFO.lawns = lawns.map(p => [p.i, p.j]);
@@ -147,8 +149,8 @@ const DEMOPG = (() => {
   const ACTS = (CITY ? cityActs() : FEAT_ACTS).map(([t, kind, v, z], n) => ({ n, t, kind, v, z, auto: z !== undefined }));
   const GARDEN0 = CITY ? ACTS.findIndex(a => a.kind === 'lawn') : ACTS.findIndex(a => a.kind === 'green');
   const LAST_ACT = ACTS[ACTS.length - 1].t;
-  const T_OUT = CITY ? 5.4 : 47.2;   // (the zone bar goes: the city cut, once it builds on its own; the feature cut, as it pulls out)
-  const CUR_OFF = CITY ? 5.4 : LAST_ACT + .5;   // (the cursor goes)
+  const T_OUT = CITY ? 4.1 : 47.2;   // (the zone bar goes: the city cut, once it builds on its own; the feature cut, as it pulls out)
+  const CUR_OFF = CITY ? 4.1 : LAST_ACT + .5;   // (the cursor goes)
   const HOUR = 20.6;
   const GRID_AT = [70, 70];   // (the Grid stands well out of sight, so its music plays from the first frame)
 
@@ -415,7 +417,7 @@ const DEMOPG = (() => {
   }
   // the yaw turns slowly the whole time (a third of a turn over the film, a little faster as it pulls out at the end), so every shot shows depth
   const Y0 = .5;
-  const yawAt = t => CITY ? Y0 + .95*t/30 + .25*ss(seg(t, 22, 30)) : Y0 + .62*t/60 + .32*ss(seg(t, T_OUT, 60));
+  const yawAt = t => CITY ? Y0 + .8*t/18 + .22*ss(seg(t, 13.6, 18)) : Y0 + .62*t/60 + .32*ss(seg(t, T_OUT, 60));
   // the plots a shot frames, each to its height at that moment of the film
   function boxes(keys, t){
     const S2 = snapAt(t) || {}, out = [];
@@ -431,15 +433,15 @@ const DEMOPG = (() => {
       const hand = [[0, 0], [1, 0], [0, 1]];
       return [
         [0,    [[0, 0]], 34, 3.2, 0, 4.2],
-        [2.8,  [[0, 0]], 34, 1.4, 2.8],
-        [5.6,  hand, 35, 1.25, 5.6],
-        [9.5,  allPlots(9.5), 36, 1.18, 9.5],
-        [14,   allPlots(14), 37, 1.14, 14],
+        [1.8,  [[0, 0]], 34, 1.4, 1.8],
+        [3.8,  hand, 35, 1.25, 3.8],
+        [6.3,  allPlots(6.3), 36, 1.18, 6.3],
+        [8.9,  allPlots(8.9), 37, 1.14, 8.9],
         // (the garden growing at the city's edge: closer and steeper, so its paths, trees and pond read)
-        [18.6, CITY_INFO.lawns, 44, 1.45, LAST_ACT],
-        [22.4, CITY_INFO.lawns, 47, 1.3, LAST_ACT],
-        [26,   allPlots(LAST_ACT), 37, 1.1, LAST_ACT],
-        [30,   allPlots(LAST_ACT), 34, 1.16, LAST_ACT],
+        [11.0, CITY_INFO.lawns, 44, 1.45, LAST_ACT],
+        [13.5, CITY_INFO.lawns, 47, 1.3, LAST_ACT],
+        [15.6, allPlots(LAST_ACT), 37, 1.1, LAST_ACT],
+        [18,   allPlots(LAST_ACT), 34, 1.16, LAST_ACT],
       ].map(([t, keys, pd, mg, at, mz]) => ({ t, ...fit(boxes(keys, at ?? t), yawAt(t), pd*DEG, mg, .05, mz) }));
     }
     const garden = [[2, 0], ...LAWNS], pondish = PLAN.water.length ? PLAN.water : [[1, 3]];

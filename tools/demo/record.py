@@ -11,7 +11,7 @@ Then the two are put together.
     python3 tools/demo/record.py --preview     # a quick 720p, 30 fps look
     python3 tools/demo/record.py               # the clip -> tools/demo/out/neon-terrarium-demo.mp4
     python3 tools/demo/record.py --vertical    # the clip, plus a 1080 x 1920 version for phones
-    python3 tools/demo/record.py --city --both # the city cut (30 s): wide 1920 x 1080 and tall 1080 x 1920, each filmed natively
+    python3 tools/demo/record.py --city --both # the city cut (30 s): wide 1920 x 1080 and tall 1080 x 1620, each filmed natively
     python3 tools/demo/record.py --pg          # the procedural generation cut (60 s, js/demo_pg.js) -> tools/demo/out/neon-terrarium-procgen.mp4
 
 The --pg cut plays the Grid's own live music, which is never the same twice, so its sound pass runs first and notes what the music player showed
@@ -91,7 +91,7 @@ def main():
     ap.add_argument('--nolab', action='store_true', help='checking only: leave the apartment out')
     ap.add_argument('--pg', action='store_true', help='the procedural generation cut (60 s, no captions, the Grid\'s live music and its player on screen: js/demo_pg.js)')
     ap.add_argument('--city', action='store_true', help='the city cut (30 s): one bare plot grows into a whole city, the Grid\'s music on (js/demo_pg.js)')
-    ap.add_argument('--tall', action='store_true', help='film it tall, 1080 x 1920, its own framing (not a crop of the wide one)')
+    ap.add_argument('--tall', action='store_true', help='film it tall, 1080 x 1620, its own framing (not a crop of the wide one)')
     ap.add_argument('--both', action='store_true', help='film it wide and then tall, one after the other')
     ap.add_argument('--test', action='store_true', help='for checking on a machine without a graphics card: a small 640 x 360 picture at 30 fps, software drawing, no sound')
     a = ap.parse_args()
@@ -104,7 +104,7 @@ def main():
             subprocess.run([sys.executable, os.path.abspath(__file__), *args, *extra], check=True)
         return
 
-    VW, VH = (1080, 1920) if a.tall else (1920, 1080)
+    VW, VH = (1080, 1620) if a.tall else (1920, 1080)
     DSF = 1
     if a.test: DSF, FPS, a.no_audio = .5, 30, True   # (the desktop layout of every panel, drawn at half the pixels)
     a.out = a.out or os.path.join(OUT, ('neon-terrarium-city' if a.city else 'neon-terrarium-procgen' if a.pg else 'neon-terrarium-demo') + ('-tall' if a.tall else '') + ('-long' if a.long else '') + ('-test' if a.test else '-preview' if a.preview else '') + '.mp4')
@@ -184,7 +184,7 @@ def main():
             sd = os.path.join(OUT, 'stills'); os.makedirs(sd, exist_ok=True)
         else:
             raw = os.path.splitext(a.out)[0] + '.video.mp4'
-            size, fps = (('720:1280' if a.tall else '1280:720'), FPS//2) if a.preview else (f'{VW}:{VH}', FPS)
+            size, fps = (('720:1080' if a.tall else '1280:720'), FPS//2) if a.preview else (f'{VW}:{VH}', FPS)
             enc = subprocess.Popen(['ffmpeg', '-v', 'error', '-y', '-f', 'image2pipe', '-framerate', str(fps), '-c:v', 'mjpeg', '-i', '-',
                                     '-vf', f'scale={size}:flags=lanczos', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', str(a.crf + (5 if a.preview else 0)),
                                     '-pix_fmt', 'yuv420p', '-r', str(fps), raw], stdin=subprocess.PIPE)

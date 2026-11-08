@@ -1785,8 +1785,12 @@ function sideMesh(mesh){
   sm.onBeforeRender = sideBefore; sm.onAfterRender = cutAfter; sm.userData.sideOf = mesh; mesh.userData.side = sm;
   return sm;
 }
+// A plot's view made again means what it shows changed (a section, a gate, a pod, a line's pillar on or off): its block's old merge is taken down at once
+// (solidDrop), as for a plot deleted, and the block's plots draw one by one until it is merged again. Hiding only the plot's pieces in it (solidHide)
+// missed the merged meshes made without piece ranges, so the old shape stayed drawn in them while merges waited for the view to hold still, and came
+// and went as the view turned and zoomed: a deleted gate flickering in and out, buildings and metro lines doing the same (owner, Nov 8; Nov 4).
 function cellView(c){
-  if (c.view){ world.remove(c.view); c.view = null; markSolid(c); }
+  if (c.view){ world.remove(c.view); c.view = null; solidDrop(c); }
   if (!c.data) return;
   const g = new THREE.Group();
   for (const [m, geo] of c.data.geo){
@@ -1798,7 +1802,7 @@ function cellView(c){
   }
   world.add(freezeTree(g)); c.view = g;
   pickBounds(c);   // (measured now, a plot at a time, rather than all at once on the first hover)
-  markSolid(c);
+  solidDrop(c);   // (its old meshes in the block's merge: the whole old merge goes, see above)
 }
 // Where the pod's building meets the deck on the lift's side: a ray from the deck's edge in toward the building finds
 // its wall, and the door (opening as people and bots come and go: see the doors in people.js) goes there. The riders

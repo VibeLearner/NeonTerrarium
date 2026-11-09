@@ -27,11 +27,14 @@ self.addEventListener('fetch', e => {
   const req = e.request; if (req.method !== 'GET') return;
   const u = new URL(req.url); if (u.origin !== location.origin) return;
   if ((u.pathname.includes('/assets/audio/') || u.searchParams.has('bench') || req.headers.has('range'))) return;
-  // fresh first: the pages, and anything without a version
-  if (req.mode === 'navigate' || !u.searchParams.has('v')){
-    e.respondWith(fetch(req).then(res => { const cp = res.clone(); e.waitUntil(put(req, cp)); return res; }).catch(async () => (await caches.match(req)) || Response.error()));
+  // fresh first: the pages (however they're asked for: itch puts a version of its own on m.html, Nov 9), and anything without a version
+  const page = req.mode === 'navigate' || req.destination === 'document' || req.destination === 'iframe' || /\.html?$/.test(u.pathname) || u.pathname.endsWith('/');
+  if (page || !u.searchParams.has('v')){
+    e.respondWith(fetch(req).then(res => { const cp = res.clone(); e.waitUntil(put(req, cp)); return res; }).catch(async () => (await caches.match(req)) || (await caches.match(req, { ignoreSearch: true })) || Response.error()));
     return;
   }
-  // a version in the address: the saved copy if there is one
-  e.respondWith(caches.match(req).then(hit => hit || fetch(req).then(res => { const cp = res.clone(); e.waitUntil(put(req, cp)); return res; })));
+  // a version in the address: the saved copy if there is one; the network failing, any saved copy of the file rather than none (a page that
+  // failed to load over a dropped connection, owner's console Nov 9)
+  e.respondWith(caches.match(req).then(hit => hit || fetch(req).then(res => { const cp = res.clone(); e.waitUntil(put(req, cp)); return res; })
+    .catch(async () => (await caches.match(req, { ignoreSearch: true })) || Response.error())));
 });

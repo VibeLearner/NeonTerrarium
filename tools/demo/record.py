@@ -11,6 +11,7 @@ Then the two are put together.
     python3 tools/demo/record.py --preview     # a quick 720p, 30 fps look
     python3 tools/demo/record.py               # the clip -> tools/demo/out/neon-terrarium-demo.mp4
     python3 tools/demo/record.py --vertical    # the clip, plus a 1080 x 1920 version for phones
+    python3 tools/demo/record.py --big --both  # the 45 s cut: the city built by hand (garden, walls, metro), the apartment, the run through the day
     python3 tools/demo/record.py --tod --both  # the 30 s cut: two homes, the apartment, then a turn over the city through the times of day
     python3 tools/demo/record.py --mid --both  # the 19 s cut: the long cut's pictures, captions on the right, wide and tall (1080 x 1620)
     python3 tools/demo/record.py --city --both # the city cut (30 s): wide 1920 x 1080 and tall 1080 x 1620, each filmed natively
@@ -28,6 +29,7 @@ ROOT = os.path.abspath(os.path.join(HERE, '..', '..'))
 OUT = os.path.join(HERE, 'out')
 FPS = 60
 STILLS = [.8, 2.0, 3.2, 4.4, 5.2, 5.5, 5.8, 6.6, 7.8, 8.9, 10.2, 11.0, 12.2, 13.6, 14.7]
+STILLS_BIG = [.6, 1.6, 2.8, 4.0, 5.2, 6.4, 7.6, 8.8, 9.9, 11.0, 12.2, 13.6, 15.0, 16.2, 17.4, 18.6, 19.8, 20.8, 22.0, 23.4, 24.8, 26.4, 28.4, 30.4, 32.6, 34.4, 35.6, 37.2, 38.4, 39.6, 40.8, 42.0, 43.2, 44.6]
 STILLS_TOD = [.6, 1.6, 2.6, 3.8, 5.0, 6.0, 7.2, 9.2, 10.3, 11.5, 13.0, 15.0, 16.4, 17.6, 18.8, 19.9, 21.4, 22.9, 24.4, 25.9, 27.2, 28.2, 29.5]
 STILLS_MID = [.5, 1.2, 2.2, 3.2, 4.3, 5.4, 6.3, 7.4, 8.4, 9.4, 10.6, 11.6, 12.6, 13.8, 14.8, 16.0, 17.2, 18.6]
 STILLS_CITY = [.5, 1.2, 2.3, 3.4, 4.6, 6.3, 8.2, 10.0, 11.4, 12.6, 13.6, 15.0, 16.6, 17.6]
@@ -94,6 +96,7 @@ def main():
     ap.add_argument('--long', action='store_true', help='the long cut: 29 s, no captions or badge, the furnisher'"'"'s sofa put back on camera, the work light off at the end')
     ap.add_argument('--nolab', action='store_true', help='checking only: leave the apartment out')
     ap.add_argument('--pg', action='store_true', help='the procedural generation cut (60 s, no captions, the Grid\'s live music and its player on screen: js/demo_pg.js)')
+    ap.add_argument('--big', action='store_true', help='the 45 s cut: a Luxury block and garden, walls, homes and industry built by hand, a metro laid across the city, the apartment, the run through the day')
     ap.add_argument('--tod', action='store_true', help='the 30 s cut: two homes go up, the apartment scene, then out over the city turning through times of day and weather, back to night for the title')
     ap.add_argument('--mid', action='store_true', help='the 19 s cut: the long cut\'s apartment scene at a quicker pace, captions on the right, the Booth loop')
     ap.add_argument('--city', action='store_true', help='the city cut (30 s): one bare plot grows into a whole city, the Grid\'s music on (js/demo_pg.js)')
@@ -113,7 +116,7 @@ def main():
     VW, VH = (1080, 1620) if a.tall else (1920, 1080)
     DSF = 1
     if a.test: DSF, FPS, a.no_audio = .5, 30, True   # (the desktop layout of every panel, drawn at half the pixels)
-    a.out = a.out or os.path.join(OUT, ('neon-terrarium-city' if a.city else 'neon-terrarium-procgen' if a.pg else 'neon-terrarium-demo') + ('-30s' if a.tod else '-19s' if a.mid else '') + ('-tall' if a.tall else '') + ('-long' if a.long else '') + ('-test' if a.test else '-preview' if a.preview else '') + '.mp4')
+    a.out = a.out or os.path.join(OUT, ('neon-terrarium-city' if a.city else 'neon-terrarium-procgen' if a.pg else 'neon-terrarium-demo') + ('-45s' if a.big else '-30s' if a.tod else '-19s' if a.mid else '') + ('-tall' if a.tall else '') + ('-long' if a.long else '') + ('-test' if a.test else '-preview' if a.preview else '') + '.mp4')
     if not shutil.which('ffmpeg') and not a.stills: sys.exit('ffmpeg is needed: brew install ffmpeg')
     from playwright.sync_api import sync_playwright
     os.makedirs(OUT, exist_ok=True)
@@ -128,6 +131,7 @@ def main():
             if a.long: ctx.add_init_script(script='window.__DM_LONG = true;')
             if a.mid: ctx.add_init_script(script='window.__DM_MID = true;')
             if a.tod: ctx.add_init_script(script='window.__DM_TOD = true;')
+            if a.big: ctx.add_init_script(script='window.__DM_BIG = true;')
             ctx.add_init_script(path=os.path.join(HERE, 'audio.js'))
             page = ctx.new_page(); log_page(page); page.goto(url, wait_until='load')
             t0 = time.time()
@@ -156,7 +160,7 @@ def main():
         def open_page(headless):
             browser = launch(pw, headless, soft=a.test)
             ctx = browser.new_context(viewport={'width': VW, 'height': VH}, device_scale_factor=DSF)
-            ctx.add_init_script(script=f'window.__DM_FPS = {FPS};' + ('window.__DM_NOLAB = true;' if a.nolab else '') + ('window.__DM_TEST = true;' if a.test else '') + ('window.__DM_LONG = true;' if a.long else '') + ('window.__DM_MID = true;' if a.mid else '') + ('window.__DM_TOD = true;' if a.tod else ''))
+            ctx.add_init_script(script=f'window.__DM_FPS = {FPS};' + ('window.__DM_NOLAB = true;' if a.nolab else '') + ('window.__DM_TEST = true;' if a.test else '') + ('window.__DM_LONG = true;' if a.long else '') + ('window.__DM_MID = true;' if a.mid else '') + ('window.__DM_TOD = true;' if a.tod else '') + ('window.__DM_BIG = true;' if a.big else ''))
             if deck: ctx.add_init_script(script='window.__DM_DECK = ' + json.dumps(deck, separators=(',', ':')) + ';')
             ctx.add_init_script(path=os.path.join(HERE, 'shim.js'))
             page = ctx.new_page(); cdp = ctx.new_cdp_session(page); log_page(page)
@@ -188,7 +192,7 @@ def main():
         frames = int(round(length*FPS)); every = 2 if a.preview else 1
         enc = None
         if a.stills:
-            want = sorted(int(round(s*FPS)) for s in (STILLS_TOD if a.tod else STILLS_MID if a.mid else STILLS_CITY if a.city else STILLS_PG if a.pg else STILLS_LONG if a.long else STILLS) if s < length)
+            want = sorted(int(round(s*FPS)) for s in (STILLS_BIG if a.big else STILLS_TOD if a.tod else STILLS_MID if a.mid else STILLS_CITY if a.city else STILLS_PG if a.pg else STILLS_LONG if a.long else STILLS) if s < length)
             sd = os.path.join(OUT, 'stills'); os.makedirs(sd, exist_ok=True)
         else:
             raw = os.path.splitext(a.out)[0] + '.video.mp4'

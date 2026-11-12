@@ -16,7 +16,7 @@
 // Nothing is saved and none of the player's own city or settings are read (saveguard.js, NT_DEMO).
 'use strict';
 const DEMO = (() => {
-  const D = { on: !!window.NT_DEMO && !/[#&]pg\b/.test(location.hash), ready: false, playing: false, done: false, held: false, t: 0, frame: 0, drawn: 0, log: [], info: {}, failed: null, len: window.__DM_LONG ? 29 : window.__DM_TOD ? 30 : window.__DM_MID ? 19 : 15 };
+  const D = { on: !!window.NT_DEMO && !/[#&]pg\b/.test(location.hash), ready: false, playing: false, done: false, held: false, t: 0, frame: 0, drawn: 0, log: [], info: {}, failed: null, len: window.__DM_LONG ? 29 : window.__DM_BIG ? 45 : window.__DM_TOD ? 30 : window.__DM_MID ? 19 : 15 };
   if (!D.on) return D;
   const CAP = !!window.__TR_CAPTURE;   // the picture pass: the recorder steps the clock and films each frame
   const AUTO = !!window.__DM_AUDIO;    // the sound pass: real time, nothing drawn, only what makes a sound
@@ -29,7 +29,13 @@ const DEMO = (() => {
   // the 30 s cut (tools/demo/record.py --tod, Nov 12): two homes go up, the person cam on their resident going in, the long cut's apartment scene,
   // then out over the city turning slowly while it cuts through times of day and weather (TOD_JUMPS), back to night for the title. No captions
   const TOD = !LONG && !MID && !!window.__DM_TOD;
-  const SOFAS = LONG || MID || TOD;   // (the long cut's apartment: the sofa scene, not the bonsai)
+  // the 45 s cut (tools/demo/record.py --big, Nov 12): the city built by hand first (a Luxury block with a garden between its towers, Luxury
+  // perimeter walls round them, homes and industry round the walls), then a metro line laid from the homes across a dense Commercial district
+  // (its tall towers and holograms, the Neon Dome) and past the town square into a second residential district (a police station); there
+  // the person cam opens on a resident going in, their apartment is furnished, and the camera pulls out and turns through the times of day
+  const BIG = !LONG && !MID && !TOD && !!window.__DM_BIG;
+  const RUN = TOD || BIG;   // (a run through the times of day at the end)
+  const SOFAS = LONG || MID || TOD || BIG;   // (the long cut's apartment: the sofa scene, not the bonsai)
   const TALL = innerHeight > innerWidth;   // (filmed tall: 1080 x 1620, record.py --tall)
   const NOLAB = !!window.__DM_NOLAB;   // (checking only, never in a recording: the apartment left out, tools/demo/record.py --test --nolab)
   const say = (...a) => { D.log.push(a.join(' ')); if (D.log.length > 500) D.log.shift(); console.log('[demo]', ...a); };
@@ -56,6 +62,7 @@ const DEMO = (() => {
 
   /* ---------- the plan ---------- */
   const MK = LONG ? { person: 2.1, walk: 2.1, arrive: 6.0, inside: 6.5, furn: 6.5, room: 7.6, exit: 22.6, out: 23.05, title: 25.2 }
+           : BIG ? { person: 21.4, walk: 21.4, arrive: 24.0, inside: 24.45, furn: 24.45, room: 25.5, exit: 34.1, out: 34.55, title: 42.0 }
            : TOD ? { person: 2.3, walk: 2.3, arrive: 4.9, inside: 5.35, furn: 5.35, room: 6.4, exit: 16.6, out: 17.05, title: 27.3 }
            : MID ? { person: 1.6, walk: 1.6, arrive: 4.55, inside: 5.0, furn: 5.0, room: 6.05, exit: 14.6, out: 15.05, title: 16.9 }
                   : { person: 1.6, walk: 1.6, arrive: 4.55, inside: 5.0, furn: 5.0, room: 6.05, exit: 10.6, out: 11.05, title: 13.2 };
@@ -67,28 +74,31 @@ const DEMO = (() => {
   const RL = TOD
     ? { grp: .65, tab: 1.3, scroll: 1.5, scrollDur: .5, tile: 2.4, aim: 2.7, place: 3.7, toClose: 4.05, close: 4.25, zFrom: 4.4, zTo: 5.4, swatch: 6.0, color: 6.75,
         letGo: 7.5, zBack0: 7.8, zBack1: 8.7, toWork: 9.05, work: 9.35, lead: .35 }   // (the 30 s cut: the long cut's steps, a little quicker)
-    : MID
+    : MID || BIG
     ? { grp: .5, tab: 1.05, scroll: 1.25, scrollDur: .45, tile: 1.95, aim: 2.25, place: 3.15, toClose: 3.45, close: 3.65, zFrom: 3.8, zTo: 4.65, swatch: 5.05, color: 5.7,
         letGo: 6.2, zBack0: 6.4, zBack1: 7.15, toWork: 7.4, work: 7.7, lead: .3 }   // (the 19 s cut: the same steps, quicker)
     : { grp: .9, tab: 1.8, scroll: 2.1, scrollDur: .65, tile: 3.3, aim: 3.65, place: 5.1, toClose: 5.6, close: 5.9, zFrom: 6.1, zTo: 7.5, swatch: 8.3, color: 9.4,
     letGo: 10.4, zBack0: 10.8, zBack1: 12.1, toWork: 12.6, work: 13.0, lead: .4 };
   // [from, to, text, where]: top left over the city, top right in the apartment (its own panels are on the left)
-  const CAPS = LONG ? [] : TOD ? [[.3, 2.2, 'Light up the night, tower by tower', 'tr'], [2.5, 5.25, 'Every window has a story', 'tr'], [6.9, 15.9, 'Make any home your own', 'tr']]
+  const CAPS = LONG ? [] : BIG ? [[.3, 9.6, 'Build your cyberpunk city', 'tr'], [21.4, 24.35, 'Every window has a story', 'tr'], [25.9, 33.0, 'Make any home your own', 'tr']]
+    : TOD ? [[.3, 2.2, 'Light up the night, tower by tower', 'tr'], [2.5, 5.25, 'Every window has a story', 'tr'], [6.9, 15.9, 'Make any home your own', 'tr']]
     : MID ? [[.3, 1.6, 'Light up the night, tower by tower', 'tr'], [1.85, 4.95, 'Every window has a story', 'tr'], [6.5, 13.6, 'Make any home your own', 'tr']]
     : [[.3, 1.6, 'Light up the night, tower by tower', 'tl'], [1.85, 4.95, 'Every window has a story', 'tl'], [6.6, 10.4, 'Make any home your own', 'tr']];
   // the five buildings, in the order they go up; the first is a tenement (it has the apartment). Each block's clicks: a new building, then a floor each
-  const BLOCKS = TOD ? ['low', 'low', 'low', 'low', 'low'] : ['low', 'mid', 'high', 'ind', 'low'];   // (the 30 s cut: only the first two are built)
-  const CLICK_T = TOD ? [[.5, .95, 1.4], [1.85, 2.25], [], [], []] : LONG && !MID ? [[.5, .95], [1.5, 1.9], [2.8, 3.25], [3.9], [4.6, 5.05]] : [[.4, .75], [1.1, 1.4], [2.1, 2.45], [2.95], [3.45, 3.8]];
+  const BLOCKS = TOD || BIG ? ['low', 'low', 'low', 'low', 'low'] : ['low', 'mid', 'high', 'ind', 'low'];   // (the 30 s cut: only the first two are built)
+  const CLICK_T = BIG ? [[0, 0, 0], [], [], [], []]   // (the 45 s cut: the resident's building stands already, put up before the film)
+    : TOD ? [[.5, .95, 1.4], [1.85, 2.25], [], [], []] : LONG && !MID ? [[.5, .95], [1.5, 1.9], [2.8, 3.25], [3.9], [4.6, 5.05]] : [[.4, .75], [1.1, 1.4], [2.1, 2.45], [2.95], [3.45, 3.8]];
   // the Booth loop on the Grid from the first frame: 4 bars at 100 BPM (9.6 s a pass), a melody on the magic keys (pads 0 to 11, always in the
   // chord), its first bar missing two notes; the pass that starts at about 9.7 s is the first with them
   const LOOP_ID = window.DEMO_LOOP.id, MISSING = window.DEMO_LOOP.missing;   // (the loop itself: js/demo_loop.js, read by booth.js before this file loads)
 
   // the 30 s cut's run through the day: [time, hour, weather]. Each a cut (with a quick flash) while the camera turns; it starts and ends at night
-  const TOD_JUMPS = [[19.6, 8.2, 'clear'], [21.1, 13.4, 'overcast'], [22.6, 17.2, 'clear'], [24.1, 19.1, 'rain'], [25.6, 23.4, 'rain'], [27.0, 20.6, 'clear']];
-  const hourAt = t => { let h = 20.6, w = 'clear'; if (TOD) for (const [a, hh, ww] of TOD_JUMPS) if (t >= a){ h = hh; w = ww; } return [h, w]; };
+  const TOD_JUMPS = BIG ? [[36.8, 8.2, 'clear'], [38.0, 13.4, 'overcast'], [39.2, 17.2, 'clear'], [40.4, 19.1, 'rain'], [41.6, 20.6, 'clear']]
+    : [[19.6, 8.2, 'clear'], [21.1, 13.4, 'overcast'], [22.6, 17.2, 'clear'], [24.1, 19.1, 'rain'], [25.6, 23.4, 'rain'], [27.0, 20.6, 'clear']];
+  const hourAt = t => { let h = 20.6, w = 'clear'; if (RUN) for (const [a, hh, ww] of TOD_JUMPS) if (t >= a){ h = hh; w = ww; } return [h, w]; };
   let todK = -1;
   function todTick(t){   // (the weather and the building lights snapped to the hour at each jump, not faded)
-    if (!TOD) return;
+    if (!RUN) return;
     let k = -1; TOD_JUMPS.forEach(([a], n) => { if (t >= a) k = n; });
     if (k !== todK){ todK = k; const w = hourAt(t)[1]; safe('weather', () => LK.setWeather(w, true, true)); D.flash = t; }
     if (k >= 0) LIGHTS_ON.value = LIGHTS_GOAL;
@@ -122,14 +132,26 @@ const DEMO = (() => {
 
   /* ---------- the city: a big night city, every kind of building, an open plaza in the middle ---------- */
   const HOUR = 20.6;
-  const CITY = { i0: -16, i1: 12, j0: -12, j1: 12 };
-  const PLAZA = { i0: -4, i1: 2, j0: -3, j1: 3 }, PC0 = { i: -1, j: 0 };
+  const CITY = BIG ? { i0: -12, i1: 14, j0: -10, j1: 10 } : { i0: -16, i1: 12, j0: -12, j1: 12 };
+  const PLAZA = BIG ? { i0: 6, i1: 9, j0: 0, j1: 4 } : { i0: -4, i1: 2, j0: -3, j1: 3 }, PC0 = BIG ? { i: 7, j: 2 } : { i: -1, j: 0 };
+  // the 45 s cut's metro line, laid on camera: east from the homes along j = 0, round the town square's west side, then east along j = -4
+  // into the second residential district (its plots are kept low: the line runs at a fixed height, and no closer than a plot to a megastructure)
+  const ROUTE = BIG ? [...Array.from({ length: 11 }, (_, k) => [-12 + k, 0]), [-2, -1], [-2, -2], [-2, -3], [-2, -4], ...Array.from({ length: 11 }, (_, k) => [-1 + k, -4])] : [];
+  const onRoute = (i, j) => ROUTE.some(([a, b]) => a === i && b === j);
   const inPlaza = (i, j) => i >= PLAZA.i0 && i <= PLAZA.i1 && j >= PLAZA.j0 && j <= PLAZA.j1;
   const ringOf = (i, j) => !inPlaza(i, j) && i >= PLAZA.i0 - 1 && i <= PLAZA.i1 + 1 && j >= PLAZA.j0 - 1 && j <= PLAZA.j1 + 1;
-  const MEGAS = [['radio', 3, -1, 2, 2], ['square', -12, -6, 5, 5], ['foundry', -15, 3, 6, 4], ['greenhouse', -14, 7, 5, 4], ['logistics', -8, 6, 6, 6],
+  const MEGAS = BIG ? [['club', -8, -5, 4, 4], ['square', 0, -2, 5, 5], ['police', 11, 1, 3, 3], ['radio', 12, -9, 2, 2], ['market', -10, 4, 4, 4]]
+    : [['radio', 3, -1, 2, 2], ['square', -12, -6, 5, 5], ['foundry', -15, 3, 6, 4], ['greenhouse', -14, 7, 5, 4], ['logistics', -8, 6, 6, 6],
     ['market', -2, -11, 4, 4], ['club', 4, -10, 4, 4], ['spire', 7, -4, 3, 3], ['square', 7, 1, 5, 5], ['pagoda', 4, 7, 5, 4], ['bathhouse', 0, 7, 3, 3], ['emitter', -9, -11, 2, 2]];
-  const LAWNS = [[-8, -2], [-8, -1], [-9, -2], [1, 9], [-11, 1], [-10, 1], [9, 9]];
+  const LAWNS = BIG ? [[12, 6], [13, 6], [6, 8], [-4, 7]] : [[-8, -2], [-8, -1], [-9, -2], [1, 9], [-11, 1], [-10, 1], [9, 9]];
   const zoneAt = (i, j, u) => {
+    if (BIG){
+      if (ringOf(i, j)) return u < .85 ? 'low' : 'mid';
+      if (i <= -11) return u < .85 ? 'low' : 'mid';
+      if (i <= -1) return u < .82 ? 'mid' : 'high';   // (the Commercial district)
+      if (i <= 4) return u < .6 ? 'mid' : 'low';
+      return u < .85 ? 'low' : 'mid';   // (the second residential district)
+    }
     if (ringOf(i, j)) return u < .8 ? 'low' : 'mid';
     if (i <= -9 && j >= 2) return u < .8 ? 'ind' : 'mid';
     if (i <= -5) return u < .75 ? 'low' : 'mid';
@@ -152,7 +174,12 @@ const DEMO = (() => {
       if (inMega(i, j)) continue;
       if (inPlaza(i, j) || isLawn(i, j)){ c.green = 'grass'; continue; }
       const z = zoneAt(i, j, R()), v = R();
-      const k = ringOf(i, j) ? (v < .6 ? 1 : 2) : z === 'ind' ? (v < .5 ? 1 : 2) : v < .25 ? 1 : v < .62 ? 2 : v < .9 ? 3 : 4;
+      let k = ringOf(i, j) ? (v < .6 ? 1 : 2) : z === 'ind' ? (v < .5 ? 1 : 2) : v < .25 ? 1 : v < .62 ? 2 : v < .9 ? 3 : 4;
+      if (BIG){
+        if (onRoute(i, j)){ if (v < .45) continue; k = 1; }   // (under the metro: short or open)
+        else if (i >= -10 && i <= -1) k = z === 'mid' || z === 'high' ? 3 + (v*4 | 0) : k;   // (the Commercial district: tall)
+        else k = Math.min(k, 3);
+      }
       c.sections = secs(z, Math.min(MAX_SECTIONS, k));
     }
     let sq = 0;
@@ -223,7 +250,7 @@ const DEMO = (() => {
     const b = PLAN.blocks[k], c = cellAt(b.i, b.j); if (!c) return;
     b.clicks.forEach((ct, n) => withSeed(h32('block', k, n), () => addSection(c, b.zone)));
   }
-  function clearBlocks(){ for (const b of PLAN.blocks){ const c = cellAt(b.i, b.j); if (c){ c.sections = []; c.green = PLAN.green.get(ckey(b.i, b.j)) || 'grass'; } } rebuildAll(); settleAll(); }
+  function clearBlocks(){ for (const b of PLAN.blocks){ if (!b.clicks.length || (BIG && b === PLAN.blocks[0])) continue; const c = cellAt(b.i, b.j); if (c){ c.sections = []; c.green = PLAN.green.get(ckey(b.i, b.j)) || 'grass'; } } rebuildAll(); settleAll(); }
   function doorOf(i, j){ const pl = places.get('c:' + i + ',' + j); return pl ? STORY.streetDoor(pl) : null; }
   function settleAll(){ finishSync(); while (anims.length) endAnim(0); finishSync(); }
   function plan(){
@@ -250,7 +277,7 @@ const DEMO = (() => {
       d = doorOf(b1.i, b1.j) || d; const n2 = way(d);
       if ((n2.x === n.x && n2.z === n.z) || ++tries >= 4) break;
       say('plan: the door turned to', JSON.stringify(n2), 'with the others up: placing them again');
-      for (let k = 1; k < 5; k++){ const b = PLAN.blocks[k], c = cellAt(b.i, b.j); if (c){ c.sections = []; c.green = PLAN.green.get(ckey(b.i, b.j)) || 'grass'; } }
+      for (let k = 1; k < 5; k++){ const b = PLAN.blocks[k], c = cellAt(b.i, b.j); if (c && b.clicks.length){ c.sections = []; c.green = PLAN.green.get(ckey(b.i, b.j)) || 'grass'; } }
       rebuildAll(); settleAll(); n = n2;
     }
     const tv = { x: -n.z, z: n.x };
@@ -381,7 +408,7 @@ const DEMO = (() => {
       tag: q('#dmTag'), title: q('#dmTitle'), msg: q('#dmMsg'), status: q('#dmStatus') };
     D.el.black.style.opacity = '1';
     const monk = () => html.style.setProperty('--monk', (1.4*Math.min(innerWidth, innerHeight)/1080).toFixed(3));
-    if (MID || TOD) html.classList.add('dm-mid');   // (captions on the right: the person cam goes top left) if (TALL) html.classList.add('dm-tall'); monk(); addEventListener('resize', monk);
+    if (MID || TOD || BIG) html.classList.add('dm-mid');   // (captions on the right: the person cam goes top left) if (TALL) html.classList.add('dm-tall'); monk(); addEventListener('resize', monk);
     if (CAP || AUTO) D.el.msg.hidden = true;
   }
   async function title(){   // the trailer's SVG, both words the same height, cropped to what it draws so it sits in the middle (the stage's)
@@ -475,7 +502,8 @@ const DEMO = (() => {
 
   /* ---------- the cursor: drawn, so it shows in the film ---------- */
   const CUR = { x: 0, y: 0, tx: null, ty: null, pulse: -9, col: '#ffffff', on: 0, want: 0 };
-  function aim(s){ if (!s) return; CUR.tx = s.x; CUR.ty = s.y; CUR.want = 1; }
+  function aim(s){ if (!s) return; CUR.wp = null; CUR.tx = s.x; CUR.ty = s.y; CUR.want = 1; }
+  function aimW(p){ CUR.wp = p; const s = toScreen(p); CUR.tx = s.x; CUR.ty = s.y; CUR.want = 1; }   // (a point in the city: the cursor stays on it as the camera moves)
   function click(col){ CUR.pulse = D.t; if (col) CUR.col = col; }
   const toScreen = p => { _v.set(p.x, p.y, p.z).project(cam); return { x: (_v.x + 1)/2*innerWidth, y: (1 - _v.y)/2*innerHeight }; };
 
@@ -488,6 +516,135 @@ const DEMO = (() => {
     safe('hover', () => showHover(tg));
     withSeed(h32('block', k, n), () => { if (!applyTarget(tg)) warn('click', 'did not build at ' + b.i + ',' + b.j); });
     click(ZONES[b.zone] ? ZONES[b.zone].col : '#fff');
+  }
+
+  /* ---------- the 45 s cut: the city built by hand, and the metro laid across it ---------- */
+  // [time, kind, plot, zone]. Kinds: btn (the cursor picks a zone), lux / home / ind (a building on an empty plot, by the cursor or, auto, in a
+  // quick run), up (a floor on it), lawn (a lawn plot: the garden grows from these), wall (a Luxury perimeter wall), gate (a wall made a gate),
+  // mt (the metro's next plot), mtEnd (its end station). The cursor makes the ones marked by hand; the rest go up on their own around it
+  const GIN = { i0: -19, i1: -15, j0: -1, j1: 1 };   // (the Luxury block: towers at its corners, the garden between)
+  const BIG_ACTS = [];
+  const BIG_INFO = {};
+  if (BIG){
+    const A = (t, kind, i, j, z, hand) => BIG_ACTS.push({ t, kind, i, j, z, hand: !!hand });
+    const LUX = [[GIN.i0, GIN.j0], [GIN.i1, GIN.j1], [GIN.i1, GIN.j0], [GIN.i0, GIN.j1]];
+    A(.45, 'btn', 0, 0, 'high', 1);
+    LUX.forEach(([i, j], k) => { A(.95 + k*.55, 'lux', i, j, 'high', 1); });   // (Luxury: one section each, never stacked)
+    // the garden: every other plot of the block, laid from the middle out
+    const lawns = []; for (let i = GIN.i0; i <= GIN.i1; i++) for (let j = GIN.j0; j <= GIN.j1; j++) if (!LUX.some(([a, b]) => a === i && b === j)) lawns.push([i, j]);
+    const mid = [(GIN.i0 + GIN.i1)/2, (GIN.j0 + GIN.j1)/2]; lawns.sort((a, b) => Math.hypot(a[0] - mid[0], a[1] - mid[1]) - Math.hypot(b[0] - mid[0], b[1] - mid[1]));
+    BIG_INFO.lawns = lawns;
+    lawns.forEach(([i, j], k) => A(3.35 + k*.28, 'lawn', i, j, null, 1));
+    // Luxury perimeter walls round the block, the cursor running round the ring; a gate on the side the metro leaves from
+    const ring = []; const W0 = { i0: GIN.i0 - 1, i1: GIN.i1 + 1, j0: GIN.j0 - 1, j1: GIN.j1 + 1 };
+    for (let i = W0.i0; i <= W0.i1; i++) ring.push([i, W0.j0]); for (let j = W0.j0 + 1; j <= W0.j1; j++) ring.push([W0.i1, j]);
+    for (let i = W0.i1 - 1; i >= W0.i0; i--) ring.push([i, W0.j1]); for (let j = W0.j1 - 1; j > W0.j0; j--) ring.push([W0.i0, j]);
+    A(6.6, 'btn', 0, 0, 'wallHigh', 1);
+    ring.forEach(([i, j], k) => A(6.95 + k*.135, 'wall', i, j, 'high', 1));
+    A(9.85, 'gate', W0.i1, 0, 'high', 1);
+    // homes and industry round the walls: the cursor picks Residential, then Industrial, and each side fills in a quick run
+    const outer = []; const O = { i0: W0.i0 - 1, i1: W0.i1 + 1, j0: W0.j0 - 1, j1: W0.j1 + 1 };
+    for (let i = O.i0; i <= O.i1; i++) for (let j = O.j0; j <= O.j1; j++) if (i === O.i0 || i === O.i1 || j === O.j0 || j === O.j1) outer.push([i, j]);
+    const isInd = ([i, j]) => i <= GIN.i0 - 1 && !(i === O.i0 + 1 && (j === O.j0 || j === O.j1)) ;   // (the west end: industry)
+    const homes = outer.filter(p => !isInd(p)).sort((a, b) => b[0] - a[0] || Math.abs(a[1]) - Math.abs(b[1])), inds = outer.filter(isInd).sort((a, b) => Math.abs(a[1]) - Math.abs(b[1]));
+    A(10.2, 'btn', 0, 0, 'low', 1);
+    homes.forEach(([i, j], k) => { const tb = 10.45 + k*.11, n = 1 + (h32('n', i, j) % 3); A(tb, 'home', i, j, 'low'); for (let q = 1; q < n; q++) A(tb + .22*q, 'up', i, j, 'low'); });
+    const tI = 10.45 + homes.length*.11 + .2;
+    A(tI, 'btn', 0, 0, 'ind', 1);
+    inds.forEach(([i, j], k) => { const tb = tI + .25 + k*.12, n = 1 + (h32('n', i, j) % 2); A(tb, 'ind', i, j, 'ind'); if (n > 1) A(tb + .25, 'up', i, j, 'ind'); });
+    // the metro: the cursor starts it at the homes' edge and lays it plot by plot (the camera rides along), to its end station
+    const T_MT = Math.max(13.3, tI + .25 + inds.length*.12 + .5);
+    A(T_MT - .3, 'btn', 0, 0, 'metro', 1);
+    ROUTE.forEach(([i, j], k) => A(T_MT + k*.2, 'mt', i, j, null, 1));
+    A(T_MT + ROUTE.length*.2 + .25, 'mtEnd', ROUTE[ROUTE.length - 1][0], ROUTE[ROUTE.length - 1][1], null, 1);
+    BIG_ACTS.sort((a, b) => a.t - b.t);
+    BIG_INFO.metro = [T_MT, T_MT + ROUTE.length*.2 + .25];
+    BIG_INFO.done = BIG_INFO.metro[1] + .35;
+  }
+  const BIG_COL = { high: '#ff5ad8', wallHigh: '#ff5ad8', low: '#38e8e0', ind: '#ffb84a', metro: '#9fdcff' };
+  let GD_SALT = 1;
+  if (BIG){ const _gu = gardenUpdate; gardenUpdate = function (){   // (each garden plot's rolls from the film's own salt: the same garden every run)
+    for (const c of cells.values()) if (!c.gd && gdGround(c)) c.gd = { s: (h32('gd', GD_SALT, c.i, c.j) % 2147483647) | 0, p: null };
+    return _gu.apply(this, arguments); }; }
+  // the garden's salt: the one (of 300) whose garden grows the most on camera: water, a bridge, a gazebo, and a good mix of pieces
+  function gardenPick(){
+    let best = null;
+    for (let salt = 1; salt <= 300; salt++){
+      GD_SALT = salt; const added = [];
+      try {
+        for (const [i, j] of BIG_INFO.lawns){ if (cellAt(i, j)) continue; const c = newCell(i, j); c.green = 'grass'; c.style = DEFAULT_STYLE; cells.set(ckey(i, j), c); added.push(c); gardenUpdate(); }
+        const P = [...cells.values()].filter(c => c.gd && c.gd.p), w = P.filter(q => q.gd.w).length, kinds = new Set(P.map(q => q.gd.p));
+        const score = (w >= 1 && w <= 3 ? 60 : 0) + (P.some(q => q.gd.w && q.gd.b) ? 40 : 0) + (kinds.has('gazebo') ? 30 : 0) + kinds.size*4;
+        if (!best || score > best.score) best = { salt, score, water: w, kinds: [...kinds].join(' ') };
+      } catch (e){ warn('garden sim', e); break; }
+      finally { for (const c of added) cells.delete(ckey(c.i, c.j)); for (const c of cells.values()) c.gd = null; }
+    }
+    GD_SALT = best ? best.salt : 1; BIG_INFO.garden = best; say('garden:', JSON.stringify(best));
+  }
+  const mtLine = () => metros[metros.length - 1];
+  function bigPoint(a){   // where the cursor points for a click
+    if (a.kind === 'btn') return null;
+    if (a.kind === 'mt' || a.kind === 'mtEnd') return { x: a.i*LOT, y: MT_Y + .2, z: a.j*LOT };
+    const c = cellAt(a.i, a.j);
+    if (a.kind === 'up' && c) return { x: c.x, y: c.height + .05, z: c.z };
+    if ((a.kind === 'wall' || a.kind === 'gate') && c && c.wall) return { x: c.x, y: CURB + 1.2, z: c.z };
+    return { x: a.i*LOT, y: CURB + .3, z: a.j*LOT };
+  }
+  function bigAct(a){
+    if (a.kind === 'btn'){ if (a.z === 'wallHigh' || a.z === 'metro'){ if (S.zone) selectZone(S.zone); } else if (S.zone !== a.z) selectZone(a.z);
+      const b = document.querySelector('.zone[data-zone="' + (a.z === 'wallHigh' ? 'high' : a.z) + '"]'); if (b && a.z !== 'metro'){ aim(labCenterMain(b)); click(BIG_COL[a.z]); } return true; }
+    const seed = h32('big', a.kind, a.i, a.j, a.t);
+    if (a.hand){ const p = bigPoint(a); if (p) aimW(p); }
+    let ok = false;
+    withSeed(seed, () => {
+      if (a.kind === 'lux' || a.kind === 'home' || a.kind === 'ind'){ S.zone = a.z; ok = !!applyTarget({ type: 'empty', i: a.i, j: a.j }); }
+      else if (a.kind === 'up'){ const c = cellAt(a.i, a.j); S.zone = a.z; ok = !!(c && applyTarget({ type: 'up', c })); }
+      else if (a.kind === 'lawn'){ const z0 = S.zone; S.zone = null; const g0 = GREEN_DEFAULT; GREEN_DEFAULT = 'grass'; try { ok = !!applyTarget({ type: 'empty', i: a.i, j: a.j }); } finally { GREEN_DEFAULT = g0; S.zone = z0; } }
+      else if (a.kind === 'wall'){ ok = !!addWall(cellAt(a.i, a.j) || null, a.i, a.j, a.z); }
+      else if (a.kind === 'gate'){ const c = cellAt(a.i, a.j); ok = !!(c && c.wall && toggleGate(c)); }
+      else if (a.kind === 'mt'){ const t = mtTargetAt({ i: a.i, j: a.j }); ok = !!(t && t.ok && mtApply(t)); if (t && !t.ok) warn('metro', a.i + ',' + a.j + ': ' + t.why); }
+      else if (a.kind === 'mtEnd'){ const l = mtLine(); const t = l && mtTargetAt({ kind: 'mtTile', l, k: l.tiles.length - 1 }); ok = !!(t && t.ok && mtApply(t)); if (t && !t.ok) warn('metro end', t.why); }
+    });
+    if (a.hand) click(a.kind === 'mt' || a.kind === 'mtEnd' ? BIG_COL.metro : a.kind === 'lawn' ? '#9cf09a' : BIG_COL[a.z] || '#fff');
+    if (!ok) warn('build', a.kind + ' at ' + a.i + ',' + a.j + ' did nothing');
+    return ok;
+  }
+  const labCenterMain = el => { const r = el.getBoundingClientRect(); return { x: r.left + r.width/2, y: r.top + r.height/2 }; };
+  // the camera through the build: shots on what is being made, then riding along the metro as it is laid, to the resident's plaza
+  const boxIJ = (i0, i1, j0, j1, top) => { const out = [], h = SIDE/2 + .3; for (const i of [i0, i1]) for (const j of [j0, j1]) for (const [a, b] of [[-h, -h], [h, h]]) for (const y of [CURB - .8, top]) out.push({ x: i*LOT + a, y, z: j*LOT + b }); return out; };
+  function bigShots(A0){
+    const Y = t => .62 + .22*t/21;   // (a slow turn through the whole build)
+    const G = GIN, K = [];
+    const key = (t, pts, pd, mg) => K.push({ t, ...fit(pts, Y(t), pd*DEG, mg, .06) });
+    key(0,    boxIJ(G.i0, G.i1, G.j0, G.j1, CURB + 5), 40, 1.75);
+    key(2.9,  boxIJ(G.i0, G.i1, G.j0, G.j1, CURB + 7), 44, 1.45);
+    key(6.3,  boxIJ(G.i0, G.i1, G.j0, G.j1, CURB + 6), 52, 1.3);
+    key(9.6,  boxIJ(G.i0 - 1, G.i1 + 1, G.j0 - 1, G.j1 + 1, CURB + 7), 44, 1.22);
+    key(12.6, boxIJ(G.i0 - 2, G.i1 + 3, G.j0 - 2, G.j1 + 2, CURB + 9), 40, 1.18);
+    // along the metro: a key every second or so, on the plots just laid, looking ahead along the line
+    const [m0, m1] = BIG_INFO.metro, n = ROUTE.length;
+    for (let t = m0 + .4; t < m1 - .2; t += 1.05){
+      const k = Math.min(n - 1, Math.max(0, Math.round((t - m0)/.2))), [i, j] = ROUTE[k], [ni, nj] = ROUTE[Math.min(n - 1, k + 3)];
+      key(t, boxIJ(Math.min(i, ni) - 2, Math.max(i, ni) + 2, Math.min(j, nj) - 2, Math.max(j, nj) + 2, MT_Y + 2), 34, 1.12);
+    }
+    const last = ROUTE[n - 1]; key(m1 + .2, boxIJ(last[0] - 3, last[0] + 3, last[1] - 2, PLAZA.j1 + 1, MT_Y + 2), 36, 1.1);
+    // then the plaza where the resident walks: the clip's own wide shot of the walk (its yaw unwound to sit beside the last one)
+    const A = Object.assign({}, A0), py = K[K.length - 1].yaw; A.yaw = py + wrapA(A.yaw - py); A.t = MK.person; K.push(A);
+    for (const k of K) k.lz = Math.log(k.zoom);
+    return K;
+  }
+  function curveK(K, t, f){
+    if (t <= K[0].t) return K[0][f]; const n = K.length - 1; if (t >= K[n].t) return K[n][f];
+    let k = 0; while (K[k + 1].t < t) k++;
+    const a = K[k], b = K[k + 1], h = b.t - a.t, u = (t - a.t)/h;
+    const slope = q => { if (q <= 0 || q >= n) return 0; const p = K[q - 1], c = K[q], d = K[q + 1]; return ((c[f] - p[f])/(c.t - p.t) + (d[f] - c[f])/(d.t - c.t))/2; };
+    const m0 = slope(k)*h, m1 = slope(k + 1)*h, u2 = u*u, u3 = u2*u;
+    return (2*u3 - 3*u2 + 1)*a[f] + (u3 - 2*u2 + u)*m0 + (-2*u3 + 3*u2)*b[f] + (u3 - u2)*m1;
+  }
+  function bigCam(t, A){
+    const K = PLAN.bigK || (PLAN.bigK = bigShots(A));
+    const z = Math.exp(curveK(K, t, 'lz'));
+    return { x: curveK(K, t, 'x'), y: curveK(K, t, 'y'), z: curveK(K, t, 'z'), yaw: curveK(K, t, 'yaw'), pitch: curveK(K, t, 'pitch'), zoom: z };
   }
 
   /* ---------- Furnish pod: the game's own hologram into their apartment, its time set by the film (the stage's) ---------- */
@@ -840,7 +997,7 @@ const DEMO = (() => {
   }
   // the push in on her starts once the first two buildings are up (the other three go up around it) and runs at one steady speed to her door,
   // only easing in and out over its first and last moments (a trapezoid of speed: ramp r, steady, ramp r)
-  const PUSH = Math.max(...CLICK_T[1]) + .1;
+  const PUSH = CLICK_T[1].length ? Math.max(...CLICK_T[1]) + .1 : 0;
   function glide(t, a, b, r){
     const T = b - a, x = t - a; if (x <= 0) return 0; if (x >= T) return 1;
     r = Math.min(r, T/2); const v = 1/(T - r);
@@ -850,12 +1007,14 @@ const DEMO = (() => {
     const P = PLAN, y0 = P.cam.yaw, p0 = P.cam.pitch;
     const A = P.A || (P.A = fit(P.wide, y0 - .08, p0 + 2*DEG, 1.12, .1));
     const B = P.B || (P.B = fit(P.near, y0 + .06, p0, 1.3, .12));
-    const W = { x: -2*LOT, y: TARGET_Y, z: 0, yaw: y0 + .8, zoom: TALL ? 50 : 32, pitch: 38*DEG };   // (filmed tall: further out, so the city still spreads across)
+    const W = BIG ? { x: -4*LOT, y: TARGET_Y, z: 0, yaw: y0 + .8, zoom: TALL ? 64 : 40, pitch: 38*DEG }   // (the 45 s cut: its city runs further west)
+      : { x: -2*LOT, y: TARGET_Y, z: 0, yaw: y0 + .8, zoom: TALL ? 50 : 32, pitch: 38*DEG };   // (filmed tall: further out, so the city still spreads across)
     const mix = (a, b, u) => ({ x: lerp(a.x, b.x, u), y: lerp(a.y, b.y, u), z: lerp(a.z, b.z, u), yaw: a.yaw + wrapA(b.yaw - a.yaw)*u, zoom: elerp(a.zoom, b.zoom, u), pitch: lerp(a.pitch, b.pitch, u) });
     let c;
     // (wide on all five buildings until the last is up, drifting in a little; then in on the door as she reaches it)
-    if (t < MK.out) c = mix(A, B, glide(t, PUSH, MK.inside, .3));
-    else if (TOD){   // (out over the city in a little over two seconds, then a slow, steady turn: easing in, never stopping, to the end)
+    if (BIG && t < MK.person) c = bigCam(t, A);
+    else if (t < MK.out) c = mix(A, B, glide(t, BIG ? MK.person + .1 : PUSH, MK.inside, .3));
+    else if (RUN){   // (out over the city in a little over two seconds, then a slow, steady turn: easing in, never stopping, to the end)
       c = mix(B, W, ease(seg(t, MK.out, MK.out + 2.4)));
       const u = t - (MK.out + 1.2); c.yaw += u <= 0 ? 0 : u < 1.5 ? .11*u*u/3 : .11*(u - .75);
     }
@@ -879,12 +1038,20 @@ const DEMO = (() => {
   const at = (t, f, name) => EV.push({ t, f, name });
   function timeline(){
     at(0, () => { html.classList.add('dm-zones'); if (!LONG) safe('broadcast', () => BOOTH.broadcast(LOOP_ID, 'rewire')); }, LONG ? 'zones up (no music in the long cut)' : 'zones up, the Booth loop on the Grid (whole)');
-    PLAN.blocks.forEach((b, k) => b.clicks.forEach((ct, n) => {
+    if (BIG){
+      if (!AUTO) BIG_ACTS.forEach((a, n) => {   // (the sound pass builds nothing: only the music is heard)
+        if (a.hand && a.kind !== 'btn'){ const prev = BIG_ACTS.slice(0, n).reverse().find(b => b.hand), gap = prev ? a.t - prev.t : .4;
+          at(a.t - Math.min(.35, gap*.85), () => { const p = bigPoint(a); if (p){ aimW(p); CUR.k = gap < .2 ? 26 : 14; } }, 'aim ' + a.kind + ' ' + a.i + ',' + a.j); }
+        at(a.t, () => bigAct(a), a.kind + ' ' + a.i + ',' + a.j);
+      });
+      at(BIG_INFO.done, () => { safe('hover', () => showHover(null)); if (S.zone) selectZone(null); CUR.want = 0; CUR.k = 13; html.classList.remove('dm-zones'); }, 'build done');
+    }
+    else PLAN.blocks.forEach((b, k) => b.clicks.forEach((ct, n) => {
       if (!AUTO) at(ct - .15, () => aim(toScreen(clickPoint(k, n))), 'aim ' + k + '.' + n);
       at(ct, () => doClick(k, n), 'build ' + k + '.' + n + ' ' + b.zone);
     }));
     const last = Math.max(...CLICK_T.flat());
-    at(last + .25, () => { safe('hover', () => showHover(null)); if (S.zone) selectZone(null); CUR.want = 0; html.classList.remove('dm-zones'); }, 'build done');
+    if (!BIG) at(last + .25, () => { safe('hover', () => showHover(null)); if (S.zone) selectZone(null); CUR.want = 0; html.classList.remove('dm-zones'); }, 'build done');
     if (!AUTO && !NOLAB){
       at(MK.furn, () => { CUR.want = 0; }, 'apartment');
       const R = MK.room;
@@ -955,7 +1122,7 @@ const DEMO = (() => {
     if (D.held) return;
     while (fired < EV.length && EV[fired].t <= t){ const e = EV[fired++]; safe(e.name, e.f); D.log.push(t.toFixed(2) + ' ' + e.name); }
     if (CAP) Math.random = rng(h32('frame', D.frame));
-    S.hour = TOD ? hourAt(t)[0] : HOUR;
+    S.hour = RUN ? hourAt(t)[0] : HOUR;
     safe('time of day', () => todTick(t));
     safe('door', () => doorAt(t));
     if (!AP.exited) safe('lab zoom', () => labZoom(t));
@@ -967,6 +1134,7 @@ const DEMO = (() => {
     const E = D.el;
     CUR.on = follow(CUR.on, CUR.want, 10, dt);
     E.cur.style.opacity = CUR.on.toFixed(3);
+    if (CUR.wp){ const s = toScreen(CUR.wp); CUR.tx = s.x; CUR.ty = s.y; }
     if (CUR.tx !== null){ if (CUR.x === 0 && CUR.y === 0){ CUR.x = CUR.tx + 60; CUR.y = CUR.ty + 70; } const k = CUR.k || 13; CUR.x = follow(CUR.x, CUR.tx, k, dt); CUR.y = follow(CUR.y, CUR.ty, k, dt); }
     const press = 1 - .14*Math.max(0, 1 - Math.abs(t - CUR.pulse)/.06);
     E.cur.style.transform = `translate(${CUR.x.toFixed(1)}px,${CUR.y.toFixed(1)}px) scale(${press.toFixed(3)})`;
@@ -1019,7 +1187,7 @@ const DEMO = (() => {
     await title().catch(e => warn('title', e));
     status('working out the city');
     await until(() => typeof pplReady !== 'undefined' && pplReady && STORY.on, 300).catch(e => warn('people', e));
-    plan(); castUp(); monitorScript(); timeline();
+    plan(); if (BIG) gardenPick(); castUp(); monitorScript(); timeline();
     if (SOFAS && STORY.sp && !STORY.sp.__dm) safe('warm home', () => { const _sp = STORY.sp, pod = PLAN.who.pod;
       STORY.sp = function (p){ const r = _sp.apply(this, arguments); if (!r || !p || p.pod !== pod) return r;
         const tm = r.temper || { outgoing: .25, careful: .5, warm: .5 };

@@ -73,6 +73,25 @@ Times are at the top of `js/demo.js` (`MK`, `CLICK_T`), captions in `CAPS`, the 
 
 Its apartment steps are in `RL` and its times in `MK` at the top of `js/demo.js`; the sofa is `SOFA`.
 
+## The 45 s cut (wide and tall)
+
+`python3 tools/demo/record.py --big --both` makes `out/neon-terrarium-demo-45s.mp4` (1920 x 1080) and `out/neon-terrarium-demo-45s-tall.mp4`
+(1080 x 1620), each filmed natively, plus a `-compressed.mp4` copy of each. Captions on the right (the person cam top left).
+
+| Time | Shot |
+|---|---|
+| 0 to 3 s | Build your cyberpunk city: four Luxury towers, one at each corner of a block, by the cursor |
+| 3.3 to 6.4 s | The garden laid between them, plot by plot (its salt picked before the film for water, a bridge and a gazebo) |
+| 6.6 to 9.9 s | Luxury perimeter walls round the block, and a gate on the east side |
+| 10.2 to 14 s | Homes round the walls, industry at the west end |
+| 14.5 to 20 s | A metro line laid from the homes east across the tall Commercial district (the Neon Dome beside it), round the town square, into a second residential district (a police station); the camera rides along |
+| 21.4 to 24.5 s | The person cam on a resident going in at their door |
+| 24.5 to 34.1 s | Their apartment: the long cut's sofa scene; Exit |
+| 34.5 to 42 s | Out over the city, a slow turn, cutting through morning, overcast, golden hour, rainy dusk and back to night |
+| 42 to 45 s | The title |
+
+The build is `BIG_ACTS` in `js/demo.js`; the city's layout is under `CITY`, `MEGAS` and `ROUTE`.
+
 ## The 30 s cut (wide and tall)
 
 `python3 tools/demo/record.py --tod --both` makes `out/neon-terrarium-demo-30s.mp4` (1920 x 1080) and `out/neon-terrarium-demo-30s-tall.mp4`

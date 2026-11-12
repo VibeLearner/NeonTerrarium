@@ -141,6 +141,9 @@ const DEMO = (() => {
   // (Nov 12) the build happens in a gap left in the middle of the city (the city all round it); the plots on the camera's side of the gap and of
   // the metro (+x, +z: the camera sits that way) are kept low, so neither is hidden
   const HOLE = { i0: -21, i1: -13, j0: -3, j1: 3 };
+  // (Nov 12) the big projected holograms: towers made tall enough and made to throw them (the air-filter ones out over the line, wall ones down a face)
+  const AIR_AT = BIG ? ['-10,-2', '-4,-2', '1,-6', '-11,-6'] : [], WALL_AT = BIG ? ['-9,-3', '-1,-7', '-6,-6', '3,-5', '-3,-11'] : [];
+  if (BIG){ window.AIR_FORCE_SET = new Set(AIR_AT); window.WALL_FORCE_SET = new Set(WALL_AT); }
   const inHole = (i, j) => BIG && i >= HOLE.i0 && i <= HOLE.i1 && j >= HOLE.j0 && j <= HOLE.j1;
   function capAt(i, j){   // the most sections a plot may have here (the 45 s cut), or Infinity
     let cap = Infinity;
@@ -154,7 +157,9 @@ const DEMO = (() => {
   }
   const inPlaza = (i, j) => i >= PLAZA.i0 && i <= PLAZA.i1 && j >= PLAZA.j0 && j <= PLAZA.j1;
   const ringOf = (i, j) => !inPlaza(i, j) && i >= PLAZA.i0 - 1 && i <= PLAZA.i1 + 1 && j >= PLAZA.j0 - 1 && j <= PLAZA.j1 + 1;
-  const MEGAS = BIG ? [['club', -8, -5, 4, 4], ['square', 0, -2, 5, 5], ['police', 10, 4, 3, 3], ['radio', 12, -10, 2, 2], ['market', -10, 5, 4, 4], ['foundry', -29, -9, 6, 4], ['logistics', -28, 4, 6, 6]]
+  const MEGAS = BIG ? [['club', -8, -5, 4, 4], ['square', 0, -2, 5, 5], ['police', 10, 4, 3, 3], ['radio', 12, -10, 2, 2], ['foundry', -29, -9, 6, 4], ['logistics', -28, 4, 6, 6],
+      // (Nov 12: the Commercial district broken up: a foundry, the bath house, the hydroponic farm and the data spire among the towers)
+      ['foundry', -10, -10, 6, 4], ['bathhouse', -7, 3, 3, 3], ['greenhouse', 1, -10, 5, 4], ['spire', -4, -9, 3, 3]]
     : [['radio', 3, -1, 2, 2], ['square', -12, -6, 5, 5], ['foundry', -15, 3, 6, 4], ['greenhouse', -14, 7, 5, 4], ['logistics', -8, 6, 6, 6],
     ['market', -2, -11, 4, 4], ['club', 4, -10, 4, 4], ['spire', 7, -4, 3, 3], ['square', 7, 1, 5, 5], ['pagoda', 4, 7, 5, 4], ['bathhouse', 0, 7, 3, 3], ['emitter', -9, -11, 2, 2]];
   const LAWNS = BIG ? [[-6, 9], [-5, 9]] : [[-8, -2], [-8, -1], [-9, -2], [1, 9], [-11, 1], [-10, 1], [9, 9]];
@@ -193,12 +198,16 @@ const DEMO = (() => {
       let k = ringOf(i, j) ? (v < .6 ? 1 : 2) : z === 'ind' ? (v < .5 ? 1 : 2) : v < .25 ? 1 : v < .62 ? 2 : v < .9 ? 3 : 4;
       if (BIG){
         if (onRoute(i, j)){ if (v < .45) continue; k = 1; }   // (under the metro: short or open)
+        else if (AIR_AT.includes(i + ',' + j)) k = 7;
+        else if (WALL_AT.includes(i + ',' + j)) k = 3 + (v*3 | 0);
         else if (i >= -10 && i <= -1) k = z === 'mid' || z === 'high' ? 3 + (v*4 | 0) : k;   // (the Commercial district: tall)
         else if (i >= 5) k = ringOf(i, j) ? (v < .45 ? 1 : 2) : 2 + (v < .55 ? 0 : 1);   // (the second residential district: cramped, every plot built, two or three high; a little lower right round the resident's, so the walk can be seen)
         else k = Math.min(k, 3);
         k = Math.min(k, capAt(i, j));
       }
-      c.sections = secs(z, Math.min(MAX_SECTIONS, k));
+      // (the 45 s cut: industry lines the metro, its red against the line; the hologram towers are Commercial)
+      const zz = !BIG ? z : AIR_AT.includes(i + ',' + j) || WALL_AT.includes(i + ',' + j) ? 'mid' : (onRoute(i, j) || capAt(i, j) === 1) && !inPlaza(i, j) && !ringOf(i, j) ? 'ind' : z;
+      c.sections = secs(zz, Math.min(MAX_SECTIONS, k));
     }
     let sq = 0;
     for (const [kind, i, j, w, h] of MEGAS){ const m = placeMega(kind, i, j, Math.floor(R()*1e9), w, h, 1); if (!m){ warn('megastructure ' + kind, 'did not fit'); continue; }
@@ -545,14 +554,15 @@ const DEMO = (() => {
   const BIG_INFO = {};
   if (BIG){
     const A = (t, kind, i, j, z, hand) => BIG_ACTS.push({ t, kind, i, j, z, hand: !!hand });
-    const LUX = [[GIN.i0, GIN.j0], [GIN.i1, GIN.j1], [GIN.i1, GIN.j0], [GIN.i0, GIN.j1]];
+    // (Nov 12) eight Luxury towers in a loose, uneven ring, the garden winding through the middle (one section each, never stacked)
+    const LUX = [[GIN.i0, GIN.j0], [GIN.i0 + 3, GIN.j0], [GIN.i1, GIN.j0], [GIN.i1, GIN.j0 + 1], [GIN.i1, GIN.j1], [GIN.i0 + 1, GIN.j1], [GIN.i0, GIN.j1], [GIN.i0, GIN.j0 + 1]];
     A(.45, 'btn', 0, 0, 'high', 1);
-    LUX.forEach(([i, j], k) => { A(.95 + k*.55, 'lux', i, j, 'high', 1); });   // (Luxury: one section each, never stacked)
+    LUX.forEach(([i, j], k) => { A(.9 + k*.32, 'lux', i, j, 'high', 1); });   // (Luxury: one section each, never stacked)
     // the garden: every other plot of the block, laid from the middle out
     const lawns = []; for (let i = GIN.i0; i <= GIN.i1; i++) for (let j = GIN.j0; j <= GIN.j1; j++) if (!LUX.some(([a, b]) => a === i && b === j)) lawns.push([i, j]);
     const mid = [(GIN.i0 + GIN.i1)/2, (GIN.j0 + GIN.j1)/2]; lawns.sort((a, b) => Math.hypot(a[0] - mid[0], a[1] - mid[1]) - Math.hypot(b[0] - mid[0], b[1] - mid[1]));
     BIG_INFO.lawns = lawns;
-    lawns.forEach(([i, j], k) => A(3.35 + k*.28, 'lawn', i, j, null, 1));
+    lawns.forEach(([i, j], k) => A(3.6 + k*.38, 'lawn', i, j, null, 1));
     // Luxury perimeter walls round the block, the cursor running round the ring; a gate on the side the metro leaves from
     const ring = []; const W0 = { i0: GIN.i0 - 1, i1: GIN.i1 + 1, j0: GIN.j0 - 1, j1: GIN.j1 + 1 };
     for (let i = W0.i0; i <= W0.i1; i++) ring.push([i, W0.j0]); for (let j = W0.j0 + 1; j <= W0.j1; j++) ring.push([W0.i1, j]);

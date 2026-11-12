@@ -80,11 +80,11 @@ Its apartment steps are in `RL` and its times in `MK` at the top of `js/demo.js`
 
 | Time | Shot |
 |---|---|
-| 0 to 3 s | Build your cyberpunk city: on a patch of bare, empty plots in the middle of the city, four Luxury towers, one at each corner of a block, by the cursor |
+| 0 to 3 s | Build your cyberpunk city: on a patch of bare, empty plots in the middle of the city, eight Luxury towers in a loose ring, by the cursor |
 | 3.3 to 6.4 s | The garden laid between them, plot by plot (its salt picked before the film for water, a bridge and a gazebo) |
 | 6.6 to 9.9 s | Luxury perimeter walls round the block, and a gate on the east side |
 | 10.2 to 14 s | Homes round the walls, industry at the west end |
-| 14.5 to 20 s | A metro line laid from the homes east across the tall Commercial district (the Neon Dome beside it), round the town square, into a second residential district (a police station); the camera rides along |
+| 14.5 to 20 s | A metro line laid from the homes east, lined with Industrial buildings, across the tall Commercial district (its big projected holograms, the Neon Dome, a foundry, the bath house, the hydroponic farm and the data spire), round the town square, into a second residential district (a police station); the camera rides along |
 | 21.4 to 24.5 s | The person cam on a resident going in at their door |
 | 24.5 to 34.1 s | Their apartment: the long cut's sofa scene; Exit |
 | 34.5 to 42 s | Out over the city, a slow turn, cutting through morning, overcast, golden hour, rainy dusk and back to night |

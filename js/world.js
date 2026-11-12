@@ -1707,8 +1707,8 @@ function rooftopBoard(c, y){
   // A building has the wall hologram or the air-filter one, never both: the plots that get the wall hologram are
   // picked first, and the air-filter tower is picked from the others. Both picks come from the plot alone, so
   // stacking never swaps one for the other.
-  const key = c.i + ',' + c.j, wallPick = window.WALL_FORCE === key || hash('wallholo', c.i, c.j) % WALL_HOLO_ODDS === 0;
-  const airPick = window.AIR_FORCE === key || (!wallPick && hash('airholo', c.i, c.j) % AIR_HOLO_ODDS === 0);
+  const key = c.i + ',' + c.j, forced = s => !!(s && s.has && s.has(key)), wallPick = window.WALL_FORCE === key || forced(window.WALL_FORCE_SET) || hash('wallholo', c.i, c.j) % WALL_HOLO_ODDS === 0;   // (*_FORCE_SET: a set of plots, for a film: js/demo.js)
+  const airPick = window.AIR_FORCE === key || forced(window.AIR_FORCE_SET) || (!wallPick && hash('airholo', c.i, c.j) % AIR_HOLO_ODDS === 0);
   const hw = hash('wallside', c.i, c.j), wsd = SIDES4[hw & 3], wallOn = mid && y >= WALL_HOLO_MIN_Y && wallPick && !airPick;
   // one commercial building in WALL_HOLO_ODDS (and not an air-filter tower), tall enough, wears a hologram ad down one
   // face, as wide as the building, never out past its plot, from just under the roofline to the top of the ground floor
@@ -1725,7 +1725,7 @@ function rooftopBoard(c, y){
     const ha = hash('airside', c.i, c.j), W = 3*LOT - .8, pair = (ha >>> 10) % 3, H = W*AIR_ASPECT[pair], yp = y - .6;
     const front = ([a, b]) => { let m = 0; for (let l = -1; l <= 1; l++){ const n = cells.get(ckey(c.i + a + (a ? 0 : l), c.j + b + (b ? 0 : l))); if (n) m = Math.max(m, n.height); } return m; };
     const sd = SIDES4.map((d, k) => [d, front(d) + ((ha >>> k*2) & 3)*.01]).sort((p, q) => p[1] - q[1])[0];
-    if (sd[1] <= yp - H/2 - .3 || window.AIR_FORCE === c.i + ',' + c.j){
+    if (sd[1] <= yp - H/2 - .3 || window.AIR_FORCE === c.i + ',' + c.j || forced(window.AIR_FORCE_SET)){
       const d = sd[0];
       airHologram(T(c.x + d[0]*1.12, yp, c.z + d[1]*1.12, Math.atan2(d[0], d[1])), W, H, 3.2, (ha >>> 4) % 50, window.AIR_PAIR !== undefined ? window.AIR_PAIR : pair);
     }

@@ -73,7 +73,7 @@ const DEMO = (() => {
     : { grp: .9, tab: 1.8, scroll: 2.1, scrollDur: .65, tile: 3.3, aim: 3.65, place: 5.1, toClose: 5.6, close: 5.9, zFrom: 6.1, zTo: 7.5, swatch: 8.3, color: 9.4,
     letGo: 10.4, zBack0: 10.8, zBack1: 12.1, toWork: 12.6, work: 13.0, lead: .4 };
   // [from, to, text, where]: top left over the city, top right in the apartment (its own panels are on the left)
-  const CAPS = LONG ? [] : TOD ? [[.3, 2.2, 'Light up the night, tower by tower', 'tr'], [2.5, 5.25, 'Every window has a story', 'tr'], [6.9, 15.9, 'Make any home your own', 'tr'], [19.8, 26.7, 'Any hour, any weather', 'tr']]
+  const CAPS = LONG ? [] : TOD ? [[.3, 2.2, 'Light up the night, tower by tower', 'tr'], [2.5, 5.25, 'Every window has a story', 'tr'], [6.9, 15.9, 'Make any home your own', 'tr']]
     : MID ? [[.3, 1.6, 'Light up the night, tower by tower', 'tr'], [1.85, 4.95, 'Every window has a story', 'tr'], [6.5, 13.6, 'Make any home your own', 'tr']]
     : [[.3, 1.6, 'Light up the night, tower by tower', 'tl'], [1.85, 4.95, 'Every window has a story', 'tl'], [6.6, 10.4, 'Make any home your own', 'tr']];
   // the five buildings, in the order they go up; the first is a tenement (it has the apartment). Each block's clicks: a new building, then a floor each

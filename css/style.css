@@ -843,3 +843,8 @@ html:not(.touch) .pctip:not([hidden]){display:block;position:fixed;left:50%;top:
   border:1px solid #ffb347;box-shadow:0 0 10px rgba(255,179,71,.35);cursor:pointer}
 .pcrestore:hover{background:rgba(60,38,8,.95);color:#fff}
 .pcrestore[hidden]{display:none}
+
+/* No text selection anywhere in the game: dragging to pan or lay track used to highlight the labels, tips and panels it passed over (owner, Nov 9).
+   Places a player types or copies from keep it: text fields, editable text, and anything marked .selectable. */
+html, body{-webkit-user-select:none;user-select:none}
+input, textarea, select, [contenteditable]:not([contenteditable="false"]), .selectable, .selectable *{-webkit-user-select:text;user-select:text}

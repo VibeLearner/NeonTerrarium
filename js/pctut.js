@@ -63,6 +63,10 @@ const PCTUT = (() => {
   const wallPlots = () => { let n = 0; for (const c of cells.values()) if (c.wall && !c.mega) n++; return n; }, tiers = () => { let n = 0; for (const c of cells.values()) if (c.wall && !c.mega) n += c.wall.n || 0; return n; };
   const gates = () => { let n = 0; for (const c of cells.values()) if (c.wall && c.wall.gate) n++; return n; };
   const MAIN = { key: KEY, st, name: 'OPERATOR NOTE', end: 'Tutorial complete. Keep building: more buildings and megastructures unlock as your city grows. All controls are under Hover for controls. To replay this tutorial, open Game Settings and scroll down.', beats: [
+    // (first, owner Nov 9: moving round the city. Done once a pan key has been pressed and the view has moved)
+    { id: 'pan', say: 'Use W, A, S, D or the arrow keys to move around the city.', ghost: 'drag',
+      arm: () => { const x = camGoal.x, z = camGoal.z; let k = false; const f = e => { if (PAN_KEYS.includes((e.key || '').toLowerCase())) k = true; }; addEventListener('keydown', f);
+        return () => { const d = k && Math.hypot(camGoal.x - x, camGoal.z - z) > .8; if (d) removeEventListener('keydown', f); return d; }; } },
     { id: 'zoom', say: 'Scroll the mouse wheel to zoom in and out (or press + and \u2212).', ghost: 'up', arm: () => { const z = zoomT; return () => Math.abs(zoomT - z) > .3; } },
     { id: 'tile', say: 'Click the sky beside the platform to add a tile.', ghost: 'tap', arm: () => { let ok = false; const f = () => { ok = true; }; addEventListener('nt:tile', f, { once: true }); return () => ok; } },
     // (a click on an empty tile cycles its surface only with no zone picked: with one picked it builds, so the beat is passed over)

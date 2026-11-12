@@ -1006,7 +1006,14 @@ if (!self.IN_RECIPE_WORKER && typeof canvas !== 'undefined' && canvas.addEventLi
 //  - Only what stands within two plots of a pond is drawn in it (owner Nov 6: the whole view near the ponds cost too much): gdMirFilter.
 const GD_MIR_Y = GD_WATER_Y + .003;
 const GD_MIR = { rt: null, cam: null, on: false, M: { value: new THREE.Matrix4() }, tex: { value: null }, use: { value: 0 }, res: { value: new THREE.Vector2(1, 1) }, scr: { value: new THREE.Vector2(1, 1) } };
-const gdMirWanted = () => !self.IN_RECIPE_WORKER && !(typeof TOUCH !== 'undefined' && TOUCH.on) && typeof renderer !== 'undefined' && renderer.capabilities.isWebGL2 && !window.__NO_POND_MIRROR;
+// The quality (owner Nov 9, a setting in the graphics presets: playerui.js): 0 off (the composite's reflections, as on a touch screen), 1 low (a third
+// of the frame's size each way, only what stands within a plot of a pond, drawn again every third frame while the view holds still), 2 medium (half
+// size, two plots, every other frame while still), 3 high (half size, two plots, every frame: as it was). While the view moves it's drawn every frame,
+// except at low, every other frame (a frame behind in a turn doesn't show; the owner's turns spent 3 to 6 ms a frame on it, Nov 9), and at once after
+// an edit at any level, so the reflection never lags the city.
+GD_MIR.q = 2; GD_MIR.at = -1e9; GD_MIR.view = new Float64Array(32); GD_MIR.edits = -1; GD_MIR.ok = false;
+const GD_MIR_Q = [null, { div: 3, rad: 1, every: 3, moving: 2 }, { div: 2, rad: 2, every: 2, moving: 1 }, { div: 2, rad: 2, every: 1, moving: 1 }];
+const gdMirWanted = () => !self.IN_RECIPE_WORKER && !(typeof TOUCH !== 'undefined' && TOUCH.on) && typeof renderer !== 'undefined' && renderer.capabilities.isWebGL2 && !window.__NO_POND_MIRROR && GD_MIR.q > 0;
 const _gmV = new THREE.Vector3(), _gmT = new THREE.Vector3(), _gmU = new THREE.Vector3(), _gmN = new THREE.Vector3(0, 1, 0), _gm4 = new THREE.Vector4(), _gmQ = new THREE.Vector4();
 const _gmP = new THREE.Matrix4(), _gmI = new THREE.Matrix4(), _gmS = new THREE.Matrix4(), _gmB = new THREE.Matrix4().set(.5, 0, 0, .5, 0, .5, 0, .5, 0, 0, .5, .5, 0, 0, 0, 1);
 const _gmCol = new THREE.Color();
@@ -1063,13 +1070,14 @@ function gdMirRootNear(o){
 const gdStill = o => o.matrixAutoUpdate === false;
 function gdMirFilter(){
   const F = GD_MIRF, wc = GD_FX.wcells;
-  const key = (typeof SC_EDITS !== 'undefined' ? SC_EDITS : 0) + '|' + world.children.length + '|' + (world.children.length ? world.children[world.children.length - 1].id : 0) + '|' + wc.length + '|' + (wc.length ? wc[0].i + ',' + wc[0].j + ',' + wc[wc.length - 1].i + ',' + wc[wc.length - 1].j : '');
+  const key = (typeof SC_EDITS !== 'undefined' ? SC_EDITS : 0) + '|' + world.children.length + '|' + (world.children.length ? world.children[world.children.length - 1].id : 0) + '|' + wc.length + '|' + (wc.length ? wc[0].i + ',' + wc[0].j + ',' + wc[wc.length - 1].i + ',' + wc[wc.length - 1].j : '') + '|' + GD_MIR.q;
   if (key !== F.key){
     F.key = key; F.far.length = 0; F.deep.length = 0;
     let i0 = 1e9, j0 = 1e9, i1 = -1e9, j1 = -1e9;
-    for (const c of wc){ i0 = Math.min(i0, c.i - 2); i1 = Math.max(i1, c.i + 2); j0 = Math.min(j0, c.j - 2); j1 = Math.max(j1, c.j + 2); }
+    const R = (GD_MIR_Q[GD_MIR.q] || GD_MIR_Q[3]).rad;   // (how far from a pond things are drawn in it: the quality's)
+    for (const c of wc){ i0 = Math.min(i0, c.i - R); i1 = Math.max(i1, c.i + R); j0 = Math.min(j0, c.j - R); j1 = Math.max(j1, c.j + R); }
     F.i0 = i0; F.j0 = j0; F.w = i1 - i0 + 1; F.h = j1 - j0 + 1; F.g = new Uint8Array(F.w*F.h);
-    for (const c of wc) for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) F.g[(c.j + b - j0)*F.w + (c.i + a - i0)] = 1;
+    for (const c of wc) for (let a = -R; a <= R; a++) for (let b = -R; b <= R; b++) F.g[(c.j + b - j0)*F.w + (c.i + a - i0)] = 1;
     // the still things, part by part (a merged block's meshes each cover the block anyway), and the moving groups inside them
     scene.updateMatrixWorld();
     const walk = o => {
@@ -1091,10 +1099,20 @@ function gdMirFilter(){
   return hid;
 }
 function gardenMirror(){
-  GD_MIR.on = false; GD_MIR.use.value = 0;
-  if (!gdMirWanted() || !GD_FX.water || !GD_FX.wcells || !GD_FX.wcells.length) return;
-  // (at half the frame's size each way, a quarter of the pixels, read back smoothed: owner Nov 6. window.__POND_MIRROR_FULL: the frame's own size, to compare)
-  const full = !!window.__POND_MIRROR_FULL, w = full ? W : Math.ceil(W/2), h = full ? H : Math.ceil(H/2);
+  if (!gdMirWanted() || !GD_FX.water || !GD_FX.wcells || !GD_FX.wcells.length){ GD_MIR.on = false; GD_MIR.use.value = 0; GD_MIR.ok = false; return; }
+  const Q = GD_MIR_Q[GD_MIR.q] || GD_MIR_Q[3];
+  // (at half the frame's size each way, a quarter of the pixels, read back smoothed: owner Nov 6; a third at the low quality. window.__POND_MIRROR_FULL: the frame's own size, to compare)
+  const full = !!window.__POND_MIRROR_FULL, w = full ? W : Math.ceil(W/Q.div), h = full ? H : Math.ceil(H/Q.div);
+  // the last picture kept, while the view hasn't moved, the city hasn't changed and it isn't yet its turn to be drawn again (the people, cars and
+  // plants round the ponds move on in it a frame or two late: at the quality's rate)
+  { cam.updateMatrixWorld(); const v = GD_MIR.view, a = cam.matrixWorld.elements, p = cam.projectionMatrix.elements; let still = true, now = !GD_MIR.ok;
+    for (let k = 0; k < 16; k++){ if (v[k] !== a[k] || v[16 + k] !== p[k]) still = false; v[k] = a[k]; v[16 + k] = p[k]; }
+    const ed = typeof SC_EDITS !== 'undefined' ? SC_EDITS : 0; if (ed !== GD_MIR.edits) now = true; GD_MIR.edits = ed;   // (an edit: drawn at once)
+    if (GD_MIR.rt && (GD_MIR.rt.width !== w || GD_MIR.rt.height !== h)) now = true;
+    const f = typeof PM !== 'undefined' ? PM.frame : 0;
+    if (!now && f - GD_MIR.at < (still ? Q.every : Q.moving)) return;   // (GD_MIR.on and use kept: the water reads the last picture)
+    GD_MIR.at = f; }
+  GD_MIR.on = false; GD_MIR.use.value = 0; GD_MIR.ok = false;
   if (!GD_MIR.rt || GD_MIR.rt.width !== w || GD_MIR.rt.height !== h){
     if (GD_MIR.rt) GD_MIR.rt.dispose();
     const f = full ? THREE.NearestFilter : THREE.LinearFilter;
@@ -1128,7 +1146,7 @@ function gardenMirror(){
     const u = (_gm4.x/_gm4.w*.5 + .5)*w, v = (_gm4.y/_gm4.w*.5 + .5)*h;
     x0 = Math.min(x0, u); x1 = Math.max(x1, u); y0 = Math.min(y0, v); y1 = Math.max(y1, v); }
   const px0 = Math.max(0, Math.floor(x0) - 2), py0 = Math.max(0, Math.floor(y0) - 2), px1 = Math.min(w, Math.ceil(x1) + 2), py1 = Math.min(h, Math.ceil(y1) + 2);
-  if (px1 - px0 < 2 || py1 - py0 < 2) return;   // (no pond on screen)
+  if (px1 - px0 < 2 || py1 - py0 < 2) return;   // (no pond on screen: GD_MIR.ok stays false, so it's drawn as soon as one is)
   GD_MIR.M.value.multiplyMatrices(_gmB, VPm);   // (a point in the world to where it is in the mirrored picture, 0 to 1)
   // the camera's view cut down to that rectangle (the rest is never drawn)
   const nx0 = px0/w*2 - 1, nx1 = px1/w*2 - 1, ny0 = py0/h*2 - 1, ny1 = py1/h*2 - 1;
@@ -1148,7 +1166,7 @@ function gardenMirror(){
     renderer.setRenderTarget(rt); renderer.setClearColor(0x000000, 0); renderer.autoClear = false; renderer.clear(true, true, false);
     if (typeof CUT_UNDER !== 'undefined') CUT_UNDER = true;   // (the buildings' undersides too: world.js cutBefore)
     renderer.render(scene, vc);
-    GD_MIR.on = true; GD_MIR.use.value = 1;
+    GD_MIR.on = true; GD_MIR.use.value = 1; GD_MIR.ok = true;
   } finally {
     if (typeof CUT_UNDER !== 'undefined') CUT_UNDER = false;
     for (const o of hid) o.visible = true; hid.length = 0;

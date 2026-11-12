@@ -16,7 +16,7 @@
 // Nothing is saved and none of the player's own city or settings are read (saveguard.js, NT_DEMO).
 'use strict';
 const DEMO = (() => {
-  const D = { on: !!window.NT_DEMO && !/[#&]pg\b/.test(location.hash), ready: false, playing: false, done: false, held: false, t: 0, frame: 0, drawn: 0, log: [], info: {}, failed: null, len: window.__DM_LONG ? 29 : window.__DM_MID ? 19 : 15 };
+  const D = { on: !!window.NT_DEMO && !/[#&]pg\b/.test(location.hash), ready: false, playing: false, done: false, held: false, t: 0, frame: 0, drawn: 0, log: [], info: {}, failed: null, len: window.__DM_LONG ? 29 : window.__DM_TOD ? 30 : window.__DM_MID ? 19 : 15 };
   if (!D.on) return D;
   const CAP = !!window.__TR_CAPTURE;   // the picture pass: the recorder steps the clock and films each frame
   const AUTO = !!window.__DM_AUDIO;    // the sound pass: real time, nothing drawn, only what makes a sound
@@ -26,7 +26,10 @@ const DEMO = (() => {
   // the 19 s cut (tools/demo/record.py --mid, Nov 7): the long cut's pictures (its sofa scene in the apartment, the warm lamps, the work light off),
   // at a quicker pace, with captions (all on the right: the person cam moves to the left for it) and the Booth loop
   const MID = !LONG && !!window.__DM_MID;
-  const SOFAS = LONG || MID;   // (the long cut's apartment: the sofa scene, not the bonsai)
+  // the 30 s cut (tools/demo/record.py --tod, Nov 12): two homes go up, the person cam on their resident going in, the long cut's apartment scene,
+  // then out over the city turning slowly while it cuts through times of day and weather (TOD_JUMPS), back to night for the title. No captions
+  const TOD = !LONG && !MID && !!window.__DM_TOD;
+  const SOFAS = LONG || MID || TOD;   // (the long cut's apartment: the sofa scene, not the bonsai)
   const TALL = innerHeight > innerWidth;   // (filmed tall: 1080 x 1620, record.py --tall)
   const NOLAB = !!window.__DM_NOLAB;   // (checking only, never in a recording: the apartment left out, tools/demo/record.py --test --nolab)
   const say = (...a) => { D.log.push(a.join(' ')); if (D.log.length > 500) D.log.shift(); console.log('[demo]', ...a); };
@@ -53,6 +56,7 @@ const DEMO = (() => {
 
   /* ---------- the plan ---------- */
   const MK = LONG ? { person: 2.1, walk: 2.1, arrive: 6.0, inside: 6.5, furn: 6.5, room: 7.6, exit: 22.6, out: 23.05, title: 25.2 }
+           : TOD ? { person: 2.3, walk: 2.3, arrive: 4.9, inside: 5.35, furn: 5.35, room: 6.4, exit: 16.6, out: 17.05, title: 27.3 }
            : MID ? { person: 1.6, walk: 1.6, arrive: 4.55, inside: 5.0, furn: 5.0, room: 6.05, exit: 14.6, out: 15.05, title: 16.9 }
                   : { person: 1.6, walk: 1.6, arrive: 4.55, inside: 5.0, furn: 5.0, room: 6.05, exit: 10.6, out: 11.05, title: 13.2 };
   // the apartment's steps, in seconds after the room is ready (R). The 15 s clip: [Plants, bonsai tile, over the table, set down, to close, close,
@@ -60,20 +64,34 @@ const DEMO = (() => {
   const RS = [.3, .9, 1.35, 1.65, 2.0, 2.25, 2.3, 3.1, 2.7, 3.1, 3.45];
   // the long cut: the sofa back in, in another color, then back to the furnisher's own; the view in and out again; the work light off
   // (each pick: the cursor goes to it, rests a moment, then presses)
-  const RL = MID
+  const RL = TOD
+    ? { grp: .65, tab: 1.3, scroll: 1.5, scrollDur: .5, tile: 2.4, aim: 2.7, place: 3.7, toClose: 4.05, close: 4.25, zFrom: 4.4, zTo: 5.4, swatch: 6.0, color: 6.75,
+        letGo: 7.5, zBack0: 7.8, zBack1: 8.7, toWork: 9.05, work: 9.35, lead: .35 }   // (the 30 s cut: the long cut's steps, a little quicker)
+    : MID
     ? { grp: .5, tab: 1.05, scroll: 1.25, scrollDur: .45, tile: 1.95, aim: 2.25, place: 3.15, toClose: 3.45, close: 3.65, zFrom: 3.8, zTo: 4.65, swatch: 5.05, color: 5.7,
         letGo: 6.2, zBack0: 6.4, zBack1: 7.15, toWork: 7.4, work: 7.7, lead: .3 }   // (the 19 s cut: the same steps, quicker)
     : { grp: .9, tab: 1.8, scroll: 2.1, scrollDur: .65, tile: 3.3, aim: 3.65, place: 5.1, toClose: 5.6, close: 5.9, zFrom: 6.1, zTo: 7.5, swatch: 8.3, color: 9.4,
     letGo: 10.4, zBack0: 10.8, zBack1: 12.1, toWork: 12.6, work: 13.0, lead: .4 };
   // [from, to, text, where]: top left over the city, top right in the apartment (its own panels are on the left)
-  const CAPS = LONG ? [] : MID ? [[.3, 1.6, 'Light up the night, tower by tower', 'tr'], [1.85, 4.95, 'Every window has a story', 'tr'], [6.5, 13.6, 'Make any home your own', 'tr']]
+  const CAPS = LONG || TOD ? [] : MID ? [[.3, 1.6, 'Light up the night, tower by tower', 'tr'], [1.85, 4.95, 'Every window has a story', 'tr'], [6.5, 13.6, 'Make any home your own', 'tr']]
     : [[.3, 1.6, 'Light up the night, tower by tower', 'tl'], [1.85, 4.95, 'Every window has a story', 'tl'], [6.6, 10.4, 'Make any home your own', 'tr']];
   // the five buildings, in the order they go up; the first is a tenement (it has the apartment). Each block's clicks: a new building, then a floor each
-  const BLOCKS = ['low', 'mid', 'high', 'ind', 'low'];
-  const CLICK_T = LONG && !MID ? [[.5, .95], [1.5, 1.9], [2.8, 3.25], [3.9], [4.6, 5.05]] : [[.4, .75], [1.1, 1.4], [2.1, 2.45], [2.95], [3.45, 3.8]];
+  const BLOCKS = TOD ? ['low', 'low', 'low', 'low', 'low'] : ['low', 'mid', 'high', 'ind', 'low'];   // (the 30 s cut: only the first two are built)
+  const CLICK_T = TOD ? [[.5, .95, 1.4], [1.85, 2.25], [], [], []] : LONG && !MID ? [[.5, .95], [1.5, 1.9], [2.8, 3.25], [3.9], [4.6, 5.05]] : [[.4, .75], [1.1, 1.4], [2.1, 2.45], [2.95], [3.45, 3.8]];
   // the Booth loop on the Grid from the first frame: 4 bars at 100 BPM (9.6 s a pass), a melody on the magic keys (pads 0 to 11, always in the
   // chord), its first bar missing two notes; the pass that starts at about 9.7 s is the first with them
   const LOOP_ID = window.DEMO_LOOP.id, MISSING = window.DEMO_LOOP.missing;   // (the loop itself: js/demo_loop.js, read by booth.js before this file loads)
+
+  // the 30 s cut's run through the day: [time, hour, weather]. Each a cut (with a quick flash) while the camera turns; it starts and ends at night
+  const TOD_JUMPS = [[19.6, 8.2, 'clear'], [21.1, 13.4, 'overcast'], [22.6, 17.2, 'clear'], [24.1, 19.1, 'rain'], [25.6, 23.4, 'rain'], [27.0, 20.6, 'clear']];
+  const hourAt = t => { let h = 20.6, w = 'clear'; if (TOD) for (const [a, hh, ww] of TOD_JUMPS) if (t >= a){ h = hh; w = ww; } return [h, w]; };
+  let todK = -1;
+  function todTick(t){   // (the weather and the building lights snapped to the hour at each jump, not faded)
+    if (!TOD) return;
+    let k = -1; TOD_JUMPS.forEach(([a], n) => { if (t >= a) k = n; });
+    if (k !== todK){ todK = k; const w = hourAt(t)[1]; safe('weather', () => LK.setWeather(w, true, true)); D.flash = t; }
+    if (k >= 0) LIGHTS_ON.value = LIGHTS_GOAL;
+  }
 
   /* ---------- the game, switched off: nothing acts unless the script says so (the stage's) ---------- */
   maybeSpawnMegas = () => {};
@@ -261,7 +279,7 @@ const DEMO = (() => {
     // what the main camera frames: all five buildings (to their finished height) and the walk; then closer, the first building and its door
     const box = (b, top) => { const h = SIDE/2, out = []; for (const [a, c] of [[-h, -h], [h, -h], [-h, h], [h, h]]) for (const y of [CURB, top]) out.push({ x: b.i*LOT + a, y, z: b.j*LOT + c }); return out; };
     const walkPts = pts.map(q => ({ x: q.x, y: CURB + .8, z: q.z })).concat(pts.map(q => ({ x: q.x, y: CURB, z: q.z })));
-    PLAN.wide = PLAN.blocks.flatMap((b, k) => box(b, PLAN.tops[k])).concat(walkPts);
+    PLAN.wide = PLAN.blocks.flatMap((b, k) => b.clicks.length ? box(b, PLAN.tops[k]) : []).concat(walkPts);   // (only the plots that get built)
     PLAN.near = box(PLAN.blocks[0], PLAN.tops[0]).concat(walkPts);
     // 6. a few people out on the plaza in front of the buildings, crossing it (looks taken from the city's residents)
     PLAN.extras = [];
@@ -315,6 +333,7 @@ const DEMO = (() => {
       #dmOv.ask{pointer-events:auto}
       #dmOv > .fill{position:absolute;inset:0;opacity:0}
       #dmBlack{background:#04050b}
+      #dmFlash{background:#eafcff;mix-blend-mode:screen}
       #dmShade{background:radial-gradient(ellipse 70% 60% at 50% 50%,rgba(6,7,16,.28),rgba(6,7,16,.78))}
       #dmSel{position:absolute;left:0;top:0;width:0;height:0;display:none}
       #dmSel b{position:absolute;width:22px;height:22px;border:3px solid #38e8e0;filter:drop-shadow(0 0 6px rgba(56,232,224,.9))}
@@ -353,11 +372,11 @@ const DEMO = (() => {
       + '<div id="dmCap"><b></b><i></i></div>'
       + '<div id="dmTag"><u></u><span>All footage captured in engine</span></div>'
       + '<svg id="dmCur" viewBox="0 0 30 30" aria-hidden="true"><path d="M4 3 L4 24 L9.6 18.8 L13.4 27.2 L17.2 25.5 L13.5 17.3 L21 17.3 Z" fill="#f4fbff" stroke="#0a0c16" stroke-width="1.6" stroke-linejoin="round"/></svg>'
-      + '<i id="dmRing"></i><i class="fill" id="dmBlack"></i>'
+      + '<i id="dmRing"></i><i class="fill" id="dmFlash"></i><i class="fill" id="dmBlack"></i>'
       + '<div id="dmMsg"><b>Demo clip</b><span id="dmStatus">building the city</span></div>';
     document.body.appendChild(ov);
     const q = s => ov.querySelector(s);
-    D.el = { ov, black: q('#dmBlack'), shade: q('#dmShade'), sel: q('#dmSel'), cur: q('#dmCur'), ring: q('#dmRing'), cap: q('#dmCap'), capT: q('#dmCap b'), capL: q('#dmCap i'),
+    D.el = { ov, flash: q('#dmFlash'), black: q('#dmBlack'), shade: q('#dmShade'), sel: q('#dmSel'), cur: q('#dmCur'), ring: q('#dmRing'), cap: q('#dmCap'), capT: q('#dmCap b'), capL: q('#dmCap i'),
       tag: q('#dmTag'), title: q('#dmTitle'), msg: q('#dmMsg'), status: q('#dmStatus') };
     D.el.black.style.opacity = '1';
     const monk = () => html.style.setProperty('--monk', (1.4*Math.min(innerWidth, innerHeight)/1080).toFixed(3));
@@ -835,6 +854,10 @@ const DEMO = (() => {
     let c;
     // (wide on all five buildings until the last is up, drifting in a little; then in on the door as she reaches it)
     if (t < MK.out) c = mix(A, B, glide(t, PUSH, MK.inside, .3));
+    else if (TOD){   // (out over the city in a little over two seconds, then a slow, steady turn: easing in, never stopping, to the end)
+      c = mix(B, W, ease(seg(t, MK.out, MK.out + 2.4)));
+      const u = t - (MK.out + 1.2); c.yaw += u <= 0 ? 0 : u < 1.5 ? .11*u*u/3 : .11*(u - .75);
+    }
     else { c = mix(B, W, ease(seg(t, MK.out, MK.title + .4))); c.yaw += .1*seg(t, MK.title, D.len); }   // (the long pull out over the whole city)
     Object.assign(CAMP, c);
   }
@@ -931,7 +954,8 @@ const DEMO = (() => {
     if (D.held) return;
     while (fired < EV.length && EV[fired].t <= t){ const e = EV[fired++]; safe(e.name, e.f); D.log.push(t.toFixed(2) + ' ' + e.name); }
     if (CAP) Math.random = rng(h32('frame', D.frame));
-    S.hour = HOUR;
+    S.hour = TOD ? hourAt(t)[0] : HOUR;
+    safe('time of day', () => todTick(t));
     safe('door', () => doorAt(t));
     if (!AP.exited) safe('lab zoom', () => labZoom(t));
     if (!AUTO) paint(t, 1/FPS);
@@ -968,6 +992,7 @@ const DEMO = (() => {
   function paint(t, dt){
     const E = D.el, T = MK.title;
     E.black.style.opacity = t < .3 ? (1 - ss(t/.3)).toFixed(3) : '0';
+    if (E.flash){ const u = D.flash === undefined ? 9 : (t - D.flash)/.18; E.flash.style.opacity = u >= 0 && u < 1 ? (.55*(1 - u)*(1 - u)).toFixed(3) : '0'; }
     E.shade.style.opacity = (.8*ss(seg(t, T - .3, T + .4))).toFixed(3);
     cursor(t, dt); caption(t);
     if (FU.carry) safe('carry', labCarry);

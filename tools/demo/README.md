@@ -73,6 +73,20 @@ Times are at the top of `js/demo.js` (`MK`, `CLICK_T`), captions in `CAPS`, the 
 
 Its apartment steps are in `RL` and its times in `MK` at the top of `js/demo.js`; the sofa is `SOFA`.
 
+## The 30 s cut (wide and tall)
+
+`python3 tools/demo/record.py --tod --both` makes `out/neon-terrarium-demo-30s.mp4` (1920 x 1080) and `out/neon-terrarium-demo-30s-tall.mp4`
+(1080 x 1620), each filmed natively, plus a `-compressed.mp4` copy of each. No captions; "All footage captured in engine" in the corner.
+
+| Time | Shot |
+|---|---|
+| 0 to 2.3 s | Two homes go up on the plaza (three floors and two) |
+| 2.3 to 5.35 s | The person cam on a resident of the first, walking in at the door |
+| 5.35 to 16.6 s | Into their apartment: the long cut's sofa scene, its color, the warm lamps, the work light off; Exit |
+| 17 to 19.5 s | Out over the whole city, then a slow, steady turn |
+| 19.6 to 27 s | Cuts through the day as it turns: morning, overcast afternoon, golden hour, rainy dusk, rainy late night (`TOD_JUMPS` in `js/demo.js`) |
+| 27 to 30 s | Back to a clear night and the title |
+
 ## The 19 s cut (wide and tall)
 
 `python3 tools/demo/record.py --mid --both` makes `out/neon-terrarium-demo-19s.mp4` (1920 x 1080) and `out/neon-terrarium-demo-19s-tall.mp4`

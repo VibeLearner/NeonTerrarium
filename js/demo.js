@@ -132,22 +132,37 @@ const DEMO = (() => {
 
   /* ---------- the city: a big night city, every kind of building, an open plaza in the middle ---------- */
   const HOUR = 20.6;
-  const CITY = BIG ? { i0: -12, i1: 14, j0: -10, j1: 10 } : { i0: -16, i1: 12, j0: -12, j1: 12 };
-  const PLAZA = BIG ? { i0: 6, i1: 9, j0: 0, j1: 4 } : { i0: -4, i1: 2, j0: -3, j1: 3 }, PC0 = BIG ? { i: 7, j: 2 } : { i: -1, j: 0 };
+  const CITY = BIG ? { i0: -30, i1: 14, j0: -11, j1: 11 } : { i0: -16, i1: 12, j0: -12, j1: 12 };
+  const PLAZA = BIG ? { i0: 7, i1: 7, j0: 2, j1: 2 } : { i0: -4, i1: 2, j0: -3, j1: 3 }, PC0 = BIG ? { i: 7, j: 2 } : { i: -1, j: 0 };
   // the 45 s cut's metro line, laid on camera: east from the homes along j = 0, round the town square's west side, then east along j = -4
   // into the second residential district (its plots are kept low: the line runs at a fixed height, and no closer than a plot to a megastructure)
   const ROUTE = BIG ? [...Array.from({ length: 11 }, (_, k) => [-12 + k, 0]), [-2, -1], [-2, -2], [-2, -3], [-2, -4], ...Array.from({ length: 11 }, (_, k) => [-1 + k, -4])] : [];
   const onRoute = (i, j) => ROUTE.some(([a, b]) => a === i && b === j);
+  // (Nov 12) the build happens in a gap left in the middle of the city (the city all round it); the plots on the camera's side of the gap and of
+  // the metro (+x, +z: the camera sits that way) are kept low, so neither is hidden
+  const HOLE = { i0: -21, i1: -13, j0: -3, j1: 3 };
+  const inHole = (i, j) => BIG && i >= HOLE.i0 && i <= HOLE.i1 && j >= HOLE.j0 && j <= HOLE.j1;
+  function capAt(i, j){   // the most sections a plot may have here (the 45 s cut), or Infinity
+    let cap = Infinity;
+    for (const [a, b] of ROUTE){ const di = i - a, dj = j - b;
+      if (Math.abs(di) <= 1 && Math.abs(dj) <= 1) cap = Math.min(cap, 1);
+      else if (di >= -1 && di <= 3 && dj >= -1 && dj <= 3) cap = Math.min(cap, 2); }   // (the camera's side of the line: low, so it shows)
+    const dx = i < HOLE.i0 ? HOLE.i0 - i : i > HOLE.i1 ? i - HOLE.i1 : 0, dz = j < HOLE.j0 ? HOLE.j0 - j : j > HOLE.j1 ? j - HOLE.j1 : 0;
+    if (dx <= 2 && dz <= 3 && j > HOLE.j1) cap = Math.min(cap, dz <= 1 ? 1 : 2);   // (in front of the gap)
+    if (dx <= 3 && dz <= 2 && i > HOLE.i1 && j >= HOLE.j0 - 2) cap = Math.min(cap, 2);
+    return cap;
+  }
   const inPlaza = (i, j) => i >= PLAZA.i0 && i <= PLAZA.i1 && j >= PLAZA.j0 && j <= PLAZA.j1;
   const ringOf = (i, j) => !inPlaza(i, j) && i >= PLAZA.i0 - 1 && i <= PLAZA.i1 + 1 && j >= PLAZA.j0 - 1 && j <= PLAZA.j1 + 1;
-  const MEGAS = BIG ? [['club', -8, -5, 4, 4], ['square', 0, -2, 5, 5], ['police', 11, 1, 3, 3], ['radio', 12, -9, 2, 2], ['market', -10, 4, 4, 4]]
+  const MEGAS = BIG ? [['club', -8, -5, 4, 4], ['square', 0, -2, 5, 5], ['police', 10, 4, 3, 3], ['radio', 12, -10, 2, 2], ['market', -10, 5, 4, 4], ['foundry', -29, -9, 6, 4], ['logistics', -28, 4, 6, 6]]
     : [['radio', 3, -1, 2, 2], ['square', -12, -6, 5, 5], ['foundry', -15, 3, 6, 4], ['greenhouse', -14, 7, 5, 4], ['logistics', -8, 6, 6, 6],
     ['market', -2, -11, 4, 4], ['club', 4, -10, 4, 4], ['spire', 7, -4, 3, 3], ['square', 7, 1, 5, 5], ['pagoda', 4, 7, 5, 4], ['bathhouse', 0, 7, 3, 3], ['emitter', -9, -11, 2, 2]];
-  const LAWNS = BIG ? [[12, 6], [13, 6], [6, 8], [-4, 7]] : [[-8, -2], [-8, -1], [-9, -2], [1, 9], [-11, 1], [-10, 1], [9, 9]];
+  const LAWNS = BIG ? [[-6, 9], [-5, 9]] : [[-8, -2], [-8, -1], [-9, -2], [1, 9], [-11, 1], [-10, 1], [9, 9]];
   const zoneAt = (i, j, u) => {
     if (BIG){
-      if (ringOf(i, j)) return u < .85 ? 'low' : 'mid';
-      if (i <= -11) return u < .85 ? 'low' : 'mid';
+      if (ringOf(i, j)) return 'low';
+      if (i <= -22) return u < .75 ? 'ind' : 'low';   // (the industrial west)
+      if (i <= -11) return u < .78 ? 'low' : 'mid';   // (homes round the gap)
       if (i <= -1) return u < .82 ? 'mid' : 'high';   // (the Commercial district)
       if (i <= 4) return u < .6 ? 'mid' : 'low';
       return u < .85 ? 'low' : 'mid';   // (the second residential district)
@@ -169,16 +184,19 @@ const DEMO = (() => {
     for (let i = CITY.i0; i <= CITY.i1; i++) for (let j = CITY.j0; j <= CITY.j1; j++){
       const ci = Math.min(i - CITY.i0, CITY.i1 - i), cj = Math.min(j - CITY.j0, CITY.j1 - j);
       if (ci + cj < 3 && R() < .85) continue;   // (the corners rounded off)
+      if (inHole(i, j)) continue;   // (the gap the build fills: open sky)
       const c = newCell(i, j); c.style = DEFAULT_STYLE; c.green = 'some'; n++;
       cells.set(ckey(i, j), c);
       if (inMega(i, j)) continue;
-      if (inPlaza(i, j) || isLawn(i, j)){ c.green = 'grass'; continue; }
+      if (inPlaza(i, j) || isLawn(i, j)){ c.green = BIG && inPlaza(i, j) ? 'some' : 'grass'; continue; }
       const z = zoneAt(i, j, R()), v = R();
       let k = ringOf(i, j) ? (v < .6 ? 1 : 2) : z === 'ind' ? (v < .5 ? 1 : 2) : v < .25 ? 1 : v < .62 ? 2 : v < .9 ? 3 : 4;
       if (BIG){
         if (onRoute(i, j)){ if (v < .45) continue; k = 1; }   // (under the metro: short or open)
         else if (i >= -10 && i <= -1) k = z === 'mid' || z === 'high' ? 3 + (v*4 | 0) : k;   // (the Commercial district: tall)
+        else if (i >= 5) k = ringOf(i, j) ? (v < .45 ? 1 : 2) : 2 + (v < .55 ? 0 : 1);   // (the second residential district: cramped, every plot built, two or three high; a little lower right round the resident's, so the walk can be seen)
         else k = Math.min(k, 3);
+        k = Math.min(k, capAt(i, j));
       }
       c.sections = secs(z, Math.min(MAX_SECTIONS, k));
     }
@@ -620,14 +638,14 @@ const DEMO = (() => {
     key(2.9,  boxIJ(G.i0, G.i1, G.j0, G.j1, CURB + 7), 44, 1.45);
     key(6.3,  boxIJ(G.i0, G.i1, G.j0, G.j1, CURB + 6), 52, 1.3);
     key(9.6,  boxIJ(G.i0 - 1, G.i1 + 1, G.j0 - 1, G.j1 + 1, CURB + 7), 44, 1.22);
-    key(12.6, boxIJ(G.i0 - 2, G.i1 + 3, G.j0 - 2, G.j1 + 2, CURB + 9), 40, 1.18);
+    key(12.6, boxIJ(G.i0 - 2, G.i1 + 3, G.j0 - 2, G.j1 + 2, CURB + 9), 44, 1.18);
     // along the metro: a key every second or so, on the plots just laid, looking ahead along the line
     const [m0, m1] = BIG_INFO.metro, n = ROUTE.length;
     for (let t = m0 + .4; t < m1 - .2; t += 1.05){
       const k = Math.min(n - 1, Math.max(0, Math.round((t - m0)/.2))), [i, j] = ROUTE[k], [ni, nj] = ROUTE[Math.min(n - 1, k + 3)];
-      key(t, boxIJ(Math.min(i, ni) - 2, Math.max(i, ni) + 2, Math.min(j, nj) - 2, Math.max(j, nj) + 2, MT_Y + 2), 34, 1.12);
+      key(t, boxIJ(Math.min(i, ni) - 2, Math.max(i, ni) + 2, Math.min(j, nj) - 2, Math.max(j, nj) + 2, MT_Y + 2), 48, 1.1);   // (steep: looking down onto the line, over the towers)
     }
-    const last = ROUTE[n - 1]; key(m1 + .2, boxIJ(last[0] - 3, last[0] + 3, last[1] - 2, PLAZA.j1 + 1, MT_Y + 2), 36, 1.1);
+    const last = ROUTE[n - 1]; key(m1 + .2, boxIJ(last[0] - 3, last[0] + 3, last[1] - 2, PLAZA.j1 + 1, MT_Y + 2), 42, 1.1);
     // then the plaza where the resident walks: the clip's own wide shot of the walk (its yaw unwound to sit beside the last one)
     const A = Object.assign({}, A0), py = K[K.length - 1].yaw; A.yaw = py + wrapA(A.yaw - py); A.t = MK.person; K.push(A);
     for (const k of K) k.lz = Math.log(k.zoom);
@@ -1007,7 +1025,7 @@ const DEMO = (() => {
     const P = PLAN, y0 = P.cam.yaw, p0 = P.cam.pitch;
     const A = P.A || (P.A = fit(P.wide, y0 - .08, p0 + 2*DEG, 1.12, .1));
     const B = P.B || (P.B = fit(P.near, y0 + .06, p0, 1.3, .12));
-    const W = BIG ? { x: -4*LOT, y: TARGET_Y, z: 0, yaw: y0 + .8, zoom: TALL ? 64 : 40, pitch: 38*DEG }   // (the 45 s cut: its city runs further west)
+    const W = BIG ? { x: -8*LOT, y: TARGET_Y, z: 0, yaw: y0 + .8, zoom: TALL ? 78 : 48, pitch: 38*DEG }   // (the 45 s cut: its city runs further west)
       : { x: -2*LOT, y: TARGET_Y, z: 0, yaw: y0 + .8, zoom: TALL ? 50 : 32, pitch: 38*DEG };   // (filmed tall: further out, so the city still spreads across)
     const mix = (a, b, u) => ({ x: lerp(a.x, b.x, u), y: lerp(a.y, b.y, u), z: lerp(a.z, b.z, u), yaw: a.yaw + wrapA(b.yaw - a.yaw)*u, zoom: elerp(a.zoom, b.zoom, u), pitch: lerp(a.pitch, b.pitch, u) });
     let c;

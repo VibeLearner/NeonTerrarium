@@ -76,7 +76,7 @@ Its apartment steps are in `RL` and its times in `MK` at the top of `js/demo.js`
 ## The 30 s cut (wide and tall)
 
 `python3 tools/demo/record.py --tod --both` makes `out/neon-terrarium-demo-30s.mp4` (1920 x 1080) and `out/neon-terrarium-demo-30s-tall.mp4`
-(1080 x 1620), each filmed natively, plus a `-compressed.mp4` copy of each. No captions; "All footage captured in engine" in the corner.
+(1080 x 1620), each filmed natively, plus a `-compressed.mp4` copy of each. Captions on the right (the person cam top left); "All footage captured in engine" in the corner.
 
 | Time | Shot |
 |---|---|

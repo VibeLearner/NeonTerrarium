@@ -184,9 +184,9 @@ const DEMO = (() => {
     for (let i = CITY.i0; i <= CITY.i1; i++) for (let j = CITY.j0; j <= CITY.j1; j++){
       const ci = Math.min(i - CITY.i0, CITY.i1 - i), cj = Math.min(j - CITY.j0, CITY.j1 - j);
       if (ci + cj < 3 && R() < .85) continue;   // (the corners rounded off)
-      if (inHole(i, j)) continue;   // (the gap the build fills: open sky)
       const c = newCell(i, j); c.style = DEFAULT_STYLE; c.green = 'some'; n++;
       cells.set(ckey(i, j), c);
+      if (inHole(i, j)){ c.green = 'none'; continue; }   // (the gap the build fills: empty plots, bare)
       if (inMega(i, j)) continue;
       if (inPlaza(i, j) || isLawn(i, j)){ c.green = BIG && inPlaza(i, j) ? 'some' : 'grass'; continue; }
       const z = zoneAt(i, j, R()), v = R();
@@ -590,12 +590,12 @@ const DEMO = (() => {
     for (let salt = 1; salt <= 300; salt++){
       GD_SALT = salt; const added = [];
       try {
-        for (const [i, j] of BIG_INFO.lawns){ if (cellAt(i, j)) continue; const c = newCell(i, j); c.green = 'grass'; c.style = DEFAULT_STYLE; cells.set(ckey(i, j), c); added.push(c); gardenUpdate(); }
+        for (const [i, j] of BIG_INFO.lawns){ const c0 = cellAt(i, j); if (c0){ c0.green = 'grass'; gardenUpdate(); continue; } const c = newCell(i, j); c.green = 'grass'; c.style = DEFAULT_STYLE; cells.set(ckey(i, j), c); added.push(c); gardenUpdate(); }
         const P = [...cells.values()].filter(c => c.gd && c.gd.p), w = P.filter(q => q.gd.w).length, kinds = new Set(P.map(q => q.gd.p));
         const score = (w >= 1 && w <= 3 ? 60 : 0) + (P.some(q => q.gd.w && q.gd.b) ? 40 : 0) + (kinds.has('gazebo') ? 30 : 0) + kinds.size*4;
         if (!best || score > best.score) best = { salt, score, water: w, kinds: [...kinds].join(' ') };
       } catch (e){ warn('garden sim', e); break; }
-      finally { for (const c of added) cells.delete(ckey(c.i, c.j)); for (const c of cells.values()) c.gd = null; }
+      finally { for (const c of added) cells.delete(ckey(c.i, c.j)); for (const c of cells.values()) c.gd = null; holeBare(); }
     }
     GD_SALT = best ? best.salt : 1; BIG_INFO.garden = best; say('garden:', JSON.stringify(best));
   }
@@ -608,6 +608,8 @@ const DEMO = (() => {
     if ((a.kind === 'wall' || a.kind === 'gate') && c && c.wall) return { x: c.x, y: CURB + 1.2, z: c.z };
     return { x: a.i*LOT, y: CURB + .3, z: a.j*LOT };
   }
+  // (between the garden pick and the film, the gap's plots go back to bare)
+  function holeBare(){ for (const c of cells.values()) if (inHole(c.i, c.j)){ c.green = 'none'; c.gd = null; } }
   function bigAct(a){
     if (a.kind === 'btn'){ if (a.z === 'wallHigh' || a.z === 'metro'){ if (S.zone) selectZone(S.zone); } else if (S.zone !== a.z) selectZone(a.z);
       const b = document.querySelector('.zone[data-zone="' + (a.z === 'wallHigh' ? 'high' : a.z) + '"]'); if (b && a.z !== 'metro'){ aim(labCenterMain(b)); click(BIG_COL[a.z]); } return true; }
@@ -615,9 +617,11 @@ const DEMO = (() => {
     if (a.hand){ const p = bigPoint(a); if (p) aimW(p); }
     let ok = false;
     withSeed(seed, () => {
-      if (a.kind === 'lux' || a.kind === 'home' || a.kind === 'ind'){ S.zone = a.z; ok = !!applyTarget({ type: 'empty', i: a.i, j: a.j }); }
+      const c0 = cellAt(a.i, a.j);
+      if (a.kind === 'lux' || a.kind === 'home' || a.kind === 'ind'){ S.zone = a.z; ok = !!applyTarget(c0 ? { type: 'onto', c: c0 } : { type: 'empty', i: a.i, j: a.j }); }
       else if (a.kind === 'up'){ const c = cellAt(a.i, a.j); S.zone = a.z; ok = !!(c && applyTarget({ type: 'up', c })); }
-      else if (a.kind === 'lawn'){ const z0 = S.zone; S.zone = null; const g0 = GREEN_DEFAULT; GREEN_DEFAULT = 'grass'; try { ok = !!applyTarget({ type: 'empty', i: a.i, j: a.j }); } finally { GREEN_DEFAULT = g0; S.zone = z0; } }
+      else if (a.kind === 'lawn'){ const z0 = S.zone; S.zone = null; const g0 = GREEN_DEFAULT; GREEN_DEFAULT = 'grass';   // (an empty plot turned to lawn, as a click with no zone does)
+        try { if (c0){ cycleGreen(c0); ok = c0.green === 'grass'; } else ok = !!applyTarget({ type: 'empty', i: a.i, j: a.j }); } finally { GREEN_DEFAULT = g0; S.zone = z0; } }
       else if (a.kind === 'wall'){ ok = !!addWall(cellAt(a.i, a.j) || null, a.i, a.j, a.z); }
       else if (a.kind === 'gate'){ const c = cellAt(a.i, a.j); ok = !!(c && c.wall && toggleGate(c)); }
       else if (a.kind === 'mt'){ const t = mtTargetAt({ i: a.i, j: a.j }); ok = !!(t && t.ok && mtApply(t)); if (t && !t.ok) warn('metro', a.i + ',' + a.j + ': ' + t.why); }

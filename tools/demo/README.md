@@ -80,7 +80,7 @@ Its apartment steps are in `RL` and its times in `MK` at the top of `js/demo.js`
 
 | Time | Shot |
 |---|---|
-| 0 to 3 s | Build your cyberpunk city: in a gap left in the middle of the city, four Luxury towers, one at each corner of a block, by the cursor |
+| 0 to 3 s | Build your cyberpunk city: on a patch of bare, empty plots in the middle of the city, four Luxury towers, one at each corner of a block, by the cursor |
 | 3.3 to 6.4 s | The garden laid between them, plot by plot (its salt picked before the film for water, a bridge and a gazebo) |
 | 6.6 to 9.9 s | Luxury perimeter walls round the block, and a gate on the east side |
 | 10.2 to 14 s | Homes round the walls, industry at the west end |

@@ -139,7 +139,7 @@ const music = (() => {
     setOn(!!grid);
   }
   function setVolume(v){ volume = v; try { localStorage.setItem(MUSIC_VOL_KEY, String(v)); } catch (e) {} }
-  function togglePause(){ if (!on) return; paused = !paused; if (!paused){ fadeIn = GRID_FADE_QUICK; level = 0; } ui.paused(paused); if (bcasting()) BOOTH.pause(paused); }
+  function togglePause(){ if (!on) return; paused = !paused; if (!paused){ fadeIn = GRID_FADE_QUICK; level = 0; } ui.paused(paused); if (bcasting()) BOOTH.pause(paused); ntEv('grid-hold', paused); }
   // the deck's next and previous step through the carrier patterns (the chord progressions), not the programs
   const progSel = () => PNL.el.querySelector('#g-progressionSelect');
   function stepPattern(d){
@@ -333,6 +333,7 @@ const music = (() => {
       sliders().forEach(PNL.fill); P.syncPrograms();
       if (typeof BOOTH !== 'undefined') BOOTH.panelOpened();
       sizeCanvases(); addEventListener('resize', sizeCanvases);
+      ntEv('panel-open');
     }
     P.show = () => {
       if (P.open || busy) return; busy = true;
@@ -358,6 +359,7 @@ const music = (() => {
       if (typeof BOOTH !== 'undefined') BOOTH.panelClosed();
       if (PNL.closePlate) PNL.closePlate();   // (the touch screen's explanation plate, grid_panel.js)
       el.classList.remove('open'); document.documentElement.classList.remove('gp-open'); removeEventListener('keydown', keyH, true); removeEventListener('resize', sizeCanvases);
+      ntEv('panel-close');
     };
     $q('gpClose').addEventListener('click', () => P.hide());
     const curve = $q('gpCurve'), barsCv = $q('gpBars');

@@ -327,6 +327,7 @@ const BOOTH = (() => {
     audio(); if (playing) return;
     playing = true; t0 = ctx.currentTime + .08 + (countIn ? 4*beatSec() : 0); schedTo = countIn ? -4 : 0; lastBar = null; apCache.clear(); stz = null; bOff = 0; lastEff = 0;
     $('bPlay').textContent = 'Stop'; $('bPlay').classList.add('on');
+    if (!bc) ntEv('booth-play');
   }
   function stop(){
     if (!playing) return; playing = false;
@@ -354,14 +355,15 @@ const BOOTH = (() => {
       if (lb % 4 === 0){ const ch = chordOf(lb/4); if (ch !== padCh || lastBar === null) padTo(ch, t); lastBar = lb/4; at(t, () => retune(ch, t, lb/4));
         if (E.setLiveChord) E.setLiveChord(ch, t);   // (the Console's pings follow the loop's chords)
         if (bc && S.song && songSounds && songSounds.chops.length) voiceOn('chops', 60, t, .32*(S.padLvl ?? 1), 0, bus.pad, 4, lb/4).off(t + 4*beatSec());   // (the song's own chord under the bar)
-        if (bc && lb === 0) at(t, () => bcPass(cyc)); }
+        if (bc && lb === 0) at(t, () => bcPass(cyc));
+        if (lb === 0) at(t, () => ntEv('booth-pass', { cyc, bc: !!bc })); }
       // the layers and the autopilot's part, for the notes that start in this beat
       if (bc){ const bn = (lb % 4) + 1; at(t, () => { E.beat = bn; }); }   // (the Console's clock and beat pictures keep time with the loop)
       const skip = thinFor(cyc);
       if (lb % 4 === 0) maybePing(Math.floor(b/4), lb/4, t, cyc);
       for (const layer of S.layers) for (const n of layer) if (n.b >= lb && n.b < lb + 1 && !(skip && skip.has(n))) playNote(n, b + n.b - lb, false);
       if (S.ap && S.layers.length){ let part = apCache.get(cyc); if (!part){ part = improvise(cyc); apCache.set(cyc, part); if (apCache.size > 3) apCache.delete(Math.min(...apCache.keys())); }
-        for (const n of part) if (n.b >= lb && n.b < lb + 1) playNote(n, b + n.b - lb, true); }
+        for (const n of part) if (n.b >= lb && n.b < lb + 1){ playNote(n, b + n.b - lb, true); if (!bc) at(tOf(b + n.b - lb), () => ntEv('booth-auto-note')); } }
       schedTo++;
     }
     if (rec){
@@ -405,6 +407,7 @@ const BOOTH = (() => {
     const e = { h, m, vel, note: null }; held.set(i, e);
     if (rec && rec.live){ e.note = { b: recPos(), d: 0, i, v: vel }; e.from = Math.max(nowBeat(), rec.from); rec.take.push(e.note); }
     keysEl[i] && keysEl[i].classList.add('down');
+    ntEv('booth-note', { i });
   }
   function noteUp(i){
     const e = held.get(i); if (!e) return; held.delete(i);
@@ -417,7 +420,7 @@ const BOOTH = (() => {
     drawKeys(ch);
     for (const [i, e] of held){
       const m = padMidi(ch, i); if (m === e.m) continue;
-      e.h.off(t); e.h = voiceOn(S.voice, m, t, e.vel*.75, -.1, null, i, bar); e.m = m;
+      e.h.off(t); e.h = voiceOn(S.voice, m, t, e.vel*.75, -.1, null, i, bar); e.m = m; ntEv('booth-retune');
       if (e.note){ e.note.d = Math.max(.1, nowBeat() - e.from); if (rec && rec.live && nowBeat() < rec.from + L() - .1){ e.note = { b: recPos(), d: 0, i, v: e.vel*.75 }; e.from = nowBeat(); rec.take.push(e.note); } else e.note = null; }
     }
   }
@@ -436,8 +439,10 @@ const BOOTH = (() => {
     const r = rec; rec = null;
     if (!cancel && r){
       for (const e of held.values()) if (e.note){ e.note.d = Math.max(.1, Math.min(L() - e.note.b, nowBeat() - e.from)); e.note = null; }
-      const take = r.take.filter(n => n.d > 0).map(n => tidy(n)).filter(n => n.b < L());
+      const raw = r.take.filter(n => n.d > 0), off = raw.filter(n => Math.abs(n.b - Math.round(n.b/.25)*.25) > .07).length;   // (notes well off the sixteenths, before tidying: the tutorial's Tidy timing tip)
+      const take = raw.map(n => tidy(n)).filter(n => n.b < L());
       if (take.length){ S.layers.push(take); apCache.clear(); loadedId = null; store(); }
+      ntEv('booth-take', { n: take.length, off, layers: S.layers.length, tidy: S.tidy });
     }
     status(); renderShelf();
   }
@@ -539,7 +544,7 @@ const BOOTH = (() => {
     sel.addEventListener('change', () => { S.prog = sel.value === 'song' ? 'song' : +sel.value; if (S.prog === 'song') ensureSong(); apCache.clear(); if (playing){ lastBar = null; padCh = null; } drawKeys(chordOf(curBar())); store(); });
     const vb = $('bVoices');
     VOICES.forEach(v => { const b = document.createElement('button'); b.className = 'gb' + (v.id === S.voice ? ' on' : '') + (v.song ? ' bsongv' : ''); b.dataset.v = v.id; b.innerHTML = v.name + '<small>' + v.sub + '</small>';
-      b.addEventListener('click', () => { if (v.song && !songSounds){ flash('Load a song first (above) for this voice'); return; } setVoice(v.id); noteDown(5, .7); setTimeout(() => noteUp(5), 350); }); vb.appendChild(b); });
+      b.addEventListener('click', () => { if (v.song && !songSounds){ flash('Load a song first (above) for this voice'); return; } setVoice(v.id); noteDown(5, .7); setTimeout(() => noteUp(5), 350); ntEv('booth-voice'); }); vb.appendChild(b); });
     voiceAvail();
     $('bSongBtn').addEventListener('click', () => { if (unsaved()) askClear(null); else $('bSongFile').click(); });
     $('bSongClear').addEventListener('click', () => { const f = pendingFile; $('bDlg').hidden = true; pendingFile = null; if (f) loadSong(f); else $('bSongFile').click(); });
@@ -611,7 +616,7 @@ const BOOTH = (() => {
       if (Date.now() - clearArm > 2500){ clearArm = Date.now(); b.textContent = 'Clear all?'; setTimeout(() => { b.textContent = 'Clear'; }, 2500); return; }
       S.layers = []; apCache.clear(); b.textContent = 'Clear'; clearArm = 0; store(); status(); });
     $('bAuto').classList.toggle('on', S.ap);
-    $('bAuto').addEventListener('click', () => { S.ap = !S.ap; $('bAuto').classList.toggle('on', S.ap); apCache.clear(); store(); status(); });
+    $('bAuto').addEventListener('click', () => { S.ap = !S.ap; $('bAuto').classList.toggle('on', S.ap); apCache.clear(); store(); status(); ntEv('booth-auto', S.ap); });
     $('bSave').addEventListener('click', saveLoop);
     $('bName').addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); saveLoop(); } });
     root.querySelectorAll('.gtab').forEach(t => t.addEventListener('click', () => setMode(t.dataset.mode)));
@@ -642,7 +647,7 @@ const BOOTH = (() => {
   }
   let songBusy = false;
   async function loadSong(f){
-    if (songBusy) return; songBusy = true; audio(); const btn = $('bSongBtn'); btn.disabled = true;
+    if (songBusy) return; songBusy = true; audio(); const btn = $('bSongBtn'); btn.disabled = true; ntEv('song-load');
     const say = t => { const m = $('bSongSt'); m.hidden = false; m.textContent = t; $('bSongInfo').hidden = true; };
     try {
       const r = await BOOTHSONG.analyze(f, ctx, say);
@@ -660,7 +665,7 @@ const BOOTH = (() => {
   }
   async function nudge(d){
     if (!S.song) return; const ns = clamp(S.song.start + d, 0, Math.max(0, S.song.list.length - S.len)); if (ns === S.song.start) return;
-    S.song.start = ns; apCache.clear(); if (playing){ lastBar = null; padCh = null; } drawKeys(chordOf(curBar())); songInfo(); store();
+    S.song.start = ns; apCache.clear(); ntEv('song-nudge'); if (playing){ lastBar = null; padCh = null; } drawKeys(chordOf(curBar())); songInfo(); store();
     if (songRecut && songSounds && songKey === S.song.key){ const c = await songRecut(ns, S.len); if (c) songSounds.chops = c; }
   }
   function drawKeys(ch){
@@ -737,7 +742,7 @@ const BOOTH = (() => {
     const data = { song: S.prog === 'song' && S.song ? JSON.parse(JSON.stringify(S.song)) : null, name: nm, prog: S.prog, len: S.len, voice: S.voice, bpm: S.bpm, ap: S.ap, apAmt: S.apAmt, layers: JSON.parse(JSON.stringify(S.layers)), at: Date.now() };
     const same = loadedId && loops.find(l => l.id === loadedId && l.name === nm);
     if (same) Object.assign(same, data); else { const id = 'L' + Date.now().toString(36); loops.unshift({ id, ...data }); loadedId = id; }
-    inp.value = ''; store(); renderShelf(); flash('Saved "' + nm + '"');
+    inp.value = ''; store(); renderShelf(); flash('Saved "' + nm + '"'); ntEv('booth-save');
   }
   function flash(t){ const s = $('bStatus'); if (!s) return; s.textContent = t.toUpperCase(); setTimeout(status, 1800); }
   function loadLoop(l){
@@ -789,6 +794,7 @@ const BOOTH = (() => {
     apCache.clear(); padCh = null; lastBar = null;
     music.setBooth(true); setSlider('g-bpmSlider', S.bpm);
     start(false); stripShow(true);
+    ntEv('booth-broadcast', { how });
     const dp = $('gdProg'); if (dp){ dp.textContent = 'Booth: ' + l.name; dp.title = how === 'rewire' ? 'A rewired copy of a Booth loop' : 'A Booth loop, as logged'; }
     return true;
   };
@@ -1027,6 +1033,7 @@ const BOOTH = (() => {
     if (m === 'booth'){ const bt = root.querySelector('.gtab.beckon'); if (bt){ bt.classList.remove('beckon'); try { localStorage.setItem('neonIsland.boothSeen', '1'); } catch (e){} }
       if (bc){ const sel = $('g-progressionSelect'); sel.value = lastPattern; sel.dispatchEvent(new Event('change', { bubbles: true })); } music.setBooth(true); audio(); if (S.song) ensureSong(); drawKeys(chordOf(curBar())); if (!raf) raf = requestAnimationFrame(frame); }
     else { stop(); music.setBooth(false); }
+    ntEv('panel-mode', m);
   }
   B.panelOpened = () => { if (mode === 'booth') setMode('booth'); };
   B.panelClosed = () => { noteChip.hide(); if (mode === 'booth'){ stop(); music.setBooth(false); } };
@@ -1043,6 +1050,7 @@ const BOOTH = (() => {
   addEventListener('blur', () => { for (const k of [...held.keys()]) noteUp(k); });
 
   buildUI();
+  B.mode = () => mode; B.recording = () => !!rec;
   B.state = S; B.improvise = improvise; B.padsFor = padsFor; B.chordOf = chordOf;   // (for checking)
   return B;
 })();

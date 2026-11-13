@@ -300,7 +300,7 @@ const GRIDVIZ = (() => {
       svg.addEventListener('pointerdown', e => { e.preventDefault(); svg.setPointerCapture(e.pointerId); drag = { y: e.clientY, v: +r.value, slop: typeof TOUCH !== 'undefined' && TOUCH.on && e.pointerType !== 'mouse' }; k.classList.add('drag'); r.focus({ preventScroll: true }); });
       svg.addEventListener('pointermove', e => { if (!drag || GRIDPANEL.lp) return;
         if (drag.slop){ if (Math.abs(drag.y - e.clientY) < 10) return; drag.slop = false; drag.y = e.clientY; }
-        const span = +r.max - +r.min, d = (drag.y - e.clientY)/(e.shiftKey ? 600 : 150)*span; setVal(r, drag.v + d); });
+        const span = +r.max - +r.min, d = (drag.y - e.clientY)/(e.shiftKey ? 600 : 150)*span; const was = +r.value; setVal(r, drag.v + d); if (+r.value !== was) ntEv('knob', { id: r.id, v: +r.value }); });
       const end = () => { drag = null; k.classList.remove('drag'); };
       svg.addEventListener('pointerup', end); svg.addEventListener('pointercancel', end);
     });

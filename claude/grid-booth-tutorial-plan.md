@@ -1,6 +1,6 @@
 # Tutorial design: the Psycho-Acoustic Grid and the Booth
 
-Nov 13, 2026. Copied from the doc https://claude.ai/artifact/CX38MedPwfWXwLcgs2eb3N (the doc is the editable version). Built on the tutorial research report "Teach the colony at the moment of need".
+Nov 13, 2026. **Built** in `js/musictut.js` (see Status at the end). Copied from the doc https://claude.ai/artifact/CX38MedPwfWXwLcgs2eb3N (the doc is the editable version). Built on the tutorial research report "Teach the colony at the moment of need".
 
 ## Summary
 
@@ -86,7 +86,7 @@ The track runs straight from opening the Booth to the player's own loop on the a
 | B1 | After B0 | Press Play (or Space) to start the loop. The chords along the top of the roll are what you'll play over. [Tap Play.] | The loop is playing | |
 | B2 | The loop is playing | Play the magic keys: click them, or press Q to ] on your keyboard. Every key fits the chord playing now, so no note is wrong. [Tap the keys. Each shows its place in the chord, 1 is the root.] | 6 notes played | Each key is a note of the chord sounding now, or a note picked to sound sweet with it. When the chord changes at a bar line, all twelve keys retune. |
 | B3 | 6 notes played, shown at the next bar line | Hold a key down as the chord changes. Listen: the note slides to fit the new chord. | A held note crosses a chord change. If two passes go by without it, the note moves on. | This is why nothing clashes. A held note moves to its key's new pitch, usually by a small step, the way a pianist moves one finger between chords. |
-| B4 | After B3 | Press Record (or Enter) and play along. Recording starts at the next bar, after one bar of count-in if the loop is stopped, and runs for one pass. | A take with 3 or more notes is kept | |
+| B4 | After B3 | Press Record (or Enter) and play along. Recording starts at the next bar, after one bar of count-in if the loop is stopped, and runs for one pass. | A take with at least one note is kept | |
 | B4b | A take ends with no notes | Nothing was played during that take. Press Record and play the keys while the playhead runs. | The next take has notes | |
 | B5 | First take kept, shown after one pass of it plays back | Your take now loops: your notes are cyan on the roll. Record again to add a layer on top; Undo layer takes the last one off. | One more pass plays, or a second take is recorded | A take is stored as keys, not pitches, so it still fits if you change the carrier pattern. |
 | B6 | After B5 | Press Autopilot. It treats your take as a theme and answers in the gaps you leave, in pink. It never plays over your notes. | The autopilot plays its first note | It answers with echoes, step-up repeats, flipped and shortened versions of your phrases, and a soft harmony under your long notes. It builds up over a few passes, then settles back. |
@@ -210,3 +210,23 @@ P0 is what a first playable version needs to be testable at all.
 - [ ] Should the Booth track finish at Save (B7), or require the broadcast step (B8)? Recommended: B8, because hearing your own loop over the city is the payoff, but it's the step most likely to be skipped.
 - [ ] Ship the B0 experience choice in the first version, or start with one wording and add it after the first playtests?
 - [ ] In the placement-puzzle mode, Grid presets will offset placement penalties. That needs its own note when the mode ships; should this track mention it, or leave it to that mode's tutorial?
+
+## Status (built Nov 13, 2026)
+
+Built in `js/musictut.js`, with the events it listens for added to `grid_panel.js`, `grid_viz.js`, `grid.js` and `booth.js` (`nt:knob`, `nt:knob-reset`, `nt:panel-open`, `nt:panel-mode`, `nt:booth-play`, `nt:booth-note`, `nt:booth-retune`, `nt:booth-take`, `nt:booth-pass`, `nt:booth-auto-note`, `nt:booth-save`, `nt:booth-broadcast`, `nt:song-load`, `nt:song-nudge`, `nt:booth-voice`, `nt:grid-hold`). Everything in P0, P1 and the later tips table is in; the P2 predict-then-hear moment is not.
+
+How the open questions were settled for the first build (all easy to change):
+
+- **Outline pulse:** yes, on desktop and touch. It's an outline on the one control, no dimming or spotlight. `nt-calm` and `nt-clean` stop its animation.
+- **Where the Booth track ends:** at B8/B9, the loop on the broadcast.
+- **B0 experience choice:** shipped. Pressing Play instead of choosing counts as "New to making music".
+- **Placement-puzzle mode:** not mentioned; left to that mode's tutorial.
+
+Other decisions made while building:
+
+- **Returning players.** A browser that had a city before this update doesn't see the Grid and Console notes unasked, and sees the Booth notes only if it had never opened the Booth (marked by index.html's first line, `neonIsland.tutMusic`). Settings has Replay the Grid notes and Replay the Booth notes, on desktop and touch.
+- **Placement.** A note sits beside its control with a pointer. While the loop plays it never covers the roll or the keys; on a phone, where there's rarely room for both, it may cover the roll but stays off the keys.
+- **The old Grid tips** (desktop "Double-click the Psycho-Acoustic Grid to open it", touch "The Grid is broadcasting...") are replaced by G1 and G2.
+- **Hover texts on desktop** now start with the plain meaning from the touch screen's `PLAIN` table in `grid_panel.js`, followed by the planners' wording, so both read from one table.
+- **The "As logged or Rewire" tip** was dropped: the dialog already explains both choices.
+- **Stats:** per note shown, done, timeout, skip, Why?, Show me, hidden-target and seconds, kept in the browser. With `#dev`, Settings has Copy music tutorial stats.

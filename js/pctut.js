@@ -115,7 +115,8 @@ const PCTUT = (() => {
   for (const r of [HW, MT]) r.st = load(r.key, st.existing ? { done: true, beats: {}, existing: true } : { done: false, beats: {} });
 
   /* ---------- the megastructures' notes ---------- */
-  const OPENS = { radio: 'Psycho-Acoustic Grid', spire: 'Data Spire', police: 'police station' };
+  // (the Psycho-Acoustic Grid has its own notes now, musictut.js, which say how to open it)
+  const OPENS = { spire: 'Data Spire', police: 'police station' };
   let megaSeen = null;   // (the megastructures there when the city was first ready: a city loaded with some already doesn't announce them)
   function megaNotes(){
     if (typeof megas === 'undefined') return;

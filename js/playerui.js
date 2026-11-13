@@ -129,7 +129,11 @@ T.panes.game.append(
   group('Camera and building', el('div', { class: 'togs' }, spinLab, paintLab)),
   // (the tutorial on a computer, pctut.js: played again from the start, the highway and metro ones too the next time each mode is turned on)
   typeof PCTUT !== 'undefined' && !(typeof TOUCH !== 'undefined' && TOUCH.on) ? group('Tutorial', el('p', { class: 'note', text: 'Shows the first steps again: tiles, surfaces and buildings, then the highway and metro controls the next time you use them.' }),
-    el('button', { class: 'wide', text: 'Replay the tutorial', onclick: () => { PCTUT.replay(); closeDeck(); } })) : null,
+    el('button', { class: 'wide', text: 'Replay the tutorial', onclick: () => { PCTUT.replay(); closeDeck(); } }),
+    // (the music notes, musictut.js: the Grid and Console ones the next time the Acoustic Panel opens, the Booth ones the next time the Booth does)
+    el('button', { class: 'wide', text: 'Replay the Grid notes', onclick: () => { if (typeof MUSICTUT !== 'undefined') MUSICTUT.replayGrid(); closeDeck(); } }),
+    el('button', { class: 'wide', text: 'Replay the Booth notes', onclick: () => { if (typeof MUSICTUT !== 'undefined') MUSICTUT.replayBooth(); closeDeck(); } }),
+    location.hash.includes('dev') ? el('button', { class: 'wide', text: 'Copy music tutorial stats', onclick: e => { const b = e.target; try { navigator.clipboard.writeText(JSON.stringify(MUSICTUT.stats(), null, 1)).then(() => { b.textContent = 'Copied'; setTimeout(() => { b.textContent = 'Copy music tutorial stats'; }, 1500); }); } catch (err) {} } }) : null) : null,
   islandSec ? group('Start over', el('p', { class: 'note', text: 'Removes every building on this island. It can\'t be undone.' }), islandSec) : null);
 
 // --- Advanced: every switch, in plain words

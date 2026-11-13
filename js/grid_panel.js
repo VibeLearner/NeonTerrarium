@@ -7,6 +7,8 @@
 // through ids that start with g-, and the player and the opening and closing are in grid.js.
 // Loads before grid_engine.js (the engine looks its controls up when it starts).
 'use strict';
+// (the music tutorial, musictut.js, listens for these: nt:knob, nt:knob-reset, nt:panel-open, nt:booth-take and the rest)
+function ntEv(name, d){ try { dispatchEvent(new CustomEvent('nt:' + name, { detail: d })); } catch (e) {} }
 const GRIDPANEL = (() => {
   const P = { el: null, open: false };
   const css = `
@@ -568,9 +570,9 @@ const GRIDPANEL = (() => {
     const set = (r, v) => { const st = +r.step || 1, lo = +r.min, hi = +r.max; v = Math.min(hi, Math.max(lo, Math.round((v - lo)/st)*st + lo));
       if (+r.value === v) return; r.value = String(+v.toFixed(4)); r.dispatchEvent(new Event('input', { bubbles: true })); r.dispatchEvent(new Event('change', { bubbles: true })); };
     el.addEventListener('wheel', e => { const r = e.target.closest && e.target.closest('.gs, .gk') && e.target.closest('.gs, .gk').querySelector('input[type=range]'); if (!r) return;
-      e.preventDefault(); const st = +r.step || 1, n = Math.max(1, Math.round((+r.max - +r.min)/st/50)); set(r, +r.value + (e.deltaY < 0 ? 1 : -1)*st*n*(e.shiftKey ? 4 : 1)); }, { passive: false });
-    el.addEventListener('dblclick', e => { const r = e.target.closest && e.target.closest('.gs, .gk') && e.target.closest('.gs, .gk').querySelector('input[type=range]'); if (r && r.dataset.def !== undefined) set(r, +r.dataset.def); });
-    if (typeof TOUCH !== 'undefined' && TOUCH.on) touchUI(el, set);
+      e.preventDefault(); const st = +r.step || 1, n = Math.max(1, Math.round((+r.max - +r.min)/st/50)); set(r, +r.value + (e.deltaY < 0 ? 1 : -1)*st*n*(e.shiftKey ? 4 : 1)); ntEv('knob', { id: r.id, v: +r.value }); }, { passive: false });
+    el.addEventListener('dblclick', e => { const r = e.target.closest && e.target.closest('.gs, .gk') && e.target.closest('.gs, .gk').querySelector('input[type=range]'); if (r && r.dataset.def !== undefined){ set(r, +r.dataset.def); ntEv('knob-reset', { id: r.id }); } });
+    if (typeof TOUCH !== 'undefined' && TOUCH.on) touchUI(el, set); else plainTitles(el);
     return el;
   }
 
@@ -702,7 +704,7 @@ const GRIDPANEL = (() => {
       return true;
     }
     plate.addEventListener('click', e => { const a = e.target.dataset && e.target.dataset.a; if (!a || !pl) return;
-      if (a === 'reset' && pl.r){ set(pl.r, +pl.r.dataset.def); show(pl.r, 'Reset'); later(); }
+      if (a === 'reset' && pl.r){ set(pl.r, +pl.r.dataset.def); show(pl.r, 'Reset'); later(); ntEv('knob-reset', { id: pl.r.id }); }
       closePlate(); });
     let lp = null, swallow = 0, lastType = 'mouse', tap = null, lastTap = null;
     P.lp = false;   // (true once a hold has opened the plate: the dial under the finger stops following it, grid_viz.js)
@@ -727,7 +729,7 @@ const GRIDPANEL = (() => {
       // a double tap on a dial: back to where it started (the canvas's own dblclick doesn't come reliably from a finger)
       if (e.type === 'pointerup' && tap && e.pointerId === tap.id && !P.lp && performance.now() - tap.t < 300){
         const now = performance.now();
-        if (lastTap && lastTap.k === tap.k && now - lastTap.t < 350){ const r = rangeOf(tap.k); if (r && r.dataset.def !== undefined){ set(r, +r.dataset.def); show(r, 'Reset'); later(); } lastTap = null; }
+        if (lastTap && lastTap.k === tap.k && now - lastTap.t < 350){ const r = rangeOf(tap.k); if (r && r.dataset.def !== undefined){ set(r, +r.dataset.def); show(r, 'Reset'); later(); ntEv('knob-reset', { id: r.id }); } lastTap = null; }
         else lastTap = { k: tap.k, t: now };
       }
       tap = null;
@@ -740,6 +742,19 @@ const GRIDPANEL = (() => {
     el.addEventListener('keydown', e => { if (pl && e.key === 'Escape'){ e.stopPropagation(); closePlate(); } }, true);
     P.closePlate = closePlate;
   }
+  // on a computer: each control's hover text says what it does in plain words first (the PLAIN table above, its first sentence), then the
+  // planners' wording it always had. One table for both, so the phone's plates and the computer's hover texts can't drift apart (owner, Nov 13)
+  function plainTitles(el){
+    const key = c => { if (c.classList.contains('gk')){ const r = c.querySelector('input[type=range]'); return r ? r.id : ''; }
+      return c.id || (c.classList.contains('subdiv-btn') ? 'subdiv' : c.classList.contains('micro-mode-btn') ? 'mode-' + c.dataset.mode : c.closest('.gprogs') ? 'prog'
+        : c.classList.contains('gtab') ? 'tab-' + c.dataset.mode : ''); };
+    el.querySelectorAll('[title]').forEach(c => {
+      const p = PLAIN[key(c)]; if (!p) return;
+      const first = (p.match(/^.*?[.!?](\s|$)/) || [p])[0].trim();
+      if (c.title.indexOf(first) !== 0) c.title = first + '\n' + c.title;
+    });
+  }
+  P.plainTitles = plainTitles;
   P.build = build; P.fill = r => { const lo = +r.min, hi = +r.max; r.style.setProperty('--p', (hi > lo ? (+r.value - lo)/(hi - lo)*100 : 0) + '%'); };
   return P;
 })();

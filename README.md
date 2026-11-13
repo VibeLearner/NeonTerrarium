@@ -86,6 +86,7 @@ js/grid.js, grid_panel.js, grid_engine.js   the Psycho-Acoustic Grid: live gener
 assets/audio/radio/     the old radio host's recordings (not played now)
 tools/make_playlist.py  optional: writes assets/audio/music/playlist.json (track order, nicer titles)
 tools/make_floor_decals.py, tools/make_holo_ads.py  asset generators for the floor decals and the hologram ad sheets
+tools/pourlab/           the Neon Dome pour lab: a standalone page (open tools/pourlab/index.html) where you pour drinks at the Neon Dome bar; not linked from the game yet (see its README)
 assets/audio/sfx/       sound effects: place.wav (build pop), remove.wav (removal thud), radio-on.wav (radio station arrives), mega-arrive.wav (any other megastructure arrives; 4.6 s, the length of its arrival animation)
 assets/audio/sfx/originals/  the untouched source recordings, for re-editing
 ```

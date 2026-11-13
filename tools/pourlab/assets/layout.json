@@ -1,0 +1,270 @@
+{
+ "W": 480,
+ "H": 270,
+ "CT": 186,
+ "NEAR": 230,
+ "VPX": 240,
+ "VPY": 100,
+ "GX": 334,
+ "POUR_X": 228,
+ "GLASS_BASE": 210,
+ "TOOL_BASE": 206,
+ "RAIL_TOP": 254,
+ "BOTTLE_FLOOR": 282,
+ "WELL": {
+  "xa": -48,
+  "xb": 12,
+  "far": 193,
+  "near": 216
+ },
+ "K": 0.3,
+ "rail": [
+  {
+   "id": "rice",
+   "x": 18,
+   "floor": 282
+  },
+  {
+   "id": "rye",
+   "x": 54,
+   "floor": 282
+  },
+  {
+   "id": "rum",
+   "x": 92,
+   "floor": 282
+  },
+  {
+   "id": "coffee",
+   "x": 127,
+   "floor": 282
+  },
+  {
+   "id": "yuzu",
+   "x": 162,
+   "floor": 282
+  },
+  {
+   "id": "ume",
+   "x": 195,
+   "floor": 282
+  },
+  {
+   "id": "lemongrass",
+   "x": 260,
+   "floor": 282
+  },
+  {
+   "id": "glow",
+   "x": 299,
+   "floor": 274
+  },
+  {
+   "id": "ginger",
+   "x": 338,
+   "floor": 282
+  },
+  {
+   "id": "shiso",
+   "x": 371,
+   "floor": 282
+  },
+  {
+   "id": "soda",
+   "x": 400,
+   "floor": 282
+  },
+  {
+   "id": "bitters",
+   "x": 429,
+   "floor": 266
+  },
+  {
+   "id": "chili",
+   "x": 460,
+   "floor": 266
+  }
+ ],
+ "ingredients": [
+  {
+   "id": "rice",
+   "name": "Clear Grid rice spirit",
+   "tag": "RCE",
+   "liquid": "#D6ECEC",
+   "top": "spout",
+   "dash": false
+  },
+  {
+   "id": "rye",
+   "name": "Ashline smoked rye",
+   "tag": "RYE",
+   "liquid": "#B8682A",
+   "top": "spout",
+   "dash": false
+  },
+  {
+   "id": "rum",
+   "name": "Neon Cane rum",
+   "tag": "RUM",
+   "liquid": "#D99A3A",
+   "top": "spout",
+   "dash": false
+  },
+  {
+   "id": "coffee",
+   "name": "Night Shift coffee liqueur",
+   "tag": "COF",
+   "liquid": "#3B2418",
+   "top": "spout",
+   "dash": false
+  },
+  {
+   "id": "yuzu",
+   "name": "Yuzu juice",
+   "tag": "YUZ",
+   "liquid": "#F0DC72",
+   "top": "cap",
+   "dash": false
+  },
+  {
+   "id": "ume",
+   "name": "Ume ferment",
+   "tag": "UME",
+   "liquid": "#C2577E",
+   "top": "spout",
+   "dash": false
+  },
+  {
+   "id": "lemongrass",
+   "name": "Lemongrass cordial",
+   "tag": "LEM",
+   "liquid": "#B6D684",
+   "top": "spout",
+   "dash": false
+  },
+  {
+   "id": "glow",
+   "name": "Glow syrup",
+   "tag": "GLO",
+   "liquid": "#FF8AD0",
+   "top": "spout",
+   "dash": false
+  },
+  {
+   "id": "ginger",
+   "name": "Ginger fire",
+   "tag": "GIN",
+   "liquid": "#E8782C",
+   "top": "crown",
+   "dash": false
+  },
+  {
+   "id": "shiso",
+   "name": "Shiso tonic",
+   "tag": "SHI",
+   "liquid": "#B9A2E0",
+   "top": "crown",
+   "dash": false
+  },
+  {
+   "id": "soda",
+   "name": "Soda water",
+   "tag": "SOD",
+   "liquid": "#CFE6F0",
+   "top": "crown",
+   "dash": false
+  },
+  {
+   "id": "bitters",
+   "name": "Static bitters",
+   "tag": "BIT",
+   "liquid": "#7A2A2A",
+   "top": "dasher",
+   "dash": true
+  },
+  {
+   "id": "chili",
+   "name": "Chili tincture",
+   "tag": "CHI",
+   "liquid": "#D23A2A",
+   "top": "dasher",
+   "dash": true
+  }
+ ],
+ "tools": [
+  {
+   "id": "cup_quarter",
+   "x": 86,
+   "y": 206
+  },
+  {
+   "id": "cup_half",
+   "x": 114,
+   "y": 206
+  },
+  {
+   "id": "cup_one",
+   "x": 145,
+   "y": 206
+  },
+  {
+   "id": "mixing_glass",
+   "x": 406,
+   "y": 207
+  },
+  {
+   "id": "shaker",
+   "x": 444,
+   "y": 207
+  }
+ ],
+ "glass": {
+  "rt": 13,
+  "rb": 12,
+  "h": 40,
+  "cx": 14
+ },
+ "cups": {
+  "cup_quarter": {
+   "rt": 9,
+   "rb": 7,
+   "h": 13
+  },
+  "cup_half": {
+   "rt": 10,
+   "rb": 8,
+   "h": 17
+  },
+  "cup_one": {
+   "rt": 11,
+   "rb": 9,
+   "h": 21
+  }
+ },
+ "foot": {
+  "cup_quarter": [
+   7,
+   2
+  ],
+  "cup_half": [
+   8,
+   2
+  ],
+  "cup_one": [
+   9,
+   3
+  ],
+  "mixing_glass": [
+   13,
+   4
+  ],
+  "shaker": [
+   9,
+   3
+  ],
+  "glass": [
+   12,
+   4
+  ]
+ }
+}

@@ -97,5 +97,24 @@ const railTip = (id) => ({ x: L.rail.find((r) => r.id === id).x, y: 220 })
   const t2 = sim.tasteOf(sim.S.glass)
   ok(t2.bubbles > 0.05 && t2.notes.sour < t1.notes.sour, `topped with soda: bubbles ${(t2.bubbles * 100).toFixed(0)}%, sour ${t1.notes.sour.toFixed(1)} -> ${t2.notes.sour.toFixed(1)}`)
 }
+{
+  console.log("stir, then pour into the shaker and shake, then strain into the glass")
+  const sim = createSim(L, sizes), mg = sim.S.tools.mixing_glass, sh = sim.S.tools.shaker, rim = sim.toolRim(mg)
+  for (const [id, secs] of [["rye", 1.2], ["ume", 0.8]]) {
+    sim.pick(id, railTip(id)); sim.aim(rim.cx - 24, rim.y - 26); run(sim, 0.5); sim.press(true); run(sim, secs); sim.press(false); run(sim, 1.2); sim.putBack(railTip(id)); run(sim, 0.3)
+  }
+  const before = sim.volOf(mg.c)
+  sim.liftTool("mixing_glass"); run(sim, 0.4); sim.press(true); run(sim, 20); sim.press(false)
+  const stirred = sim.readout(mg.c)
+  sim.strainTool("shaker"); run(sim, 3)
+  ok(sim.volOf(mg.c) < 1e-6 && mg.state === "home", "the stirring glass emptied into the shaker and went back")
+  ok(sim.volOf(sh.c) > before * 0.95, `the shaker caught it (${sim.volOf(sh.c).toFixed(2)} of ${(before / (1 - stirred.dilution)).toFixed(2)})`)
+  sim.liftTool("shaker"); run(sim, 0.4); sim.press(true); run(sim, 3); sim.press(false)
+  const both = sim.readout(sh.c)
+  ok(both.dilution < stirred.dilution + 0.04, `shaking after stirring doesn't double the melted ice (${(stirred.dilution * 100).toFixed(0)}% -> ${(both.dilution * 100).toFixed(0)}%)`)
+  sim.strainTool(); run(sim, 3)
+  const log = sim.S.glass.log.join(", ")
+  ok(/Stirred/.test(log) && /Shaken/.test(log) && sim.S.glass.shaken, "the glass remembers both: " + log)
+}
 console.log(fails ? `${fails} failed` : "all passed")
 process.exit(fails ? 1 : 0)

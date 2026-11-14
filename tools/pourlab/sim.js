@@ -27,11 +27,11 @@ export const INGREDIENT_RULES = {
   ginger: { flow: 1.6 }, shiso: { flow: 2.0 }, soda: { flow: 2.2 },
   bitters: { dash: true }, chili: { dash: true },
 }
-// Short names for the readout (the full names don't fit beside the glass).
+// Names for the readout: the bottles' full names, plus melted ice.
 export const SHORT = {
-  rice: "Clear Grid rice", rye: "Ashline rye", rum: "Neon Cane rum", coffee: "Night Shift coffee", yuzu: "Yuzu juice",
-  ume: "Ume ferment", lemongrass: "Lemongrass cordial", glow: "Glow syrup", ginger: "Ginger fire", shiso: "Shiso tonic",
-  soda: "Soda water", bitters: "Static bitters", chili: "Chili tincture", water: "Melted ice",
+  rice: "Clear Grid rice spirit", rye: "Ashline smoked rye", rum: "Neon Cane rum", coffee: "Night Shift coffee liqueur",
+  yuzu: "Yuzu juice", ume: "Ume ferment", lemongrass: "Lemongrass cordial", glow: "Glow syrup", ginger: "Ginger fire",
+  shiso: "Shiso tonic", soda: "Soda water", bitters: "Static bitters", chili: "Chili tincture", water: "Melted ice",
 }
 const isFizzy = (id) => FLAVOR[id].tags.includes("fizz")
 
@@ -52,7 +52,7 @@ export function rng(seed) { let s = seed >>> 0 || 1; return () => ((s = (s * 166
 // ---------------------------------------------------------------- what a vessel holds
 // parts (melted ice included as "water"), how cold it is (summed over its volume), how much of its fizz is left,
 // whether it was shaken, how many dashes of each, and a short log of how it was made
-const newContents = () => ({ parts: new Map(), chillVol: 0, fizzKeep: 0, shaken: false, dashes: new Map(), log: [], directVol: 0, buildWater: 0, techT: 0, techWater: 0 })
+const newContents = () => ({ parts: new Map(), chillVol: 0, fizzKeep: 0, shaken: false, dashes: new Map(), log: [], directVol: 0, buildWater: 0, techT: 0 })
 const volOf = (c) => { let s = 0; for (const v of c.parts.values()) s += v; return s }
 const fizzyOf = (c) => { let s = 0; for (const [id, v] of c.parts) if (isFizzy(id)) s += v; return s }
 function addTo(c, comp, vol, meta = {}) {
@@ -64,6 +64,7 @@ function addTo(c, comp, vol, meta = {}) {
   if (meta.shaken) c.shaken = true
   if (meta.direct) c.directVol += vol
   if (meta.log) for (const l of meta.log) if (!c.log.includes(l)) c.log.push(l)
+  if (meta.dashRate) for (const [id, n] of meta.dashRate) c.dashes.set(id, (c.dashes.get(id) || 0) + n * vol)   // dashes per part, so each drop brings its share
 }
 // take some volume out (a cup or tool pouring): returns its makeup and properties, and shrinks the rest to match
 function takeFrom(c, vol) {
@@ -71,9 +72,10 @@ function takeFrom(c, vol) {
   if (tot <= 0 || vol <= 0) return null
   const k = vol / tot, fz = fizzyOf(c)
   const out = { comp: new Map([...c.parts].map(([id, v]) => [id, v / tot])), vol,
-    meta: { chill: c.chillVol / tot, ret: fz > 0 ? c.fizzKeep / fz : 1, shaken: c.shaken, log: [...c.log] } }
+    meta: { chill: c.chillVol / tot, ret: fz > 0 ? c.fizzKeep / fz : 1, shaken: c.shaken, log: [...c.log], dashRate: new Map([...c.dashes].map(([id, n]) => [id, n / tot])) } }
   for (const [id, v] of c.parts) c.parts.set(id, v * (1 - k))
-  for (const key of ["chillVol", "fizzKeep", "directVol", "buildWater", "techWater"]) c[key] *= 1 - k
+  for (const [id, n] of c.dashes) c.dashes.set(id, n * (1 - k))     // dashes travel with the drink
+  for (const key of ["chillVol", "fizzKeep", "directVol", "buildWater"]) c[key] *= 1 - k
   return out
 }
 function clearContents(c) { Object.assign(c, newContents()) }
@@ -266,14 +268,18 @@ export function createSim(L, sizes) {
   }
   function moveTool(tool, state, to) { tool.state = state; tool.anim = 0; tool.from = { x: tool.x, y: tool.y }; tool.to = to }
   function putToolDown() { const tool = S.tools[S.toolMode]; if (!tool) return; S.toolMode = null; S.pressing = false; moveTool(tool, "down", { ...tool.home }) }
-  function strainTool() {
+  // strain into the glass, or into the other tool (stir, then shake: or the other way round)
+  function strainTool(into = "glass") {
     const tool = S.tools[S.toolMode]; if (!tool || tool.state !== "ready") return
+    const other = into !== "glass" && S.tools[into]
+    if (into !== "glass" && (!other || other === tool || other.state !== "home")) return
     S.toolMode = null; S.pressing = false
-    // its method goes in the drink's log
+    // its method goes in the drink's log, and travels with the drink
     if (tool.c.techT > 0.3) tool.c.log.push(`${tool.method === "shake" ? "Shaken" : "Stirred"} ${Math.round(tool.c.techT)} s`)
-    // place it so the turned lip ends up just above the glass's middle
-    const lip = lipOffset(tool, 1.9)
-    moveTool(tool, "strainUp", { x: glass.cx - 3 - lip.x, y: glass.top - 6 - lip.y })
+    tool.c.techT = 0
+    // place it so the turned lip ends up just above the middle of what it pours into
+    const lip = lipOffset(tool, 1.9), rim = other ? toolRim(other) : { cx: glass.cx, y: glass.top }
+    moveTool(tool, "strainUp", { x: rim.cx - 3 - lip.x, y: rim.y - 6 - lip.y })
   }
   function dumpTool() { const tool = S.tools[S.toolMode]; if (!tool) return; clearContents(tool.c); putToolDown() }
   // shaking or stirring while held: melted ice and cold build up with time, easing to a plateau
@@ -281,8 +287,10 @@ export function createSim(L, sizes) {
     const c = tool.c, M = METHOD[tool.method]
     c.techT += dt
     const ingVol = volOf(c) - (c.parts.get("water") || 0)
-    const D = M.dilution(c.techT), target = ingVol * D / (1 - D)
-    if (target > c.techWater) { addTo(c, new Map([["water", 1]]), target - c.techWater); c.techWater = target }
+    // melted ice only builds up to this method's curve: water already in the drink (from stirring before shaking,
+    // say) counts toward it, so a second technique adds only what it would add beyond the first
+    const D = M.dilution(c.techT), target = ingVol * D / (1 - D), water = c.parts.get("water") || 0
+    if (target > water) addTo(c, new Map([["water", 1]]), target - water)
     const v = volOf(c); c.chillVol = Math.max(c.chillVol, v * M.chill(c.techT))
     if (tool.method === "shake") {
       c.shaken = true
@@ -539,7 +547,7 @@ export function createSim(L, sizes) {
   // ---------------------------------------------------------------- readouts
   function readout(c = S.glass) {
     const rows = []
-    for (const [id, v] of c.parts) if (v > 0.004) rows.push({ id, name: SHORT[id], parts: v, dashes: c.dashes.get(id) || 0 })
+    for (const [id, v] of c.parts) if (v > 0.004) rows.push({ id, name: SHORT[id], parts: v, dashes: Math.round(c.dashes.get(id) || 0) })
     rows.sort((a, b) => (a.id === "water") - (b.id === "water"))
     const tot = volOf(c)
     return { rows, total: tot, ice: c === S.glass ? iceIn() : 0, full: c === S.glass && tot + iceDisp() >= MAX_PARTS - 0.01, fillLine: FILL_LINE,

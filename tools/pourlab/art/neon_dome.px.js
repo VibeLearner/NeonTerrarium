@@ -754,17 +754,20 @@ const RAIL_X = (() => {
 const railX = (k) => RAIL_X[k]
 const POUR_X = Math.round((RAIL_X[GAP_AFTER] + RAIL_X[GAP_AFTER + 1]) / 2)
 function railBack(c) { c.rect(0, NEAR + 4, W, H - NEAR - 4, "0"); c.hline(0, NEAR + 4, W, "K") }
+const RAIL_WORD = { rice: "RICE", rye: "RYE", rum: "RUM", coffee: "COFFEE", yuzu: "YUZU", ume: "UME", lemongrass: "LEMONGRASS",
+  glow: "GLOW", ginger: "GINGER", shiso: "SHISO", soda: "SODA", bitters: "BITTERS", chili: "CHILI" }
 function railFront(c) {
   c.rect(0, RAIL_TOP, W, H - RAIL_TOP, "E")
   c.hline(0, RAIL_TOP, W, "F"); c.hline(0, RAIL_TOP + 1, W, "f"); c.hline(0, RAIL_TOP + 2, W, "e")
   for (let y = RAIL_TOP + 5; y < H - 1; y += 4) c.hline(0, y, W, "e")
   c.hline(0, H - 1, W, "e")
   for (let x = 4; x < W; x += 120) { c.rect(x, RAIL_TOP + 6, 2, 2, "f"); c.px(x, RAIL_TOP + 6, "F") }
-  // tape labels so the everyday bottles read at a glance
+  // tape labels so the everyday bottles read at a glance: each drink's plain name, whole (the full brand name
+  // shows when the player points at the bottle)
   INGREDIENTS.forEach((ing, k) => {
-    const x = railX(k)
-    c.rect(x - 7, RAIL_TOP + 5, 15, 7, "c"); c.hline(x - 7, RAIL_TOP + 11, 15, "p")
-    c.text(x - 5, RAIL_TOP + 6, ing.tag, "1")
+    const x = railX(k), word = RAIL_WORD[ing.id], w = word.length * 4 - 1, left = Math.round(x - w / 2)
+    c.rect(left - 2, RAIL_TOP + 5, w + 4, 7, "c"); c.hline(left - 2, RAIL_TOP + 11, w + 4, "p")
+    c.text(left, RAIL_TOP + 6, word, "1")
   })
 }
 

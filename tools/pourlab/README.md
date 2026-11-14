@@ -12,6 +12,8 @@ with `fetch`, so opening the file directly won't work):
 
 **Pouring**
 
+- **Point at anything** (a bottle, cup, tool, the ice well, the glass) to see a card saying what it is and does.
+  The rail's tape labels name each drink; the card and the panel give the full name.
 - **Click a bottle** on the rail to pick it up. It follows the pointer, held by its spout.
 - **Hold** anywhere to tilt it and pour; let go to stop (a few last drops fall). Move while pouring to aim.
   Flow ramps up with the tilt, and each bottle pours at its own rate (syrups slower, soda faster).
@@ -30,6 +32,9 @@ with `fetch`, so opening the file directly won't work):
   the panel's gauges show it getting colder and more diluted, quickly (about 10 seconds is right). Shaking knocks
   most of the fizz out, so add soda after. Then **Strain into the glass**.
 - **Stir:** the same with the stirring glass, slower and gentler (about 20 seconds), and it keeps the fizz.
+- **Both:** a lifted tool can pour into the other one, so you can stir and then shake (or the other way round).
+  Melted ice isn't counted twice: the second technique only adds water beyond what the first already put in.
+  The drink remembers both ("Stirred 20 s, shaken 3 s").
 - While a tool is lifted you can also **Taste** it, **Put down** to keep it for later, or **Dump** it out.
 
 **The guest**
@@ -40,7 +45,8 @@ with `fetch`, so opening the file directly won't work):
   sweet), a glowing piece is what got boosted (strength carries heat, bubbles lift freshness). Depth, Brightness and
   Toasted grow from two notes being close to each other (the bracket on the left shows which). Complexity and
   Balance are dials. Point at a bar to read what made it.
-- **Serve** (once the glass reaches the gold line, 2.5 parts) slides the glass to the guest. They react in the same
+- **Serve** (once the glass reaches the gold serve line: 2.5 parts, the smallest drink a guest will take; the glass
+  holds up to 8) slides the glass to the guest. They react in the same
   vibe words, and the spectrograph opens with their arrows: gold for more, pink for less, green for spot on.
 - **Phrasebook** lists every phrase the guests use; serving someone teaches you the ones they said and what range
   of the note each stands for. It's saved in the browser.

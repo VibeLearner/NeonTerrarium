@@ -17,6 +17,8 @@ vm.runInContext(src + `
   tools: TOOLS().map(([n, x, y]) => ({ id: n, x, y })),
   glass: { rt: 13, rb: 12, h: 40, cx: 14 },
   cups: { cup_quarter: { rt: 9, rb: 7, h: 13 }, cup_half: { rt: 10, rb: 8, h: 17 }, cup_one: { rt: 11, rb: 9, h: 21 } },
+  // the tools as vessels, in their sprites own pixels: rim half widths at top and base, height, middle x, rim top y
+  vessels: { shaker: { rt: 11, rb: 9, h: 46, cx: 13, top: 1, opaque: true }, mixing_glass: { rt: 13, rb: 13, h: 30, cx: 14, top: 14 } },
   foot: FOOT,
 }`, ctx)
 fs.writeFileSync(path.join(here, "assets/layout.json"), JSON.stringify(ctx.__layout, null, 1))

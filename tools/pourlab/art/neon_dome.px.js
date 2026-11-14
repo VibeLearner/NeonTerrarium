@@ -634,6 +634,24 @@ sprite("mixing_glass", { w: 30, h: vesselSize(13, 13, 30).h + 14, pivot: "bottom
   for (let x = 4; x <= 24; x += 4) for (let y = v.rimY + 6; y < v.baseY - 4; y++) if ((y + x) % 3) c.px(x, y, (x / 4) % 2 ? "U" : "u")
   c.line(20, 0, 15, v.baseY - 6, "f"); c.line(21, 0, 16, v.baseY - 6, "E"); c.rect(19, 0, 4, 2, "F")
 })
+// the same stirring glass with the spoon out (the pour lab turns the spoon itself while stirring)
+sprite("mixing_glass_bare", { w: 30, h: vesselSize(13, 13, 30).h + 14, pivot: "bottom" }, (c) => {
+  const v = vessel(c, 14, 14, 13, 13, 30, "glass")
+  for (let x = 4; x <= 24; x += 4) for (let y = v.rimY + 6; y < v.baseY - 4; y++) if ((y + x) % 3) c.px(x, y, (x / 4) % 2 ? "U" : "u")
+})
+// the shaker's cap: a smaller tin turned upside down over the mouth, closed end up, frosted rim at the seam
+sprite("shaker_cap", { w: 23, h: 26, pivot: "bottom", outline: "0" }, (c) => {
+  const cx = 11, top = 2, H = 20
+  for (let y = 0; y <= H; y++) {
+    const hw = 7 + 3 * y / H
+    for (let x = Math.round(cx - hw); x <= Math.round(cx + hw); x++) {
+      const u = (x - (cx - hw)) / (2 * hw)
+      c.px(x, top + y, u < 0.1 ? "f" : u < 0.32 ? "F" : u < 0.45 ? "f" : u < 0.8 ? "E" : "e")
+    }
+  }
+  c.ellipse(cx, top, 7, 2, "f"); c.hline(cx - 5, top - 1, 9, "F")
+  c.hline(cx - 10, top + H, 21, "F"); c.hline(cx - 10, top + H + 1, 21, "E")
+})
 // Boston shaker tin: wide mouth up, a weighted base band
 sprite("shaker", { w: 25, h: vesselSize(11, 9, 46).h, pivot: "bottom", outline: "0" }, (c) => {
   const v = vessel(c, 12, 0, 11, 9, 46, "steel")
@@ -795,7 +813,7 @@ barScene("neon_dome")
 // pour_bg: everything that never moves. The cups, the glass and the rail bottles are left out (the page draws them,
 // with their shadows and reflections, so they can be picked up); the shaker and stirring glass stay in for now.
 // pour_front: the rail's front plate on its own, drawn over the bottles.
-const STATIC_TOOLS = () => TOOLS().filter(([n]) => n === "shaker" || n === "mixing_glass")
+const STATIC_TOOLS = () => []   // the pour lab moves every tool now
 scene("pour_bg", { w: W, h: H, bg: "3", world: { light: [-1, -0.6] } },
   layer("sky", skyThroughGlass, cityThroughGlass),
   layer("haze", { opacity: 0.3 }, rect(0, 86, W, 30, "H")),

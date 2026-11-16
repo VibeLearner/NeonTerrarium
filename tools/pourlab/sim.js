@@ -18,6 +18,12 @@ const PART_VOL = 0.01                 // parts carried by one stream particle
 export const MAX_PARTS = 8, FILL_LINE = 2.5, DASH = 0.05
 const ICE_DISPLACE = 0.35             // parts of level each floating cube adds (lab choice)
 const MAX_ICE = 4
+export const TOOL_ICE = 6             // cubes a shaker or stirring glass takes (lab choice)
+export const ICE_FOR_FULL = 3         // cubes a tool needs to chill and dilute fully; with none it barely does (lab choice)
+const ICE_ASSIST = 3                  // px of forgiveness past the edge of an opening: a near miss still drops in
+const ICE_MAGNET = 16                 // px past an opening's edge where a falling cube gets steered toward its middle
+const ICE_MAGNET_FAR = 0.1            // ...widened for long throws: 10% of the distance thrown, so far targets are as fair
+const MAX_THROW = 950                 // px/s: the fastest a flick can send a cube (enough to reach the shaker)
 
 // Pour rates (lab choice: the design doc says each bottle has its own rate, not what they are).
 // flow: parts per second at full tilt. thick: syrups fall in a heavier, steadier stream.
@@ -52,7 +58,7 @@ export function rng(seed) { let s = seed >>> 0 || 1; return () => ((s = (s * 166
 // ---------------------------------------------------------------- what a vessel holds
 // parts (melted ice included as "water"), how cold it is (summed over its volume), how much of its fizz is left,
 // whether it was shaken, how many dashes of each, and a short log of how it was made
-const newContents = () => ({ parts: new Map(), chillVol: 0, fizzKeep: 0, shaken: false, dashes: new Map(), log: [], directVol: 0, buildWater: 0, techT: 0 })
+const newContents = () => ({ ice: 0, parts: new Map(), chillVol: 0, fizzKeep: 0, shaken: false, dashes: new Map(), log: [], directVol: 0, buildWater: 0, techT: 0 })
 const volOf = (c) => { let s = 0; for (const v of c.parts.values()) s += v; return s }
 const fizzyOf = (c) => { let s = 0; for (const [id, v] of c.parts) if (isFizzy(id)) s += v; return s }
 function addTo(c, comp, vol, meta = {}) {
@@ -130,6 +136,8 @@ export function createSim(L, sizes) {
     pressing: false,
     cups: {}, activeCup: null,
     tools: {}, toolMode: null,  // the shaker and stirring glass; which one is lifted and in use
+    grab: null,                 // a cube held from the ice well: where it is, and where the pointer has been lately
+    thrown: [],                 // cubes in the air, or landed on the counter and melting away
     emitAcc: 0, streamId: 1, trail: 0,
     notice: null,               // a short message for the player, fading
   }
@@ -234,6 +242,106 @@ export function createSim(L, sizes) {
     return true
   }
 
+  // ---------------------------------------------------------------- ice from the well: drag it, drop it, or flick it
+  // A cube follows the pointer. Let go over an opening and it drops in; let go while moving and it flies off at the
+  // pointer's speed and direction, under gravity, so a flick at the right angle arcs into the glass or a tool.
+  // times are the pointer events' own clock in seconds when the page passes them (the simulation's clock only moves
+  // once per drawn frame, too coarse to time a flick); the tests leave them out and use the simulation's clock
+  function grabIce(x, y, t = S.t) {
+    if (S.held) { if (S.held.kind === "cup") returnCup(); else S.held = null }
+    S.grab = { x, y, samples: [{ x, y, t }] }
+  }
+  function moveIce(x, y, t = S.t) {
+    const g = S.grab; if (!g) return
+    g.x = x; g.y = y; g.samples.push({ x, y, t }); if (g.samples.length > 24) g.samples.shift()
+  }
+  // the pointer's speed over the last moment before letting go (a tenth of a second at most)
+  function throwVelocity(g, now) {
+    const last = g.samples[g.samples.length - 1]
+    let old = null
+    for (const s of g.samples) if (now - s.t <= 0.1 && last.t - s.t >= 1 / 60) { old = s; break }
+    if (!old || now - last.t > 0.08) return { vx: 0, vy: 0 }        // held still before letting go: a drop
+    let vx = (last.x - old.x) / (last.t - old.t), vy = (last.y - old.y) / (last.t - old.t)
+    const sp = Math.hypot(vx, vy); if (sp > MAX_THROW) { vx *= MAX_THROW / sp; vy *= MAX_THROW / sp }
+    return { vx, vy }
+  }
+  function releaseIce(now = S.t) {
+    const g = S.grab; if (!g) return
+    S.grab = null
+    const { vx, vy } = throwVelocity(g, now)
+    S.thrown.push({ x: g.x, y: g.y, x0: g.x, vx, vy, rot: 0, spin: (R() - 0.5) * 8 + vx * 0.02, state: "fly", life: 1.2, py: g.y })
+  }
+  // the openings a cube can drop into: the glass, and the tools on the counter (or lifted, waiting)
+  function iceTargets() {
+    const list = [{ name: "glass", cx: glass.cx, y: glass.rimY, hw: glass.hw(glass.rimY) - 2, side: glass.hw(glass.rimY) + 2, bottom: L.GLASS_BASE }]
+    for (const tool of Object.values(S.tools)) if (tool.state === "home" || (tool.state === "ready" && tool.id !== "shaker")) {   // not a capped shaker
+      const rim = toolRim(tool); list.push({ name: tool.id, tool, cx: rim.cx, y: rim.y, hw: rim.hw, side: tool.rt + 2, bottom: tool.y })
+    }
+    return list
+  }
+  function landIce(cube, t) {
+    if (t.name === "glass") {
+      if (S.ice.length >= MAX_ICE) { say("Four cubes is plenty for this glass."); return false }
+      S.ice.push({ state: "in", x: clamp(cube.x, glass.cx - 6, glass.cx + 6), y: glass.rimY - 2, vx: 0, vy: Math.max(40, cube.vy * 0.6) })
+      return true
+    }
+    if (t.tool.c.ice >= TOOL_ICE) { say("That's plenty of ice."); return false }
+    t.tool.c.ice++; t.tool.clink = 0.25
+    return true
+  }
+  function stepThrown(dt) {
+    const targets = iceTargets(), keep = []
+    for (const c of S.thrown) {
+      if (c.state === "counter") {                       // landed: slides to a stop and melts away
+        c.vx *= Math.exp(-dt * 6); c.x += c.vx * dt; c.life -= dt
+        if (c.life > 0) keep.push(c)
+        continue
+      }
+      // a gentle steer for near misses (game-dev "aim assist"): late in its fall, a cube heading for just beside an
+      // opening is nudged toward its middle, so the throw only has to be close, not perfect
+      if (c.vy > -40) {
+        let best = null
+        for (const t of targets) {
+          if (c.y >= t.y) continue
+          const disc = c.vy * c.vy + 2 * GRAV * (t.y - c.y); if (disc < 0) continue
+          const th = (-c.vy + Math.sqrt(disc)) / GRAV, ax = c.x + c.vx * th
+          if (th < 0.7 && Math.abs(ax - t.cx) < t.hw + Math.max(ICE_MAGNET, ICE_MAGNET_FAR * Math.abs(t.cx - c.x0)) && (!best || Math.abs(ax - t.cx) < best.d)) best = { t, th, d: Math.abs(ax - t.cx) }
+        }
+        if (best) c.vx += ((best.t.cx - c.x) / best.th - c.vx) * (1 - Math.exp(-dt * 7))
+      }
+      const py = c.y, px0 = c.x
+      c.vy += GRAV * dt; c.x += c.vx * dt; c.y += c.vy * dt; c.rot += c.spin * dt
+      let gone = false
+      for (const t of targets) {
+        // through the opening, coming down (a little past the edge still counts)
+        if (c.vy > 0 && py < t.y && c.y >= t.y) {
+          const ax = px0 + (c.x - px0) * ((t.y - py) / (c.y - py)), d = Math.abs(ax - t.cx)
+          if (d <= t.hw + ICE_ASSIST) { if (landIce({ ...c, x: ax }, t)) { gone = true; break } }
+          if (d <= t.side + 3) {                          // off the rim (or the vessel is full): a clink and a bounce
+            c.vy = -Math.abs(c.vy) * 0.3; c.vx = Math.sign(ax - t.cx || 1) * Math.max(40, Math.abs(c.vx) * 0.6); c.y = t.y - 1
+            c.spin *= -1.5; S.clink = { x: ax, y: t.y, t: 0.2 }
+          }
+        }
+        // the vessel's side: knocked away
+        if (!gone && c.y > t.y && c.y < t.bottom && Math.abs(c.x - t.cx) < t.side + 3 && Math.abs(px0 - t.cx) >= t.side + 3) {
+          c.vx = Math.sign(c.x - t.cx) * Math.abs(c.vx) * 0.4; c.x = t.cx + Math.sign(c.x - t.cx) * (t.side + 3)
+        }
+      }
+      if (gone) continue
+      // the counter, or back into the well
+      if (c.y >= L.GLASS_BASE + 2 && c.vy > 0) {
+        const well = c.x >= proj(L.WELL.xa, L.GLASS_BASE) && c.x <= proj(L.WELL.xb, L.GLASS_BASE)
+        if (!well) { c.state = "counter"; c.y = L.GLASS_BASE + 2; c.vx *= 0.5; keep.push(c) }
+        continue
+      }
+      if (c.x < -20 || c.x > L.W + 20 || c.y > L.H + 20) continue
+      keep.push(c)
+    }
+    S.thrown = keep
+    if (S.clink && (S.clink.t -= dt) <= 0) S.clink = null
+  }
+  const proj = (xn, y) => L.VPX + (xn - L.VPX) * (y - L.VPY) / (L.NEAR - L.VPY)
+
   // ---------------------------------------------------------------- cups: measure, then pick up and pour
   function moveCup(cup, state, to) { cup.state = state; cup.anim = 0; cup.from = { x: cup.x, y: cup.y }; cup.to = to }
   function activateCup(id) {
@@ -264,7 +372,7 @@ export function createSim(L, sizes) {
     if (volOf(tool.c) < 0.01) { say(id === "shaker" ? "Pour something into the shaker first." : "Pour something into the stirring glass first."); return }
     if (S.held) S.held = null
     moveTool(tool, "lift", { x: tool.home.x + (id === "shaker" ? 2 : 0), y: tool.home.y - (id === "shaker" ? 30 : 20) })   // straight up off its spot
-    S.toolMode = id; S.pressing = false
+    S.toolMode = id; S.pressing = false; tool.warned = false
   }
   function moveTool(tool, state, to) { tool.state = state; tool.anim = 0; tool.from = { x: tool.x, y: tool.y }; tool.to = to }
   function putToolDown() { const tool = S.tools[S.toolMode]; if (!tool) return; S.toolMode = null; S.pressing = false; moveTool(tool, "down", { ...tool.home }) }
@@ -289,9 +397,12 @@ export function createSim(L, sizes) {
     const ingVol = volOf(c) - (c.parts.get("water") || 0)
     // melted ice only builds up to this method's curve: water already in the drink (from stirring before shaking,
     // say) counts toward it, so a second technique adds only what it would add beyond the first
-    const D = M.dilution(c.techT), target = ingVol * D / (1 - D), water = c.parts.get("water") || 0
+    // the ice does the work: with no ice it barely chills or dilutes, with three cubes or more it follows the curve
+    const f = 0.08 + 0.92 * Math.min(1, c.ice / ICE_FOR_FULL)
+    if (c.ice === 0 && !tool.warned) { tool.warned = true; say(tool.id === "shaker" ? "No ice in the shaker: it won't get cold. Put it down and add ice first." : "No ice in the stirring glass: it won't get cold. Drag or flick some ice in.") }
+    const D = M.dilution(c.techT) * f, target = ingVol * D / (1 - D), water = c.parts.get("water") || 0
     if (target > water) addTo(c, new Map([["water", 1]]), target - water)
-    const v = volOf(c); c.chillVol = Math.max(c.chillVol, v * M.chill(c.techT))
+    const v = volOf(c); c.chillVol = Math.max(c.chillVol, v * M.chill(c.techT) * f)
     if (tool.method === "shake") {
       c.shaken = true
       const fz = fizzyOf(c); if (fz > 0) c.fizzKeep = Math.max(fz * SHAKE_FIZZ_LEFT, c.fizzKeep * Math.exp(-dt * 4))
@@ -299,7 +410,7 @@ export function createSim(L, sizes) {
   }
 
   function emptyGlass() {
-    clearContents(S.glass); S.ice = S.ice.filter((c) => c.state === "fly")
+    clearContents(S.glass); S.ice = []
     S.wave.fill(0); S.waveV.fill(0); S.swirls = []; S.bubbles = []; S.foam = 0; S.overflow = 0
     S.fieldReady = false
     S.particles = S.particles.filter((p) => !p.inGlass)
@@ -319,6 +430,8 @@ export function createSim(L, sizes) {
     stepField(dt)
     stepFizz(dt)
     stepIce(dt)
+    stepThrown(dt)
+    for (const tool of Object.values(S.tools)) if (tool.clink > 0) tool.clink -= dt
     if (S.overflow > 0) S.overflow = Math.max(0, S.overflow - dt * 0.6)
   }
 
@@ -550,13 +663,13 @@ export function createSim(L, sizes) {
     for (const [id, v] of c.parts) if (v > 0.004) rows.push({ id, name: SHORT[id], parts: v, dashes: Math.round(c.dashes.get(id) || 0) })
     rows.sort((a, b) => (a.id === "water") - (b.id === "water"))
     const tot = volOf(c)
-    return { rows, total: tot, ice: c === S.glass ? iceIn() : 0, full: c === S.glass && tot + iceDisp() >= MAX_PARTS - 0.01, fillLine: FILL_LINE,
+    return { rows, total: tot, ice: c === S.glass ? iceIn() : c.ice, full: c === S.glass && tot + iceDisp() >= MAX_PARTS - 0.01, fillLine: FILL_LINE,
       chill: tot > 0 ? c.chillVol / tot : 0, dilution: tot > 0 ? (c.parts.get("water") || 0) / tot : 0, log: c.log }
   }
 
   return {
     S, L, ing, glass, MEASURE, CAP,
-    step, pick, putBack, aim, press, addIce, activateCup, clickActiveCup, sendHome, emptyGlass,
+    step, pick, putBack, aim, press, addIce, grabIce, moveIce, releaseIce, activateCup, clickActiveCup, sendHome, emptyGlass,
     liftTool, putToolDown, strainTool, dumpTool, toolBox, toolRim, toolLip,
     total, levelParts, surfaceY, volOf, cupRim, compColor, srgb, readout, tasteOf, say,
   }

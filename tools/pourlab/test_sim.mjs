@@ -8,6 +8,9 @@ const sizes = Object.fromEntries(["glass", "cup_quarter", "cup_half", "cup_one",
 let fails = 0
 const ok = (cond, msg) => { console.log((cond ? "  ok   " : "  FAIL ") + msg); if (!cond) fails++ }
 const run = (sim, secs) => { for (let t = 0; t < secs; t += STEP) sim.step() }
+// ice: hold a cube still over an opening and let go (a drop), or move it and let go (a flick)
+const dropIce = (sim, rim, n) => { for (let k = 0; k < n; k++) { sim.grabIce(rim.cx, rim.y - 15); run(sim, 0.2); sim.releaseIce(); run(sim, 0.4) } }
+const flick = (sim, from, vx, vy) => { sim.grabIce(from.x - vx * 0.05, from.y - vy * 0.05); for (let k = 0; k < 6; k++) sim.step(); sim.moveIce(from.x, from.y); sim.releaseIce(); run(sim, 1.5) }   // exactly 0.05 s of pointer movement
 const railTip = (id) => ({ x: L.rail.find((r) => r.id === id).x, y: 220 })
 
 {
@@ -84,6 +87,7 @@ const railTip = (id) => ({ x: L.rail.find((r) => r.id === id).x, y: 220 })
   }
   const inShaker = sim.volOf(sh.c)
   ok(inShaker > 2 && sim.total() < 0.01, "the shaker filled, the glass didn't (" + inShaker.toFixed(2) + " parts)")
+  dropIce(sim, rim, 3); ok(sh.c.ice === 3, "3 cubes dropped into the shaker")
   sim.liftTool("shaker"); run(sim, 0.4); ok(sim.S.toolMode === "shaker", "the shaker is lifted to shake")
   sim.press(true); run(sim, 10); sim.press(false)
   const r = sim.readout(sh.c)
@@ -107,6 +111,7 @@ const railTip = (id) => ({ x: L.rail.find((r) => r.id === id).x, y: 220 })
   for (let k = 0; k < 3; k++) { sim.press(true); sim.press(false); run(sim, 0.3) }
   run(sim, 1); sim.putBack(railTip("bitters")); run(sim, 0.3)
   ok(mg.c.dashes.get("bitters") === 3, "3 dashes of bitters in the stirring glass")
+  dropIce(sim, rim, 3); dropIce(sim, sim.toolRim(sh), 3)
   const before = sim.volOf(mg.c)
   sim.liftTool("mixing_glass"); run(sim, 0.4); sim.press(true); run(sim, 20); sim.press(false)
   const stirred = sim.readout(mg.c)
@@ -121,6 +126,45 @@ const railTip = (id) => ({ x: L.rail.find((r) => r.id === id).x, y: 220 })
   ok(/Stirred/.test(log) && /Shaken/.test(log) && sim.S.glass.shaken, "the glass remembers both: " + log)
   const dashes = sim.readout().rows.find((r) => r.id === "bitters")
   ok(dashes && dashes.dashes === 3, `the dashes came along through both tools (${dashes ? dashes.dashes : 0} dashes, ${dashes ? dashes.parts.toFixed(3) : 0} parts)`)
+}
+{
+  console.log("ice: drop it in, flick it in, miss")
+  const sim = createSim(L, sizes), g = sim.glass
+  dropIce(sim, { cx: g.cx, y: g.rimY }, 2)
+  ok(sim.readout().ice === 2, "held still over the glass and let go: 2 cubes drop in")
+  sim.emptyGlass()
+  // a flick from beside the well that arcs into the middle of the glass in half a second
+  const from = { x: 60, y: 192 }, T = 0.7, vx = (g.cx - from.x) / T, vy = (g.rimY - from.y - 0.5 * 520 * T * T) / T
+  flick(sim, from, vx, vy)
+  ok(sim.readout().ice === 1, `a flick at ${(Math.atan2(-vy, vx) * 180 / Math.PI).toFixed(0)} degrees, ${Math.hypot(vx, vy).toFixed(0)} px/s, lands in the glass`)
+  // how much the angle can vary and still go in
+  const sp = Math.hypot(vx, vy), a0 = Math.atan2(vy, vx), inside = []
+  for (let d = -12; d <= 12; d += 0.5) {
+    const s2 = createSim(L, sizes), a = a0 + d * Math.PI / 180
+    flick(s2, from, sp * Math.cos(a), sp * Math.sin(a))
+    if (s2.readout().ice === 1) inside.push(d)
+  }
+  const win = inside.length ? inside[inside.length - 1] - inside[0] : 0
+  ok(win >= 6 && win <= 30, `the angle can be off by ${inside[0]} to +${inside[inside.length - 1]} degrees and still go in (a ${win}-degree window)`)
+  const spdOk = [0.94, 1.06].every((k) => { const s5 = createSim(L, sizes); flick(s5, from, vx * k, vy * k); return s5.readout().ice === 1 })
+  ok(spdOk, "6% too soft or too hard still goes in (a gentle steer for near misses)")
+  const s3 = createSim(L, sizes); flick(s3, from, vx * 0.7, vy)
+  ok(s3.readout().ice === 0 && s3.S.thrown.length <= 1, "a flick that's too soft falls short onto the counter")
+  const s4 = createSim(L, sizes), sh = s4.S.tools.shaker
+  for (let k = 0; k < 5; k++) dropIce(s4, { cx: g.cx, y: g.rimY }, 1)
+  ok(s4.readout().ice === 4, "the glass takes four cubes, the fifth bounces off")
+  dropIce(s4, s4.toolRim(sh), 2); ok(sh.c.ice === 2, "cubes drop into the shaker too")
+}
+{
+  console.log("shaking needs ice")
+  const sim = createSim(L, sizes), sh = sim.S.tools.shaker, rim = sim.toolRim(sh)
+  sim.pick("rum", railTip("rum")); sim.aim(rim.cx - 24, rim.y - 26); run(sim, 0.5); sim.press(true); run(sim, 1.2); sim.press(false); run(sim, 1.2); sim.putBack(railTip("rum")); run(sim, 0.3)
+  sim.liftTool("shaker"); run(sim, 0.4); sim.press(true); run(sim, 0.2)
+  const told = sim.S.notice ? sim.S.notice.text : "nothing"
+  run(sim, 9.8); sim.press(false)
+  const r = sim.readout(sh.c)
+  ok(r.chill < 0.12 && r.dilution < 0.03, `10 s of shaking with no ice: chill ${r.chill.toFixed(2)}, ${(r.dilution * 100).toFixed(1)}% melted ice`)
+  ok(/No ice/.test(told), "the player is told why: " + told)
 }
 console.log(fails ? `${fails} failed` : "all passed")
 process.exit(fails ? 1 : 0)

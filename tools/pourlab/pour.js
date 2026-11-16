@@ -252,7 +252,8 @@ function targetAt(x, y) {
     const dial = x >= SPEC.x + 186 ? (y < SPEC.y + 96 ? "complexity" : y < SPEC.y + 160 ? "balance" : null) : null
     return { kind: "spectro", row: i >= 0 && x < SPEC.x + 186 ? SPEC_ROWS[i] : dial }
   }
-  if (guest.phase !== "asking" || S.toolMode) return null
+  if (guest.phase !== "asking") return null
+  if (S.toolMode) return inPoly(x, y, WELL) ? { kind: "ice" } : null       // a lifted tool can still take ice
   // bottles on the rail (the one in hand has left its slot)
   for (const g of L.ingredients) {
     if (S.held && S.held.id === g.id) continue
@@ -280,12 +281,12 @@ view.addEventListener("pointerdown", (e) => {
   if (book.open || (t && t.kind === "spectro")) return
   if (e.button === 2) { putBackHeld(); return }
   if (guest.phase !== "asking") { sim.say("Click Next guest to serve someone new."); return }
+  if (t && t.kind === "ice") { sim.grabIce(p.x, p.y, e.timeStamp / 1000); return }      // a cube from the well, to drag or flick
   if (S.toolMode) { sim.press(true); return }                     // hold anywhere to shake or stir
   if (t && t.kind === "bottle") {
     dropHeld()                                                     // swap: the one in hand goes straight back
     sim.pick(t.id, railTip(t.id)); const a = clampAim(p); sim.aim(a.x, a.y)
   } else if (t && t.kind === "rail") putBackHeld()
-  else if (t && t.kind === "ice") sim.addIce(WELL_MID)
   else if (t && t.kind === "cup") sim.activateCup(t.id)
   else if (t && t.kind === "activeCup") sim.clickActiveCup()
   else if (t && t.kind === "tool") sim.liftTool(t.id)
@@ -294,8 +295,9 @@ view.addEventListener("pointerdown", (e) => {
 view.addEventListener("pointermove", (e) => {
   const p = toScene(e); pointer.x = p.x; pointer.y = p.y
   if (S.held && !S.held.back) { const a = clampAim(p); sim.aim(a.x, a.y) }
+  if (S.grab) sim.moveIce(clamp(p.x, 2, W - 2), clamp(p.y, 2, H - 2), e.timeStamp / 1000)
 })
-const release = () => { pointer.down = false; if (S.toolMode || (S.held && S.held.kind !== "dasher")) sim.press(false) }
+const release = (e) => { pointer.down = false; if (S.grab) { sim.releaseIce(e.timeStamp / 1000); return } if (S.toolMode || (S.held && S.held.kind !== "dasher")) sim.press(false) }
 view.addEventListener("pointerup", release)
 view.addEventListener("pointercancel", release)
 view.addEventListener("pointerleave", () => { pointer.x = -99; pointer.y = -99 })
@@ -349,17 +351,20 @@ function drawCup(cup) {
 }
 // the stirring glass is clear, so its drink shows through the side: a body, a surface, and a few cubes of ice
 function drawMixLiquid(tool, left, top) {
-  const c = tool.c, vol = sim.volOf(c); if (vol < 0.005) return
+  const c = tool.c, vol = sim.volOf(c)
   const cx = left + tool.cx, rim = top + tool.top + tool.ryT, base = rim + L.vessels[tool.id].h - 4
   const surf = Math.round(base - Math.min(1, vol / 6) * (base - rim - 3))
   const col = sim.srgb(sim.compColor(c.parts)), face = mixRgb(mixRgb(col, SKY, 0.18), WHITE, 0.15)
-  for (let y = surf - 1; y <= base; y++) for (let x = cx - tool.rt + 2; x <= cx + tool.rt - 1; x++) {
+  if (vol >= 0.005) for (let y = surf - 1; y <= base; y++) for (let x = cx - tool.rt + 2; x <= cx + tool.rt - 1; x++) {
     const d = (x - cx) / tool.rt
     px(x, y, y <= surf ? face : mixRgb(col, INK, 0.3 * d * d))
   }
-  for (let k = 0; k < 3; k++) {
-    const sx = cx - 6 + k * 6 + Math.round(Math.sin(tool.stir * 6 + k * 2.1) * 4), sy = surf + 1 + (k % 2)
-    for (let y = 0; y < 5; y++) for (let x = 0; x < 5; x++) px(sx + x - 2, sy + y - 2, x === 0 || y === 0 ? hex("#8CCBC0") : x === 4 || y === 4 ? hex("#4F9C96") : mixRgb(hex("#C6EDE4"), col, 0.3))
+  // its ice: floating at the surface (turning with the spoon), or piled on the bottom while it's dry
+  for (let k = 0; k < c.ice; k++) {
+    const row = Math.floor(k / 3), slot = k % 3
+    const sx = cx - 6 + slot * 6 + (vol >= 0.005 ? Math.round(Math.sin(tool.stir * 6 + k * 2.1) * 3) : row * 3)
+    const sy = vol >= 0.005 ? Math.max(surf + 1 + (k % 2) + row * 5, rim + 4) : base - 4 - row * 5
+    for (let y = 0; y < 5; y++) for (let x = 0; x < 5; x++) px(sx + x - 2, sy + y - 2, mixRgb(cubePx(Math.min(5, x + (x > 1)), Math.min(5, y + (y > 1))), col, vol >= 0.005 && sy + y - 2 > surf ? 0.3 : 0))
   }
 }
 // the bar spoon, turning in the stirring glass: its bowl circles near the bottom, the handle leans out of the top
@@ -380,6 +385,12 @@ function drawToolHome(tool) {
     const rim = sim.toolRim(tool), f = Math.min(1, sim.volOf(tool.c) / 6)
     drawOpening(Math.round(rim.cx), Math.round(rim.y), rim.hw + 1, tool.ryT, (1 - f) * 8, sim.srgb(sim.compColor(tool.c.parts)))
   }
+  // the tops of its cubes, seen down the tin's opening
+  if (tool.id === "shaker" && tool.c.ice) {
+    const rim = sim.toolRim(tool)
+    for (let k = 0; k < Math.min(4, tool.c.ice); k++) { const x = Math.round(rim.cx - 6 + k * 4), y = Math.round(rim.y + (k % 2)); fill(x, y, 3, 1, WHITE); fill(x, y + 1, 3, 1, hex("#8CCBC0")) }
+  }
+  if (tool.clink > 0) { const rim = sim.toolRim(tool); ctx.globalAlpha = tool.clink * 4; px(rim.cx - 5, rim.y - 4, WHITE); px(rim.cx + 4, rim.y - 5, WHITE); px(rim.cx, rim.y - 7, WHITE); ctx.globalAlpha = 1 }
 }
 // a tool off its spot: lifted to shake or stir (jiggling while held down), or tipped to strain into the glass
 function drawToolMoving(tool) {
@@ -452,16 +463,30 @@ function drawLiquid() {
   const bc = mixRgb(mean, WHITE, 0.55)
   for (const b of S.bubbles) px(b.x + Math.sin(b.ph) * 0.6, b.y, bc)
 }
+// an ice cube: 6 px, lit from the top left; tinted by the drink where it's under the surface
+function cubePx(x, y, under) {
+  const edge = x === 0 || y === 0 || x === 5 || y === 5
+  const col = edge ? (y === 0 || x === 0 ? hex("#8CCBC0") : hex("#4F9C96")) : y === 1 || x === 1 ? WHITE : hex("#C6EDE4")
+  return under ? mixRgb(col, under, 0.45) : col
+}
+const CUBE = document.createElement("canvas"); CUBE.width = 6; CUBE.height = 6
+{ const g = CUBE.getContext("2d"); for (let y = 0; y < 6; y++) for (let x = 0; x < 6; x++) { g.fillStyle = rgbStr(cubePx(x, y)); g.fillRect(x, y, 1, 1) } }
+// cubes in the air (turning as they fly), melting on the counter, and the one in hand
+function drawThrown() {
+  for (const c of S.thrown) {
+    if (c.state === "counter") ctx.globalAlpha = Math.min(1, c.life * 1.5)
+    ctx.save(); ctx.translate(Math.round(c.x), Math.round(c.y)); ctx.rotate(Math.round(c.rot / (Math.PI / 8)) * (Math.PI / 8)); ctx.drawImage(CUBE, -3, -3); ctx.restore()
+    ctx.globalAlpha = 1
+  }
+  if (S.clink) { const a = S.clink.t / 0.2; ctx.globalAlpha = a; for (const [dx, dy] of [[-3, -2], [3, -2], [0, -4]]) px(S.clink.x + dx * (2 - a), S.clink.y + dy * (2 - a), WHITE); ctx.globalAlpha = 1 }
+  if (S.grab) { drawShadow(S.grab.x, Math.min(L.GLASS_BASE, S.grab.y + 14), 3, 1, 0.25); ctx.drawImage(CUBE, Math.round(S.grab.x - 3), Math.round(S.grab.y - 3)) }
+}
 function drawIce() {
   const s = sim.surfaceY()
   for (const c of S.ice) {
-    const x0 = Math.round(c.x - 3), y0 = Math.round(c.y - 3)
-    for (let y = 0; y < 6; y++) for (let x = 0; x < 6; x++) {
-      const edge = x === 0 || y === 0 || x === 5 || y === 5
-      let col = edge ? (y === 0 || x === 0 ? hex("#8CCBC0") : hex("#4F9C96")) : y === 1 || x === 1 ? WHITE : hex("#C6EDE4")
-      if (c.state === "in" && sim.total() > 0.15 && y0 + y > s + S.wave[clamp(x0 + x - glass.col0, 0, glass.N - 1)]) col = mixRgb(col, sim.srgb(S.mean), 0.45)
-      px(x0 + x, y0 + y, col)
-    }
+    const x0 = Math.round(c.x - 3), y0 = Math.round(c.y - 3), mean = sim.srgb(S.mean)
+    for (let y = 0; y < 6; y++) for (let x = 0; x < 6; x++)
+      px(x0 + x, y0 + y, cubePx(x, y, c.state === "in" && sim.total() > 0.15 && y0 + y > s + S.wave[clamp(x0 + x - glass.col0, 0, glass.N - 1)] ? mean : null))
   }
 }
 function drawFillLine() {
@@ -530,6 +555,7 @@ function drawHeld() {
 }
 function tag(s, cx, y, color = CREAM) {
   const w = textW(s) + 6
+  cx = clamp(cx, w / 2 + 2, W - w / 2 - 2)            // keep it on screen
   fill(Math.round(cx - w / 2), y, w, 10, "rgba(20,26,22,0.82)")
   text(s, Math.round(cx), y + 1, color, "center")
 }
@@ -539,7 +565,12 @@ function drawLabels() {
     const v = sim.volOf(cup.c)
     tag(`${v.toFixed(2)} / ${cup.cap.toFixed(2)}`, cup.x, cupBox(cup).y - 12, v >= cup.cap - 0.005 ? "#FFC94A" : CREAM)
   }
-  for (const tool of Object.values(S.tools)) if (tool.state === "home" && sim.volOf(tool.c) > 0.004) tag(`${sim.volOf(tool.c).toFixed(2)} parts`, tool.x, toolBoxOf(tool).y - 11)
+  for (const tool of Object.values(S.tools)) if (tool.state === "home" && (sim.volOf(tool.c) > 0.004 || tool.c.ice)) {
+    const v = sim.volOf(tool.c), bits = []
+    if (v > 0.004) bits.push(`${v.toFixed(2)} parts`)
+    bits.push(tool.c.ice ? `${tool.c.ice} ice` : "no ice")
+    tag(bits.join(", "), tool.x, toolBoxOf(tool).y - 11, tool.c.ice ? CREAM : "#E9A08A")
+  }
 }
 function drawWellHover() {
   if (!(hover && hover.kind === "ice")) return
@@ -572,7 +603,7 @@ function drawSidePanel() {
   const P = { x: 6, y: 44, w: Math.max(160, ...r.rows.map((row) => 12 + textW(row.name) + 8 + textW(row.dashes ? "6 dashes" : "0.00") + 6)) }
   const hint = wrap(hintText(), P.w - 12)
   const rows = Math.max(1, r.rows.length)
-  const h = tool ? 14 + rows * 9 + 6 + 9 + 30 + 11 + 48 + hint.length * 9 + 4
+  const h = tool ? 14 + rows * 9 + 6 + 9 + 9 + 30 + 11 + 48 + hint.length * 9 + 4
     : 14 + rows * 9 + 6 + 9 + (r.ice ? 9 : 0) + 11 + (r.log.length ? 9 : 0) + 17 + hint.length * 9 + 4
   panel(P.x, P.y, P.w, h)
   let y = P.y + 5
@@ -581,6 +612,9 @@ function drawSidePanel() {
   fill(P.x + 6, y + 1, P.w - 12, 1, "rgba(232,176,96,0.35)"); y += 5
   text("Total", P.x + 6, y, CREAM); text(tool ? `${r.total.toFixed(2)} parts` : `${r.total.toFixed(2)} of ${MAX_PARTS} parts`, P.x + P.w - 6, y, CREAM, "right"); y += 9
   if (tool) {
+    if (tool.c.ice) { text("Ice", P.x + 6, y, CREAM); text(`${tool.c.ice} cube${tool.c.ice > 1 ? "s" : ""}${tool.c.ice < 3 ? " (3 works best)" : ""}`, P.x + P.w - 6, y, CREAM, "right") }
+    else text("No ice: it won't get cold", P.x + 6, y, "#FF8A7A")
+    y += 9
     gauge("Cold", P.x + 6, y + 1, P.w - 12, r.chill, r.chill.toFixed(2), "#8FE6FF"); y += 15
     gauge("Melted ice", P.x + 6, y + 1, P.w - 12, r.dilution / 0.4, `${Math.round(r.dilution * 100)}%`, "#C6EDE4"); y += 15
     const verb = tool.method === "shake" ? "Shaken" : "Stirred"
@@ -595,7 +629,7 @@ function drawSidePanel() {
   } else {
     if (r.ice) { text("Ice", P.x + 6, y, CREAM); text(`${r.ice} cube${r.ice > 1 ? "s" : ""}`, P.x + P.w - 6, y, CREAM, "right"); y += 9 }
     const diff = r.total - FILL_LINE
-    const status = r.full ? ["Full to the rim", "#FF8A7A"] : Math.abs(diff) <= 0.05 ? ["At the serve line: ready to serve", "#FFC94A"] : diff < 0 ? [`Serve line: ${(-diff).toFixed(2)} parts to go`, DIM] : ["Past the serve line: ready to serve", "#9CF0B0"]
+    const status = r.full ? ["Full to the rim", "#FF8A7A"] : Math.abs(diff) <= 0.05 ? ["At the serve line", "#FFC94A"] : diff < 0 ? [`Serve line: ${(-diff).toFixed(2)} parts to go`, DIM] : ["Past the serve line", "#9CF0B0"]
     text(status[0], P.x + 6, y, status[1]); y += 11
     if (r.log.length) { text(logText(r.log), P.x + 6, y - 2, SOFT); y += 9 }
     const asking = guest.phase === "asking", has = r.total > 0.05, bw = Math.floor((P.w - 12 - 8) / 3)
@@ -822,9 +856,9 @@ function drawTooltip() {
     const tool = S.tools[hover.id], has = sim.volOf(tool.c) > 0.004
     tooltip(tool.id === "shaker" ? "Shaker" : "Stirring glass", (tool.id === "shaker"
       ? "Shaking chills a drink fast, waters it down more, and knocks out most of the fizz (add soda after). "
-      : "Stirring chills a drink gently and keeps it clear and fizzy. ") + (has ? "Click to pick it up." : "Pour bottles into it first, then click it."), tool.x, toolBoxOf(tool).y - 14)
+      : "Stirring chills a drink gently and keeps it clear and fizzy. ") + (tool.c.ice ? "" : "It needs ice to work: drag or flick some in. ") + (has ? "Click to pick it up." : "Pour bottles into it, then click it."), tool.x, toolBoxOf(tool).y - 14)
   }
-  else if (hover.kind === "ice") tooltip("Ice well", "Click to drop a cube into the glass (up to 4). Ice slowly melts into a drink built in the glass and chills it.", WELL_MID.x + 40, WELL[0][1] - 4)
+  else if (hover.kind === "ice") tooltip("Ice well", "Drag a cube out and drop it into the glass, shaker or stirring glass, or flick it in. The shaker and stirring glass need ice to chill a drink; in the glass it melts in slowly.", WELL_MID.x + 50, WELL[0][1] - 4)
   else if (hover.kind === "glass" && guest.phase === "asking")
     tooltip("The glass", `The gold mark is the serve line: ${FILL_LINE} parts, the smallest drink a guest will take. You can pour more, up to ${MAX_PARTS} parts. Ice raises the level a little but isn't counted.`, glass.cx, glass.top - 4)
 }
@@ -853,6 +887,7 @@ function render() {
   drawLabels()
   drawBubble()
   if (!spectro.open) drawSidePanel()
+  drawThrown()                         // ice in the air goes over the panels, so a flick can be followed the whole way
   if (!book.open) drawSpectro()
   drawStrip()
   drawBook()
@@ -878,7 +913,7 @@ function frame(now) {
   while (acc >= STEP) { sim.step(); update(STEP); acc -= STEP }
   hover = targetAt(pointer.x, pointer.y)
   if (spectro.open && hover && hover.kind === "spectro") spectro.row = hover.row
-  view.style.cursor = S.toolMode ? (pointer.down ? "grabbing" : "grab") : S.held ? (pointer.down ? "grabbing" : hover ? "pointer" : "grab") : hover && hover.kind !== "spectro" && hover.kind !== "modal" ? "pointer" : "default"
+  view.style.cursor = S.grab ? "grabbing" : S.toolMode ? (pointer.down ? "grabbing" : "grab") : S.held ? (pointer.down ? "grabbing" : hover ? "pointer" : "grab") : hover && hover.kind !== "spectro" && hover.kind !== "modal" ? "pointer" : "default"
   render()
   requestAnimationFrame(frame)
 }

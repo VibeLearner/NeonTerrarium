@@ -22,16 +22,21 @@ with `fetch`, so opening the file directly won't work):
   dashes is the most a drink takes.
 - **Measuring cups** (quarter, half, one part): click one to bring it beside the glass, pour into it (it brims
   over past its measure), then click it to pick it up and pour it wherever you aim. It goes back once it's empty.
-- **Ice**: click the ice well to toss a cube into the glass (up to 4). Cubes float, bob and raise the level.
+- **Ice**: press on the ice well to pick up a cube. Drag it over the glass, the shaker or the stirring glass and let
+  go to drop it in, or **flick** it: let go while moving and it flies off at the speed and angle of your flick,
+  under gravity. Get the arc about right and it drops in (a gentle steer forgives near misses); too soft or too
+  hard and it clinks off the rim or lands on the counter and melts away. The glass takes 4 cubes, a tool 6. In the
+  glass ice floats, bobs and raises the level.
 
 **Technique** (the three ways to make a drink, from the design doc)
 
 - **Build:** pour straight into the glass over ice. The ice slowly melts into it (to 10% water) and chills it a
   little.
-- **Shake:** pour into the shaker (the steel tin on the right), then click it to lift it. Hold anywhere to shake:
+- **Shake:** pour into the shaker (the steel tin on the right) and add ice (3 cubes works best), then click it to
+  lift it. Without ice it barely gets cold. Hold anywhere to shake:
   the panel's gauges show it getting colder and more diluted, quickly (about 10 seconds is right). Shaking knocks
   most of the fizz out, so add soda after. Then **Strain into the glass**.
-- **Stir:** the same with the stirring glass, slower and gentler (about 20 seconds), and it keeps the fizz.
+- **Stir:** the same with the stirring glass (ice too), slower and gentler (about 20 seconds), and it keeps the fizz.
 - **Both:** a lifted tool can pour into the other one, so you can stir and then shake (or the other way round).
   Melted ice isn't counted twice: the second technique only adds water beyond what the first already put in.
   The drink remembers both ("Stirred 20 s, shaken 3 s").
@@ -100,7 +105,8 @@ into `assets/` and `sprites/bottle_*.png`, `glass.png`, `cup_*.png`, `shaker*.pn
 ## Choices made where the design doc is silent
 
 The flow rates (`INGREDIENT_RULES` in `sim.js`, 0.9 to 2.2 parts a second at full tilt), the ice displacement
-(0.35 parts a cube, 4 at most), how much a tool holds (6 parts), the strain rate (3 parts a second), how fast a
+(0.35 parts a cube, 4 at most), ice in the tools (6 at most, 3 for the full effect, 8% effect with none), the flick
+assist (16 px past an opening, or 10% of the throw's distance, whichever is more), how much a tool holds (6 parts), the strain rate (3 parts a second), how fast a
 fizzy drink goes flat in the glass, the cut-offs between the five phrase levels (under 1, 1 to 3.5, 3.5 to 6, 6 to
 8.5, 8.5 and up), the Sour and Spice phrases and the "none" phrases, and how much of each tag an ingredient needs
 for a discovery (a fifth of a part). All are marked "lab choice" in the code.

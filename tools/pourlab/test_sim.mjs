@@ -103,6 +103,10 @@ const railTip = (id) => ({ x: L.rail.find((r) => r.id === id).x, y: 220 })
   for (const [id, secs] of [["rye", 1.2], ["ume", 0.8]]) {
     sim.pick(id, railTip(id)); sim.aim(rim.cx - 24, rim.y - 26); run(sim, 0.5); sim.press(true); run(sim, secs); sim.press(false); run(sim, 1.2); sim.putBack(railTip(id)); run(sim, 0.3)
   }
+  sim.pick("bitters", railTip("bitters")); sim.aim(rim.cx, rim.y - 30); run(sim, 0.4)
+  for (let k = 0; k < 3; k++) { sim.press(true); sim.press(false); run(sim, 0.3) }
+  run(sim, 1); sim.putBack(railTip("bitters")); run(sim, 0.3)
+  ok(mg.c.dashes.get("bitters") === 3, "3 dashes of bitters in the stirring glass")
   const before = sim.volOf(mg.c)
   sim.liftTool("mixing_glass"); run(sim, 0.4); sim.press(true); run(sim, 20); sim.press(false)
   const stirred = sim.readout(mg.c)
@@ -115,6 +119,8 @@ const railTip = (id) => ({ x: L.rail.find((r) => r.id === id).x, y: 220 })
   sim.strainTool(); run(sim, 3)
   const log = sim.S.glass.log.join(", ")
   ok(/Stirred/.test(log) && /Shaken/.test(log) && sim.S.glass.shaken, "the glass remembers both: " + log)
+  const dashes = sim.readout().rows.find((r) => r.id === "bitters")
+  ok(dashes && dashes.dashes === 3, `the dashes came along through both tools (${dashes ? dashes.dashes : 0} dashes, ${dashes ? dashes.parts.toFixed(3) : 0} parts)`)
 }
 console.log(fails ? `${fails} failed` : "all passed")
 process.exit(fails ? 1 : 0)

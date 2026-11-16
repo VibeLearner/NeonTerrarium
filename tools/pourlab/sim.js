@@ -136,6 +136,7 @@ export function createSim(L, sizes) {
     pressing: false,
     cups: {}, activeCup: null,
     tools: {}, toolMode: null,  // the shaker and stirring glass; which one is lifted and in use
+    glassHeld: false,           // the glass is off its mat, in hand
     grab: null,                 // a cube held from the ice well: where it is, and where the pointer has been lately
     thrown: [],                 // cubes in the air, or landed on the counter and melting away
     emitAcc: 0, streamId: 1, trail: 0,
@@ -218,6 +219,7 @@ export function createSim(L, sizes) {
   function putBack(railPos) {
     if (!S.held) return
     if (S.held.kind === "cup") { returnCup(); return }
+    if (S.held.kind === "glass") railPos = glassLip            // the glass goes back on its mat
     S.held.back = { x: railPos.x, y: railPos.y, t: 0 }
     S.pressing = false
   }
@@ -273,7 +275,7 @@ export function createSim(L, sizes) {
   }
   // the openings a cube can drop into: the glass, and the tools on the counter (or lifted, waiting)
   function iceTargets() {
-    const list = [{ name: "glass", cx: glass.cx, y: glass.rimY, hw: glass.hw(glass.rimY) - 2, side: glass.hw(glass.rimY) + 2, bottom: L.GLASS_BASE }]
+    const list = S.glassHeld ? [] : [{ name: "glass", cx: glass.cx, y: glass.rimY, hw: glass.hw(glass.rimY) - 2, side: glass.hw(glass.rimY) + 2, bottom: L.GLASS_BASE }]
     for (const tool of Object.values(S.tools)) if (tool.state === "home" || (tool.state === "ready" && tool.id !== "shaker")) {   // not a capped shaker
       const rim = toolRim(tool); list.push({ name: tool.id, tool, cx: rim.cx, y: rim.y, hw: rim.hw, side: tool.rt + 2, bottom: tool.y })
     }
@@ -365,6 +367,18 @@ export function createSim(L, sizes) {
     moveCup(cup, "toMeasure", { ...MEASURE })
   }
 
+  // ---------------------------------------------------------------- the glass itself: pick it up and pour it out
+  // (into the shaker or stirring glass, say, if the drink went into the glass first). Held by the right end of its rim.
+  const glassLip = { x: glass.cx + L.glass.rt + 1, y: glass.rimY }
+  function pickGlass() {
+    if (volOf(S.glass) < 0.01 && !S.ice.length) { say("The glass is empty."); return }
+    if (S.held) { if (S.held.kind === "cup") returnCup(); else S.held = null }
+    S.held = { kind: "glass", id: "glass", x: glassLip.x, y: glassLip.y, tx: glassLip.x, ty: glassLip.y, angle: 0, back: null }
+    S.glassHeld = true; S.pressing = false
+  }
+  // set straight down, no animation (when serving or emptying)
+  function dropGlass() { if (S.held && S.held.kind === "glass") { S.held = null; S.glassHeld = false; S.pressing = false } }
+
   // ---------------------------------------------------------------- tools: shake or stir, then strain
   function liftTool(id) {
     const tool = S.tools[id]
@@ -442,7 +456,7 @@ export function createSim(L, sizes) {
       h.back.t += dt / 0.22
       h.x = lerp(h.x, h.back.x, Math.min(1, h.back.t)); h.y = lerp(h.y, h.back.y, Math.min(1, h.back.t))
       h.angle = lerp(h.angle, 0, Math.min(1, dt * 14))
-      if (h.back.t >= 1) S.held = null
+      if (h.back.t >= 1) { S.held = null; if (h.kind === "glass") S.glassHeld = false }
       return
     }
     const k = 1 - Math.exp(-dt * 16)
@@ -453,7 +467,18 @@ export function createSim(L, sizes) {
     // flow ramps up with the tilt (nothing until the liquid reaches the neck, at about 65 degrees)
     const f = clamp((h.angle - 1.13) / (1.85 - 1.13), 0, 1)
     let flow, source = null
-    if (h.kind === "cup") {
+    if (h.kind === "glass") {
+      source = S.glass
+      flow = volOf(S.glass) > 1e-6 ? 3 * f : 0
+      // its ice tumbles out too, one cube at a time once it's tipped well over
+      S.iceOut = f > 0.3 && S.ice.length ? (S.iceOut || 0) + dt : 0
+      if (S.iceOut > 0.3) {
+        S.iceOut = 0; S.ice.pop()
+        const [dx, dy] = pourDir(h.angle)
+        S.thrown.push({ x: h.x + dx * 3, y: h.y + dy * 3, x0: h.x, vx: dx * 50, vy: dy * 50 + 20, rot: 0, spin: 6, state: "fly", life: 1.2 })
+      }
+      if (volOf(S.glass) <= 1e-6 && !S.ice.length && !S.pressing && h.angle < 0.3) { emptyGlass(); putBack(); return }
+    } else if (h.kind === "cup") {
       const cup = S.cups[h.id]; source = cup.c
       flow = volOf(cup.c) > 1e-6 ? 3 * f : 0
       if (volOf(cup.c) <= 1e-6 && !S.pressing && h.angle < 0.3) { clearContents(cup.c); returnCup(); return }
@@ -543,7 +568,7 @@ export function createSim(L, sizes) {
       }
       // into the glass: through the rim opening, then down to the surface
       const [il, ir] = glass.inner(p.y)
-      if (!p.inGlass && p.y >= glass.rimY - glass.ryT && p.y - p.vy * dt < glass.rimY - glass.ryT && p.vy > 0) {
+      if (!S.glassHeld && !p.inGlass && p.y >= glass.rimY - glass.ryT && p.y - p.vy * dt < glass.rimY - glass.ryT && p.vy > 0) {
         if (p.x >= il && p.x <= ir) p.inGlass = true
         else if (p.x >= il - 3 && p.x <= ir + 3) { if (p.vol > 0) splat(p.x, p.y, p.color); continue }   // caught the rim
       }
@@ -671,6 +696,7 @@ export function createSim(L, sizes) {
     S, L, ing, glass, MEASURE, CAP,
     step, pick, putBack, aim, press, addIce, grabIce, moveIce, releaseIce, activateCup, clickActiveCup, sendHome, emptyGlass,
     liftTool, putToolDown, strainTool, dumpTool, toolBox, toolRim, toolLip,
+    pickGlass, dropGlass, glassLip,
     total, levelParts, surfaceY, volOf, cupRim, compColor, srgb, readout, tasteOf, say,
   }
 }

@@ -22,6 +22,9 @@ with `fetch`, so opening the file directly won't work):
   dashes is the most a drink takes.
 - **Measuring cups** (quarter, half, one part): click one to bring it beside the glass, pour into it (it brims
   over past its measure), then click it to pick it up and pour it wherever you aim. It goes back once it's empty.
+- **The glass** can be picked up too: click it, then hold to pour it into the shaker or stirring glass (handy when
+  a drink went into the glass first). Its ice tumbles out with it. Click its mat to set it down; once it's empty it
+  goes back by itself.
 - **Ice**: press on the ice well to pick up a cube. Drag it over the glass, the shaker or the stirring glass and let
   go to drop it in, or **flick** it: let go while moving and it flies off at the speed and angle of your flick,
   under gravity. Get the arc about right and it drops in (a gentle steer forgives near misses); too soft or too

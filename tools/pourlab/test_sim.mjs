@@ -166,5 +166,22 @@ const railTip = (id) => ({ x: L.rail.find((r) => r.id === id).x, y: 220 })
   ok(r.chill < 0.12 && r.dilution < 0.03, `10 s of shaking with no ice: chill ${r.chill.toFixed(2)}, ${(r.dilution * 100).toFixed(1)}% melted ice`)
   ok(/No ice/.test(told), "the player is told why: " + told)
 }
+{
+  console.log("pick up the glass and pour it into the shaker, ice and all")
+  const sim = createSim(L, sizes), g = sim.glass, sh = sim.S.tools.shaker, rim = sim.toolRim(sh)
+  for (const [id, secs] of [["rice", 1.2], ["yuzu", 0.6]]) {
+    sim.pick(id, railTip(id)); sim.aim(g.cx - 22, g.top - 26); run(sim, 0.5); sim.press(true); run(sim, secs); sim.press(false); run(sim, 1.2); sim.putBack(railTip(id)); run(sim, 0.3)
+  }
+  dropIce(sim, { cx: g.cx, y: g.rimY }, 2)
+  const had = sim.total()
+  ok(had > 1.5 && sim.readout().ice === 2, `a drink in the glass with 2 cubes (${had.toFixed(2)} parts)`)
+  sim.pickGlass(); ok(sim.S.held && sim.S.held.kind === "glass", "the glass is picked up")
+  sim.aim(rim.cx - 26, rim.y - 30); run(sim, 0.5); sim.press(true); run(sim, 2.5); sim.press(false); run(sim, 2)
+  ok(sim.volOf(sh.c) > had * 0.9, `the shaker got the drink (${sim.volOf(sh.c).toFixed(2)} of ${had.toFixed(2)})`)
+  ok(sh.c.ice === 2, `the cubes went with it (${sh.c.ice} in the shaker)`)
+  ok(!sim.S.held && !sim.S.glassHeld && sim.total() < 0.01, "the empty glass went back on its mat")
+  sim.pick("soda", railTip("soda")); sim.aim(g.cx - 22, g.top - 26); run(sim, 0.5); sim.press(true); run(sim, 1.0); sim.press(false); run(sim, 1.5)
+  ok(sim.total() > 0.5, "and it catches a pour again (" + sim.total().toFixed(2) + ")")
+}
 console.log(fails ? `${fails} failed` : "all passed")
 process.exit(fails ? 1 : 0)

@@ -259,6 +259,8 @@ function targetAt(x, y) {
     if (S.held && S.held.id === g.id) continue
     if (hitBottle(g.id, x, y)) return { kind: "bottle", id: g.id }
   }
+  const glassBox = { x: glass.left, y: glass.top, w: glass.w, h: glass.h }
+  if (S.held && S.held.kind === "glass" && inBox(x, y, glassBox)) return { kind: "mat" }   // set the glass back down
   if (S.held && y >= L.RAIL_TOP - 4) return { kind: "rail" }
   if (inPoly(x, y, WELL)) return { kind: "ice" }
   for (const cup of Object.values(S.cups)) {
@@ -270,8 +272,8 @@ function targetAt(x, y) {
   return null
 }
 // whatever is in hand goes back: a bottle to its slot, a cup to the measuring spot
-function dropHeld() { if (!S.held) return; if (S.held.kind === "cup") sim.putBack(null); else S.held = null }
-function putBackHeld() { if (!S.held || S.held.back) return; if (S.held.kind === "cup") sim.putBack(null); else sim.putBack(railTip(S.held.id)) }
+function dropHeld() { if (!S.held) return; if (S.held.kind === "cup") sim.putBack(null); else if (S.held.kind === "glass") sim.dropGlass(); else S.held = null }
+function putBackHeld() { if (!S.held || S.held.back) return; if (S.held.kind === "cup" || S.held.kind === "glass") sim.putBack(null); else sim.putBack(railTip(S.held.id)) }
 const clampAim = (p) => ({ x: clamp(p.x, 12, W - 12), y: clamp(p.y, 66, 214) })
 view.addEventListener("pointerdown", (e) => {
   e.preventDefault(); view.setPointerCapture(e.pointerId)
@@ -290,6 +292,8 @@ view.addEventListener("pointerdown", (e) => {
   else if (t && t.kind === "cup") sim.activateCup(t.id)
   else if (t && t.kind === "activeCup") sim.clickActiveCup()
   else if (t && t.kind === "tool") sim.liftTool(t.id)
+  else if (t && t.kind === "glass") sim.pickGlass()
+  else if (t && t.kind === "mat") putBackHeld()
   else if (S.held) sim.press(true)
 })
 view.addEventListener("pointermove", (e) => {
@@ -502,12 +506,14 @@ function drawFillLine() {
 const glassLayer = document.createElement("canvas"); glassLayer.width = W; glassLayer.height = H
 const GCTX = glassLayer.getContext("2d"); GCTX.imageSmoothingEnabled = false
 function drawGlass() {
-  const pose = glassPose()
+  const pose = glassPose(), h = S.held && S.held.kind === "glass" ? S.held : null
   ctx = GCTX; ctx.clearRect(0, 0, W, H)
-  drawShadow(glass.cx, L.GLASS_BASE - 1 - glass.ryB, 13, glass.ryB, 0.45)
+  if (!h) drawShadow(glass.cx, L.GLASS_BASE - 1 - glass.ryB, 13, glass.ryB, 0.45)
   drawLiquid(); drawIce(); ctx.drawImage(IMG.glass, glass.left, glass.top)
-  if (guest.phase === "asking" && guest.back >= 1) drawFillLine()
+  if (!h && guest.phase === "asking" && guest.back >= 1) drawFillLine()
   ctx = MAIN
+  // in hand: held by the right end of its rim and turned about it, drink and all
+  if (h) { ctx.save(); ctx.translate(Math.round(h.x), Math.round(h.y)); ctx.rotate(h.angle); ctx.drawImage(glassLayer, -sim.glassLip.x, -sim.glassLip.y); ctx.restore(); return }
   const ox = Math.round(glass.cx + pose.dx - glass.cx * pose.s), oy = Math.round(L.GLASS_BASE + pose.dy - L.GLASS_BASE * pose.s)
   ctx.drawImage(glassLayer, 0, 0, W, H, ox, oy, Math.round(W * pose.s), Math.round(H * pose.s))
 }
@@ -523,7 +529,7 @@ function drawStream() {
   }
   for (const s of S.splats) { ctx.globalAlpha = Math.min(1, s.life * 2); fill(s.x - 1, s.y, 3, 1, sim.srgb(s.color)); ctx.globalAlpha = 1 }
   // spilled over the rim: drips running down the outside of the glass
-  if (S.overflow > 0.02 && guest.phase === "asking") {
+  if (S.overflow > 0.02 && guest.phase === "asking" && !S.glassHeld) {
     ctx.globalAlpha = Math.min(1, S.overflow * 2); const col = sim.srgb(S.mean), [il, ir] = glass.inner(glass.rimY)
     for (const [x, ph] of [[il - 2, 0], [ir + 2, 1.7], [il + 5, 3.1]]) { const len = 6 + Math.round((Math.sin(S.t * 3 + ph) * 0.5 + 0.5) * 30); line(x, glass.rimY, x, glass.rimY + len, col) }
     ctx.globalAlpha = 1
@@ -539,6 +545,7 @@ function drawRail() {
 }
 function drawHeld() {
   const h = S.held; if (!h) return
+  if (h.kind === "glass") { drawGlass(); return }
   if (h.kind === "cup") {
     // a cup is held by its pouring lip (the right end of its rim) and turns about it
     const cup = S.cups[h.id], i = IMG[cup.id]
@@ -560,6 +567,7 @@ function tag(s, cx, y, color = CREAM) {
   text(s, Math.round(cx), y + 1, color, "center")
 }
 function drawLabels() {
+  if (S.pressing && S.held) ctx.globalAlpha = 0.3          // faded while pouring, so the stream shows through
   const cup = S.activeCup && S.cups[S.activeCup]
   if (cup && cup.state === "active") {
     const v = sim.volOf(cup.c)
@@ -571,6 +579,7 @@ function drawLabels() {
     bits.push(tool.c.ice ? `${tool.c.ice} ice` : "no ice")
     tag(bits.join(", "), tool.x, toolBoxOf(tool).y - 11, tool.c.ice ? CREAM : "#E9A08A")
   }
+  ctx.globalAlpha = 1
 }
 function drawWellHover() {
   if (!(hover && hover.kind === "ice")) return
@@ -635,7 +644,7 @@ function drawSidePanel() {
     const asking = guest.phase === "asking", has = r.total > 0.05, bw = Math.floor((P.w - 12 - 8) / 3)
     button("Taste", P.x + 6, y, () => { if (!has) return sim.say("Pour something first, then taste it."); spectro.open && spectro.src === "glass" ? closeSpectro() : openSpectro("glass") }, { w: bw, dim: !has || !asking, on: spectro.open && spectro.src === "glass" })
     button("Serve", P.x + 10 + bw, y, serve, { w: bw, dim: !asking || r.total < FILL_LINE - 0.05 })
-    button("Empty", P.x + 14 + 2 * bw, y, () => { if (asking) sim.emptyGlass() }, { w: bw, dim: !asking || !has }); y += 17
+    button("Empty", P.x + 14 + 2 * bw, y, () => { if (asking) { sim.dropGlass(); sim.emptyGlass() } }, { w: bw, dim: !asking || !has }); y += 17
   }
   for (const l of hint) { text(l, P.x + 6, y, SOFT); y += 9 }
 }
@@ -646,6 +655,7 @@ function hintText() {
   const cup = S.activeCup && S.cups[S.activeCup]
   if (S.held && S.held.kind === "dasher") return "Click to add a dash. Click the rail to put it back."
   if (S.held && S.held.kind === "cup") return "Hold to pour from the cup. It goes back once it's empty."
+  if (S.held && S.held.kind === "glass") return "Hold to pour the glass into the shaker or stirring glass; its ice goes too. Click its mat to set it down."
   if (S.held) return "Hold to pour, move to aim: into the glass, a cup, the shaker or the stirring glass. Click the rail to put it back."
   if (cup && cup.state === "active") return sim.volOf(cup.c) > 0.001 ? "Click the cup to pick it up and pour it." : "Pour a bottle into the cup. Click the empty cup to put it away."
   return "Point at anything to see what it does. Click a bottle to pick it up."
@@ -860,7 +870,7 @@ function drawTooltip() {
   }
   else if (hover.kind === "ice") tooltip("Ice well", "Drag a cube out and drop it into the glass, shaker or stirring glass, or flick it in. The shaker and stirring glass need ice to chill a drink; in the glass it melts in slowly.", WELL_MID.x + 50, WELL[0][1] - 4)
   else if (hover.kind === "glass" && guest.phase === "asking")
-    tooltip("The glass", `The gold mark is the serve line: ${FILL_LINE} parts, the smallest drink a guest will take. You can pour more, up to ${MAX_PARTS} parts. Ice raises the level a little but isn't counted.`, glass.cx, glass.top - 4)
+    tooltip("The glass", `The gold mark is the serve line: ${FILL_LINE} parts, the smallest drink a guest will take. You can pour more, up to ${MAX_PARTS} parts.` + (sim.total() > 0.01 ? " Click to pick it up and pour it into the shaker or stirring glass." : ""), glass.cx, glass.top - 4)
 }
 function drawNotice() {
   if (!S.notice) return
@@ -878,15 +888,15 @@ function render() {
   drawWellHover()
   for (const cup of Object.values(S.cups)) if (cup.state === "home" || cup.state === "toHome") drawCup(cup)
   for (const tool of Object.values(S.tools)) if (tool.state === "home") drawToolHome(tool)
-  drawGlass()
+  if (!S.glassHeld) drawGlass()
   for (const cup of Object.values(S.cups)) if (cup.state === "active" || cup.state === "toMeasure") drawCup(cup)
   drawStream()
   drawRail()
   for (const tool of Object.values(S.tools)) if (tool.state !== "home") drawToolMoving(tool)
-  drawHeld()
   drawLabels()
   drawBubble()
   if (!spectro.open) drawSidePanel()
+  drawHeld()                           // whatever is in hand stays on top, even over the bubble and the panel
   drawThrown()                         // ice in the air goes over the panels, so a flick can be followed the whole way
   if (!book.open) drawSpectro()
   drawStrip()

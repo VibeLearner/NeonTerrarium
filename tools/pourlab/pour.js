@@ -609,7 +609,7 @@ function gauge(label, x, y, w, f, value, color) {
 // It shows one vessel at a time, picked by its tab: the glass, the shaker or the stirring glass. It switches by itself
 // to whatever you pour or drop ice into, and to a tool you pick up. Laid out top to bottom as a list of drawing
 // steps first, so the panel's background can be sized to fit before anything is drawn on it.
-const PANEL = { x: -EXT + 4, y: 42, w: EXT - 8 }
+const PANEL = { x: -EXT + 4, y: 4, w: EXT - 8, h: H - 8 }   // the full height of the empty bar, shelf to rail
 const VESSELS = [["glass", "Glass"], ["shaker", "Shaker"], ["mixing_glass", "Stirrer"]]   // tab labels (the stirring glass is "Stirrer" to fit)
 let focus = "glass"
 function followFocus() {
@@ -674,9 +674,11 @@ function drawSidePanel() {
     })
     y += 15
   }
-  y += 3
+  // the hint sits at the bottom of the panel (or right under the rest, if that runs long)
+  const hint = wrap(hintText(), inner)
+  y = Math.max(y + 3, P.y + P.h - 4 - hint.length * 9)
   line(hintText(), SOFT)
-  panel(P.x, P.y, P.w, y - P.y + 3)
+  panel(P.x, P.y, P.w, Math.max(P.h, y - P.y + 3))
   for (const f of ops) f()
 }
 function hintText() {

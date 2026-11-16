@@ -67,7 +67,7 @@ const railTip = (id) => ({ x: L.rail.find((r) => r.id === id).x, y: 220 })
   sim.pick("soda", railTip("soda")); sim.aim(g.cx - 22, g.top - 26); run(sim, 0.5)
   sim.press(true); run(sim, 1.2)
   ok(sim.S.foam > 1, "a foam head forms while soda pours (" + sim.S.foam.toFixed(2) + " px)")
-  sim.press(false); run(sim, 3)
+  sim.press(false); run(sim, 4)
   ok(sim.S.foam < 1, "the foam settles within a few seconds (" + sim.S.foam.toFixed(2) + " px)")
   const before = sim.levelParts()
   for (let k = 0; k < 3; k++) { sim.addIce({ x: 30, y: 200 }); run(sim, 0.2) }

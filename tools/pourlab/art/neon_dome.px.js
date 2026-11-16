@@ -22,6 +22,11 @@ pal({
 ramps("012345", "TtuU", "KrLMP", "eEfF")
 
 const W = 480, H = 270
+// the pour lab's wide view adds EXT px of bar on the left (empty counter past the ice well, for the side panel);
+// the room's functions draw from X0 so the same art continues there. The 480 px scenes are unchanged.
+const EXT = 160, X0 = -EXT
+// how much the round room bends at screen x: u² across the old 480 px view, gentler past its edges
+const bowF = (x) => { const u = Math.abs((x - 240) / 240); return u <= 1 ? u * u : 1 + (u - 1) * 0.9 }   // u² on screen, gentler past its old edges
 const mix = (a, b, t) => {
   const pa = [1, 3, 5].map((k) => parseInt(a.slice(k, k + 2), 16)), pb = [1, 3, 5].map((k) => parseInt(b.slice(k, k + 2), 16))
   return "#" + pa.map((v, k) => Math.round(v + (pb[k] - v) * t).toString(16).padStart(2, "0")).join("")
@@ -203,7 +208,7 @@ function ringPts(k) {
   const [Y, Bw, d] = RINGS[k], off = k % 2 ? 0.5 : 0, out = []
   for (let i = -8; i <= 8; i++) {
     const u = i + off, x = Math.round(240 + d * u * (1 + 0.05 * Math.abs(u))), sx = (x - 240) / 240
-    out.push([x, Math.round(Y - Bw * sx * sx)])
+    out.push([x, Math.round(Y - Bw * bowF(x))])
   }
   return out
 }
@@ -235,7 +240,7 @@ const neonOf = (e) => {
 }
 function skyThroughGlass(c) {
   const tones = ["B", "b", "b", "s", "s", "S", "H"]
-  for (let y = 0; y < HORIZON + 4; y++) for (let x = 0; x < W; x++) {
+  for (let y = 0; y < HORIZON + 4; y++) for (let x = X0; x < W; x++) {
     // whole rows step between tones (no checkerboard): the next tone comes in by rows at shrinking gaps
     const v = Math.max(0, y + 20) / (HORIZON + 30) * (tones.length - 1), f = v - Math.floor(v)
     const next = f > [0.8, 0.6, 0.9, 0.7][y % 4]
@@ -250,7 +255,7 @@ function skyThroughGlass(c) {
 function cityThroughGlass(c) {
   const r = c.rng(7)
   const band = (top, var_, col, lit, step) => {
-    for (let x = -4; x < W;) {
+    for (let x = X0 - 4; x < W;) {
       const bw = step[0] + Math.floor(r() * step[1]), t = top + Math.floor(r() * var_)
       c.rect(x, t, bw, HORIZON + 6 - t, col)
       if (r() < 0.35 && bw > 6) c.vline(x + 2, t - 5, 5, col)
@@ -284,10 +289,10 @@ function struts(c) {
 // the far side: the far gallery and its rail on top of the drum, the drum's band of windows below it. Below eye
 // level a round room's far wall comes nearer toward the sides, so it bends down there; the near rail, the
 // inside edge of our own gallery, goes away toward the sides, so it bends up. Between them, the drop to the floor.
-const bow = (x, B) => Math.round(B * ((x - 240) / 240) ** 2)
+const bow = (x, B) => Math.round(B * bowF(x))
 const farY = (x) => 116 + bow(x, 10), railY = (x) => 172 - bow(x, 8)
 function farSide(c) {
-  for (let x = 0; x < W; x++) {
+  for (let x = X0; x < W; x++) {
     const y0 = farY(x)
     if (x % 6 === 0) c.vline(x, y0 - 4, 4, "D")
     c.px(x, y0 - 4, "d")
@@ -299,7 +304,7 @@ function farSide(c) {
 }
 // the dance floor down below: dark tiles, a very few lit (it's morning: the club is idling)
 function danceFloor(c) {
-  for (let x = 0; x < W; x++) {
+  for (let x = X0; x < W; x++) {
     const top = farY(x) + 20, bot = railY(x)
     for (let y = top; y < bot; y++) {
       const tx = Math.floor(x / 6), ty = Math.floor((y - top) / 3), h = ((tx * 73856093) ^ (ty * 19349663)) >>> 0
@@ -310,7 +315,7 @@ function danceFloor(c) {
 }
 function nearRail(c) {
   // our gallery's rail behind the guest: dark steel, no neon (the neon stays on the dome and the windows)
-  for (let x = 0; x < W; x++) {
+  for (let x = X0; x < W; x++) {
     const y = railY(x)
     if (x % 10 === 2) c.vline(x, y, 6, "D")
     c.px(x, y, "d"); c.px(x, y + 1, "D")
@@ -340,7 +345,7 @@ const SHELF = { x: -4, y: 0, w: 488, h: 30 }
 function shelfBack(c) {
   const { x, y, w, h } = SHELF
   // glowing back panel behind the bottles: hottest in the middle
-  for (let yy = y; yy < y + h; yy++) for (let xx = 0; xx < W; xx++) {
+  for (let yy = y; yy < y + h; yy++) for (let xx = X0; xx < W; xx++) {
     const d = Math.hypot((xx - 240) / 260, (yy - 18) / 26)
     c.px(xx, yy, d < 0.3 ? "w" : d < 0.55 ? "Y" : d < 0.75 ? ((xx + yy) % 2 ? "Y" : "p") : d < 0.92 ? "p" : "m")
   }
@@ -350,13 +355,13 @@ function shelfBoard(c) {
   // DOWN toward eye level (above the eye, further away sits lower). Its slats run back toward the vanishing
   // point, so they lean in toward the middle. The light strip runs along the back edge, shining down.
   const lip = SHELF.y + SHELF.h, under = lip + 9, back = under + 18
-  c.rect(0, lip, W, 9, "y"); c.hline(0, lip, W, "Y"); c.hline(0, lip + 8, W, "g")
-  for (let y = under; y < back; y++) c.hline(0, y, W, y < under + 3 ? "0" : y < under + 7 ? "K" : y < under + 12 ? "r" : y < under + 16 ? "O" : "o")
+  c.rect(X0, lip, W - X0, 9, "y"); c.hline(X0, lip, W - X0, "Y"); c.hline(X0, lip + 8, W - X0, "g")
+  for (let y = under; y < back; y++) c.hline(X0, y, W - X0, y < under + 3 ? "0" : y < under + 7 ? "K" : y < under + 12 ? "r" : y < under + 16 ? "O" : "o")
   const at = (xn, y) => Math.round(VPX + (xn - VPX) * (VPY - y) / (VPY - under))
   for (let xn = VPX - 16 * 32; xn <= VPX + 16 * 32; xn += 32) {
     for (let y = under; y < back; y++) { const x = at(xn, y); c.px(x, y, "K"); c.px(x + (xn < VPX ? 1 : -1), y, y > under + 10 ? "q" : y > under + 4 ? "M" : "r") }
   }
-  c.hline(0, back, W, "g"); c.hline(0, back + 1, W, "N"); c.hline(0, back + 2, W, "n")
+  c.hline(X0, back, W - X0, "g"); c.hline(X0, back + 1, W - X0, "N"); c.hline(X0, back + 2, W - X0, "n")
   // DRINKS, as on the pylon outside, set into the middle of the lip
   c.rect(218, lip, 44, 9, "1"); c.rect(219, lip + 1, 42, 7, "0")
   c.text(240, lip + 1, "DRINKS", "V", { font: "5x7", align: "c" })
@@ -506,7 +511,7 @@ function counterTop(c) {
   // depth: the far end catches the light from the dome, the near end is in our own shadow
   const depthTone = (y) => { const t = (y - CT) / (NEAR - CT), d = [0.9, 0.3, 0.6, 0.1][y % 4] * 0.18
     return t + d < 0.16 ? 3 : t + d < 0.7 ? 2 : 1 }
-  for (let y = CT; y < NEAR; y++) for (let x = 0; x < W; x++) {
+  for (let y = CT; y < NEAR; y++) for (let x = X0; x < W; x++) {
     const xn = unproj(x, y), b = Math.floor((xn + 10000) / BOARD)
     let k = depthTone(y) - (b % 2 ? 0 : 0) - (b % 3 === 1 && y > CT + 12 ? 1 : 0)
     c.px(x, y, WOOD[Math.max(0, k)])
@@ -528,7 +533,7 @@ function counterTop(c) {
     for (let x = x0; x <= x1; x++) if ((x + y) % (t < 0.3 ? 1 : t < 0.6 ? 2 : 4) === 0) c.px(x, y, "P")
   }
   // our edge: a rounded brass rail
-  c.hline(0, NEAR, W, "Y"); c.hline(0, NEAR + 1, W, "y"); c.hline(0, NEAR + 2, W, "g"); c.hline(0, NEAR + 3, W, "K")
+  c.hline(X0, NEAR, W - X0, "Y"); c.hline(X0, NEAR + 1, W - X0, "y"); c.hline(X0, NEAR + 2, W - X0, "g"); c.hline(X0, NEAR + 3, W - X0, "K")
 }
 // reflections on the gloss: what's beyond the far edge, mirrored and smeared toward us
 function reflections(c) {
@@ -549,7 +554,7 @@ function guestReflection(c) {
 }
 function farEdge(c) {
   // the far edge of the counter: a pink neon tube along its lip
-  c.hline(0, CT - 5, W, "1"); c.hline(0, CT - 4, W, "z"); c.hline(0, CT - 3, W, "v"); c.hline(0, CT - 2, W, "z"); c.hline(0, CT - 1, W, "K")
+  c.hline(X0, CT - 5, W - X0, "1"); c.hline(X0, CT - 4, W - X0, "z"); c.hline(X0, CT - 3, W - X0, "v"); c.hline(X0, CT - 2, W - X0, "z"); c.hline(X0, CT - 1, W - X0, "K")
 }
 function barMat(c) {
   const far = 192, near = 212, xa = POUR_X - 72, xb = POUR_X + 52   // xa, xb: its sides, as x where they would meet our edge
@@ -753,15 +758,15 @@ const RAIL_X = (() => {
 })()
 const railX = (k) => RAIL_X[k]
 const POUR_X = Math.round((RAIL_X[GAP_AFTER] + RAIL_X[GAP_AFTER + 1]) / 2)
-function railBack(c) { c.rect(0, NEAR + 4, W, H - NEAR - 4, "0"); c.hline(0, NEAR + 4, W, "K") }
+function railBack(c) { c.rect(X0, NEAR + 4, W - X0, H - NEAR - 4, "0"); c.hline(X0, NEAR + 4, W - X0, "K") }
 const RAIL_WORD = { rice: "RICE", rye: "RYE", rum: "RUM", coffee: "COFFEE", yuzu: "YUZU", ume: "UME", lemongrass: "LEMONGRASS",
   glow: "GLOW", ginger: "GINGER", shiso: "SHISO", soda: "SODA", bitters: "BITTERS", chili: "CHILI" }
 function railFront(c) {
-  c.rect(0, RAIL_TOP, W, H - RAIL_TOP, "E")
-  c.hline(0, RAIL_TOP, W, "F"); c.hline(0, RAIL_TOP + 1, W, "f"); c.hline(0, RAIL_TOP + 2, W, "e")
-  for (let y = RAIL_TOP + 5; y < H - 1; y += 4) c.hline(0, y, W, "e")
-  c.hline(0, H - 1, W, "e")
-  for (let x = 4; x < W; x += 120) { c.rect(x, RAIL_TOP + 6, 2, 2, "f"); c.px(x, RAIL_TOP + 6, "F") }
+  c.rect(X0, RAIL_TOP, W - X0, H - RAIL_TOP, "E")
+  c.hline(X0, RAIL_TOP, W - X0, "F"); c.hline(X0, RAIL_TOP + 1, W - X0, "f"); c.hline(X0, RAIL_TOP + 2, W - X0, "e")
+  for (let y = RAIL_TOP + 5; y < H - 1; y += 4) c.hline(X0, y, W - X0, "e")
+  c.hline(X0, H - 1, W - X0, "e")
+  for (let x = X0 + 4; x < W; x += 120) { c.rect(x, RAIL_TOP + 6, 2, 2, "f"); c.px(x, RAIL_TOP + 6, "F") }
   // tape labels so the everyday bottles read at a glance: each drink's plain name, whole (the full brand name
   // shows when the player points at the bottle)
   INGREDIENTS.forEach((ing, k) => {
@@ -817,37 +822,41 @@ barScene("neon_dome")
 // with their shadows and reflections, so they can be picked up); the shaker and stirring glass stay in for now.
 // pour_front: the rail's front plate on its own, drawn over the bottles.
 const STATIC_TOOLS = () => []   // the pour lab moves every tool now
-scene("pour_bg", { w: W, h: H, bg: "3", world: { light: [-1, -0.6] } },
-  layer("sky", skyThroughGlass, cityThroughGlass),
-  layer("haze", { opacity: 0.3 }, rect(0, 86, W, 30, "H")),
-  layer("panes", { opacity: 0.22 }, panes),
-  layer("far side", farSide),
-  layer("dance floor", danceFloor),
-  layer("light shafts", { opacity: 0.07 }, poly([88, 70, 120, 66, 300, 170, 210, 170], "w"), poly([130, 72, 160, 70, 360, 170, 300, 170], "w")),
-  layer("near rail", nearRail),
-  layer("depth haze", { opacity: 0.28 }, rect(0, 108, W, CT - 108, "s")),
-  layer("dome", struts, lightRig, stamp("mirror_ball", 196, 78)),
-  layer("guest", stamp("guest", GX, VPY - Math.round(9 * GS) + GUEST_H)),
-  layer("counter", counterTop),
-  layer("reflections", { opacity: 0.35 }, reflections),
-  layer("guest reflection", { opacity: 0.5 }, guestReflection),
-  layer("far edge", farEdge),
-  layer("guest arms", guestArms, stamp("guest_hands", GX, CT + 9)),
-  layer("mat", barMat),
-  layer("ice well", iceWell),
-  layer("tool reflections", { opacity: 0.28 }, ...toolReflections(0, 5, STATIC_TOOLS())),
-  layer("tool reflections far", { opacity: 0.14 }, ...toolReflections(5, 12, STATIC_TOOLS())),
-  layer("cast shadows", { shade: 1 }, (c) => castShadows(c, STATIC_TOOLS())),
-  layer("contact", { shade: 1 }, (c) => contactShadows(c, STATIC_TOOLS())),
-  layer("tools", ...STATIC_TOOLS().map(([n, x, y]) => stamp(n, x, y))),
-  layer("rail back", railBack),
-  layer("shelf glow", { opacity: 0.1 }, poly([0, 60, 480, 60, 480, 86, 0, 86], "n")),
-  layer("top shelf", shelfBack, shelfBottles, shelfBoard),
+const bgScene = (name, ox) => scene(name, { w: W + ox, h: H, bg: "3", world: { light: [-1, -0.6] } },
+  layer("sky", { x: ox }, skyThroughGlass, cityThroughGlass),
+  layer("haze", { x: ox, opacity: 0.3 }, rect(X0, 86, W - X0, 30, "H")),
+  layer("panes", { x: ox, opacity: 0.22 }, panes),
+  layer("far side", { x: ox }, farSide),
+  layer("dance floor", { x: ox }, danceFloor),
+  layer("light shafts", { x: ox, opacity: 0.07 }, poly([88, 70, 120, 66, 300, 170, 210, 170], "w"), poly([130, 72, 160, 70, 360, 170, 300, 170], "w")),
+  layer("near rail", { x: ox }, nearRail),
+  layer("depth haze", { x: ox, opacity: 0.28 }, rect(X0, 108, W - X0, CT - 108, "s")),
+  layer("dome", { x: ox }, struts, lightRig, stamp("mirror_ball", 196, 78)),
+  layer("guest", { x: ox }, stamp("guest", GX, VPY - Math.round(9 * GS) + GUEST_H)),
+  layer("counter", { x: ox }, counterTop),
+  layer("reflections", { x: ox, opacity: 0.35 }, reflections),
+  layer("guest reflection", { x: ox, opacity: 0.5 }, guestReflection),
+  layer("far edge", { x: ox }, farEdge),
+  layer("guest arms", { x: ox }, guestArms, stamp("guest_hands", GX, CT + 9)),
+  layer("mat", { x: ox }, barMat),
+  layer("ice well", { x: ox }, iceWell),
+  layer("tool reflections", { x: ox, opacity: 0.28 }, ...toolReflections(0, 5, STATIC_TOOLS())),
+  layer("tool reflections far", { x: ox, opacity: 0.14 }, ...toolReflections(5, 12, STATIC_TOOLS())),
+  layer("cast shadows", { x: ox, shade: 1 }, (c) => castShadows(c, STATIC_TOOLS())),
+  layer("contact", { x: ox, shade: 1 }, (c) => contactShadows(c, STATIC_TOOLS())),
+  layer("tools", { x: ox }, ...STATIC_TOOLS().map(([n, x, y]) => stamp(n, x, y))),
+  layer("rail back", { x: ox }, railBack),
+  layer("shelf glow", { x: ox, opacity: 0.1 }, poly([X0, 60, 480, 60, 480, 86, X0, 86], "n")),
+  layer("top shelf", { x: ox }, shelfBack, shelfBottles, shelfBoard),
   glow("Nn", { r: 5, strength: 0.4 }),
   glow("Vv", { r: 5, strength: 0.35 }),
   glow("G", { r: 3, strength: 0.4 }),
   glow("Zz", { r: 3, strength: 0.3 }),
-  glow("w", { where: [84, 58, 24, 24], r: 12, strength: 0.25 }),
+  glow("w", { where: [84 + ox, 58, 24, 24], r: 12, strength: 0.25 }),
 )
+bgScene("pour_bg", 0)
+// the wide view for the pour lab: EXT more px of empty bar on the left
+bgScene("pour_bg_wide", EXT)
 scene("pour_front", { w: W, h: H }, layer("rail front", railFront))
+scene("pour_front_wide", { w: W + EXT, h: H }, layer("rail front", { x: EXT }, railFront))
 barScene("neon_dome_hover", "rum")

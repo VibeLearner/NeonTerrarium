@@ -16,6 +16,7 @@ export const STEP = 1 / 120
 const GRAV = 520                      // px/s², tuned by feel: a stream falls about 50 px in a third of a second
 const PART_VOL = 0.01                 // parts carried by one stream particle
 export const MAX_PARTS = 8, FILL_LINE = 2.5, DASH = 0.05
+const READY_TILT = 0.95                // radians a held bottle rests at: just short of where it starts to pour (1.13)
 const ICE_DISPLACE = 0.35             // parts of level each floating cube adds (lab choice)
 const MAX_ICE = 4
 export const TOOL_ICE = 6             // cubes a shaker or stirring glass takes (lab choice)
@@ -96,12 +97,19 @@ export function createSim(L, sizes) {
   const R = rng(7)
   const ing = Object.fromEntries(L.ingredients.map((g) => [g.id, { ...g, ...INGREDIENT_RULES[g.id], lin: lin(hexRgb(g.liquid)) }]))
   ing.water = { id: "water", lin: lin(hexRgb("#E2EEF0")) }
-  // water lightens a mix only gently (melted ice doesn't wash a drink out to white)
-  const colorWeight = (id) => (id === "water" ? 0.35 : 1)
-  function compColor(parts) {
-    let tot = 0; const m = [0, 0, 0]
-    for (const [id, v] of parts) { const w = v * colorWeight(id); tot += w; for (let k = 0; k < 3; k++) m[k] += ing[id].lin[k] * w }
-    return tot > 0 ? m.map((x) => x / tot) : [0, 0, 0]
+  // A drink's color, the way light passes through it (Beer-Lambert): each liquid filters some of each color, by how
+  // much of the drink it is. Clear spirits, soda and melted ice filter almost nothing, so they lighten a drink
+  // without turning it grey; strongly colored ones (coffee, ginger, ume) lead. Averaging the colors instead sent
+  // most drinks to the same pale pinkish grey. depth: how much liquid the light goes through (the glass, 1.4 times
+  // a bottle's color swatch; a thin stream, 1).
+  const absorb = Object.fromEntries(Object.entries(ing).map(([id, g]) => [id, g.lin.map((v) => -Math.log(Math.max(v, 0.02)))]))
+  absorb.water = [0.01, 0.005, 0]       // melted ice is clear: it only thins the color
+  function compColor(parts, depth = 1.4) {
+    let tot = 0; const A = [0, 0, 0]
+    for (const [, v] of parts) tot += v
+    if (tot <= 0) return [0, 0, 0]
+    for (const [id, v] of parts) for (let k = 0; k < 3; k++) A[k] += absorb[id][k] * v / tot
+    return A.map((a) => Math.exp(-a * depth))
   }
 
   // ---------------------------------------------------------------- the glass (from the sprite's own numbers)
@@ -136,6 +144,7 @@ export function createSim(L, sizes) {
     pressing: false,
     cups: {}, activeCup: null,
     tools: {}, toolMode: null,  // the shaker and stirring glass; which one is lifted and in use
+    lastInto: "glass",         // the vessel something last went into (the page's panel follows it)
     glassHeld: false,           // the glass is off its mat, in hand
     grab: null,                 // a cube held from the ice well: where it is, and where the pointer has been lately
     thrown: [],                 // cubes in the air, or landed on the counter and melting away
@@ -284,11 +293,11 @@ export function createSim(L, sizes) {
   function landIce(cube, t) {
     if (t.name === "glass") {
       if (S.ice.length >= MAX_ICE) { say("Four cubes is plenty for this glass."); return false }
-      S.ice.push({ state: "in", x: clamp(cube.x, glass.cx - 6, glass.cx + 6), y: glass.rimY - 2, vx: 0, vy: Math.max(40, cube.vy * 0.6) })
+      S.ice.push({ state: "in", x: clamp(cube.x, glass.cx - 6, glass.cx + 6), y: glass.rimY - 2, vx: 0, vy: Math.max(40, cube.vy * 0.6) }); S.lastInto = "glass"
       return true
     }
     if (t.tool.c.ice >= TOOL_ICE) { say("That's plenty of ice."); return false }
-    t.tool.c.ice++; t.tool.clink = 0.25
+    t.tool.c.ice++; t.tool.clink = 0.25; S.lastInto = t.name
     return true
   }
   function stepThrown(dt) {
@@ -403,6 +412,7 @@ export function createSim(L, sizes) {
     const lip = lipOffset(tool, 1.9), rim = other ? toolRim(other) : { cx: glass.cx, y: glass.top }
     moveTool(tool, "strainUp", { x: rim.cx - 3 - lip.x, y: rim.y - 6 - lip.y })
   }
+  function emptyTool(id) { const tool = S.tools[id]; if (tool && tool.state === "home") clearContents(tool.c) }
   function dumpTool() { const tool = S.tools[S.toolMode]; if (!tool) return; clearContents(tool.c); putToolDown() }
   // shaking or stirring while held: melted ice and cold build up with time, easing to a plateau
   function workTool(tool, dt) {
@@ -462,7 +472,9 @@ export function createSim(L, sizes) {
     const k = 1 - Math.exp(-dt * 16)
     h.x += (h.tx - h.x) * k; h.y += (h.ty - h.y) * k
     if (h.kind === "dasher") { h.angle = Math.PI; if (h.shake > 0) h.shake -= dt; return }
-    const target = S.pressing ? 2.0 : 0, rate = S.pressing ? 3.2 : 6        // about 115 degrees: a full, steady pour
+    // pressed: about 115 degrees, a full, steady pour. Not pressed: a bottle rests tipped to just short of pouring
+    // (about 54 degrees), so it starts the moment you press; cups and the glass rest upright
+    const target = S.pressing ? 2.0 : h.kind === "bottle" ? READY_TILT : 0, rate = S.pressing ? 3.2 : 6
     h.angle += clamp(target - h.angle, -rate * dt, rate * dt)
     // flow ramps up with the tilt (nothing until the liquid reaches the neck, at about 65 degrees)
     const f = clamp((h.angle - 1.13) / (1.85 - 1.13), 0, 1)
@@ -496,7 +508,7 @@ export function createSim(L, sizes) {
       let comp, meta, color, vol = PART_VOL
       if (source) {
         const out = takeFrom(source, PART_VOL); if (!out) break
-        comp = out.comp; meta = out.meta; color = compColor(out.comp); vol = out.vol
+        comp = out.comp; meta = out.meta; color = compColor(out.comp, 1); vol = out.vol
       } else { comp = new Map([[h.id, 1]]); meta = { direct: true }; color = ing[h.id].lin }
       const wob = Math.sin(S.t * (thick ? 9 : 17) + S.streamId) * (thick ? 2 : 5)
       S.particles.push({ x: h.x + dx * 1.5, y: h.y + dy * 1.5, vx: dx * speed + wob + (R() - 0.5) * 3, vy: dy * speed, vol,
@@ -523,7 +535,7 @@ export function createSim(L, sizes) {
       // through the strainer at about 3 parts a second; the ice stays in the tool
       const out = takeFrom(tool.c, Math.min(volOf(tool.c), 3 * dt))
       if (out) {
-        const lip = toolLip(tool), n = Math.max(1, Math.round(out.vol / PART_VOL)), color = compColor(out.comp)
+        const lip = toolLip(tool), n = Math.max(1, Math.round(out.vol / PART_VOL)), color = compColor(out.comp, 1)
         for (let k = 0; k < n; k++) S.particles.push({ x: lip.x, y: lip.y, vx: 6 + (R() - 0.5) * 4, vy: 10, vol: out.vol / n, color, comp: out.comp, meta: out.meta, sid: -2, life: 4 })
       }
       if (volOf(tool.c) <= 1e-6) { tool.anim += dt; if (tool.anim > 0.25) { clearContents(tool.c); moveTool(tool, "strainDown", { ...tool.home }) } }
@@ -559,6 +571,7 @@ export function createSim(L, sizes) {
             if (p.dash && (k.c.dashes.get(p.dash) || 0) >= MAX_DASHES) { say("Six dashes is the most a drink takes."); break }
             const room = k.cap - volOf(k.c)
             if (room > 0) addTo(k.c, p.comp, Math.min(room, p.vol), p.meta)
+            S.lastInto = k.name
             if (p.dash) k.c.dashes.set(p.dash, (k.c.dashes.get(p.dash) || 0) + 1)
             if (p.vol > room + 1e-9) splat(p.x + (R() - 0.5) * 6, k.rim.y + 2, p.color)   // brimming over
             break
@@ -579,7 +592,7 @@ export function createSim(L, sizes) {
           if (p.vol > 0) {
             if (p.dash && (S.glass.dashes.get(p.dash) || 0) >= MAX_DASHES) say("Six dashes is the most a drink takes.")
             else {
-              addToGlass(p.comp, p.vol, p.x, Math.hypot(p.vx, p.vy), p.meta || {})
+              addToGlass(p.comp, p.vol, p.x, Math.hypot(p.vx, p.vy), p.meta || {}); S.lastInto = "glass"
               if (p.dash) S.glass.dashes.set(p.dash, (S.glass.dashes.get(p.dash) || 0) + 1)
             }
           } else S.waveV[c] -= 4
@@ -695,7 +708,7 @@ export function createSim(L, sizes) {
   return {
     S, L, ing, glass, MEASURE, CAP,
     step, pick, putBack, aim, press, addIce, grabIce, moveIce, releaseIce, activateCup, clickActiveCup, sendHome, emptyGlass,
-    liftTool, putToolDown, strainTool, dumpTool, toolBox, toolRim, toolLip,
+    liftTool, putToolDown, strainTool, dumpTool, emptyTool, toolBox, toolRim, toolLip,
     pickGlass, dropGlass, glassLip,
     total, levelParts, surfaceY, volOf, cupRim, compColor, srgb, readout, tasteOf, say,
   }

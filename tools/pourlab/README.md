@@ -10,6 +10,10 @@ with `fetch`, so opening the file directly won't work):
 
 ## How to play
 
+**The side panel** sits on the empty bar left of the ice well. Its tabs show what's in the glass, the shaker or the
+stirring glass ("Stirrer"), and it switches by itself to whatever you pour or drop ice into. For a tool it shows the
+ice, how cold and diluted it is, and buttons to pick it up, taste it or dump it.
+
 **Pouring**
 
 - **Point at anything** (a bottle, cup, tool, the ice well, the glass) to see a card saying what it is and does.
@@ -17,7 +21,9 @@ with `fetch`, so opening the file directly won't work):
 - **Click a bottle** on the rail to pick it up. It follows the pointer, held by its spout.
 - **Hold** anywhere to tilt it and pour; let go to stop (a few last drops fall). Move while pouring to aim.
   Flow ramps up with the tilt, and each bottle pours at its own rate (syrups slower, soda faster).
-- **Click the rail** (or right-click, or Escape) to put the bottle back. Clicking another bottle swaps.
+- A held bottle rests tipped, just short of pouring, so the stream starts the moment you press.
+- **Click its slot** in the rail (a faint ghost of it shows there), anywhere along the rail, right-click or Escape to
+  put the bottle back. Clicking another bottle swaps.
 - **Dashers** (Static bitters, Chili tincture): pick one up, then each click adds one dash, 0.05 parts. Six
   dashes is the most a drink takes.
 - **Measuring cups** (quarter, half, one part): click one to bring it beside the glass, pour into it (it brims
@@ -53,7 +59,7 @@ with `fetch`, so opening the file directly won't work):
   sweet), a glowing piece is what got boosted (strength carries heat, bubbles lift freshness). Depth, Brightness and
   Toasted grow from two notes being close to each other (the bracket on the left shows which). Complexity and
   Balance are dials. Point at a bar to read what made it.
-- **Serve** (once the glass reaches the gold serve line: 2.5 parts, the smallest drink a guest will take; the glass
+- **Serve** (once the glass reaches the gold MIN mark, the minimum drink amount: 2.5 parts; the glass
   holds up to 8) slides the glass to the guest. They react in the same
   vibe words, and the spectrograph opens with their arrows: gold for more, pink for less, green for spot on.
 - **Phrasebook** lists every phrase the guests use; serving someone teaches you the ones they said and what range
@@ -67,7 +73,7 @@ There is no timer, money or menu yet: those come next round.
 
 | File | What it is |
 | --- | --- |
-| `index.html` | the page: one canvas, 480x270, scaled up whole pixels at a time |
+| `index.html` | the page: one canvas, 640x270 (the 480 px scene plus 160 px of empty bar on the left for the side panel), scaled to fill the window with square, sharp pixels |
 | `pour.js` | drawing and input: the bar, the panels, the spectrograph, the guest and the phrasebook |
 | `sim.js` | the simulation, no drawing: pouring, the stream, surface waves, color mixing, fizz, ice, cups, tools |
 | `flavor.js` | the taste model from the design doc: notes, masking, carrying, fused notes, Complexity, Balance, crowds, guests, scoring |
@@ -97,9 +103,10 @@ into `assets/` and `sprites/bottle_*.png`, `glass.png`, `cup_*.png`, `shaker*.pn
   Pouring from one into another carries all of that along.
 - **The surface** is a heightfield: one height per pixel column, each pulled by its neighbors, so where the stream
   lands it dips and the ripple runs out and back and settles. A hard, fast stream throws spray.
-- **Mixing:** the drink's true color is the mix of everything in it by volume, worked out in linear light (how light
-  really adds up). Each pixel of the liquid holds its own color and drifts toward its neighbors and toward that
-  mix, so a new pour streaks in and blends over a second or two.
+- **Mixing:** the drink's color is worked out the way light passes through it (Beer-Lambert): each liquid filters
+  some of each color, by how much of the drink it is, so clear spirits, soda and melted ice lighten a drink without
+  greying it and strongly colored ones lead. Each pixel of the liquid holds its own color and drifts toward its
+  neighbors and toward that mix, so a new pour streaks in and blends over a second or two.
 - **Shaking and stirring** follow the doc's curves: dilution and cold rise fast at first and level off, so going
   much longer than the sweet spot only waters the drink down.
 - **State:** a tool moves from one state to the next (at home, lifted, straining, going back), and the page draws

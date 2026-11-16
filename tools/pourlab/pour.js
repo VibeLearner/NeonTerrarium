@@ -23,6 +23,8 @@ await Promise.all([
   ...names.map((n) => loadImg("assets/sprites/" + n + ".png").then((i) => (IMG[n] = i))),
 ])
 const sizes = Object.fromEntries(["glass", "cup_quarter", "cup_half", "cup_one", "shaker", "mixing_glass"].map((n) => [n, { w: IMG[n].width, h: IMG[n].height }]))
+const EXT = L.EXT || 0, CW = W + EXT    // the canvas: EXT px of empty bar left of the scene, for the side panel
+view.width = CW; view.height = H
 const sim = createSim(L, sizes)
 const S = sim.S, glass = sim.glass
 
@@ -177,7 +179,7 @@ function nextGuest() {
 }
 function serve() {
   if (guest.phase !== "asking") return
-  if (sim.total() < FILL_LINE - 0.05) { sim.say(`Fill the glass to the gold serve line first: ${FILL_LINE} parts is the smallest drink a guest will take.`); return }
+  if (sim.total() < FILL_LINE - 0.05) { sim.say(`Pour at least the minimum drink amount first: ${FILL_LINE} parts, the gold MIN mark on the glass.`); return }
   dropHeld()
   if (S.toolMode) sim.putToolDown()
   const t = sim.tasteOf(S.glass), s = score(guest.g, t)
@@ -212,7 +214,7 @@ function learn(said) {
 // ---------------------------------------------------------------- the spectrograph: what the drink tastes like
 // A hologram that slides down over the scene: one bar per note, built from each ingredient's share, with what was
 // hidden (masked) as a hollow piece and what was boosted (carried) as a glowing piece; Complexity and Balance as dials.
-const SPEC = { x: 6, y: 28, w: 262, h: 196 }
+const SPEC = { x: 6 - EXT, y: 28, w: 262, h: 196 }
 const spectro = { open: false, t: 0, src: "glass", taste: null, row: null }
 function openSpectro(src) { spectro.open = true; spectro.t = 0; spectro.src = src; spectro.row = null }
 function closeSpectro() { spectro.open = false }
@@ -227,6 +229,7 @@ const BAR_X = SPEC.x + 66, UNIT = 10
 
 // ---------------------------------------------------------------- buttons (rebuilt every frame, so they always match what's drawn)
 let buttons = []
+const TOOL_NAME = { shaker: "THE SHAKER", mixing_glass: "THE STIRRING GLASS" }
 const TONES = {
   gold: { fill: "rgba(232,176,96,0.15)", hov: "rgba(232,176,96,0.38)", edge: "rgba(232,176,96,0.8)", text: CREAM, off: "rgba(232,176,96,0.05)", offEdge: "rgba(232,176,96,0.35)", offText: DIM },
   holo: { fill: "rgba(95,243,232,0.10)", hov: "rgba(95,243,232,0.32)", edge: "rgba(95,243,232,0.8)", text: HOLO.text, off: "rgba(95,243,232,0.04)", offEdge: "rgba(95,243,232,0.3)", offText: HOLO.dim },
@@ -244,7 +247,7 @@ function button(label, x, y, act, { w, tone = "gold", key = label, dim = false, 
 // ---------------------------------------------------------------- input
 const pointer = { x: -99, y: -99, down: false }
 let hover = null
-function toScene(e) { const r = view.getBoundingClientRect(); return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height } }
+function toScene(e) { const r = view.getBoundingClientRect(); return { x: (e.clientX - r.left) * CW / r.width - EXT, y: (e.clientY - r.top) * H / r.height } }
 function targetAt(x, y) {
   for (let i = buttons.length - 1; i >= 0; i--) if (inBox(x, y, buttons[i])) return { kind: "button", key: buttons[i].key, b: buttons[i] }
   if (book.open) return { kind: "modal" }
@@ -262,6 +265,8 @@ function targetAt(x, y) {
   }
   const glassBox = { x: glass.left, y: glass.top, w: glass.w, h: glass.h }
   if (S.held && S.held.kind === "glass" && inBox(x, y, glassBox)) return { kind: "mat" }   // set the glass back down
+  const bottleInHand = S.held && (S.held.kind === "bottle" || S.held.kind === "dasher")
+  if (bottleInHand && (y >= L.NEAR - 2 || inBox(x, y, bottleBox(S.held.id)))) return { kind: "rail" }   // its slot, or the rail
   if (S.held && y >= L.RAIL_TOP - 4) return { kind: "rail" }
   if (inPoly(x, y, WELL)) return { kind: "ice" }
   for (const cup of Object.values(S.cups)) {
@@ -313,9 +318,10 @@ addEventListener("keydown", (e) => {
 })
 
 // ---------------------------------------------------------------- fit the window, crisp
+// as big as the window allows (not only whole-number steps, so it fills the screen), pixels kept square and sharp
 function fit() {
-  const s = Math.min(innerWidth / W, innerHeight / H), k = s >= 1 ? Math.floor(s) : s
-  view.style.width = W * k + "px"; view.style.height = H * k + "px"
+  const k = Math.min(innerWidth / CW, innerHeight / H)
+  view.style.width = Math.floor(CW * k) + "px"; view.style.height = Math.floor(H * k) + "px"
 }
 addEventListener("resize", fit); fit()
 
@@ -500,6 +506,7 @@ function drawFillLine() {
   ctx.globalAlpha = near ? 1 : 0.6
   for (let x = il; x <= ir; x += 2) px(x, y, GOLD)
   px(il - 3, y, GOLD); px(il - 4, y, GOLD); px(ir + 3, y, GOLD); px(ir + 4, y, GOLD)
+  text("MIN", ir + 7, y - 3, GOLD)          // the minimum drink amount
   ctx.globalAlpha = 1
 }
 // the glass and everything in it is painted on its own layer, so it can slide across to the guest and shrink a
@@ -538,11 +545,14 @@ function drawStream() {
 }
 function drawRail() {
   for (const g of L.ingredients) {
-    if (S.held && S.held.id === g.id) continue
+    if (S.held && S.held.id === g.id) {
+      // its empty slot shows a faint ghost of it, brighter when pointed at: click there to put it back
+      const r = railOf[g.id]; spriteAt("bottle_" + g.id, r.x, r.floor, hover && hover.kind === "rail" ? 0.45 : 0.18); continue
+    }
     const r = railOf[g.id], hov = hover && hover.kind === "bottle" && hover.id === g.id
     spriteAt("bottle_" + g.id + (hov ? "_hover" : ""), r.x, r.floor - (hov ? 6 : 0))
   }
-  ctx.drawImage(IMG.front, 0, 0)
+  ctx.drawImage(IMG.front, -EXT, 0)
 }
 function drawHeld() {
   const h = S.held; if (!h) return
@@ -595,69 +605,89 @@ function gauge(label, x, y, w, f, value, color) {
   text(label, x, y, CREAM); text(value, x + w, y, CREAM, "right")
   fill(x, y + 9, w, 3, "rgba(232,176,96,0.18)"); fill(x, y + 9, Math.round(w * clamp(f, 0, 1)), 3, color)
 }
-function contentRows(r, P, y) {
-  if (!r.rows.length) { text("Empty", P.x + 6, y, DIM); return y + 9 }
-  for (const row of r.rows) {
-    fill(P.x + 6, y + 2, 3, 3, liquidOf(row.id))
-    text(row.name, P.x + 12, y, row.id === "water" ? SOFT : CREAM)
-    text(row.dashes ? `${row.dashes} dash${row.dashes > 1 ? "es" : ""}` : row.parts.toFixed(2), P.x + P.w - 6, y, CREAM, "right"); y += 9
-  }
-  return y
+// ---------------------------------------------------------------- the side panel, on the empty bar left of the ice well
+// It shows one vessel at a time, picked by its tab: the glass, the shaker or the stirring glass. It switches by itself
+// to whatever you pour or drop ice into, and to a tool you pick up. Laid out top to bottom as a list of drawing
+// steps first, so the panel's background can be sized to fit before anything is drawn on it.
+const PANEL = { x: -EXT + 4, y: 42, w: EXT - 8 }
+const VESSELS = [["glass", "Glass"], ["shaker", "Shaker"], ["mixing_glass", "Stirrer"]]   // tab labels (the stirring glass is "Stirrer" to fit)
+let focus = "glass"
+function followFocus() {
+  if (S.toolMode) focus = S.toolMode
+  else if (S.lastInto) { if (VESSELS.some(([id]) => id === S.lastInto)) focus = S.lastInto; S.lastInto = null }
 }
-const TOOL_NAME = { shaker: "THE SHAKER", mixing_glass: "THE STIRRING GLASS" }
-// the left panel shows the vessel you're working with: the glass, or the shaker or stirring glass in your hand
 function drawSidePanel() {
-  const tool = S.toolMode && S.tools[S.toolMode]
-  // measure first (draw nothing), then draw: the panel's size follows its contents (wide enough for the longest name)
+  const P = PANEL, ops = [], add = (f) => ops.push(f)
+  const tool = focus === "glass" ? null : S.tools[focus], lifted = tool && S.toolMode === tool.id
   const r = tool ? sim.readout(tool.c) : sim.readout()
-  const P = { x: 6, y: 44, w: Math.max(160, ...r.rows.map((row) => 12 + textW(row.name) + 8 + textW(row.dashes ? "6 dashes" : "0.00") + 6)) }
-  const hint = wrap(hintText(), P.w - 12)
-  const rows = Math.max(1, r.rows.length)
-  const h = tool ? 14 + rows * 9 + 6 + 9 + 9 + 30 + 11 + 48 + hint.length * 9 + 4
-    : 14 + rows * 9 + 6 + 9 + (r.ice ? 9 : 0) + 11 + (r.log.length ? 9 : 0) + 17 + hint.length * 9 + 4
-  panel(P.x, P.y, P.w, h)
-  let y = P.y + 5
-  text(tool ? "IN " + TOOL_NAME[tool.id] : "IN THE GLASS", P.x + 6, y, GOLD); y += 12
-  y = contentRows(r, P, y)
-  fill(P.x + 6, y + 1, P.w - 12, 1, "rgba(232,176,96,0.35)"); y += 5
-  text("Total", P.x + 6, y, CREAM); text(tool ? `${r.total.toFixed(2)} parts` : `${r.total.toFixed(2)} of ${MAX_PARTS} parts`, P.x + P.w - 6, y, CREAM, "right"); y += 9
-  if (tool) {
-    if (tool.c.ice) { text("Ice", P.x + 6, y, CREAM); text(`${tool.c.ice} cube${tool.c.ice > 1 ? "s" : ""}${tool.c.ice < 3 ? " (3 works best)" : ""}`, P.x + P.w - 6, y, CREAM, "right") }
-    else text("No ice: it won't get cold", P.x + 6, y, "#FF8A7A")
-    y += 9
-    gauge("Cold", P.x + 6, y + 1, P.w - 12, r.chill, r.chill.toFixed(2), "#8FE6FF"); y += 15
-    gauge("Melted ice", P.x + 6, y + 1, P.w - 12, r.dilution / 0.4, `${Math.round(r.dilution * 100)}%`, "#C6EDE4"); y += 15
-    const verb = tool.method === "shake" ? "Shaken" : "Stirred"
-    text(tool.c.techT > 0.05 ? `${verb} ${tool.c.techT.toFixed(1)} s` : `Not ${verb.toLowerCase()} yet`, P.x + 6, y, S.pressing ? "#FFC94A" : SOFT); y += 11
-    button("Strain into the glass", P.x + 6, y, () => sim.strainTool(), { w: P.w - 12, dim: tool.state !== "ready" }); y += 16
-    const other = tool.id === "shaker" ? "mixing_glass" : "shaker"
-    button(other === "shaker" ? "Pour into the shaker" : "Pour into the stirring glass", P.x + 6, y, () => sim.strainTool(other), { w: P.w - 12, dim: tool.state !== "ready", key: "intoOther" }); y += 16
-    const bw = Math.floor((P.w - 12 - 8) / 3)
-    button("Taste", P.x + 6, y, () => (spectro.open && spectro.src === tool.id ? closeSpectro() : openSpectro(tool.id)), { w: bw, on: spectro.open && spectro.src === tool.id })
-    button("Put down", P.x + 10 + bw, y, () => sim.putToolDown(), { w: bw })
-    button("Dump", P.x + 14 + 2 * bw, y, () => sim.dumpTool(), { w: bw }); y += 16
-  } else {
-    if (r.ice) { text("Ice", P.x + 6, y, CREAM); text(`${r.ice} cube${r.ice > 1 ? "s" : ""}`, P.x + P.w - 6, y, CREAM, "right"); y += 9 }
-    const diff = r.total - FILL_LINE
-    const status = r.full ? ["Full to the rim", "#FF8A7A"] : Math.abs(diff) <= 0.05 ? ["At the serve line", "#FFC94A"] : diff < 0 ? [`Serve line: ${(-diff).toFixed(2)} parts to go`, DIM] : ["Past the serve line", "#9CF0B0"]
-    text(status[0], P.x + 6, y, status[1]); y += 11
-    if (r.log.length) { text(logText(r.log), P.x + 6, y - 2, SOFT); y += 9 }
-    const asking = guest.phase === "asking", has = r.total > 0.05, bw = Math.floor((P.w - 12 - 8) / 3)
-    button("Taste", P.x + 6, y, () => { if (!has) return sim.say("Pour something first, then taste it."); spectro.open && spectro.src === "glass" ? closeSpectro() : openSpectro("glass") }, { w: bw, dim: !has || !asking, on: spectro.open && spectro.src === "glass" })
-    button("Serve", P.x + 10 + bw, y, serve, { w: bw, dim: !asking || r.total < FILL_LINE - 0.05 })
-    button("Empty", P.x + 14 + 2 * bw, y, () => { if (asking) { sim.dropGlass(); sim.emptyGlass() } }, { w: bw, dim: !asking || !has }); y += 17
+  const inner = P.w - 12, asking = guest.phase === "asking"
+  let y = P.y + 4
+  // tabs
+  { let x = P.x + 4; for (const [id, label] of VESSELS) { const w = textW(label) + 6, xx = x, yy = y
+    add(() => button(label, xx, yy, () => { if (!S.toolMode) focus = id }, { w, key: "tab_" + id, on: focus === id, dim: S.toolMode && S.toolMode !== id })); x += w + 2 } }
+  y += 17
+  // what's in it: long names wrap under themselves, the amount stays on the first line
+  if (!r.rows.length) { const yy = y; add(() => text("Empty", P.x + 6, yy, DIM)); y += 9 }
+  for (const row of r.rows) {
+    const amt = row.dashes ? `${row.dashes} dash${row.dashes > 1 ? "es" : ""}` : row.parts.toFixed(2)
+    const lines = wrap(row.name, inner - 6 - textW(amt) - 6), yy = y
+    add(() => { fill(P.x + 6, yy + 2, 3, 3, liquidOf(row.id)); lines.forEach((l, k) => text(l, P.x + 12, yy + k * 9, row.id === "water" ? SOFT : CREAM)); text(amt, P.x + P.w - 6, yy, CREAM, "right") })
+    y += lines.length * 9
   }
-  for (const l of hint) { text(l, P.x + 6, y, SOFT); y += 9 }
+  { const yy = y; add(() => fill(P.x + 6, yy + 1, inner, 1, "rgba(232,176,96,0.35)")) } y += 5
+  { const yy = y, tot = tool ? `${r.total.toFixed(2)} parts` : `${r.total.toFixed(2)} of ${MAX_PARTS} parts`; add(() => { text("Total", P.x + 6, yy, CREAM); text(tot, P.x + P.w - 6, yy, CREAM, "right") }) } y += 9
+  const line = (str, color, gap = 0) => { for (const l of wrap(str, inner)) { const yy = y; add(() => text(l, P.x + 6, yy, color)); y += 9 } y += gap }
+  const pair = (a, b, color = CREAM) => { const yy = y; add(() => { text(a, P.x + 6, yy, color); text(b, P.x + P.w - 6, yy, color, "right") }); y += 9 }
+  if (tool) {
+    if (tool.c.ice) pair("Ice", `${tool.c.ice} cube${tool.c.ice > 1 ? "s" : ""}${tool.c.ice < 3 ? ", 3 is best" : ""}`)
+    else line("No ice: it won't get cold", "#FF8A7A")
+    { const yy = y; add(() => gauge("Cold", P.x + 6, yy + 1, inner, r.chill, r.chill.toFixed(2), "#8FE6FF")) } y += 15
+    { const yy = y; add(() => gauge("Melted ice", P.x + 6, yy + 1, inner, r.dilution / 0.4, `${Math.round(r.dilution * 100)}%`, "#C6EDE4")) } y += 15
+    const verb = tool.method === "shake" ? "Shaken" : "Stirred"
+    line(tool.c.techT > 0.05 ? `${verb} ${tool.c.techT.toFixed(1)} s` : `Not ${verb.toLowerCase()} yet`, S.pressing && lifted ? "#FFC94A" : SOFT, 2)
+    const full = (label, act, opts = {}) => { const yy = y; add(() => button(label, P.x + 6, yy, act, { w: inner, ...opts })); y += 15 }
+    const third = (items) => { const yy = y, bw = Math.floor((inner - 8) / 3); items.forEach(([label, act, opts], k) => add(() => button(label, P.x + 6 + k * (bw + 4), yy, act, { w: bw, ...opts }))); y += 15 }
+    const tasteBtn = ["Taste", () => (spectro.open && spectro.src === tool.id ? closeSpectro() : openSpectro(tool.id)), { on: spectro.open && spectro.src === tool.id, key: "taste_" + tool.id }]
+    if (lifted) {
+      full("Strain into the glass", () => sim.strainTool(), { dim: tool.state !== "ready" })
+      const other = tool.id === "shaker" ? "mixing_glass" : "shaker"
+      full(other === "shaker" ? "Into the shaker" : "Into the stirring glass", () => sim.strainTool(other), { dim: tool.state !== "ready", key: "intoOther" })
+      third([tasteBtn, ["Put down", () => sim.putToolDown(), {}], ["Dump", () => sim.dumpTool(), {}]])
+    } else {
+      const has = sim.volOf(tool.c) > 0.01
+      full(tool.method === "shake" ? "Pick it up to shake" : "Pick it up to stir", () => (asking ? sim.liftTool(tool.id) : null), { dim: !has || !asking || tool.state !== "home", key: "lift_" + tool.id })
+      third([tasteBtn, ["Dump", () => sim.emptyTool(tool.id), { dim: !has && !tool.c.ice }], ["Glass", () => (focus = "glass"), { key: "toGlass" }]])
+    }
+  } else {
+    if (r.ice) pair("Ice", `${r.ice} cube${r.ice > 1 ? "s" : ""}`)
+    const left = FILL_LINE - r.total
+    if (r.full) line("Full to the rim", "#FF8A7A")
+    else if (left > 0.05) line(`Minimum drink amount: ${left.toFixed(2)} parts to go`, DIM)
+    else line("Minimum drink amount reached", "#9CF0B0")
+    if (r.log.length) line(logText(r.log), SOFT)
+    y += 2
+    const has = r.total > 0.05, yy = y, bw = Math.floor((inner - 8) / 3)
+    add(() => {
+      button("Taste", P.x + 6, yy, () => { if (!has) return sim.say("Pour something first, then taste it."); spectro.open && spectro.src === "glass" ? closeSpectro() : openSpectro("glass") }, { w: bw, dim: !has || !asking, on: spectro.open && spectro.src === "glass" })
+      button("Serve", P.x + 10 + bw, yy, serve, { w: bw, dim: !asking || r.total < FILL_LINE - 0.05 })
+      button("Empty", P.x + 14 + 2 * bw, yy, () => { if (asking) { sim.dropGlass(); sim.emptyGlass() } }, { w: bw, dim: !asking || !has })
+    })
+    y += 15
+  }
+  y += 3
+  line(hintText(), SOFT)
+  panel(P.x, P.y, P.w, y - P.y + 3)
+  for (const f of ops) f()
 }
 function hintText() {
   if (guest.phase !== "asking") return "Click Next guest when you're ready for the next one."
   const tool = S.toolMode && S.tools[S.toolMode]
   if (tool) return tool.method === "shake" ? "Hold anywhere to shake: about 10 seconds gets it cold. To stir it too, pour it into the stirring glass." : "Hold anywhere to stir: about 20 seconds, gentler than shaking. To shake it too, pour it into the shaker."
   const cup = S.activeCup && S.cups[S.activeCup]
-  if (S.held && S.held.kind === "dasher") return "Click to add a dash. Click the rail to put it back."
+  if (S.held && S.held.kind === "dasher") return "Click to add a dash. Click its slot in the rail to put it back."
   if (S.held && S.held.kind === "cup") return "Hold to pour from the cup. It goes back once it's empty."
   if (S.held && S.held.kind === "glass") return "Hold to pour the glass into the shaker or stirring glass; its ice goes too. Click its mat to set it down."
-  if (S.held) return "Hold to pour, move to aim: into the glass, a cup, the shaker or the stirring glass. Click the rail to put it back."
+  if (S.held) return "Hold to pour, move to aim: into the glass, a cup, the shaker or the stirring glass. Click its slot in the rail to put it back."
   if (cup && cup.state === "active") return sim.volOf(cup.c) > 0.001 ? "Click the cup to pick it up and pour it." : "Pour a bottle into the cup. Click the empty cup to put it away."
   return "Point at anything to see what it does. Click a bottle to pick it up."
 }
@@ -736,6 +766,9 @@ function dial(cx, cy, r, v, color, caption, sub, arrow) {
 function drawSpectro() {
   if (!spectro.open) return
   const t = spectroTaste(); if (!t) { closeSpectro(); return }
+  // the story of the bar you point at goes under the bars, whole: the panel grows to fit it
+  const story = rowStory(t, spectro.row).split("\n").flatMap((part) => wrap(part, SPEC.w - 16)).slice(0, 8)
+  SPEC.h = 168 + story.length * 9 + 2
   const slide = 1 - (1 - Math.min(1, spectro.t / 0.28)) ** 3
   const P = { ...SPEC, y: Math.round(SPEC.y - (1 - slide) * (SPEC.h + SPEC.y)) }
   const dy = P.y - SPEC.y
@@ -808,7 +841,7 @@ function drawSpectro() {
   for (const d of t.discoveries.slice(0, 1)) text(`Discovered: ${d.name}, +${d.bonus.toFixed(1)} ${LABEL[d.note]}`, P.x + 8, y, HOLO.glow)
   y = P.y + 162
   fill(P.x + 6, y, P.w - 12, 1, "rgba(95,243,232,0.25)"); y += 4
-  for (const l of rowStory(t, spectro.row).split("\n").flatMap((part) => wrap(part, P.w - 16)).slice(0, 3)) { text(l, P.x + 8, y, HOLO.text); y += 9 }
+  for (const l of story) { text(l, P.x + 8, y, HOLO.text); y += 9 }
 }
 // what's behind a bar, in words: its top three ingredients, then anything hidden or boosted
 function rowStory(t, n) {
@@ -831,7 +864,7 @@ function rowStory(t, n) {
 // ---------------------------------------------------------------- drawing: the phrasebook
 function drawBook() {
   if (!book.open) return
-  const P = { x: 96, y: 58, w: 288, h: 162 }
+  const P = { x: Math.round((CW - 288) / 2) - EXT, y: 58, w: 288, h: 162 }
   holoPanel(P.x, P.y, P.w, P.h, book.t)
   text("PHRASEBOOK", P.x + 8, P.y + 5, HOLO.title)
   button("Close", P.x + P.w - 40, P.y + 3, () => (book.open = false), { w: 34, tone: "holo", key: "bookClose" })
@@ -854,7 +887,7 @@ function drawBook() {
 // a small card above whatever the player points at: a title, then a few lines
 function tooltip(title, body, cx, bottom) {
   const w = 150, lines = wrap(body, w - 10), h = 16 + lines.length * 9
-  const x = clamp(Math.round(cx - w / 2), 4, W - 4 - w), y = Math.max(4, bottom - h)
+  const x = clamp(Math.round(cx - w / 2), 4 - EXT, W - 4 - w), y = Math.max(4, bottom - h)
   fill(x, y, w, h, "rgba(20,26,22,0.92)"); frame1(x, y, w, h, "rgba(255,201,74,0.75)")
   text(title, x + 5, y + 4, "#FFC94A")
   lines.forEach((l, i) => text(l, x + 5, y + 14 + i * 9, CREAM))
@@ -872,7 +905,7 @@ function drawTooltip() {
   }
   else if (hover.kind === "ice") tooltip("Ice well", "Drag a cube out and drop it into the glass, shaker or stirring glass, or flick it in. The shaker and stirring glass need ice to chill a drink; in the glass it melts in slowly.", WELL_MID.x + 50, WELL[0][1] - 4)
   else if (hover.kind === "glass" && guest.phase === "asking")
-    tooltip("The glass", `The gold mark is the serve line: ${FILL_LINE} parts, the smallest drink a guest will take. You can pour more, up to ${MAX_PARTS} parts.` + (sim.total() > 0.01 ? " Click to pick it up and pour it into the shaker or stirring glass." : ""), glass.cx, glass.top - 4)
+    tooltip("The glass", `The gold MIN mark is the minimum drink amount: ${FILL_LINE} parts. Guests won't take a smaller drink. It holds up to ${MAX_PARTS} parts.` + (sim.total() > 0.01 ? " Click to pick it up and pour it into the shaker or stirring glass." : ""), glass.cx, glass.top - 4)
 }
 function drawNotice() {
   if (!S.notice) return
@@ -886,7 +919,8 @@ function drawNotice() {
 
 function render() {
   buttons = []
-  ctx.drawImage(IMG.bg, 0, 0)
+  MAIN.setTransform(1, 0, 0, 1, EXT, 0)          // everything below is in the scene's own coordinates
+  ctx.drawImage(IMG.bg, -EXT, 0)
   drawWellHover()
   for (const cup of Object.values(S.cups)) if (cup.state === "home" || cup.state === "toHome") drawCup(cup)
   for (const tool of Object.values(S.tools)) if (tool.state === "home") drawToolHome(tool)
@@ -923,6 +957,7 @@ function update(dt) {
 function frame(now) {
   acc += Math.min(0.1, (now - last) / 1000); last = now
   while (acc >= STEP) { sim.step(); update(STEP); acc -= STEP }
+  followFocus()
   hover = targetAt(pointer.x, pointer.y)
   if (spectro.open && hover && hover.kind === "spectro") spectro.row = hover.row
   view.style.cursor = S.grab ? "grabbing" : S.toolMode ? (pointer.down ? "grabbing" : "grab") : S.held ? (pointer.down ? "grabbing" : hover ? "pointer" : "grab") : hover && hover.kind !== "spectro" && hover.kind !== "modal" ? "pointer" : "default"

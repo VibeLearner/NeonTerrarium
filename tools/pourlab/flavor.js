@@ -15,6 +15,7 @@ export const LABEL = { sweet: "Sweet", sour: "Sour", bitter: "Bitter", strength:
 export const PARENTS = { depth: ["sweet", "bitter"], brightness: ["sour", "fresh"], toasted: ["smoke", "sweet"] }
 
 // values per part, tags and cost (dome credits per part), straight from the doc's Ingredients table
+export const TRACE = 0.04
 export const INGREDIENTS = {
   rice: { v: { strength: 20, sweet: 1 }, tags: ["spirit"], cost: 1.0 },
   rye: { v: { strength: 18, smoke: 9, spice: 2, bitter: 2 }, tags: ["spirit", "smoked"], cost: 1.4 },
@@ -59,7 +60,10 @@ export function taste(d) {
   const out = { notes: {}, contrib: {}, masked: {}, carried: {}, discoveries: [], ingredients: 0, volume: vol, ingVol,
     dilution: vol > 0 ? (parts.get("water") || 0) / vol : 0, chill: d.chill || 0, bubbles: 0, complexity: 0, balance: 10, drags: [] }
   if (vol <= 0) { for (const n of NOTES) out.notes[n] = 0; return out }
-  out.ingredients = [...parts.keys()].filter((id) => id !== "water" && parts.get(id) > 1e-6).length
+  // what counts as an ingredient: anything at least most of a dash. Stray drops (a bottle dripping as it's carried
+  // back over the glass, a splash) are traces and don't count toward "too many ingredients" (lab choice: 0.04 parts)
+  out.counted = [...parts.keys()].filter((id) => id !== "water" && parts.get(id) >= TRACE)
+  out.ingredients = out.counted.length
 
   // concentration and perception, with each ingredient's share of every note kept for the stacked bars
   const raw = {}
@@ -113,7 +117,7 @@ export function taste(d) {
   for (const n of BASE) drag(2 * Math.max(0, out.notes[n] - 8) * (1 - 0.4 * out.chill), `${LABEL[n]} is harsh`)
   const sorted = BASE.map((n) => [out.notes[n], n]).sort((a, b) => b[0] - a[0])
   drag(0.5 * Math.max(0, sorted[0][0] - sorted[1][0] - 3), `${LABEL[sorted[0][1]]} drowns out the rest`)
-  drag(muddle, "too many ingredients")
+  drag(muddle, `${out.ingredients} ingredients, 5 at most`)
   drag(0.25 * Math.max(0, out.dilution * 100 - 28), "watery")
   out.drags.sort((a, b) => b[0] - a[0])
   out.balance = clamp(10 - out.drags.reduce((s, x) => s + x[0], 0))

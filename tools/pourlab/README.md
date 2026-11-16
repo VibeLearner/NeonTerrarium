@@ -112,4 +112,5 @@ The flow rates (`INGREDIENT_RULES` in `sim.js`, 0.9 to 2.2 parts a second at ful
 assist (16 px past an opening, or 10% of the throw's distance, whichever is more), how much a tool holds (6 parts), the strain rate (3 parts a second), how fast a
 fizzy drink goes flat in the glass, the cut-offs between the five phrase levels (under 1, 1 to 3.5, 3.5 to 6, 6 to
 8.5, 8.5 and up), the Sour and Spice phrases and the "none" phrases, and how much of each tag an ingredient needs
-for a discovery (a fifth of a part). All are marked "lab choice" in the code.
+for a discovery (a fifth of a part), and what counts toward "too many ingredients" (at least 0.04 parts, so stray
+drops from a dripping bottle don't count, while a single dash does). All are marked "lab choice" in the code.

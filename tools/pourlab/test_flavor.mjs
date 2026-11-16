@@ -70,5 +70,15 @@ for (let i = 0; i < 3; i++) {
   console.log(`    ${g.crowdName}${g.mood ? ", " + g.mood.name : ""}${g.quirk ? ", " + g.quirk.kind + "s " + g.quirk.note : ""}: "${req.map((r) => r.text).join(" ")}" -> ${s.tier} ${s.score.toFixed(0)}: ${fb.lines.join(" ")}`)
 }
 ok(true, "requests and feedback read in vibe words")
+{
+  console.log("what counts as an ingredient")
+  const five = new Map([["rice", 1.2], ["yuzu", 0.5], ["glow", 0.4], ["lemongrass", 0.3], ["bitters", 0.1]])
+  const base = taste({ parts: five, chill: 0.9, fizz: 1, shaken: true })
+  const specks = taste({ parts: new Map([...five, ["coffee", 0.01], ["soda", 0.02], ["water", 0.6]]), chill: 0.9, fizz: 1, shaken: true })
+  ok(base.ingredients === 5 && specks.ingredients === 5 && !specks.drags.some(([, w]) => /ingredients, 5 at most/.test(w)), `stray drops and melted ice don't count: ${specks.ingredients} ingredients, no muddle`)
+  const six = taste({ parts: new Map([...five, ["chili", 0.05]]), chill: 0.9, fizz: 1, shaken: true })
+  const d = six.drags.find(([, w]) => /ingredients, 5 at most/.test(w))
+  ok(six.ingredients === 6 && d && Math.abs(d[0] - 0.8) < 1e-9, `one dash of a sixth ingredient counts: "${d && d[1]}" (-${d && d[0].toFixed(1)})`)
+}
 console.log(fails ? `${fails} failed` : "all passed")
 process.exit(fails ? 1 : 0)

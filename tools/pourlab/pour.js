@@ -79,6 +79,7 @@ function wrap(s, maxW) {
 }
 
 // ---------------------------------------------------------------- what each bottle is (shown on hover)
+const PLAIN = { rice: "rice", rye: "rye", rum: "rum", coffee: "coffee", yuzu: "yuzu", ume: "ume", lemongrass: "lemongrass", glow: "glow", ginger: "ginger", shiso: "shiso", soda: "soda", bitters: "bitters", chili: "chili" }
 const CUP_NAME = { cup_quarter: "A quarter", cup_half: "A half", cup_one: "One" }
 const DESC = {
   rice: "A clean, clear spirit. Strong, with a whisper of sweetness, so everything else shows through.",
@@ -211,7 +212,7 @@ function learn(said) {
 // ---------------------------------------------------------------- the spectrograph: what the drink tastes like
 // A hologram that slides down over the scene: one bar per note, built from each ingredient's share, with what was
 // hidden (masked) as a hollow piece and what was boosted (carried) as a glowing piece; Complexity and Balance as dials.
-const SPEC = { x: 6, y: 28, w: 262, h: 190 }
+const SPEC = { x: 6, y: 28, w: 262, h: 196 }
 const spectro = { open: false, t: 0, src: "glass", taste: null, row: null }
 function openSpectro(src) { spectro.open = true; spectro.t = 0; spectro.src = src; spectro.row = null }
 function closeSpectro() { spectro.open = false }
@@ -222,7 +223,7 @@ function spectroTaste() {
 }
 const SPEC_ROWS = [...BASE, ...FUSED]
 const rowY = (i) => SPEC.y + 37 + i * 11 + (i >= BASE.length ? 4 : 0)
-const BAR_X = SPEC.x + 60, UNIT = 10
+const BAR_X = SPEC.x + 66, UNIT = 10
 
 // ---------------------------------------------------------------- buttons (rebuilt every frame, so they always match what's drawn)
 let buttons = []
@@ -805,15 +806,16 @@ function drawSpectro() {
   // discoveries, then the hovered row's story
   let y = rowY(SPEC_ROWS.length - 1) + dy + 12
   for (const d of t.discoveries.slice(0, 1)) text(`Discovered: ${d.name}, +${d.bonus.toFixed(1)} ${LABEL[d.note]}`, P.x + 8, y, HOLO.glow)
-  y = P.y + 165
+  y = P.y + 162
   fill(P.x + 6, y, P.w - 12, 1, "rgba(95,243,232,0.25)"); y += 4
-  for (const l of wrap(rowStory(t, spectro.row), P.w - 16).slice(0, 2)) { text(l, P.x + 8, y, HOLO.text); y += 9 }
+  for (const l of rowStory(t, spectro.row).split("\n").flatMap((part) => wrap(part, P.w - 16)).slice(0, 3)) { text(l, P.x + 8, y, HOLO.text); y += 9 }
 }
 // what's behind a bar, in words: its top three ingredients, then anything hidden or boosted
 function rowStory(t, n) {
   if (!n) return "Point at a bar to see what made it."
-  if (n === "complexity") return `Complexity counts how many notes stand out clearly: ${t.effectiveNotes.toFixed(1)} here.` + (t.ingredients > 5 ? ` More than five ingredients muddles it.` : "")
-  if (n === "balance") return t.drags.length ? "Balance loses: " + t.drags.slice(0, 3).map(([a, why]) => `${why} (-${a.toFixed(1)})`).join(", ") + "." : "Balance is perfect: nothing sticks out."
+  const counted = `\nCounted: ${t.counted.map((id) => PLAIN[id]).join(", ")}.`
+  if (n === "complexity") return `Complexity counts how many notes stand out clearly: ${t.effectiveNotes.toFixed(1)} here.` + (t.ingredients > 5 ? counted : "")
+  if (n === "balance") return (t.drags.length ? "Balance loses: " + t.drags.slice(0, 3).map(([a, why]) => `${why} (-${a.toFixed(1)})`).join(", ") + "." : "Balance is perfect: nothing sticks out.") + (t.ingredients > 5 ? counted : "")
   const v = t.notes[n]
   if (FUSED.includes(n)) {
     const [a, b] = PARENTS[n], d = t.discoveries.filter((x) => x.note === n)

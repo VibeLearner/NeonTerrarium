@@ -16,7 +16,7 @@ well, the glass, the screen) to see a card saying what it is and does.
 **The screen** hangs from the top shelf on the left. It lists everything in the drink in one list: what's in the
 glass, and anything still in the shaker, marked with a gold [SHKR] tag next to its amount. The taste profile beside
 it shows the glass; if everything is still in the shaker, it shows the shaker. When the ingredients are split
-between the two, it shows only what's in the glass. Click the screen for the full taste breakdown.
+between the two, it shows only what's in the glass.
 
 **Pouring**
 
@@ -63,7 +63,7 @@ between the two, it shows only what's in the glass. Click the screen for the ful
 - **The screen** hanging from the shelf shows the whole drink in a small font. When
   the list is longer than the screen, it scrolls: the mouse wheel over the screen, or the little arrows on the
   divider. A new ingredient scrolls itself into view.
-- The full taste breakdown (click the screen) has one bar per note, built from the ingredients that give it; a
+- The full taste breakdown opens by itself after you serve, with the guest's reaction. It has one bar per note, built from the ingredients that give it; a
   hollow piece is what got hidden, a glowing piece what got boosted. Depth, Brightness and Toasted grow from two
   notes being close. Complexity and Balance are dials. Point at a bar to read what made it.
 - **The book** (top right) is a two-screen e-reader, saved in the browser. The left screen lists your discoveries,

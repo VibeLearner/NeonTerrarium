@@ -309,7 +309,7 @@ function targetAt(x, y) {
   if (book.open) return { kind: "modal" }
   if (spectro.open && inBox(x, y, SPEC)) {
     const i = SPEC_ROWS.findIndex((_, k) => y >= rowY(k) - 2 && y < rowY(k) + 9)
-    const dial = x >= SPEC.x + 186 ? (y < SPEC.y + 96 ? "complexity" : y < SPEC.y + 160 ? "balance" : null) : null
+    const dial = x >= SPEC.x + 186 ? (y >= SPEC.y + 96 && y < SPEC.y + 160 ? "balance" : null) : null
     return { kind: "spectro", row: i >= 0 && x < SPEC.x + 186 ? SPEC_ROWS[i] : dial }
   }
   if (guest.phase !== "asking") return null
@@ -371,7 +371,6 @@ view.addEventListener("pointerdown", (e) => {
   if (e.button === 2) { putBackHeld(); return }
   if (guest.phase !== "asking") { sim.say("Click Next guest to serve someone new."); return }
   if (e.button === 0 && doubleClick(e, p)) return
-  if (t && t.kind === "screen") { if (sim.volOf(drinkContents()) > 0.01) openSpectro("drink"); else sim.say("Nothing to taste yet."); return }
   if (t && t.kind === "ice") { sim.grabIce(p.x, p.y, e.timeStamp / 1000); return }      // a cube from the well, to drag or flick
   if (S.toolMode) { sim.press(true); return }                     // hold anywhere to shake or stir
   if (t && t.kind === "bottle") {
@@ -842,7 +841,6 @@ function drawScreenBody() {
   fill(P.x - 2, P.y - 2, P.w + 4, P.h + 4, "#1B1F24"); frame1(P.x - 2, P.y - 2, P.w + 4, P.h + 4, "#3A4048")
   fill(P.x, P.y, P.w, P.h, "rgba(6,22,30,0.94)")
   for (let yy = P.y + 1; yy < P.y + P.h; yy += 2) fill(P.x, yy, P.w, 1, "rgba(95,243,232,0.03)")
-  if (hover && hover.kind === "screen") frame1(P.x, P.y, P.w, P.h, "rgba(95,243,232,0.6)")
   // one list for the whole drink: the glass, and anything still in the shaker (tagged SHKR)
   const r = sim.readout(), sh = S.tools.shaker, sc = sh.c, rs = sim.readout(sc), inShaker = rs.total > 0.004 || sc.ice > 0
   const c = S.glass, tool = null
@@ -1106,9 +1104,7 @@ function drawSpectro() {
 // what's behind a bar, in words: its top three ingredients, then anything hidden or boosted
 function rowStory(t, n) {
   if (!n) return "Point at a bar to see what made it."
-  const counted = `\nCounted: ${t.counted.map((id) => PLAIN[id]).join(", ")}.`
-  if (n === "complexity") return `Complexity counts how many notes stand out clearly: ${t.effectiveNotes.toFixed(1)} here.` + (t.ingredients > 5 ? counted : "")
-  if (n === "balance") return (t.drags.length ? "Balance loses: " + t.drags.slice(0, 3).map(([a, why]) => `${why} (-${a.toFixed(1)})`).join(", ") + "." : "Balance is perfect: nothing sticks out.") + (t.ingredients > 5 ? counted : "")
+  if (n === "balance") return t.drags.length ? "Balance loses: " + t.drags.slice(0, 3).map(([a, why]) => `${why} (-${a.toFixed(1)})`).join(", ") + "." : "Balance is perfect: nothing sticks out."
   const v = t.notes[n]
   if (FUSED.includes(n)) {
     const [a, b] = PARENTS[n], d = t.discoveries.filter((x) => x.note === n)
@@ -1286,7 +1282,7 @@ function drawTooltip() {
   }
   else if (hover.kind === "spoonHome") tooltip("Bar spoon", "Click to put it in the glass, then stir there.", S.spoon.home.x, holderBox().y - 4)
   else if (hover.kind === "spoon") tooltip("Bar spoon", "Press and hold on it, then move the mouse in circles to stir. Back and forth doesn't stir. Click it to take it out." + (sim.readout().ice ? "" : " Put ice in first, or the drink won't get cold."), glass.cx, spoonGlassBox().y - 4)
-  else if (hover.kind === "screen") tooltip("The screen", "What's in the glass or the tool you're using, and how it tastes right now. Click it for the full breakdown.", SCREEN.x + SCREEN.w / 2 + 40, SCREEN.y + SCREEN.h + 62)
+  else if (hover.kind === "screen") tooltip("The screen", "What's in the drink, and how it tastes right now. After you serve, the full breakdown opens with the guest's reaction.", SCREEN.x + SCREEN.w / 2 + 40, SCREEN.y + SCREEN.h + 62)
   else if (hover.kind === "ice") tooltip("Ice well", "Drag a cube out and drop it into the glass, shaker or stirring glass, or flick it in. The shaker and stirring glass need ice to chill a drink; in the glass it melts in slowly.", WELL_MID.x + 50, WELL[0][1] - 4)
   else if (hover.kind === "glass" && guest.phase === "asking")
     tooltip("The glass", `The lights on its sides mark the minimum drink amount: ${FILL_LINE} parts. They turn from red to green once there's enough. Guests won't take a smaller drink. It holds up to ${MAX_PARTS} parts.` + " Slide it over to the guest to serve it. Click to pick it up and pour it out. Drag it to move it. Double-click to empty it.", glass.cx, glass.top - 4)
@@ -1353,7 +1349,7 @@ function frame(now) {
   hover = targetAt(pointer.x, pointer.y)
   trackDwell(dt)
   if (spectro.open && hover && hover.kind === "spectro") spectro.row = hover.row
-  view.style.cursor = S.grab || S.moving || S.stirring ? "grabbing" : hover && hover.kind === "spoon" ? "grab" : hover && hover.kind === "spoonHome" ? "pointer" : S.toolMode ? (pointer.down ? "grabbing" : "grab") : S.held ? (pointer.down ? "grabbing" : hover ? "pointer" : "grab") : hover && hover.kind !== "spectro" && hover.kind !== "modal" ? "pointer" : "default"
+  view.style.cursor = S.grab || S.moving || S.stirring ? "grabbing" : hover && hover.kind === "spoon" ? "grab" : hover && hover.kind === "spoonHome" ? "pointer" : S.toolMode ? (pointer.down ? "grabbing" : "grab") : S.held ? (pointer.down ? "grabbing" : hover ? "pointer" : "grab") : hover && hover.kind !== "spectro" && hover.kind !== "modal" && hover.kind !== "screen" ? "pointer" : "default"
   render()
   requestAnimationFrame(frame)
 }

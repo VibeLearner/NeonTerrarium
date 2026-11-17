@@ -66,13 +66,14 @@ between the two, it shows only what's in the glass.
 - The full taste breakdown opens by itself after you serve, with the guest's reaction. It has one bar per note, built from the ingredients that give it; a
   hollow piece is what got hidden, a glowing piece what got boosted. Depth, Brightness and Toasted grow from two
   notes being close. Complexity and Balance are dials. Point at a bar to read what made it.
-- **The book** (top right) is a two-screen e-reader, saved in the browser. The left screen lists your discoveries,
+- **Recipes** (the button on the screen's title bar) opens a two-screen e-reader, saved in the browser. The left screen lists your discoveries,
   one line each, like "Coffee + Ginger = Toasted": any two ingredients that build Depth, Brightness or Toasted to 2
   or more, and the three secret pairings ("? + ? = Depth" until found). They're picked up from the screen as you
   make drinks, and from what you serve. The right screen holds your recipes: after a guest has tasted a drink,
   press **Save recipe** in the taste breakdown and it becomes a card with every ingredient and amount, the ice, how
   it was made and how the guest rated it. Turn pages with the arrows or the mouse wheel over a screen.
-- **Next guest** brings someone new. The crowd button picks the crowd.
+- **Next guest:** when you're done with a guest's reaction, press **Next guest** in the taste breakdown (or Escape)
+  and someone new comes up. Each guest is from a random crowd.
 
 There is no timer, money or menu yet: those come next round.
 

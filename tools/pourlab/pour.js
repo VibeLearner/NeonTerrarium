@@ -281,6 +281,9 @@ const SPEC = { x: 6 - EXT, y: 28, w: 262, h: 196 }
 const spectro = { open: false, t: 0, src: "glass", taste: null, row: null }
 function openSpectro(src) { spectro.open = true; spectro.t = 0; spectro.src = src; spectro.row = null; if (src !== "served") noteDiscoveries(spectroTaste()) }
 function closeSpectro() { spectro.open = false }
+// done with the guest's reaction: the breakdown closes and the next guest comes up
+function finishTasting() { closeSpectro(); if (guest.phase === "reacting") nextGuest() }
+function openBook() { book.open = !book.open; book.t = 0; book.flash = [0, 0] }
 function spectroTaste() {
   if (spectro.src === "served") return guest.result && guest.result.t
   return sim.tasteOf(drinkContents())
@@ -382,7 +385,7 @@ view.addEventListener("pointerdown", (e) => {
   if (t && t.kind === "button") { t.b.act(); return }
   if (book.open || (t && t.kind === "spectro")) return
   if (e.button === 2) { putBackHeld(); return }
-  if (guest.phase !== "asking") { sim.say("Click Next guest to serve someone new."); return }
+  if (guest.phase !== "asking") { sim.say(guest.phase === "served" ? "They're tasting it." : "Press Next guest in the taste breakdown to serve someone new."); return }
   if (e.button === 0 && doubleClick(e, p)) return
   if (t && t.kind === "ice") { sim.grabIce(p.x, p.y, e.timeStamp / 1000); return }      // a cube from the well, to drag or flick
   if (S.toolMode) { sim.press(true); return }                     // hold anywhere to shake or stir
@@ -446,7 +449,7 @@ view.addEventListener("wheel", (e) => {
 view.addEventListener("contextmenu", (e) => { e.preventDefault(); putBackHeld() })
 addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return
-  if (book.open) book.open = false; else if (spectro.open) closeSpectro(); else if (S.toolMode) sim.putToolDown(); else putBackHeld()
+  if (book.open) book.open = false; else if (spectro.open) finishTasting(); else if (S.toolMode) sim.putToolDown(); else putBackHeld()
 })
 
 // ---------------------------------------------------------------- fit the window, crisp
@@ -857,10 +860,14 @@ function drawScreenBody() {
   const r = sim.readout(), sh = S.tools.shaker, sc = sh.c, rs = sim.readout(sc), inShaker = rs.total > 0.004 || sc.ice > 0
   const c = S.glass, tool = null
   text("THE DRINK", P.x + 5, P.y + 6, HOLO.title)
-  const room = P.x + P.w - 4 - (P.x + 5 + textW("THE DRINK") + 8)
+  // the recipe book opens from here
+  const bl = "Recipes", bw = textW(bl) + 10, bxr = P.x + P.w - 3 - bw
+  if (spectro.open || book.open) { frame1(bxr, P.y + 3, bw, 12, "rgba(95,243,232,0.3)"); text(bl, bxr + 5, P.y + 6, HOLO.dim) }   // under a panel: not clickable
+  else button(bl, bxr, P.y + 3, openBook, { w: bw, tone: "holo", key: "book" })
+  const room = bxr - 5 - (P.x + 5 + textW("THE DRINK") + 8)
   const gl = [`${r.total.toFixed(2)} of ${MAX_PARTS} parts`, `${r.total.toFixed(2)} / ${MAX_PARTS}`]
   const totals = inShaker && rs.total > 0.004 ? [`${gl[0]} + ${rs.total.toFixed(2)} SHKR`, `${gl[1]} + ${rs.total.toFixed(2)} SHKR`, gl[1]] : gl
-  text(totals.find((t2) => textW(t2) <= room) || totals[totals.length - 1], P.x + P.w - 4, P.y + 6, HOLO.text, "right")
+  text(totals.find((t2) => textW(t2) <= room) || totals[totals.length - 1], bxr - 5, P.y + 6, HOLO.text, "right")
   fill(P.x + 3, P.y + 17, P.w - 6, 1, "rgba(95,243,232,0.3)")
   // the columns, measured from the text itself: the taste profile on the right is as wide as its longest label plus
   // a bar; the contents on the left get the rest
@@ -988,16 +995,6 @@ function drawBubble() {
   ctx.globalAlpha = 1
 }
 // the guest controls, top right
-function drawStrip() {
-  const y = 44, labels = [["Book", () => { book.open = !book.open; book.t = 0; book.flash = [0, 0] }], [crowdPick ? CROWDS[crowdPick].name : "Any crowd", cycleCrowd], ["Next guest", nextGuest]]
-  let x = 476
-  for (const [l, act] of labels) { const w = textW(l) + 10; x -= w; button(l, x, y, act, { w, key: act === cycleCrowd ? "crowd" : l, on: l === "Book" && book.open }); x -= 4 }
-}
-function cycleCrowd() {
-  const i = crowdPick ? CROWD_IDS.indexOf(crowdPick) : -1
-  crowdPick = i + 1 < CROWD_IDS.length ? CROWD_IDS[i + 1] : null
-  sim.say(`The next guest will be from ${crowdPick ? "the " + CROWDS[crowdPick].name + " crowd" : "any crowd"}.`)
-}
 
 // ---------------------------------------------------------------- drawing: the spectrograph
 function holoPanel(x, y, w, h, t) {
@@ -1045,9 +1042,10 @@ function drawSpectro() {
   // header: what's being tasted, and how it was made
   const what = served ? "THE SERVED DRINK" : drinkContents() === S.glass ? "TASTE: THE GLASS" : "TASTE: THE SHAKER"
   text(what, P.x + 8, P.y + 5, HOLO.title)
-  button("Close", P.x + P.w - 40, P.y + 3, closeSpectro, { w: 34, tone: "holo" })
+  const cl = served ? "Next guest" : "Close", cw = textW(cl) + 10
+  button(cl, P.x + P.w - 6 - cw, P.y + 3, served ? finishTasting : closeSpectro, { w: cw, tone: "holo", key: "spectroClose" })
   // once the guest has tasted it, the drink can be saved to the book as a recipe card
-  if (served) { const l = guest.saved ? "Saved" : "Save recipe", w = textW(l) + 10; button(l, P.x + P.w - 44 - w, P.y + 3, saveRecipe, { w, tone: "holo", key: "saveRecipe", on: guest.saved }) }
+  if (served) { const l = guest.saved ? "Saved" : "Save recipe", w = textW(l) + 10; button(l, P.x + P.w - 10 - cw - w, P.y + 3, saveRecipe, { w, tone: "holo", key: "saveRecipe", on: guest.saved }) }
   const c = served ? S.glass : drinkContents()
   const stats = [`Melted ice ${Math.round(t.dilution * 100)}%`, `Cold ${t.chill.toFixed(1)}`]
   if (t.bubbles > 0.01) stats.push(`Bubbles ${Math.round(t.bubbles * 100)}%`)
@@ -1330,7 +1328,6 @@ function render() {
   drawHeld()                           // whatever is in hand stays on top, even over the bubble and the panel
   drawThrown()                         // ice in the air goes over the panels, so a flick can be followed the whole way
   if (!book.open) drawSpectro()
-  drawStrip()
   drawBook()
   drawTooltip()
   drawNotice()

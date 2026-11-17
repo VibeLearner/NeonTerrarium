@@ -1103,8 +1103,9 @@ function drawSpectro() {
   const c = served ? S.glass : drinkContents()
   const stats = [`Melted ice ${Math.round(t.dilution * 100)}%`, `Cold ${t.chill.toFixed(1)}`]
   if (t.bubbles > 0.01) stats.push(`Bubbles ${Math.round(t.bubbles * 100)}%`)
-  text(c.log.length ? logText(c.log) : "Poured straight in", P.x + 8, P.y + 15, HOLO.text)
-  text(stats.join(" / "), P.x + 8, P.y + 24, HOLO.dim)
+  // below the buttons (they end at P.y + 15), with room to breathe before the note bars at P.y + 37
+  text(c.log.length ? logText(c.log) : "Poured straight in", P.x + 8, P.y + 18, HOLO.text)
+  text(stats.join(" / "), P.x + 8, P.y + 27, HOLO.dim)
   // the note bars
   for (let i = 0; i < SPEC_ROWS.length; i++) {
     const n = SPEC_ROWS[i], y = rowY(i) + dy, v = t.notes[n], hov = spectro.row === n

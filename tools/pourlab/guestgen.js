@@ -316,6 +316,7 @@ export function drawGuest(L, frame) {
   head(ctx)
   frontHair(ctx)
   hats(ctx)
+  goggles(ctx)
 
   const C = render(B, { openBelow: CLIP_Y })
   for (let x = 0; x < B.w; x++) for (let y = CLIP_Y + 1; y < B.h; y++) { C[y * B.w + x] = null; B.id[y * B.w + x] = -1 }
@@ -511,6 +512,7 @@ function hairDetail(ctx, C) {
     const seg = Math.floor((a - Math.PI) / 0.13) % 2
     for (let d = 0; d < 3; d++) {
       const x = hx + Math.cos(a) * (r0 - d), y = cy + Math.sin(a) * (r0 - d) * 0.9
+      if (ctx.shaved && Math.abs(x - hx) > 4) continue                 // a mohawk: shine only on the strip, not the shaved sides
       if (seg === 0 || d === 1) P(C, B, x, y, d === 1 ? L.hair[4] : L.hair[3], isHair)
     }
   }
@@ -768,6 +770,30 @@ function lanyard(ctx, C, y0, ok) {
 }
 function rgbToHex(c) { return "#" + c.map((v) => v.toString(16).padStart(2, "0")).join("") }
 
+// ---------------------------------------------------------------- work goggles pushed up on the forehead
+// Drawn as shapes so they get the same shading and outlines as everything else. The strap curves down toward the sides
+// the way a band wraps a head, and is only drawn over the head (skin, hair, hat), so it never sticks out past it.
+function goggles(ctx) {
+  const { L, B, hx, hy } = ctx
+  if (!L.extras.goggles) return
+  const onHat = L.hat === "hardhat", gy = onHat ? hy - 23 : hy - 16
+  const isHead = (x, y) => { const n = B.at(x, y); return n >= 0 && (n === ctx.faceId || n === ctx.hairId || n === ctx.backHairId || n === ctx.hatId) }
+  const strap = B.shape(ramp("#3A3F48"), { shade: 1, lit: 1 })
+  for (let x = hx - L.rw - 4; x <= hx + L.rw + 4; x++) {
+    const y = gy + Math.round(((x - hx) / L.rw) ** 2 * 4)
+    for (const yy of [y, y + 1]) if (isHead(x, yy)) B.put(x, yy, strap)
+  }
+  const frame = B.shape(ramp("#5A6268"), { shade: 2, lit: 2 }), lens = B.shape(ramp("#E8B060"), { shade: 2, lit: 2, line: false })
+  ctx.goggleLens = []
+  for (const s of [-1, 1]) {
+    const lx = hx + s * 7, ly = gy + 1
+    ellipse(B, frame, lx, ly, 5, 3.5)
+    ellipse(B, lens, lx, ly, 3.4, 2)
+    ctx.goggleLens.push([lx, ly])
+  }
+  capsule(B, frame, hx - 2, gy + 1, hx + 2, gy + 1, 1, 1)          // the bridge between the lenses
+}
+
 // ---------------------------------------------------------------- accessories over the face and head
 function accessories(ctx, C) {
   const { L, B, hx, hy } = ctx, rw = L.rw, g = L.eyeGap, ey = hy + 3, any = () => true
@@ -786,11 +812,7 @@ function accessories(ctx, C) {
     lineC(C, B, hx - 2, ey - 3, hx + 1, ey - 3, dark, any)
   }
   if (L.extras.monocle) { const cx = hx + g; for (let a = 0; a < 24; a++) P(C, B, cx + Math.round(Math.cos(a / 24 * Math.PI * 2) * 5.5), ey + Math.round(Math.sin(a / 24 * Math.PI * 2) * 5), L.gold[3], any); lineC(C, B, cx + 5, ey + 4, cx + 9, ey + 22, L.gold[2], any) }
-  if (L.extras.goggles) {
-    const gy = L.hat === "hardhat" ? hy - 24 : hy - 18
-    lineC(C, B, hx - rw - 2, gy + 1, hx + rw + 2, gy + 1, hexRgb("#2E3338"), any)
-    for (const s of [-1, 1]) stamp(C, B, hx + s * 8 - 5, gy - 3, [".xxxxxxxx.", "xyyyyyyyyx", "xyzzyyyyyx", "xyyyyyyyyx", ".xxxxxxxx."], { x: hexRgb("#4A5258"), y: hexRgb("#E8B060"), z: hexRgb("#FFF0C8") }, any)
-  }
+  if (ctx.goggleLens) for (const [lx, ly] of ctx.goggleLens) { P(C, B, lx - 2, ly - 1, hexRgb("#FFF0C8"), any); P(C, B, lx - 1, ly - 1, hexRgb("#FFF0C8"), any) }   // a glint on each lens
   if (L.extras.headphones && !L.phonesOnNeck) {
     for (let a = 0; a <= 28; a++) { const t = Math.PI + a / 28 * Math.PI; P(C, B, hx + Math.cos(t) * (rw + 3), hy - 6 + Math.sin(t) * (rw + 5), hexRgb("#3A3F48"), any); P(C, B, hx + Math.cos(t) * (rw + 4), hy - 6 + Math.sin(t) * (rw + 6), hexRgb("#2A2E36"), any) }
     for (const s of [-1, 1]) stamp(C, B, hx + s * (rw + 1) - 3, hy - 2, [".xxxx.", "xyyyyx", "xyyyyx", "xyyyyx", "xyyyyx", ".xxxx."], { x: hexRgb("#2A2E36"), y: L.accent[2] }, any)

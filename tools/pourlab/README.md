@@ -10,69 +10,54 @@ with `fetch`, so opening the file directly won't work):
 
 ## How to play
 
-**The side panel** sits on the empty bar left of the ice well. Its tabs show what's in the glass, the shaker or the
-stirring glass ("Stirrer"), and it switches by itself to whatever you pour or drop ice into. For a tool it shows the
-ice, how cold and diluted it is, and buttons to pick it up, taste it or dump it.
+Everything is done by hand: there are no action buttons at the bar. Point at anything (a bottle, cup, tool, the ice
+well, the glass, the screen) to see a card saying what it is and does.
+
+**The screen** hangs from the top shelf on the left. It shows what's in the glass, the shaker or the stirring glass
+("Stirrer"), switching by itself to whichever you're pouring into or holding, and the drink's taste profile as it
+stands (one short bar per note). Click the tabs to look at another vessel; click the screen for the full taste
+breakdown.
 
 **Pouring**
 
-- **Point at anything** (a bottle, cup, tool, the ice well, the glass) to see a card saying what it is and does.
-  The rail's tape labels name each drink; the card and the panel give the full name.
-- **Click a bottle** on the rail to pick it up. It follows the pointer, held by its spout.
-- **Hold** anywhere to tilt it and pour; let go to stop (a few last drops fall). Move while pouring to aim.
-  Flow ramps up with the tilt, and each bottle pours at its own rate (syrups slower, soda faster).
-- A held bottle rests tipped, just short of pouring, so the stream starts the moment you press.
+- **Click a bottle** on the rail to pick it up. It follows the pointer, held by its spout, resting tipped just
+  short of pouring. **Hold** anywhere to pour; let go to stop. Each bottle pours at its own rate.
 - **Click its slot** in the rail (a faint ghost of it shows there), anywhere along the rail, right-click or Escape to
-  put the bottle back. Clicking another bottle swaps.
-- **Dashers** (Static bitters, Chili tincture): pick one up, then each click adds one dash, 0.05 parts. Six
-  dashes is the most a drink takes.
-- **Measuring cups** (quarter, half, one part): click one to bring it beside the glass, pour into it (it brims
-  over past its measure), then click it to pick it up and pour it wherever you aim. It goes back once it's empty.
-- **Move things around:** press and drag the glass, the shaker, the stirring glass or a measuring cup to slide it
-  somewhere else on the counter. It settles where you let go (nudged clear of anything already there, and never
-  into the ice well). A click without dragging still does what it always did.
-- **The glass** can be picked up too: click it, then hold to pour it into the shaker or stirring glass (handy when
-  a drink went into the glass first). Its ice tumbles out with it. Click its mat to set it down; once it's empty it
-  goes back by itself.
-- **Ice**: press on the ice well to pick up a cube. Drag it over the glass, the shaker or the stirring glass and let
-  go to drop it in, or **flick** it: let go while moving and it flies off at the speed and angle of your flick,
-  under gravity. Get the arc about right and it drops in (a gentle steer forgives near misses); too soft or too
-  hard and it clinks off the rim or lands on the counter and melts away. The glass takes 4 cubes, a tool 6. In the
-  glass ice floats, bobs and raises the level.
+  put it back. Clicking another bottle swaps.
+- **Dashers** (Static bitters, Chili tincture): each click adds one dash, 0.05 parts; six at most.
+- **Measuring cups** (quarter, half, one part): click one to set it beside the glass, pour into it, then click it to
+  pick it up and pour the measure wherever you aim.
+- **Ice**: press on the ice well to pick up a cube; drag it over the glass, the shaker or the stirring glass and let
+  go, or **flick** it there (let go while moving: it flies at your flick's speed and angle). A gentle steer forgives
+  near misses. The glass takes 4 cubes, a tool 6.
+- **Move things around:** press and drag the glass, a tool or a cup to slide it somewhere else on the counter.
 
 **Technique** (the three ways to make a drink, from the design doc)
 
-- **Build:** pour straight into the glass over ice. The ice slowly melts into it (to 10% water) and chills it a
-  little.
-- **Shake:** pour into the shaker (the steel tin on the right) and add ice (3 cubes works best), then click it to
-  lift it. Without ice it barely gets cold. Hold anywhere to shake:
-  the panel's gauges show it getting colder and more diluted, quickly (about 10 seconds is right). Shaking knocks
-  most of the fizz out, so add soda after. Then **Strain into the glass**.
-- **Stir:** the same with the stirring glass (ice too), slower and gentler (about 20 seconds), and it keeps the fizz.
-- **Both:** a lifted tool can pour into the other one, so you can stir and then shake (or the other way round).
-  Melted ice isn't counted twice: the second technique only adds water beyond what the first already put in.
-  The drink remembers both ("Stirred 20 s, shaken 3 s").
-- **Pour a tool by hand:** "Pick it up to pour" (or "Pour it by hand" once it's lifted) puts the shaker or
-  stirring glass in your hand like the glass: hold to pour it wherever you aim, and the strainer keeps the ice in.
-- While a tool is lifted you can also **Taste** it, **Put down** to keep it for later, or **Dump** it out.
+- **Build:** pour straight into the glass over ice. The ice slowly melts in (to 10% water) and chills it a little.
+- **Shake:** pour into the shaker and add ice (3 cubes is best; without ice it barely gets cold). Click it to pick it
+  up, then **move it back and forth**: the cap goes on and it shakes, frosting over. About 10 seconds gets it cold.
+  Shaking knocks most of the fizz out, so add soda after. **Hold** to pour it (into the glass, or the stirring
+  glass); the strainer keeps the ice in.
+- **Stir:** the same with the stirring glass: move it about and the spoon turns. Slower and gentler (about 20
+  seconds), and it keeps the fizz.
+- **Both:** pour one tool into the other to stir and then shake. Melted ice isn't counted twice, and the drink
+  remembers both ("Stirred 20 s, shaken 3 s").
+- **The glass** can be picked up and poured too (click it), into a tool or out.
 
 **The guest**
 
 - The guest's bubble says what they want: their crowd, maybe a mood, and three things that matter most to them.
-- **Taste** opens the spectrograph: a hologram with one bar per note. Each bar is built from the ingredients that
-  give it (in their colors); a hollow piece is what got hidden (sweet hides sour, sugar hides burn, cold mutes
-  sweet), a glowing piece is what got boosted (strength carries heat, bubbles lift freshness). Depth, Brightness and
-  Toasted grow from two notes being close to each other (the bracket on the left shows which). Complexity and
-  Balance are dials. Point at a bar to read what made it.
-- **Serve** (once the glass reaches the gold MIN mark, the minimum drink amount: 2.5 parts; the glass
-  holds up to 8) slides the glass to the guest. They react in the same
-  vibe words, and the spectrograph opens with their arrows: gold for more, pink for less, green for spot on.
-- **Discoveries** (top right) collects the combinations you find, saved in the browser. The three secret pairings
-  from the design doc (fermented + smoked, citrus + herbal, roasted + spice) show as ??? with a hint until you make
-  one, then list the ingredients that did it. Under Combined notes, any two ingredients that build Depth, Brightness
-  or Toasted to 2 or more are listed. Tasting or serving a drink both count.
-- **Next guest** brings someone new. The crowd button picks the crowd (Industrial, Residential, Commercial,
-  Luxury, or any).
+- **Serve** by sliding the glass over to the guest (drag it to the ring in front of their hands) once it holds at
+  least the minimum drink amount, the gold MIN mark: 2.5 parts (it holds up to 8). They react in the same vibe
+  words, and the full taste breakdown opens with their arrows: gold for more, pink for less, green for spot on.
+- The full taste breakdown (click the screen) has one bar per note, built from the ingredients that give it; a
+  hollow piece is what got hidden, a glowing piece what got boosted. Depth, Brightness and Toasted grow from two
+  notes being close. Complexity and Balance are dials. Point at a bar to read what made it.
+- **Discoveries** (top right) collects the combinations you find, saved in the browser: the three secret pairings
+  (??? with a hint until found) and any two ingredients that build Depth, Brightness or Toasted to 2 or more.
+  They're picked up from the screen as you make drinks, and from what you serve.
+- **Next guest** brings someone new. The crowd button picks the crowd.
 
 There is no timer, money or menu yet: those come next round.
 
@@ -80,7 +65,7 @@ There is no timer, money or menu yet: those come next round.
 
 | File | What it is |
 | --- | --- |
-| `index.html` | the page: one canvas, 640x270 (the 480 px scene plus 160 px of empty bar on the left for the side panel), scaled to fill the window with square, sharp pixels |
+| `index.html` | the page: one canvas, 480x270, scaled to fill the window with square, sharp pixels |
 | `pour.js` | drawing and input: the bar, the panels, the spectrograph, the guest and the discoveries book |
 | `sim.js` | the simulation, no drawing: pouring, the stream, surface waves, color mixing, fizz, ice, cups, tools |
 | `flavor.js` | the taste model from the design doc: notes, masking, carrying, fused notes, Complexity, Balance, crowds, guests, scoring |

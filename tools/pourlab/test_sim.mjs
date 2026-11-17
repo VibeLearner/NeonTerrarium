@@ -209,5 +209,22 @@ const railTip = (id) => ({ x: L.rail.find((r) => r.id === id).x, y: 220 })
   ok(sh.c.ice === 2, "the strainer kept the ice in the shaker")
   ok(!sim.S.held && sh.state === "home" && sh.x === sh.home.x, "the empty shaker went back to its new spot")
 }
+{
+  console.log("shake by moving the shaker in hand")
+  const sim = createSim(L, sizes), g = sim.glass, sh = sim.S.tools.shaker, rim = sim.toolRim(sh)
+  for (const [id, secs] of [["rice", 1.2], ["yuzu", 0.6]]) {
+    sim.pick(id, railTip(id)); sim.aim(rim.cx - 24, rim.y - 26); run(sim, 0.5); sim.press(true); run(sim, secs); sim.press(false); run(sim, 1.2); sim.putBack(railTip(id)); run(sim, 0.3)
+  }
+  dropIce(sim, rim, 3)
+  sim.handTool("shaker"); run(sim, 0.3)
+  // back and forth, 20 px each way, three times a second, for 10 seconds
+  for (let t = 0; t < 10; t += STEP) { sim.aim(300 + 20 * Math.sin(t * 2 * Math.PI * 3), 120); sim.step() }
+  const r = sim.readout(sh.c)
+  ok(r.chill > 0.9 && r.dilution > 0.15 && r.dilution < 0.3, `10 s of shaking by hand: cold ${r.chill.toFixed(2)}, ${(r.dilution * 100).toFixed(0)}% melted ice`)
+  const still = sh.c.techT; for (let t = 0; t < 2; t += STEP) { sim.aim(300, 120); sim.step() }
+  ok(sh.c.techT - still < 0.4, "held still, it stops shaking")
+  sim.aim(g.cx - 26, g.top - 30); run(sim, 0.6); sim.press(true); run(sim, 2.5); sim.press(false); run(sim, 2)
+  ok(sim.total() > 1.8 && /Shaken 1\d s/.test(sim.S.glass.log.join(",")), `poured into the glass: ${sim.total().toFixed(2)} parts, "${sim.S.glass.log.join(", ")}"`)
+}
 console.log(fails ? `${fails} failed` : "all passed")
 process.exit(fails ? 1 : 0)

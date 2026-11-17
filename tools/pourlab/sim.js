@@ -16,6 +16,7 @@ export const STEP = 1 / 120
 const GRAV = 520                      // px/s², tuned by feel: a stream falls about 50 px in a third of a second
 const PART_VOL = 0.01                 // parts carried by one stream particle
 export const MAX_PARTS = 8, FILL_LINE = 2.5, DASH = 0.05
+const WORK_SPEED = 70                  // px/s of hand movement that counts as shaking or stirring
 const READY_TILT = 0.95                // radians a held bottle rests at: just short of where it starts to pour (1.13)
 const ICE_DISPLACE = 0.35             // parts of level each floating cube adds (lab choice)
 const MAX_ICE = 4
@@ -407,7 +408,7 @@ export function createSim(L, sizes) {
   // Press and drag the glass, a tool or a measuring cup to slide it somewhere else on the counter. It lifts a little
   // while it's carried and settles where you let go: on the counter top, clear of the ice well, never on top of
   // something else (it slides over to the nearest free spot).
-  const SPOT = { xmin: 62, xmax: 474, ymin: 199, ymax: 214 }   // where a foot can stand: the counter top, right of the well
+  const SPOT = { xmin: 62, xmax: 474, ymin: 202, ymax: 214 }   // where a foot can stand: the counter top, right of the well
   function things() {
     const list = []
     if (!S.glassHeld) list.push({ kind: "glass", id: "glass", x: glass.cx, y: glass.base, r: glass.w / 2 })
@@ -507,11 +508,9 @@ export function createSim(L, sizes) {
   function handTool(id) {
     const tool = S.tools[id]
     if (!(tool.state === "home" || tool.state === "ready")) return
-    if (volOf(tool.c) < 0.01) { say(id === "shaker" ? "The shaker is empty." : "The stirring glass is empty."); return }
     settleTool()
     if (S.held) { if (S.held.kind === "cup") returnCup(); else if (S.held.kind === "glass") dropGlass(); else S.held = null }
     if (S.toolMode === id) S.toolMode = null
-    logTechnique(tool)
     const o = lipOffset(tool, 0), lip = { x: tool.x + o.x, y: tool.y + o.y }
     tool.state = "hand"; S.pressing = false
     S.held = { kind: "tool", id, x: lip.x, y: lip.y, tx: lip.x, ty: lip.y, angle: 0, back: null }
@@ -600,7 +599,14 @@ export function createSim(L, sizes) {
       if (volOf(S.glass) <= 1e-6 && !S.ice.length && !S.pressing && h.angle < 0.3) { emptyGlass(); putBack(); return }
     } else if (h.kind === "tool") {
       const tool = S.tools[h.id]; source = tool.c
+      // moving it about while it's upright shakes it (the shaker) or stirs it (the stirring glass): how fast the
+      // pointer moves, smoothed over a moment, has to stay above WORK_SPEED
+      const sp = Math.hypot(h.tx - (h.ptx ?? h.tx), h.ty - (h.pty ?? h.ty)) / dt; h.ptx = h.tx; h.pty = h.ty
+      h.speed = lerp(h.speed || 0, sp, 1 - Math.exp(-dt * 6))
+      tool.working = !S.pressing && h.angle < 0.4 && h.speed > WORK_SPEED && volOf(tool.c) > 0.01
+      if (tool.working) { workTool(tool, dt); tool.stir += dt; tool.workShow = 0.4 } else tool.workShow = Math.max(0, (tool.workShow || 0) - dt)
       flow = volOf(tool.c) > 1e-6 ? 3 * f : 0
+      if (flow > 0) logTechnique(tool)              // the way it was made goes along with the drink
       if (volOf(tool.c) <= 1e-6 && !S.pressing && h.angle < 0.3) { putBack(); return }
     } else if (h.kind === "cup") {
       const cup = S.cups[h.id]; source = cup.c

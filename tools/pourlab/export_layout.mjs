@@ -11,7 +11,7 @@ for (const k of ["pal", "ramps", "include", "sprite", "scene", "layer", "stamp",
 vm.createContext(ctx)
 vm.runInContext(src + `
 ;globalThis.__layout = {
-  W, H, EXT, CT, NEAR, VPX, VPY, GX, POUR_X, GLASS_BASE, TOOL_BASE, RAIL_TOP, BOTTLE_FLOOR, WELL, K,
+  W, H, CT, NEAR, VPX, VPY, GX, POUR_X, GLASS_BASE, TOOL_BASE, RAIL_TOP, BOTTLE_FLOOR, WELL, K,
   rail: INGREDIENTS.map((ing, k) => ({ id: ing.id, x: RAIL_X[k], floor: BOTTLE_FLOOR - lift(ing) })),
   ingredients: INGREDIENTS.map((ing) => ({ id: ing.id, name: ing.name, tag: ing.tag, liquid: ing.liquid, top: ing.top, dash: !!ing.dash })),
   tools: TOOLS().map(([n, x, y]) => ({ id: n, x, y })),

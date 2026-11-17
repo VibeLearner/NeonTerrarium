@@ -704,46 +704,64 @@ function drawScreen() {
     x += w + 2
   }
   const tool = focus === "glass" ? null : S.tools[focus], c = focusContents(), r = tool ? sim.readout(c) : sim.readout()
-  text(tool ? `${r.total.toFixed(2)} parts` : `${r.total.toFixed(2)} of ${MAX_PARTS} parts`, P.x + P.w - 4, P.y + 6, HOLO.text, "right")
+  // the total, right of the tabs: the long form if it fits, else a shorter one (never over the tabs)
+  const room = P.x + P.w - 4 - (x + 2)
+  const totals = tool ? [`${r.total.toFixed(2)} parts`, r.total.toFixed(2)] : [`${r.total.toFixed(2)} of ${MAX_PARTS} parts`, `${r.total.toFixed(2)} / ${MAX_PARTS} parts`, `${r.total.toFixed(2)} / ${MAX_PARTS}`]
+  text(totals.find((t2) => textW(t2) <= room) || totals[totals.length - 1], P.x + P.w - 4, P.y + 6, HOLO.text, "right")
   fill(P.x + 3, P.y + 17, P.w - 6, 1, "rgba(95,243,232,0.3)")
-  // left: what's in it (long names wrap under themselves), and a status line or two
-  const colR = P.x + 112, status = []
+  // the columns, measured from the text itself: the taste profile on the right is as wide as its longest label plus
+  // a bar; the contents on the left get the rest
+  const labelW = Math.max(...SPEC_ROWS.map((n) => textW(LABEL[n]))), BAR = 24
+  const colR = P.x + P.w - 4 - BAR - 3 - labelW - 6        // the left column's right edge
+  const leftW = colR - (P.x + 5)                            // room for text in the left column
+  // status lines under the contents, wrapped to the column so they never run into the profile
+  const status = []
+  const say2 = (str, col) => { for (const l of wrap(str, leftW)) status.push([l, col]) }
   if (tool) {
     const verb = tool.method === "shake" ? "Shaken" : "Stirred"
-    if (!c.ice) status.push(["No ice: it won't get cold", "#FF8AA8"])
-    else status.push([c.techT > 0.05 ? `${verb} ${c.techT.toFixed(1)} s` : c.log.length ? c.log[c.log.length - 1] : `Not ${verb.toLowerCase()} yet`, tool.working ? "#FFC94A" : HOLO.dim])
-    if (r.total > 0.01) status.push([`Cold ${r.chill.toFixed(1)}, ${Math.round(r.dilution * 100)}% melted`, HOLO.dim])
+    if (!c.ice) say2("No ice: it stays warm", "#FF8AA8")
+    else say2(c.techT > 0.05 ? `${verb} ${c.techT.toFixed(1)} s` : c.log.length ? c.log[c.log.length - 1] : `Not ${verb.toLowerCase()} yet`, tool.working ? "#FFC94A" : HOLO.dim)
+    if (r.total > 0.01) say2(`Cold ${r.chill.toFixed(1)}, ${Math.round(r.dilution * 100)}% melted`, HOLO.dim)
   } else if (guest.phase === "asking") {
     const left = FILL_LINE - r.total
-    if (r.full) status.push(["Full to the rim", "#FF8AA8"])
-    else if (left > 0.05) status.push([`Min amount: ${left.toFixed(2)} to go`, HOLO.dim])
-    else status.push(["Ready: slide the glass", "#9CF0B0"], ["over to the guest", "#9CF0B0"])
+    if (r.full) say2("Full to the rim", "#FF8AA8")
+    else if (left > 0.05) { say2("Minimum drink amount", HOLO.dim); say2(`${left.toFixed(2)} parts to go`, HOLO.dim) }
+    else { say2("Ready to serve.", "#9CF0B0"); say2("Slide it to the guest.", "#9CF0B0") }
   }
   const bottom = P.y + P.h - 3 - status.length * 9
+  // left: what's in it; a long name wraps under itself, its amount stays on the first line
   let y = P.y + 21
   const ice = tool ? c.ice : r.ice
-  const rows = r.rows.map((row) => [row.name, row.dashes ? `${row.dashes} dash${row.dashes > 1 ? "es" : ""}` : row.parts.toFixed(2), row.id])
+  const rows = r.rows.filter((row) => row.parts >= 0.04 || row.dashes).map((row) => [row.name, row.dashes ? `${row.dashes} dash${row.dashes > 1 ? "es" : ""}` : row.parts.toFixed(2), row.id])
   if (ice) rows.push(["Ice", `${ice} cube${ice > 1 ? "s" : ""}`, null])
   if (!rows.length) text("Empty", P.x + 5, y, HOLO.dim)
+  // measure every row first; if they don't all fit, keep as many as fit with a "+n more" line under them
+  const nameW = (amt) => colR - (P.x + 11) - textW(amt) - 5
+  const heights = rows.map(([name, amt]) => wrap(name, nameW(amt)).length * 9)
+  let shown = rows.length, used = heights.reduce((a2, b2) => a2 + b2, 0)
+  if (y + used > bottom) { while (shown > 0 && y + used + 9 > bottom) used -= heights[--shown] }
   for (let k = 0; k < rows.length; k++) {
-    const [name, amt, id] = rows[k], lines = wrap(name, colR - P.x - 14 - textW(amt) - 4)
-    if (y + lines.length * 9 > bottom) { text(`+${rows.length - k} more`, P.x + 5, y, HOLO.dim); break }
+    const [name, amt, id] = rows[k], lines = wrap(name, nameW(amt))
+    if (k >= shown) { text(`+${rows.length - k} more`, P.x + 5, y, HOLO.dim); break }
     if (id) fill(P.x + 5, y + 2, 3, 3, liquidOf(id))
     lines.forEach((l, n) => text(l, P.x + 11, y + n * 9, id === "water" || !id ? HOLO.dim : HOLO.text))
     text(amt, colR, y, HOLO.value, "right"); y += lines.length * 9
   }
+  const rowsEnd = rows.length ? y + (shown < rows.length ? 9 : 0) : y + 9
   status.forEach(([t2, col], k) => text(t2, P.x + 5, bottom + k * 9, col))
-  // right: the taste profile, one short bar per note
-  fill(colR + 4, P.y + 20, 1, P.h - 23, "rgba(95,243,232,0.2)")
-  const t = r.total > 0.01 ? sim.tasteOf(c) : null, bx = P.x + P.w - 33
+  // right: the taste profile, one short bar per note, starting after the longest label
+  fill(colR + 3, P.y + 20, 1, P.h - 23, "rgba(95,243,232,0.2)")
+  const t = r.total > 0.01 ? sim.tasteOf(c) : null, lx = colR + 6, bx = P.x + P.w - 4 - BAR
   SPEC_ROWS.forEach((n, k) => {
     const yy = P.y + 20 + k * 8 + (k >= BASE.length ? 1 : 0), v = t ? t.notes[n] : 0
-    text(LABEL[n], colR + 8, yy, v > 0.05 ? HOLO.text : HOLO.dim)
-    fill(bx, yy + 3, 30, 1, HOLO.track)
-    const col = FUSED.includes(n) ? FUSED_COLOR[n] : [143, 255, 244], bw = Math.max(1, Math.round(v * 3))
+    text(LABEL[n], lx, yy, v > 0.05 ? HOLO.text : HOLO.dim)
+    fill(bx, yy + 3, BAR, 1, HOLO.track)
+    const col = FUSED.includes(n) ? FUSED_COLOR[n] : [143, 255, 244], bw = Math.max(1, Math.round(v * BAR / 10))
     if (v > 0.05) { fill(bx, yy + 1, bw, 5, mixRgb(col, [6, 22, 30], 0.3)); fill(bx, yy + 1, bw, 1, col) }
   })
+  SCREEN.layout = { colR, leftW, lx, labelW, bx, status, rows: rows.length, rowsBottom: rowsEnd, statusTop: bottom }     // for the layout check in the tests
 }
+
 // the guest's speech bubble, beside their head: what they want, then how they liked it
 const HEAD = { x: 352, y: 96 }
 function drawBubble() {
@@ -969,7 +987,7 @@ function drawTooltip() {
       ? "Shaking chills a drink fast, waters it down more, and knocks out most of the fizz (add soda after). "
       : "Stirring chills a drink gently and keeps it clear and fizzy. ") + (tool.c.ice ? "" : "It needs ice to work: drag or flick some in. ") + "Pour bottles into it, then click to pick it up: move it about to " + (tool.id === "shaker" ? "shake" : "stir") + " it, hold to pour it. Drag it to move it.", tool.x, toolBoxOf(tool).y - 14)
   }
-  else if (hover.kind === "screen") tooltip("The screen", "What's in the glass or the tool you're using, and how it tastes right now. Click it for the full breakdown.", SCREEN.x + SCREEN.w / 2, SCREEN.y + SCREEN.h + 40)
+  else if (hover.kind === "screen") tooltip("The screen", "What's in the glass or the tool you're using, and how it tastes right now. Click it for the full breakdown.", SCREEN.x + SCREEN.w / 2 + 40, SCREEN.y + SCREEN.h + 62)
   else if (hover.kind === "ice") tooltip("Ice well", "Drag a cube out and drop it into the glass, shaker or stirring glass, or flick it in. The shaker and stirring glass need ice to chill a drink; in the glass it melts in slowly.", WELL_MID.x + 50, WELL[0][1] - 4)
   else if (hover.kind === "glass" && guest.phase === "asking")
     tooltip("The glass", `The gold MIN mark is the minimum drink amount: ${FILL_LINE} parts. Guests won't take a smaller drink. It holds up to ${MAX_PARTS} parts.` + " Slide it over to the guest to serve it. Click to pick it up and pour it out. Drag it to move it.", glass.cx, glass.top - 4)
@@ -1040,4 +1058,4 @@ function frame(now) {
 }
 requestAnimationFrame(frame)
 // a handle for the browser console and the node test harness: the simulation, the guest, and today's buttons
-globalThis.pourlab = { sim, guest, spectro, book, get buttons() { return buttons } }
+globalThis.pourlab = { sim, guest, spectro, book, SCREEN, textW, get buttons() { return buttons } }

@@ -1266,8 +1266,8 @@ function drawTooltip() {
   if (!hover || S.pressing || S.moving || S.stirring || book.open) return
   if (hover.kind !== "bottle" && dwell.t < DWELL) return
   if (hover.kind === "bottle") { const b = bottleBox(hover.id); tooltip(ingOf[hover.id].name, (ingOf[hover.id].alcohol ? "Alcohol. " : "No alcohol. ") + DESC[hover.id], b.x + b.w / 2, b.y - 8) }
-  else if (hover.kind === "cup") { const cup = S.cups[hover.id]; tooltip(`${CUP_NAME[cup.id]} measuring cup`, `Holds exactly ${CUP_NAME[cup.id].toLowerCase()} part. Click to set it beside the glass, pour a bottle into it, then click it to pick it up and pour the measure. Drag it to move it.`, cup.x, cupBox(cup).y - 4) }
-  else if (hover.kind === "activeCup") tooltip("Measuring cup", sim.volOf(S.cups[hover.id].c) > 0.001 ? "Click to pick it up, then hold to pour it." : "Pour a bottle into it, or click to put it away.", S.cups[hover.id].x, cupBox(S.cups[hover.id]).y - 14)
+  else if (hover.kind === "cup") { const cup = S.cups[hover.id]; tooltip(`${CUP_NAME[cup.id]} jigger`, `A bar measuring cup. Holds exactly ${CUP_NAME[cup.id].toLowerCase()} part. Click to set it beside the glass, pour a bottle into it, then click it to pick it up and pour the measure. Drag it to move it.`, cup.x, cupBox(cup).y - 4) }
+  else if (hover.kind === "activeCup") tooltip("Jigger", sim.volOf(S.cups[hover.id].c) > 0.001 ? "Click to pick it up, then hold to pour it." : "Pour a bottle into it, or click to put it away.", S.cups[hover.id].x, cupBox(S.cups[hover.id]).y - 14)
   else if (hover.kind === "tool") {
     const tool = S.tools[hover.id], has = sim.volOf(tool.c) > 0.004
     tooltip(tool.id === "shaker" ? "Shaker" : "Stirring glass", (tool.id === "shaker"

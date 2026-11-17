@@ -662,17 +662,49 @@ sprite("shaker", { w: 25, h: vesselSize(11, 9, 46).h, pivot: "bottom", outline: 
   const v = vessel(c, 12, 0, 11, 9, 46, "steel")
   for (let x = 3; x <= 21; x++) { const u = (x - 3) / 18; c.px(x, v.baseY - 6, u < 0.45 ? "F" : "E") }
 })
-// measuring cups: a quarter, a half and one part; a steel cup with a handle on the right
-function cupSprite(name, rt, rb, h) {
+// measuring cups: Japanese-style bar jiggers in polished steel. The wide cone on top holds the measure; it narrows to a
+// ringed waist and flares out again into a smaller cone that the jigger stands on.
+// The opening and the height match the page's cup shapes (rt, h), so pouring and measuring are unchanged.
+function jiggerSprite(name, rt, rb, h) {
   const H = vesselSize(rt, rb, h).h
   sprite(name, { w: 2 * rt + 8, h: H, pivot: [rt + 1, H], outline: "0" }, (c) => {
-    const v = vessel(c, rt + 1, 0, rt, rb, h, "steel")
-    const hx = 2 * rt + 2, hy = v.rimY + 2
-    c.hline(hx, hy, 4, "F"); c.vline(hx + 4, hy, 6, "f"); c.hline(hx, hy + 6, 4, "E"); c.px(hx + 4, hy, "F")
-    c.hline(rt - 2, v.rimY + Math.round(h / 2), 6, "E")
+    const cx = rt + 1, ryT = Math.max(2, Math.round(rt * K)), rf = Math.round(rt * 0.7), ryF = Math.max(2, Math.round(rf * K))
+    const rimY = ryT, baseY = H - 1 - ryF, waistY = rimY + Math.round((baseY - rimY) * 0.58), wHW = 2.5
+    const hwAt = (y) => y <= waistY ? rt + (wHW - rt) * (y - rimY) / (waistY - rimY) : wHW + (rf - wHW) * (y - waistY - 2) / Math.max(1, baseY - waistY - 2)
+    const inEll = (x, y, ex, ey, rx, ry) => ((x - ex) / (rx + 0.5)) ** 2 + ((y - ey) / (ry + 0.5)) ** 2 <= 1
+    const steel = (u) => u < 0.1 ? "f" : u < 0.3 ? "F" : u < 0.42 ? "f" : u < 0.78 ? "E" : "e"
+    const dk = { F: "f", f: "E", E: "e", e: "0" }
+    for (let y = rimY; y <= baseY + ryF; y++) {
+      const hw = y > baseY ? rf : y <= waistY + 1 && y >= waistY ? wHW + 0.5 : Math.max(wHW, hwAt(y))
+      for (let x = Math.round(cx - hw); x <= Math.round(cx + hw); x++) {
+        if (y > baseY && !inEll(x, y, cx, baseY, rf, ryF)) continue
+        const u = (x - (cx - hw)) / (2 * hw)
+        let k = steel(u)
+        if (y >= waistY - 2 && y <= waistY + 3) k = dk[k] || k            // the waist sits in the upper cone's shadow
+        if (y === waistY || y === waistY + 1) k = u > 0.2 && u < 0.45 ? "F" : y === waistY ? "f" : "E"   // its ring
+        if (y >= baseY - 1) k = dk[k] || k                               // the foot turns under
+        c.px(x, y, k)
+      }
+    }
+    // the foot's rim, a bright lip where it meets the counter
+    for (let x = Math.round(cx - rf); x <= Math.round(cx + rf); x++) {
+      const d = ryF * Math.sqrt(Math.max(0, 1 - ((x - cx) / (rf + 0.5)) ** 2))
+      c.px(x, Math.round(baseY + d), "e")
+      const yl = Math.round(baseY - d * 0.3) - 1
+      if (Math.abs(x - cx) < Math.max(wHW, hwAt(yl)) - 1) c.px(x, yl, "f")
+    }
+    // the opening: dark inside, the far inner wall lit just under the back rim, a bright rolled front rim
+    for (let y = rimY - ryT; y <= rimY + ryT; y++) for (let x = Math.round(cx - rt); x <= Math.round(cx + rt); x++) {
+      if (!inEll(x, y, cx, rimY, rt, ryT)) continue
+      c.px(x, y, y < rimY - ryT + 2 ? "E" : y < rimY ? "e" : "0")
+    }
+    for (let x = Math.round(cx - rt); x <= Math.round(cx + rt); x++) {
+      const d = ryT * Math.sqrt(Math.max(0, 1 - ((x - cx) / (rt + 0.5)) ** 2))
+      c.px(x, Math.round(rimY - d), "f"); c.px(x, Math.round(rimY + d), "F")
+    }
   })
 }
-cupSprite("cup_quarter", 9, 7, 13); cupSprite("cup_half", 10, 8, 17); cupSprite("cup_one", 11, 9, 21)
+jiggerSprite("cup_quarter", 9, 7, 13); jiggerSprite("cup_half", 10, 8, 17); jiggerSprite("cup_one", 11, 9, 21)
 // The ice well: a steel-lined cubby sunk into the counter top, drawn in the counter's own perspective (its sides
 // run toward the vanishing point like the boards). It sits left of us, so we see down its far wall and its left
 // inner wall; the near wall is hidden under the counter's edge. Ice heaped just under the rim, the cubes smaller

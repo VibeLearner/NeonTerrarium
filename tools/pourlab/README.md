@@ -26,7 +26,7 @@ breakdown.
 - **Click its slot** in the rail (a faint ghost of it shows there), anywhere along the rail, right-click or Escape to
   put it back. Clicking another bottle swaps.
 - **Dashers** (Static bitters, Chili tincture): each click adds one dash, 0.05 parts; six at most.
-- **Measuring cups** (quarter, half, one part): click one to set it beside the glass, pour into it, then click it to
+- **Measuring cups** are steel bar jiggers (quarter, half, one part): click one to set it beside the glass, pour into it, then click it to
   pick it up and pour the measure wherever you aim.
 - **Ice**: press on the ice well to pick up a cube; drag it over the glass or the shaker and let
   go, or **flick** it there (let go while moving: it flies at your flick's speed and angle). A gentle steer forgives

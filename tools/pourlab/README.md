@@ -67,8 +67,10 @@ ice, how cold and diluted it is, and buttons to pick it up, taste it or dump it.
 - **Serve** (once the glass reaches the gold MIN mark, the minimum drink amount: 2.5 parts; the glass
   holds up to 8) slides the glass to the guest. They react in the same
   vibe words, and the spectrograph opens with their arrows: gold for more, pink for less, green for spot on.
-- **Phrasebook** lists every phrase the guests use; serving someone teaches you the ones they said and what range
-  of the note each stands for. It's saved in the browser.
+- **Discoveries** (top right) collects the combinations you find, saved in the browser. The three secret pairings
+  from the design doc (fermented + smoked, citrus + herbal, roasted + spice) show as ??? with a hint until you make
+  one, then list the ingredients that did it. Under Combined notes, any two ingredients that build Depth, Brightness
+  or Toasted to 2 or more are listed. Tasting or serving a drink both count.
 - **Next guest** brings someone new. The crowd button picks the crowd (Industrial, Residential, Commercial,
   Luxury, or any).
 
@@ -79,7 +81,7 @@ There is no timer, money or menu yet: those come next round.
 | File | What it is |
 | --- | --- |
 | `index.html` | the page: one canvas, 640x270 (the 480 px scene plus 160 px of empty bar on the left for the side panel), scaled to fill the window with square, sharp pixels |
-| `pour.js` | drawing and input: the bar, the panels, the spectrograph, the guest and the phrasebook |
+| `pour.js` | drawing and input: the bar, the panels, the spectrograph, the guest and the discoveries book |
 | `sim.js` | the simulation, no drawing: pouring, the stream, surface waves, color mixing, fizz, ice, cups, tools |
 | `flavor.js` | the taste model from the design doc: notes, masking, carrying, fused notes, Complexity, Balance, crowds, guests, scoring |
 | `test_sim.mjs`, `test_flavor.mjs` | check the numbers with no screen: `node tools/pourlab/test_sim.mjs` |
@@ -123,6 +125,6 @@ The flow rates (`INGREDIENT_RULES` in `sim.js`, 0.9 to 2.2 parts a second at ful
 (0.35 parts a cube, 4 at most), ice in the tools (6 at most, 3 for the full effect, 8% effect with none), the flick
 assist (16 px past an opening, or 10% of the throw's distance, whichever is more), how much a tool holds (6 parts), the strain rate (3 parts a second), how fast a
 fizzy drink goes flat in the glass, the cut-offs between the five phrase levels (under 1, 1 to 3.5, 3.5 to 6, 6 to
-8.5, 8.5 and up), the Sour and Spice phrases and the "none" phrases, and how much of each tag an ingredient needs
+8.5, 8.5 and up), the Sour and Spice phrases and the "none" phrases, what counts as a combined-note find (2 or more), and how much of each tag an ingredient needs
 for a discovery (a fifth of a part), and what counts toward "too many ingredients" (at least 0.04 parts, so stray
 drops from a dripping bottle don't count, while a single dash does). All are marked "lab choice" in the code.

@@ -2,7 +2,7 @@
 // draws them at the scene's own 480x270 pixels, scaled up crisply (nearest-neighbor, no blur), and turns clicks and
 // holds into actions. It also runs the test guest: they ask in vibe words, you serve, they react.
 import { createSim, STEP, FILL_LINE, MAX_PARTS, SHORT, rng } from "./sim.js"
-import { BASE, FUSED, LABEL, PARENTS, CROWDS, PHRASES, makeGuest, request, score, feedback } from "./flavor.js"
+import { BASE, FUSED, LABEL, PARENTS, CROWDS, makeGuest, request, score, feedback } from "./flavor.js"
 
 const W = 480, H = 270
 const view = document.getElementById("view")
@@ -196,28 +196,44 @@ function glassPose() {
   return { dx: 0, dy: 0, s: 1 }
 }
 
-// ---------------------------------------------------------------- the phrasebook: what the guests' words mean
-// A phrase is learned once you serve someone who said it; its entry then shows the range of the note it stands for.
-const BOOK_KEY = "neonDome.phrasebook.v1"
-const BOOK_AXES = ["strength", "sweet", "sour", "bitter", "fresh", "smoke", "spice", "complexity", "balance"]
-const LEVEL_NAME = ["None", "A little", "Some", "A lot", "The most"]
-const LEVEL_RANGE = ["under 1", "1 to 3.5", "3.5 to 6", "6 to 8.5", "8.5 and up"]
-let learned = {}
-try { learned = JSON.parse(globalThis.localStorage?.getItem(BOOK_KEY) || "{}") } catch { learned = {} }
-const book = { open: false, ax: "sweet", t: 0 }
-function learn(said) {
-  let fresh = 0
-  for (const { ax, level } of said) { learned[ax] ||= [false, false, false, false, false]; if (!learned[ax][level]) { learned[ax][level] = true; fresh++ } }
-  try { globalThis.localStorage?.setItem(BOOK_KEY, JSON.stringify(learned)) } catch {}
-  return fresh
+// ---------------------------------------------------------------- discoveries: the combinations you've found
+// Two kinds, kept in the browser between visits:
+//   pairings  the design doc's three secret pairs (fermented + smoked, citrus + herbal, roasted + spice): extra Depth,
+//             Brightness or Toasted. Shown as ??? until found, then with the ingredients that did it.
+//   combos    two ingredients that built Depth, Brightness or Toasted to at least 2 between them (the biggest giver
+//             of each of the note's two parent notes). Any drink you taste or serve counts.
+const BOOK_KEY = "neonDome.discoveries.v1"
+const PAIRINGS = [["Fermented and smoked", "depth", "Something fermented with something smoked"], ["Citrus and herbal", "brightness", "Something citrus with something herbal"], ["Roasted and spice", "toasted", "Something roasted with something spicy"]]
+const COMBO_MIN = 2
+let found = { pairings: {}, combos: {} }
+try { found = { pairings: {}, combos: {}, ...JSON.parse(globalThis.localStorage?.getItem(BOOK_KEY) || "{}") } } catch {}
+const book = { open: false, t: 0, scroll: 0 }
+const pairKey = (ids) => [...new Set(ids)].sort().join("+")
+function noteDiscoveries(t) {
+  if (!t) return
+  const fresh = []
+  for (const d of t.discoveries) {
+    const list = (found.pairings[d.name] ||= []), k = pairKey(d.ids)
+    if (!list.includes(k)) { list.push(k); fresh.push(`${namesOf(k)}: ${d.name.toLowerCase()}, +${d.bonus.toFixed(1)} ${LABEL[d.note]}`) }
+  }
+  for (const n of FUSED) {
+    if (t.notes[n] < COMBO_MIN) continue
+    const ids = PARENTS[n].map((p) => (t.contrib[p][0] || [])[0]).filter(Boolean)
+    const list = (found.combos[n] ||= []), k = pairKey(ids)
+    if (ids.length && !list.includes(k)) { list.push(k); fresh.push(`${namesOf(k)} gives ${LABEL[n]}`) }
+  }
+  if (!fresh.length) return
+  try { globalThis.localStorage?.setItem(BOOK_KEY, JSON.stringify(found)) } catch {}
+  sim.say(fresh.length === 1 ? `New combination: ${fresh[0]}.` : `${fresh.length} new combinations in Discoveries.`)
 }
+const namesOf = (k) => k.split("+").map((id) => SHORT[id]).join(" + ") + (k.includes("+") ? "" : " on its own")
 
 // ---------------------------------------------------------------- the spectrograph: what the drink tastes like
 // A hologram that slides down over the scene: one bar per note, built from each ingredient's share, with what was
 // hidden (masked) as a hollow piece and what was boosted (carried) as a glowing piece; Complexity and Balance as dials.
 const SPEC = { x: 6 - EXT, y: 28, w: 262, h: 196 }
 const spectro = { open: false, t: 0, src: "glass", taste: null, row: null }
-function openSpectro(src) { spectro.open = true; spectro.t = 0; spectro.src = src; spectro.row = null }
+function openSpectro(src) { spectro.open = true; spectro.t = 0; spectro.src = src; spectro.row = null; if (src !== "served") noteDiscoveries(spectroTaste()) }
 function closeSpectro() { spectro.open = false }
 function spectroTaste() {
   if (spectro.src === "served") return guest.result && guest.result.t
@@ -328,6 +344,7 @@ const release = (e, cancelled = false) => {
 view.addEventListener("pointerup", release)
 view.addEventListener("pointercancel", (e) => release(e, true))
 view.addEventListener("pointerleave", () => { pointer.x = -99; pointer.y = -99 })
+view.addEventListener("wheel", (e) => { if (book.open) { e.preventDefault(); book.scroll += e.deltaY * 0.25 } }, { passive: false })
 view.addEventListener("contextmenu", (e) => { e.preventDefault(); putBackHeld() })
 addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return
@@ -750,9 +767,9 @@ function drawBubble() {
 }
 // the guest controls, top right
 function drawStrip() {
-  const y = 44, labels = [["Phrasebook", () => { book.open = !book.open; book.t = 0 }], [crowdPick ? CROWDS[crowdPick].name : "Any crowd", cycleCrowd], ["Next guest", nextGuest]]
+  const y = 44, labels = [["Discoveries", () => { book.open = !book.open; book.t = 0 }], [crowdPick ? CROWDS[crowdPick].name : "Any crowd", cycleCrowd], ["Next guest", nextGuest]]
   let x = 476
-  for (const [l, act] of labels) { const w = textW(l) + 10; x -= w; button(l, x, y, act, { w, key: act === cycleCrowd ? "crowd" : l, on: l === "Phrasebook" && book.open }); x -= 4 }
+  for (const [l, act] of labels) { const w = textW(l) + 10; x -= w; button(l, x, y, act, { w, key: act === cycleCrowd ? "crowd" : l, on: l === "Discoveries" && book.open }); x -= 4 }
 }
 function cycleCrowd() {
   const i = crowdPick ? CROWD_IDS.indexOf(crowdPick) : -1
@@ -890,28 +907,42 @@ function rowStory(t, n) {
   return s
 }
 
-// ---------------------------------------------------------------- drawing: the phrasebook
+// ---------------------------------------------------------------- drawing: discoveries
 function drawBook() {
   if (!book.open) return
-  const P = { x: Math.round((CW - 288) / 2) - EXT, y: 58, w: 288, h: 162 }
+  const w = 380, P = { x: Math.round((CW - w) / 2) - EXT, y: 30, w, h: 212 }
   holoPanel(P.x, P.y, P.w, P.h, book.t)
-  text("PHRASEBOOK", P.x + 8, P.y + 5, HOLO.title)
+  const nPair = PAIRINGS.filter(([name]) => (found.pairings[name] || []).length).length
+  const nCombo = FUSED.reduce((s, n) => s + (found.combos[n] || []).length, 0)
+  text("DISCOVERIES", P.x + 8, P.y + 5, HOLO.title)
   button("Close", P.x + P.w - 40, P.y + 3, () => (book.open = false), { w: 34, tone: "holo", key: "bookClose" })
-  text("Serve guests to learn what their words mean.", P.x + 8, P.y + 16, HOLO.dim)
-  BOOK_AXES.forEach((ax, i) => {
-    const n = (learned[ax] || []).filter(Boolean).length
-    button(`${LABEL[ax]} ${n}/5`, P.x + 8, P.y + 28 + i * 14, () => (book.ax = ax), { w: 80, tone: "holo", key: "book_" + ax, on: book.ax === ax })
-  })
-  let y = P.y + 30
-  const x = P.x + 96, w = P.w - 104
-  PHRASES[book.ax].forEach((phrase, lv) => {
-    // Complexity and Balance use the same words for their two lowest levels; show those once
-    if (lv === 1 && PHRASES[book.ax][0] === phrase) return
-    const known = learned[book.ax] && (learned[book.ax][lv] || (PHRASES[book.ax][0] === PHRASES[book.ax][1] && lv === 0 && learned[book.ax][1]))
-    text(`${LEVEL_NAME[lv]}: ${LABEL[book.ax]} ${lv === 0 && PHRASES[book.ax][1] === phrase ? "under 3.5" : LEVEL_RANGE[lv]}`, x, y, HOLO.text); y += 9
-    for (const l of wrap(known ? `"${phrase[0].toUpperCase() + phrase.slice(1)}"` : "Not heard yet", w)) { text(l, x + 4, y, known ? HOLO.value : HOLO.dim); y += 9 }
-    y += 4
-  })
+  text("Taste or serve drinks to find what combines.", P.x + 8, P.y + 16, HOLO.dim)
+  // lay the whole list out first, then draw the part that fits (scroll with the wheel)
+  const rows = [], x = P.x + 10, inner = P.w - 22
+  const head = (s) => rows.push([s, HOLO.title, 0, 12])
+  const row = (s, c, indent = 0) => { for (const l of wrap(s, inner - indent)) rows.push([l, c, indent, 9]) }
+  head(`SECRET PAIRINGS  ${nPair} of 3`)
+  for (const [name, note, hint] of PAIRINGS) {
+    const list = found.pairings[name] || []
+    if (!list.length) { row(`??? : extra ${LABEL[note]}`, HOLO.dim); row(`Hint: ${hint}.`, HOLO.dim, 8) }
+    else { row(`${name}: extra ${LABEL[note]}`, HOLO.glow); for (const k of list) row(namesOf(k), HOLO.value, 8) }
+    rows.push(["", null, 0, 3])
+  }
+  head(`COMBINED NOTES  ${nCombo} found`)
+  for (const n of FUSED) {
+    const [a, b] = PARENTS[n], list = found.combos[n] || []
+    row(`${LABEL[n]}: when ${LABEL[a]} and ${LABEL[b]} are close to each other`, rgbStr(FUSED_COLOR[n]))
+    if (!list.length) row("None found yet", HOLO.dim, 8)
+    for (const k of list) row(namesOf(k), HOLO.value, 8)
+    rows.push(["", null, 0, 3])
+  }
+  const top = P.y + 30, bottom = P.y + P.h - 6, total = rows.reduce((s, r) => s + r[3], 0)
+  book.max = Math.max(0, total - (bottom - top)); book.scroll = clamp(book.scroll, 0, book.max)
+  let y = top - book.scroll
+  ctx.save(); ctx.beginPath(); ctx.rect(P.x + 2, top - 2, P.w - 4, bottom - top + 2); ctx.clip()
+  for (const [s2, c, indent, h] of rows) { if (c && y > top - 12 && y < bottom) text(s2, x + indent, y, c); y += h }
+  ctx.restore()
+  if (book.max > 0) { const bh = Math.max(12, (bottom - top) * (bottom - top) / total); fill(P.x + P.w - 5, top + (bottom - top - bh) * book.scroll / book.max, 2, bh, HOLO.edge) }
 }
 // a small card above whatever the player points at: a title, then a few lines
 function tooltip(title, body, cx, bottom) {
@@ -981,8 +1012,7 @@ function update(dt) {
   if (guest.phase === "served" && guest.t >= 1.2) {
     guest.phase = "reacting"
     openSpectro("served")
-    const n = learn(guest.said)
-    if (n) sim.say(`${n} new phrase${n > 1 ? "s" : ""} in your phrasebook.`)
+    noteDiscoveries(guest.result.t)
   }
 }
 function frame(now) {

@@ -101,7 +101,11 @@ export function taste(d) {
   }
   // Discoveries: secret tag pairings (lab choice: each side needs at least a fifth of a part)
   for (const [t1, t2, note, bonus, name] of [["fermented", "smoked", "depth", 1.2, "Fermented and smoked"], ["citrus", "herbal", "brightness", 1.0, "Citrus and herbal"], ["roasted", "spice", "toasted", 1.0, "Roasted and spice"]]) {
-    if (hasTag(t1) && hasTag(t2)) { out.notes[note] = clamp(out.notes[note] + bonus); out.discoveries.push({ name, note, bonus }) }
+    if (hasTag(t1) && hasTag(t2)) {
+      // which ingredients did it: the biggest pour with each tag (one ingredient can carry both, like shiso)
+      const top = (t) => [...parts].filter(([id, p]) => p >= 0.2 && INGREDIENTS[id].tags.includes(t)).sort((a, b) => b[1] - a[1])[0][0]
+      out.notes[note] = clamp(out.notes[note] + bonus); out.discoveries.push({ name, note, bonus, tags: [t1, t2], ids: [top(t1), top(t2)] })
+    }
   }
 
   // Complexity: the effective number of clearly present notes (a diversity index), 1.5 notes -> 0, 7.5 -> 10

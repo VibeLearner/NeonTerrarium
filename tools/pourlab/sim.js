@@ -408,7 +408,7 @@ export function createSim(L, sizes) {
   // Press and drag the glass, a tool or a measuring cup to slide it somewhere else on the counter. It lifts a little
   // while it's carried and settles where you let go: on the counter top, clear of the ice well, never on top of
   // something else (it slides over to the nearest free spot).
-  const SPOT = { xmin: 62, xmax: 474, ymin: 202, ymax: 214 }   // where a foot can stand: the counter top, right of the well
+  const SPOT = { xmin: 62, xmax: 474, ymin: 208, ymax: 214 }   // the back row stays clear of the screen above   // where a foot can stand: the counter top, right of the well
   function things() {
     const list = []
     if (!S.glassHeld) list.push({ kind: "glass", id: "glass", x: glass.cx, y: glass.base, r: glass.w / 2 })

@@ -679,7 +679,7 @@ function gauge(label, x, y, w, f, value, color) {
 // Shows one vessel at a time (glass, shaker or stirring glass), switching by itself to whichever you're using: what's
 // in it, and its taste profile as it stands. It hangs above the counter, clear of everything you can pick up, and
 // draws behind the action, so a bottle or a stream in front of it is never hidden. Click it for the full breakdown.
-const SCREEN = { x: 4, y: 44, w: 210, h: 102 }
+const SCREEN = { x: 4, y: 43, w: 260, h: 109 }   // under the shelf and the DRINKS sign, left of the guest buttons
 const VESSELS = [["glass", "Glass"], ["shaker", "Shaker"], ["mixing_glass", "Stirrer"]]
 let focus = "glass"
 function followFocus() {
@@ -690,7 +690,7 @@ const focusContents = () => (focus === "glass" ? S.glass : S.tools[focus].c)
 function drawScreen() {
   const P = SCREEN, free = !S.held && !S.grab && !S.moving && guest.phase === "asking"
   // the two cables up to the shelf, then the bezel
-  for (const cx of [P.x + 24, P.x + P.w - 24]) { fill(cx, 37, 1, P.y - 37, "#2A2F35"); fill(cx + 1, 37, 1, P.y - 37, "#4A525A") }
+  for (const cx of [P.x + 24, P.x + 200]) { fill(cx, 33, 1, P.y - 33, "#2A2F35"); fill(cx + 1, 33, 1, P.y - 33, "#4A525A") }
   fill(P.x - 2, P.y - 2, P.w + 4, P.h + 4, "#1B1F24"); frame1(P.x - 2, P.y - 2, P.w + 4, P.h + 4, "#3A4048")
   fill(P.x, P.y, P.w, P.h, "rgba(6,22,30,0.94)")
   for (let yy = P.y + 1; yy < P.y + P.h; yy += 2) fill(P.x, yy, P.w, 1, "rgba(95,243,232,0.03)")
@@ -711,8 +711,8 @@ function drawScreen() {
   fill(P.x + 3, P.y + 17, P.w - 6, 1, "rgba(95,243,232,0.3)")
   // the columns, measured from the text itself: the taste profile on the right is as wide as its longest label plus
   // a bar; the contents on the left get the rest
-  const labelW = Math.max(...SPEC_ROWS.map((n) => textW(LABEL[n]))), BAR = 24
-  const colR = P.x + P.w - 4 - BAR - 3 - labelW - 6        // the left column's right edge
+  const labelW = Math.max(...SPEC_ROWS.map((n) => textW(LABEL[n]))), BAR = 50, valW = textW("10.0")
+  const colR = P.x + P.w - 4 - valW - 4 - BAR - 4 - labelW - 7   // the left column's right edge
   const leftW = colR - (P.x + 5)                            // room for text in the left column
   // status lines under the contents, wrapped to the column so they never run into the profile
   const status = []
@@ -749,17 +749,27 @@ function drawScreen() {
   }
   const rowsEnd = rows.length ? y + (shown < rows.length ? 9 : 0) : y + 9
   status.forEach(([t2, col], k) => text(t2, P.x + 5, bottom + k * 9, col))
-  // right: the taste profile, one short bar per note, starting after the longest label
-  fill(colR + 3, P.y + 20, 1, P.h - 23, "rgba(95,243,232,0.2)")
-  const t = r.total > 0.01 ? sim.tasteOf(c) : null, lx = colR + 6, bx = P.x + P.w - 4 - BAR
+  // right: the taste profile, a row per note: label, a bar built from what each ingredient gives (in its color), the value
+  fill(colR + 3, P.y + 19, 1, P.h - 21, "rgba(95,243,232,0.2)")
+  const t = r.total > 0.01 ? sim.tasteOf(c) : null, lx = colR + 7, bx = lx + labelW + 4, vx = P.x + P.w - 4
   SPEC_ROWS.forEach((n, k) => {
-    const yy = P.y + 20 + k * 8 + (k >= BASE.length ? 1 : 0), v = t ? t.notes[n] : 0
-    text(LABEL[n], lx, yy, v > 0.05 ? HOLO.text : HOLO.dim)
+    const yy = P.y + 19 + k * 9, v = t ? t.notes[n] : 0, on = v > 0.05
+    if (k === BASE.length) fill(lx, yy - 1, vx - lx, 1, "rgba(95,243,232,0.12)")   // the three combined notes below
+    text(LABEL[n], lx, yy, on ? HOLO.text : HOLO.dim)
     fill(bx, yy + 3, BAR, 1, HOLO.track)
-    const col = FUSED.includes(n) ? FUSED_COLOR[n] : [143, 255, 244], bw = Math.max(1, Math.round(v * BAR / 10))
-    if (v > 0.05) { fill(bx, yy + 1, bw, 5, mixRgb(col, [6, 22, 30], 0.3)); fill(bx, yy + 1, bw, 1, col) }
+    for (let q = 0; q <= 10; q += 5) fill(bx + q * BAR / 10, yy + 2, 1, 3, HOLO.track)
+    if (on) {
+      const segs = FUSED.includes(n) ? [[FUSED_COLOR[n], v]] : (() => { const tot = t.contrib[n].reduce((a2, [, x2]) => a2 + x2, 0) || 1; return t.contrib[n].map(([id, x2]) => [mixRgb(liquidOf(id), [200, 255, 250], 0.4), v * x2 / tot]) })()
+      let acc = 0, px0 = bx
+      for (const [col, part] of segs) {
+        acc += part; const end = Math.round(bx + Math.min(10, acc) * BAR / 10)
+        if (end > px0) { fill(px0, yy + 1, end - px0, 5, mixRgb(col, [6, 22, 30], 0.15)); fill(px0, yy + 1, end - px0, 1, mixRgb(col, [255, 255, 255], 0.4)) }
+        px0 = Math.max(px0, end)
+      }
+    }
+    text(on ? v.toFixed(1) : "0", vx, yy, on ? HOLO.value : HOLO.dim, "right")
   })
-  SCREEN.layout = { colR, leftW, lx, labelW, bx, status, rows: rows.length, rowsBottom: rowsEnd, statusTop: bottom }     // for the layout check in the tests
+  SCREEN.layout = { colR, leftW, lx, labelW, bx, barEnd: bx + BAR, valLeft: vx - valW, status, rows: rows.length, rowsBottom: rowsEnd, statusTop: bottom }     // for the layout check in the tests
 }
 
 // the guest's speech bubble, beside their head: what they want, then how they liked it

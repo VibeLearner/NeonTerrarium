@@ -846,7 +846,15 @@ function hand(ctx, AB, [x, y], kind, side, cyber) {
   const { L } = ctx, r = cyber ? L.metal : L.skin, id = AB.shape(r, { cls: "hand", shade: 3, lit: 2 })
   if (kind === "grip") { ellipse(AB, id, x, y, 8, 7); ellipse(AB, id, x - 6 * side, y - 6, 3.5, 3) }
   else if (kind === "fist") ellipse(AB, id, x, y, 8, 6.5)
-  else if (kind === "thumb") { ellipse(AB, id, x, y + 3, 7, 6); capsule(AB, id, x - 2, y - 2, x - 2, y - 11, 2.6) }
+  else if (kind === "thumb") {
+    // a thumbs up: the fist turned sideways, four curled fingers stacked down its front, the thumb rising from the
+    // side nearest the body (never from the middle of the fist, where a lone raised digit reads as a middle finger)
+    const sd = side >= 0 ? 1 : -1
+    ellipse(AB, id, x, y + 3, 6, 7.5)
+    for (let k = 0; k < 4; k++) { const f = AB.shape(r, { cls: "finger" + k, shade: 3, lit: 2 }); ellipse(AB, f, x + 2 * sd, y - 1 + k * 3.2, 4.2, 1.9) }
+    const th = AB.shape(r, { cls: "thumbup", shade: 3, lit: 2 })
+    capsule(AB, th, x - 3 * sd, y - 2, x - 4 * sd, y - 10, 2.7, 2.2)
+  }
   else if (kind === "palm" || kind === "flat") { ellipse(AB, id, x, y, 7, 7.5); for (let k = -4; k <= 4; k += 3) capsule(AB, id, x + k, y - 4, x + k * 1.1, y - 11, 1.6) }
   else if (kind === "ok") { ellipse(AB, id, x, y + 2, 6.5, 6); ellipse(AB, id, x - 3, y - 6, 3.5, 3.5); for (let k = 1; k <= 5; k += 2) capsule(AB, id, x + k, y - 3, x + k, y - 10, 1.4) }
 }

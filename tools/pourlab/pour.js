@@ -12,9 +12,11 @@ MAIN.imageSmoothingEnabled = false
 let ctx = MAIN                       // what the draw helpers paint on (swapped to an offscreen layer for the glass)
 
 // ---------------------------------------------------------------- loading
-const loadImg = (src) => new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = src })
-const L = await (await fetch("assets/layout.json")).json()
-const FONT = await (await fetch("assets/font5x7.json")).json()
+// every load asks for a fresh copy (?v=...), so a browser never shows art or layout saved from an older version
+const FRESH = "?v=" + Date.now()
+const loadImg = (src) => new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = src + FRESH })
+const L = await (await fetch("assets/layout.json" + FRESH)).json()
+const FONT = await (await fetch("assets/font5x7.json" + FRESH)).json()
 const IMG = {}
 const TOOL_IMGS = ["shaker", "shaker_cap", "mixing_glass", "mixing_glass_bare"]
 const names = ["glass", "cup_quarter", "cup_half", "cup_one", ...TOOL_IMGS, ...L.ingredients.flatMap((g) => ["bottle_" + g.id, "bottle_" + g.id + "_hover"])]
@@ -144,6 +146,16 @@ function toolBoxOf(tool) { const b = sim.toolBox(tool); return { x: b.left, y: b
 // the bar spoon: its holder on the counter, and its handle sticking up out of the glass (press there to stir)
 function holderBox() { const h = S.spoon.home; return { x: h.x - 8, y: h.y - 36, w: 16, h: 37 } }
 function spoonGlassBox() { return { x: glass.cx - 3, y: glass.top - 17, w: 18, h: glass.rimY + 3 - (glass.top - 17) } }
+// where the spoon is drawn in the glass: its handle top (tx, ty) and its bowl (bx, by), turning with the stirring
+function spoonGeom() {
+  const a = S.spoon.a, by = glass.bottomY - 3, [il, ir] = glass.inner(by), r = Math.max(2, (ir - il) / 2 - 3)
+  return { tx: glass.cx + 5 + Math.cos(a) * 2, ty: glass.top - 14, bx: glass.cx + Math.cos(a) * r, by: by + Math.sin(a) * 1.5 }
+}
+// pointing at the spoon: anywhere within 5 px of its handle, all the way down, or the box over the rim
+function onSpoon(x, y) {
+  const g = spoonGeom(), dx = g.bx - g.tx, dy = g.by - g.ty, k = clamp(((x - g.tx) * dx + (y - g.ty) * dy) / (dx * dx + dy * dy), 0, 1)
+  return Math.hypot(x - (g.tx + dx * k), y - (g.ty + dy * k)) <= 5 || inBox(x, y, spoonGlassBox())
+}
 // the ice well's opening, in the counter's perspective (the same numbers the art used)
 const proj = (xn, y) => L.VPX + (xn - L.VPX) * (y - L.VPY) / (L.NEAR - L.VPY)
 const WELL = [[proj(L.WELL.xa, L.WELL.far), L.WELL.far], [proj(L.WELL.xb, L.WELL.far), L.WELL.far], [proj(L.WELL.xb, L.WELL.near), L.WELL.near], [proj(L.WELL.xa, L.WELL.near), L.WELL.near]]
@@ -319,6 +331,8 @@ function targetAt(x, y) {
     if (S.held && S.held.id === g.id) continue
     if (hitBottle(g.id, x, y)) return { kind: "bottle", id: g.id }
   }
+  // the spoon in the glass first: its handle sticks up in front of the screen's bottom edge
+  if (!S.held && !S.grab && S.spoon.state === "glass" && onSpoon(x, y)) return { kind: "spoon" }
   if (!S.held && !S.grab && inBox(x, y, SCREEN)) return { kind: "screen" }
   const glassBox = { x: glass.left, y: glass.top, w: glass.w, h: glass.h }
   if (S.held && S.held.kind === "glass" && inBox(x, y, glassBox)) return { kind: "mat" }   // set the glass back down
@@ -330,7 +344,6 @@ function targetAt(x, y) {
     if (cup.state === "home" && inBox(x, y, cupBox(cup))) return { kind: "cup", id: cup.id }
     if (cup.state === "active" && !S.held && inBox(x, y, cupBox(cup))) return { kind: "activeCup", id: cup.id }
   }
-  if (!S.held && S.spoon.state === "glass" && inBox(x, y, spoonGlassBox())) return { kind: "spoon" }
   if (!S.held && S.spoon.state === "home" && inBox(x, y, holderBox())) return { kind: "spoonHome" }
   if (!S.held && inBox(x, y, { x: glass.left, y: glass.top, w: glass.w, h: glass.h })) return { kind: "glass" }
   if (!S.held) for (const tool of Object.values(S.tools)) if (tool.state === "home" && y < L.RAIL_TOP - 2 && inBox(x, y, toolBoxOf(tool))) return { kind: "tool", id: tool.id }
@@ -519,8 +532,7 @@ function spoonKnob(x, y) { fill(x - 1, y - 1, 4, 2, "#C9D3DA"); px(x - 1, y - 1,
 // in the glass: the bowl circles near the bottom as you stir, the handle leans out over the rim
 function drawGlassSpoon() {
   if (S.spoon.state !== "glass") return
-  const a = S.spoon.a, by = glass.bottomY - 3, [il, ir] = glass.inner(by), r = Math.max(2, (ir - il) / 2 - 3)
-  const bx = glass.cx + Math.cos(a) * r, byy = by + Math.sin(a) * 1.5, tx = glass.cx + 5 + Math.cos(a) * 2, ty = glass.top - 14
+  const { tx, ty, bx, by: byy } = spoonGeom()
   const surf = sim.total() > 0.05 ? sim.surfaceY() : undefined
   spoonLine(tx, ty, bx, byy, surf)
   ctx.globalAlpha = surf !== undefined ? 0.6 : 1; fill(bx - 1, byy, 3, 2, "#C9D3DA"); ctx.globalAlpha = 1
@@ -1354,4 +1366,4 @@ function frame(now) {
 }
 requestAnimationFrame(frame)
 // a handle for the browser console and the node test harness: the simulation, the guest, and today's buttons
-globalThis.pourlab = { sim, guest, spectro, book, SCREEN, textW: textWSmall, get buttons() { return buttons } }
+globalThis.pourlab = { sim, guest, spectro, book, SCREEN, textW: textWSmall, get buttons() { return buttons }, get hover() { return hover } }

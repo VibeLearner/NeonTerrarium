@@ -750,7 +750,7 @@ const toolReflections = (from, to, list = TOOLS()) => list.map(([n, x, y]) => cl
 // bottles laid out left to right with even gaps, and one wider gap under the glass so nothing stands in front of the pour.
 // The drinks with alcohol stand together at the left end, the rest after them; a small gap and a post mark where
 // one group ends (their rail tapes differ too: amber for alcohol, cream for the rest)
-const GAP_AFTER = 5, POUR_GAP = 30, GROUP_GAP = 8
+const GAP_AFTER = 5, POUR_GAP = 0, GROUP_GAP = 10
 const ALCOHOL = new Set(["rice", "rye", "rum", "coffee"])
 const GROUP_END = INGREDIENTS.findIndex((ing) => !ALCOHOL.has(ing.id)) - 1      // the last bottle with alcohol
 const RAIL_X = (() => {

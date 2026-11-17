@@ -141,7 +141,9 @@ function railTip(id) { const b = bottleBox(id), t = tipOf(id); return { x: b.x +
 function cupBox(cup) { return { x: Math.round(cup.x - (cup.rt + 2)), y: Math.round(cup.y - cup.h), w: cup.w, h: cup.h } }
 function toolBoxOf(tool) { const b = sim.toolBox(tool); return { x: b.left, y: b.top, w: tool.w, h: tool.h } }
 // the bar spoon's handle, sticking up out of the stirring glass: press on it and circle the mouse to stir
-function spoonBox(tool) { const b = toolBoxOf(tool); return { x: b.x + 11, y: b.y - 3, w: 16, h: tool.top + tool.ryT + 5 } }
+// the bar spoon: its holder on the counter, and its handle sticking up out of the glass (press there to stir)
+function holderBox() { const h = S.spoon.home; return { x: h.x - 8, y: h.y - 36, w: 16, h: 37 } }
+function spoonGlassBox() { return { x: glass.cx - 3, y: glass.top - 17, w: 18, h: glass.rimY + 3 - (glass.top - 17) } }
 // the ice well's opening, in the counter's perspective (the same numbers the art used)
 const proj = (xn, y) => L.VPX + (xn - L.VPX) * (y - L.VPY) / (L.NEAR - L.VPY)
 const WELL = [[proj(L.WELL.xa, L.WELL.far), L.WELL.far], [proj(L.WELL.xb, L.WELL.far), L.WELL.far], [proj(L.WELL.xb, L.WELL.near), L.WELL.near], [proj(L.WELL.xa, L.WELL.near), L.WELL.near]]
@@ -180,7 +182,7 @@ let crowdPick = null                                 // null: any crowd
 const guest = { g: null, said: [], phase: "asking", t: 0, result: null, back: 1 }
 function newGuest() {
   guest.g = makeGuest(GR, crowdPick); guest.said = request(guest.g)
-  guest.phase = "asking"; guest.t = 0; guest.result = null
+  guest.phase = "asking"; guest.t = 0; guest.result = null; guest.saved = false
 }
 newGuest(); guest.back = 1
 function nextGuest() {
@@ -193,6 +195,7 @@ function serve() {
   if (sim.total() < FILL_LINE - 0.05) { sim.say(`Pour at least the minimum drink amount first: ${FILL_LINE} parts, the lights on the glass turn green.`); return }
   dropHeld()
   if (S.toolMode) sim.putToolDown()
+  sim.homeSpoon()
   const t = sim.tasteOf(S.glass), s = score(guest.g, t)
   guest.result = { t, s, fb: feedback(guest.g, t, s) }
   guest.phase = "served"; guest.t = 0
@@ -218,26 +221,46 @@ const PAIRINGS = [["Fermented and smoked", "depth", "Something fermented with so
 const COMBO_MIN = 2
 let found = { pairings: {}, combos: {} }
 try { found = { pairings: {}, combos: {}, ...JSON.parse(globalThis.localStorage?.getItem(BOOK_KEY) || "{}") } } catch {}
-const book = { open: false, t: 0, scroll: 0 }
+const book = { open: false, t: 0, page: [0, 0], flash: [0, 0], wheel: 0 }
+
+// ---------------------------------------------------------------- recipes: drinks saved after a guest has tasted them
+const RECIPE_KEY = "neonDome.recipes.v1"
+let recipes = []
+try { recipes = JSON.parse(globalThis.localStorage?.getItem(RECIPE_KEY) || "[]") } catch {}
+function saveRecipe() {
+  if (!guest.result || guest.saved) return
+  const r = sim.readout(), c = S.glass
+  const items = r.rows.filter((row) => row.id !== "water" && (row.parts >= 0.04 || row.dashes)).map((row) => row.dashes ? [row.id, 0, row.dashes] : [row.id, +row.parts.toFixed(2), 0])
+  const rec = { no: recipes.length ? recipes[recipes.length - 1].no + 1 : 1, crowd: guest.g.crowdName, tier: guest.result.s.tier, score: Math.round(guest.result.s.score),
+    color: sim.srgb(sim.compColor(c.parts)), items, ice: r.ice, method: c.log.length ? logText(c.log) : "Built in the glass", total: +r.total.toFixed(2) }
+  recipes.push(rec); guest.saved = true
+  try { globalThis.localStorage?.setItem(RECIPE_KEY, JSON.stringify(recipes)) } catch {}
+  book.page[1] = recipes.length - 1
+  sim.say(`Saved to your book as No. ${rec.no}.`)
+}
+
 const pairKey = (ids) => [...new Set(ids)].sort().join("+")
 function noteDiscoveries(t) {
   if (!t) return
   const fresh = []
   for (const d of t.discoveries) {
     const list = (found.pairings[d.name] ||= []), k = pairKey(d.ids)
-    if (!list.includes(k)) { list.push(k); fresh.push(`${namesOf(k)}: ${d.name.toLowerCase()}, +${d.bonus.toFixed(1)} ${LABEL[d.note]}`) }
+    if (!list.includes(k)) { list.push(k); fresh.push(`${namesOf(k)} = ${LABEL[d.note]}`) }
   }
   for (const n of FUSED) {
     if (t.notes[n] < COMBO_MIN) continue
     const ids = PARENTS[n].map((p) => (t.contrib[p][0] || [])[0]).filter(Boolean)
     const list = (found.combos[n] ||= []), k = pairKey(ids)
-    if (ids.length && !list.includes(k)) { list.push(k); fresh.push(`${namesOf(k)} gives ${LABEL[n]}`) }
+    if (ids.length && !list.includes(k)) { list.push(k); fresh.push(`${namesOf(k)} = ${LABEL[n]}`) }
   }
   if (!fresh.length) return
   try { globalThis.localStorage?.setItem(BOOK_KEY, JSON.stringify(found)) } catch {}
-  sim.say(fresh.length === 1 ? `New combination: ${fresh[0]}.` : `${fresh.length} new combinations in Discoveries.`)
+  sim.say(fresh.length === 1 ? `New in your book: ${fresh[0]}` : `${fresh.length} new finds in your book.`)
 }
-const namesOf = (k) => k.split("+").map((id) => SHORT[id]).join(" + ") + (k.includes("+") ? "" : " on its own")
+// the book's short names: the words on the rail tapes
+const BOOK_NAME = { rice: "Rice", rye: "Rye", rum: "Rum", coffee: "Coffee", yuzu: "Yuzu", ume: "Ume", lemongrass: "Lemongrass",
+  glow: "Glow", ginger: "Ginger", shiso: "Shiso", soda: "Soda", bitters: "Bitters", chili: "Chili" }
+const namesOf = (k) => k.split("+").map((id) => BOOK_NAME[id] || SHORT[id]).join(" + ")
 
 // ---------------------------------------------------------------- the spectrograph: what the drink tastes like
 // A hologram that slides down over the scene: one bar per note, built from each ingredient's share, with what was
@@ -302,8 +325,8 @@ function targetAt(x, y) {
     if (cup.state === "home" && inBox(x, y, cupBox(cup))) return { kind: "cup", id: cup.id }
     if (cup.state === "active" && !S.held && inBox(x, y, cupBox(cup))) return { kind: "activeCup", id: cup.id }
   }
-  const mg = S.tools.mixing_glass
-  if (!S.held && mg && mg.state === "home" && inBox(x, y, spoonBox(mg))) return { kind: "spoon", id: "mixing_glass" }
+  if (!S.held && S.spoon.state === "glass" && inBox(x, y, spoonGlassBox())) return { kind: "spoon" }
+  if (!S.held && S.spoon.state === "home" && inBox(x, y, holderBox())) return { kind: "spoonHome" }
   if (!S.held && inBox(x, y, { x: glass.left, y: glass.top, w: glass.w, h: glass.h })) return { kind: "glass" }
   if (!S.held) for (const tool of Object.values(S.tools)) if (tool.state === "home" && y < L.RAIL_TOP - 2 && inBox(x, y, toolBoxOf(tool))) return { kind: "tool", id: tool.id }
   return null
@@ -315,10 +338,10 @@ const clampAim = (p) => ({ x: clamp(p.x, 12, W - 12), y: clamp(p.y, 66, 214) })
 // the glass, the tools and the cups can be dragged to another spot on the counter; a click without moving does what
 // clicking always did (pick up, lift, set beside the glass)
 const MOVABLE = { glass: "glass", tool: "tool", cup: "cup", activeCup: "cup" }
-let pending = null
+let pending = null, stirPress = null
 // a second click on the same glass or tool soon after the first empties it (the first click picked it up: it goes
 // straight back down, empty)
-const DOUBLE_MS = 400, NAMES = { glass: "the glass", shaker: "the shaker", mixing_glass: "the stirring glass" }
+const DOUBLE_MS = 400, NAMES = { glass: "the glass", shaker: "the shaker" }
 let lastClick = null
 function doubleClick(e, p) {
   const lc = lastClick; lastClick = null
@@ -350,7 +373,8 @@ view.addEventListener("pointerdown", (e) => {
     dropHeld()                                                     // swap: the one in hand goes straight back
     sim.pick(t.id, railTip(t.id)); const a = clampAim(p); sim.aim(a.x, a.y)
   } else if (t && t.kind === "rail") putBackHeld()
-  else if (t && t.kind === "spoon") sim.startStir(t.id, p.x, p.y)
+  else if (t && t.kind === "spoon") { if (sim.startStir(p.x, p.y)) stirPress = { t: e.timeStamp, x: p.x, y: p.y } }
+  else if (t && t.kind === "spoonHome") { if (sim.placeSpoon()) focus = "glass" }
   else if (t && MOVABLE[t.kind] && sim.canMove(MOVABLE[t.kind], t.id || "glass")) pending = { t, x: p.x, y: p.y, moving: false }   // a click or a drag: decided when it moves or lets go
   else if (t && t.kind === "cup") sim.activateCup(t.id)
   else if (t && t.kind === "activeCup") sim.clickActiveCup()
@@ -369,7 +393,12 @@ view.addEventListener("pointermove", (e) => {
   if (pending && pending.moving) sim.dragTo(p.x, p.y)
 })
 const release = (e, cancelled = false) => {
-  if (S.stirring) { sim.endStir(); pointer.down = false; return }
+  if (S.stirring) {
+    // a quick click on the spoon (no circling) takes it out of the glass and back to its holder
+    const p = toScene(e), sp = stirPress; stirPress = null; pointer.down = false
+    if (sp && !cancelled && e.timeStamp - sp.t < 250 && Math.hypot(p.x - sp.x, p.y - sp.y) < 4) sim.homeSpoon(); else sim.endStir()
+    return
+  }
   if (pending) {
     const pd = pending; pending = null; pointer.down = false
     if (pd.moving) { const toGuest = pd.t.kind === "glass" && !cancelled && overServe(); sim.endMove(); if (toGuest) serve() }
@@ -381,7 +410,14 @@ view.addEventListener("pointerup", release)
 view.addEventListener("pointercancel", (e) => release(e, true))
 view.addEventListener("pointerleave", () => { pointer.x = -99; pointer.y = -99 })
 view.addEventListener("wheel", (e) => {
-  if (book.open) { e.preventDefault(); book.scroll += e.deltaY * 0.25; return }
+  if (book.open) {
+    e.preventDefault()
+    // the wheel turns the page under the pointer, a page per notch
+    book.wheel += e.deltaY
+    const side = toScene(e).x < READER.x + READER.w / 2 ? 0 : 1
+    while (Math.abs(book.wheel) >= 60) { const d = Math.sign(book.wheel); turnPage(side, d); book.wheel -= d * 60 }
+    return
+  }
   const p = toScene(e)
   if (!spectro.open && inBox(p.x, p.y, SCREEN)) {
     e.preventDefault()
@@ -464,6 +500,46 @@ function drawSpoon(tool, left, top) {
   const bx = cx + Math.cos(a) * 7, by = base + Math.sin(a) * 2, tx = cx + 4 + Math.cos(a) * 2, ty = top + 1
   line(bx, by, tx, ty, "#DCE6EC"); line(bx + 1, by, tx + 1, ty, "#8A98A2")
   fill(tx - 1, ty - 1, 4, 2, "#C9D3DA"); fill(bx - 1, by, 3, 2, "#C9D3DA")
+}
+// the bar spoon: a long twisted steel handle with a small disc on top and a little bowl at the bottom
+function spoonLine(x0, y0, x1, y1, surf) {
+  const n = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0)))
+  for (let k = 0; k <= n; k++) {
+    const x = Math.round(x0 + (x1 - x0) * k / n), y = Math.round(y0 + (y1 - y0) * k / n)
+    ctx.globalAlpha = surf !== undefined && y > surf ? 0.55 : 1          // seen through the drink below its surface
+    px(x, y, k % 4 === 0 ? "#8A98A2" : "#DCE6EC"); px(x + 1, y, "#6E7C86")
+  }
+  ctx.globalAlpha = 1
+}
+function spoonKnob(x, y) { fill(x - 1, y - 1, 4, 2, "#C9D3DA"); px(x - 1, y - 1, "#F2F7F9") }
+// in the glass: the bowl circles near the bottom as you stir, the handle leans out over the rim
+function drawGlassSpoon() {
+  if (S.spoon.state !== "glass") return
+  const a = S.spoon.a, by = glass.bottomY - 3, [il, ir] = glass.inner(by), r = Math.max(2, (ir - il) / 2 - 3)
+  const bx = glass.cx + Math.cos(a) * r, byy = by + Math.sin(a) * 1.5, tx = glass.cx + 5 + Math.cos(a) * 2, ty = glass.top - 14
+  const surf = sim.total() > 0.05 ? sim.surfaceY() : undefined
+  spoonLine(tx, ty, bx, byy, surf)
+  ctx.globalAlpha = surf !== undefined ? 0.6 : 1; fill(bx - 1, byy, 3, 2, "#C9D3DA"); ctx.globalAlpha = 1
+  spoonKnob(tx, ty)
+  if (hover && hover.kind === "spoon" && !S.stirring) frame1(Math.round(tx) - 3, ty - 3, 8, 6, "#FFC94A")
+}
+// at home: standing in a small steel tin on the counter
+function drawHolder() {
+  const h = S.spoon.home, x = Math.round(h.x), y = Math.round(h.y), hov = hover && hover.kind === "spoonHome"
+  drawShadow(x, y - 2, 7, 2, 0.4)
+  if (S.spoon.state === "home") {
+    if (hov) { spoonLineGold(x + 1, y - 10, x + 3, y - 33) }
+    spoonLine(x + 1, y - 10, x + 3, y - 33); spoonKnob(x + 3, y - 33)
+  }
+  if (hov) frame1(x - 7, y - 15, 15, 16, "#FFC94A")
+  fill(x - 6, y - 13, 13, 13, "#56666E"); fill(x - 5, y - 13, 2, 13, "#93A6AC"); fill(x + 5, y - 13, 2, 13, "#2E3A44")
+  fill(x - 6, y - 14, 13, 2, "#D8E4E2"); fill(x - 5, y - 13, 11, 1, "#2E3A44")
+  fill(x - 6, y - 1, 13, 1, "#2E3A44")
+}
+function spoonLineGold(x0, y0, x1, y1) {
+  const n = Math.ceil(Math.hypot(x1 - x0, y1 - y0))
+  for (let k = 0; k <= n; k++) { const x = Math.round(x0 + (x1 - x0) * k / n), y = Math.round(y0 + (y1 - y0) * k / n); fill(x - 1, y, 4, 1, "#FFC94A") }
+  fill(x1 - 2, y1 - 2, 6, 4, "#FFC94A")
 }
 function drawToolHome(tool) {
   const b = toolBoxOf(tool), img = IMG[tool.id], ryB = Math.max(2, Math.round(tool.rb * K)), carried = tool.state === "carried"
@@ -599,7 +675,7 @@ const GCTX = glassLayer.getContext("2d"); GCTX.imageSmoothingEnabled = false
 function drawGlass() {
   const pose = glassPose(), h = S.held && S.held.kind === "glass" ? S.held : null
   ctx = GCTX; ctx.clearRect(0, 0, W, H)
-  drawLiquid(); drawIce(); ctx.drawImage(IMG.glass, glass.left, glass.top)
+  drawLiquid(); drawIce(); drawGlassSpoon(); ctx.drawImage(IMG.glass, glass.left, glass.top)
   if (!h && guest.phase === "asking" && guest.back >= 1) drawFillLine()
   ctx = MAIN
   // in hand: held by the right end of its rim and turned about it, drink and all
@@ -727,9 +803,10 @@ function gauge(label, x, y, w, f, value, color) {
 // in it, and its taste profile as it stands. It hangs above the counter, clear of everything you can pick up, and
 // draws behind the action, so a bottle or a stream in front of it is never hidden. Click it for the full breakdown.
 const SCREEN = { x: 4, y: 43, w: 260, h: 109 }   // under the shelf and the DRINKS sign, left of the guest buttons
-const VESSELS = [["glass", "Glass"], ["shaker", "Shaker"], ["mixing_glass", "Stirrer"]]
+const VESSELS = [["glass", "Glass"], ["shaker", "Shaker"]]
 let focus = "glass"
 function followFocus() {
+  if (S.stirring) { focus = "glass"; return }
   if (S.held && (S.held.kind === "tool" || S.held.kind === "glass")) focus = S.held.id
   else if (S.lastInto) { if (VESSELS.some(([id]) => id === S.lastInto)) focus = S.lastInto; S.lastInto = null }
 }
@@ -791,6 +868,11 @@ function drawScreenBody() {
     if (r.total > 0.01) say2(`Cold ${r.chill.toFixed(1)}, ${Math.round(r.dilution * 100)}% melted`, HOLO.dim)
   } else if (guest.phase === "asking") {
     if (r.full) say2("Full to the rim", "#FF8AA8")
+    if (S.spoon.state === "glass" || c.stirT > 0.05) {
+      if (S.spoon.state === "glass" && !r.ice) say2("No ice: it stays warm", "#FF8AA8")
+      say2(c.stirT > 0.05 ? `Stirred ${c.stirT.toFixed(1)} s` : "Not stirred yet", S.spoon.working ? "#FFC94A" : HOLO.dim)
+      if (c.stirT > 0.05) say2(`Cold ${r.chill.toFixed(1)}, ${Math.round(r.dilution * 100)}% melted`, HOLO.dim)
+    }
   }
   const bottom = P.y + P.h - 3 - status.length * LH
   listScroll.bar = false
@@ -889,9 +971,9 @@ function drawBubble() {
 }
 // the guest controls, top right
 function drawStrip() {
-  const y = 44, labels = [["Discoveries", () => { book.open = !book.open; book.t = 0 }], [crowdPick ? CROWDS[crowdPick].name : "Any crowd", cycleCrowd], ["Next guest", nextGuest]]
+  const y = 44, labels = [["Book", () => { book.open = !book.open; book.t = 0; book.flash = [0, 0] }], [crowdPick ? CROWDS[crowdPick].name : "Any crowd", cycleCrowd], ["Next guest", nextGuest]]
   let x = 476
-  for (const [l, act] of labels) { const w = textW(l) + 10; x -= w; button(l, x, y, act, { w, key: act === cycleCrowd ? "crowd" : l, on: l === "Discoveries" && book.open }); x -= 4 }
+  for (const [l, act] of labels) { const w = textW(l) + 10; x -= w; button(l, x, y, act, { w, key: act === cycleCrowd ? "crowd" : l, on: l === "Book" && book.open }); x -= 4 }
 }
 function cycleCrowd() {
   const i = crowdPick ? CROWD_IDS.indexOf(crowdPick) : -1
@@ -943,9 +1025,11 @@ function drawSpectro() {
   holoPanel(P.x, P.y, P.w, P.h, spectro.t)
   const served = spectro.src === "served", arrows = served ? guest.result.fb.arrows : {}
   // header: what's being tasted, and how it was made
-  const what = served ? "THE SERVED DRINK" : spectro.src === "glass" ? "THE GLASS" : TOOL_NAME[spectro.src]
-  text("TASTE: " + what, P.x + 8, P.y + 5, HOLO.title)
+  const what = served ? "THE SERVED DRINK" : "TASTE: " + (spectro.src === "glass" ? "THE GLASS" : TOOL_NAME[spectro.src])
+  text(what, P.x + 8, P.y + 5, HOLO.title)
   button("Close", P.x + P.w - 40, P.y + 3, closeSpectro, { w: 34, tone: "holo" })
+  // once the guest has tasted it, the drink can be saved to the book as a recipe card
+  if (served) { const l = guest.saved ? "Saved" : "Save recipe", w = textW(l) + 10; button(l, P.x + P.w - 44 - w, P.y + 3, saveRecipe, { w, tone: "holo", key: "saveRecipe", on: guest.saved }) }
   const c = spectro.src === "glass" || served ? S.glass : S.tools[spectro.src].c
   const stats = [`Melted ice ${Math.round(t.dilution * 100)}%`, `Cold ${t.chill.toFixed(1)}`]
   if (t.bubbles > 0.01) stats.push(`Bubbles ${Math.round(t.bubbles * 100)}%`)
@@ -1030,41 +1114,138 @@ function rowStory(t, n) {
 }
 
 // ---------------------------------------------------------------- drawing: discoveries
+// ---------------------------------------------------------------- the book: a two-screen e-reader
+// Left screen: what you've found, one line each ("Coffee + Ginger = Toasted"; a star marks a secret pairing, the
+// ones still hidden read "? + ? = Depth"). Right screen: saved recipes, a card a page. E-ink: pale paper, dark ink,
+// a quick black flash when a page changes.
+const READER = { x: 40, y: 24, w: 400, h: 222 }
+const EINK = "#1F2622", INK2 = "#5A6458", INK3 = "#8E978A", PAPER = "#C8D0C0"
+const BOOK_LH = 11
+const inkOf = (n) => rgbStr(mixRgb(FUSED_COLOR[n], [31, 38, 34], 0.45))
+function pageBoxes() {
+  const D = READER, pw = (D.w - 16 - 12) / 2
+  return [{ x: D.x + 8, y: D.y + 15, w: pw, h: D.h - 25 }, { x: D.x + 8 + pw + 12, y: D.y + 15, w: pw, h: D.h - 25 }]
+}
+function bookEntries() {
+  const out = []
+  for (const n of FUSED) {
+    const secret = PAIRINGS.find(([, note]) => note === n), sk = found.pairings[secret[0]] || []
+    const keys = [...new Set([...sk, ...(found.combos[n] || [])])]
+    for (const k of keys) out.push({ k, n, star: sk.includes(k) })
+  }
+  for (const [name, n] of PAIRINGS) if (!(found.pairings[name] || []).length) out.push({ k: null, n, star: true })
+  return out
+}
+const findsPerPage = () => Math.floor((pageBoxes()[0].h - 36) / BOOK_LH)
+function bookPages(side) {
+  if (side === 1) return Math.max(1, recipes.length)
+  return Math.max(1, Math.ceil(bookEntries().length / findsPerPage()))
+}
+function turnPage(side, d) {
+  const n = bookPages(side), p = clamp(book.page[side] + d, 0, n - 1)
+  if (p !== book.page[side]) { book.page[side] = p; book.flash[side] = 0.14 }
+}
+function roundFill(x, y, w, h, col) { fill(x + 2, y, w - 4, h, col); fill(x + 1, y + 1, w - 2, h - 2, col); fill(x, y + 2, w, h - 4, col) }
+function star(x, y, col) { fill(x + 1, y, 1, 3, col); fill(x, y + 1, 3, 1, col) }
 function drawBook() {
   if (!book.open) return
-  const w = 380, P = { x: Math.round((CW - w) / 2) - EXT, y: 30, w, h: 212 }
-  holoPanel(P.x, P.y, P.w, P.h, book.t)
-  const nPair = PAIRINGS.filter(([name]) => (found.pairings[name] || []).length).length
-  const nCombo = FUSED.reduce((s, n) => s + (found.combos[n] || []).length, 0)
-  text("DISCOVERIES", P.x + 8, P.y + 5, HOLO.title)
-  button("Close", P.x + P.w - 40, P.y + 3, () => (book.open = false), { w: 34, tone: "holo", key: "bookClose" })
-  text("Taste or serve drinks to find what combines.", P.x + 8, P.y + 16, HOLO.dim)
-  // lay the whole list out first, then draw the part that fits (scroll with the wheel)
-  const rows = [], x = P.x + 10, inner = P.w - 22
-  const head = (s) => rows.push([s, HOLO.title, 0, 12])
-  const row = (s, c, indent = 0) => { for (const l of wrap(s, inner - indent)) rows.push([l, c, indent, 9]) }
-  head(`SECRET PAIRINGS  ${nPair} of 3`)
-  for (const [name, note, hint] of PAIRINGS) {
-    const list = found.pairings[name] || []
-    if (!list.length) { row(`??? : extra ${LABEL[note]}`, HOLO.dim); row(`Hint: ${hint}.`, HOLO.dim, 8) }
-    else { row(`${name}: extra ${LABEL[note]}`, HOLO.glow); for (const k of list) row(namesOf(k), HOLO.value, 8) }
-    rows.push(["", null, 0, 3])
+  for (const k of [0, 1]) book.flash[k] = Math.max(0, book.flash[k] - 1 / 60)
+  const D = READER, [LP, RP] = pageBoxes()
+  // the case: dark metal, a pink neon strip along the top, a cyan one along the bottom
+  ctx.globalAlpha = 0.55; fill(-EXT, 0, CW, H, "#06080A"); ctx.globalAlpha = 1
+  roundFill(D.x - 1, D.y - 1, D.w + 2, D.h + 2, "#3A4048")
+  roundFill(D.x, D.y, D.w, D.h, "#15181C")
+  fill(D.x + 6, D.y, D.w - 12, 1, "#FF4FC8"); fill(D.x + 6, D.y + D.h - 1, D.w - 12, 1, "#38E8E0")
+  // the status bar on the case: a name, a battery, the close button
+  useFont(true)
+  text("DOME//READER", D.x + 9, D.y + 4, "#5FA8A8")
+  const bx = D.x + D.w - 44; frame1(bx, D.y + 4, 11, 6, "#5FA8A8"); fill(bx + 11, D.y + 6, 1, 2, "#5FA8A8"); fill(bx + 2, D.y + 6, 6, 2, "#38E8E0")
+  useFont(false)
+  const cb = { x: D.x + D.w - 27, y: D.y + 2, w: 19, h: 11, key: "bookClose", act: () => (book.open = false) }
+  const ch = hover && hover.kind === "button" && hover.key === "bookClose"
+  fill(cb.x, cb.y, cb.w, cb.h, ch ? "rgba(255,79,200,0.35)" : "rgba(255,79,200,0.12)"); frame1(cb.x, cb.y, cb.w, cb.h, "#FF4FC8")
+  for (let k = 0; k < 5; k++) { fill(cb.x + 7 + k, cb.y + 3 + k, 1, 1, "#FFC2EC"); fill(cb.x + 11 - k, cb.y + 3 + k, 1, 1, "#FFC2EC") }
+  buttons.push(cb)
+  // the hinge between the two screens
+  const hx = LP.x + LP.w + 2
+  fill(hx, LP.y, 8, LP.h, "#0E1013"); fill(hx + 3, LP.y + 2, 2, LP.h - 4, "#262B31")
+  for (const yy of [LP.y + 20, LP.y + LP.h - 24]) { fill(hx + 1, yy, 6, 4, "#3A4048"); fill(hx + 2, yy + 1, 4, 1, "#56666E") }
+  fill(hx + 3, Math.round(LP.y + LP.h / 2 - 1), 2, 2, "#38E8E0")
+  // the screens: an e-ink flash when the book opens or a page turns, then the page
+  const opening = book.t < 0.12
+  for (const [k, P] of [[0, LP], [1, RP]]) {
+    if (opening || book.flash[k] > 0.07) { fill(P.x, P.y, P.w, P.h, EINK); continue }
+    fill(P.x, P.y, P.w, P.h, PAPER)
+    for (let yy = P.y + 1; yy < P.y + P.h; yy += 3) fill(P.x, yy, P.w, 1, "rgba(31,38,34,0.035)")
+    if (book.flash[k] > 0) { ctx.globalAlpha = 0.5; fill(P.x, P.y, P.w, P.h, INK3); ctx.globalAlpha = 1 }
+    if (k === 0) drawFinds(P); else drawRecipe(P)
   }
-  head(`COMBINED NOTES  ${nCombo} found`)
-  for (const n of FUSED) {
-    const [a, b] = PARENTS[n], list = found.combos[n] || []
-    row(`${LABEL[n]}: when ${LABEL[a]} and ${LABEL[b]} are close to each other`, rgbStr(FUSED_COLOR[n]))
-    if (!list.length) row("None found yet", HOLO.dim, 8)
-    for (const k of list) row(namesOf(k), HOLO.value, 8)
-    rows.push(["", null, 0, 3])
+}
+// a page's header, and its footer with the page turners
+function pageFrame(P, side, title, count) {
+  text(title, P.x + 7, P.y + 6, EINK)
+  useFont(true)
+  if (count) text(count, P.x + P.w - 7, P.y + 7, INK2, "right")
+  fill(P.x + 6, P.y + 16, P.w - 12, 1, INK2)
+  const n = bookPages(side), pg = book.page[side] = clamp(book.page[side], 0, n - 1), fy = P.y + P.h - 11
+  if (n > 1) {
+    text(`${pg + 1} / ${n}`, P.x + P.w / 2, fy + 2, INK2, "center")
+    for (const [d, x] of [[-1, P.x + 6], [1, P.x + P.w - 18]]) {
+      const can = pg + d >= 0 && pg + d < n, key = `page${side}${d}`, hov = hover && hover.kind === "button" && hover.key === key
+      if (hov && can) fill(x, fy, 12, 10, "rgba(31,38,34,0.12)")
+      for (let r = 0; r < 4; r++) fill(d < 0 ? x + 4 + r : x + 7 - r, fy + 4 - r, 1, 1 + r * 2, can ? EINK : INK3)
+      if (can) buttons.push({ x, y: fy, w: 12, h: 10, key, act: () => turnPage(side, d) })
+    }
   }
-  const top = P.y + 30, bottom = P.y + P.h - 6, total = rows.reduce((s, r) => s + r[3], 0)
-  book.max = Math.max(0, total - (bottom - top)); book.scroll = clamp(book.scroll, 0, book.max)
-  let y = top - book.scroll
-  ctx.save(); ctx.beginPath(); ctx.rect(P.x + 2, top - 2, P.w - 4, bottom - top + 2); ctx.clip()
-  for (const [s2, c, indent, h] of rows) { if (c && y > top - 12 && y < bottom) text(s2, x + indent, y, c); y += h }
-  ctx.restore()
-  if (book.max > 0) { const bh = Math.max(12, (bottom - top) * (bottom - top) / total); fill(P.x + P.w - 5, top + (bottom - top - bh) * book.scroll / book.max, 2, bh, HOLO.edge) }
+  useFont(false)
+}
+function drawFinds(P) {
+  const all = bookEntries(), known = all.filter((e) => e.k).length, per = findsPerPage()
+  pageFrame(P, 0, "DISCOVERIES", known ? `${known} found` : "")
+  useFont(true)
+  const list = all.slice(book.page[0] * per, book.page[0] * per + per)
+  let y = P.y + 23
+  if (!known) { text("Nothing yet.", P.x + P.w / 2, y, INK2, "center"); y += BOOK_LH + 4 }
+  for (const e of list) {
+    let x = P.x + 9
+    const put = (str, col) => { text(str, x, y, col); x += textW(str) + 3 }
+    const names = e.k ? e.k.split("+").map((id) => BOOK_NAME[id]) : ["?", "?"]
+    names.forEach((nm, i) => { if (i) put("+", INK3); put(nm, e.k ? EINK : INK3) })
+    put("=", INK3)
+    text(LABEL[e.n], P.x + P.w - 8, y, e.k ? inkOf(e.n) : INK3, "right")
+    y += BOOK_LH
+  }
+  useFont(false)
+}
+function drawRecipe(P) {
+  pageFrame(P, 1, "RECIPES", recipes.length ? `${recipes.length} saved` : "")
+  useFont(true)
+  if (!recipes.length) {
+    text("No recipes yet.", P.x + P.w / 2, P.y + 23, INK2, "center")
+    wrap("After a guest tastes a drink, press Save recipe to keep it here.", P.w - 24).forEach((l, i) => text(l, P.x + P.w / 2, P.y + 38 + i * 9, INK3, "center"))
+    useFont(false); return
+  }
+  const r = recipes[book.page[1]]
+  useFont(false); text(`No. ${r.no}`, P.x + 8, P.y + 22, EINK); useFont(true)
+  text(`${r.crowd} crowd`, P.x + 8, P.y + 32, INK2)
+  text(`${r.tier}, ${r.score}`, P.x + 8, P.y + 41, r.score >= 65 ? "#2E6B4A" : r.score >= 40 ? INK2 : "#8A3A3A")
+  // the drink itself: a small tumbler in its color
+  const gx = Math.round(P.x + P.w - 26), gy = P.y + 22
+  fill(gx + 1, gy + 6, 14, 13, rgbStr(mixRgb(r.color, [200, 208, 192], 0.2))); fill(gx + 1, gy + 6, 14, 1, rgbStr(mixRgb(r.color, [255, 255, 255], 0.35)))
+  fill(gx, gy, 1, 20, EINK); fill(gx + 15, gy, 1, 20, EINK); fill(gx, gy + 19, 16, 2, EINK)
+  fill(P.x + 6, P.y + 51, P.w - 12, 1, INK3)
+  // what went in, and how much
+  let y = P.y + 55
+  const row = (name, amt, sw) => {
+    if (sw) fill(P.x + 8, y + 2, 3, 3, sw)
+    text(name, P.x + 14, y, EINK); text(amt, P.x + P.w - 8, y, EINK, "right"); y += 9
+  }
+  for (const [id, parts, dashes] of r.items) row(SHORT[id], dashes ? `${dashes} dash${dashes > 1 ? "es" : ""}` : parts.toFixed(2), liquidOf(id))
+  if (r.ice) row("Ice", `${r.ice} cube${r.ice > 1 ? "s" : ""}`, "#E8F4F4")
+  fill(P.x + 6, y + 1, P.w - 12, 1, INK3); y += 5
+  text("Total", P.x + 14, y, INK2); text(`${r.total.toFixed(2)} parts`, P.x + P.w - 8, y, INK2, "right"); y += 11
+  for (const l of wrap(r.method, P.w - 22)) { if (y > P.y + P.h - 22) break; text(l, P.x + 8, y, INK2); y += 9 }
+  useFont(false)
 }
 // a small card above whatever the player points at: a title, then a few lines
 function tooltip(title, body, cx, bottom) {
@@ -1095,10 +1276,8 @@ function drawTooltip() {
         ? "Pour bottles into it, then click to pick it up: move it about to shake it, hold to pour it. Drag it to move it. Double-click to empty it."
         : "Pour bottles into it. To stir, press on the spoon and move the mouse in circles. Click the glass to pick it up and pour it. Drag it to move it. Double-click to empty it."), tool.x, toolBoxOf(tool).y - 14)
   }
-  else if (hover.kind === "spoon") {
-    const tool = S.tools[hover.id]
-    tooltip("Bar spoon", "Press and hold on it, then move the mouse in circles to stir. Back and forth doesn't stir." + (tool.c.ice ? "" : " Put ice in first, or the drink won't get cold."), tool.x, spoonBox(tool).y - 4)
-  }
+  else if (hover.kind === "spoonHome") tooltip("Bar spoon", "Click to put it in the glass, then stir there.", S.spoon.home.x, holderBox().y - 4)
+  else if (hover.kind === "spoon") tooltip("Bar spoon", "Press and hold on it, then move the mouse in circles to stir. Back and forth doesn't stir. Click it to take it out." + (sim.readout().ice ? "" : " Put ice in first, or the drink won't get cold."), glass.cx, spoonGlassBox().y - 4)
   else if (hover.kind === "screen") tooltip("The screen", "What's in the glass or the tool you're using, and how it tastes right now. Click it for the full breakdown.", SCREEN.x + SCREEN.w / 2 + 40, SCREEN.y + SCREEN.h + 62)
   else if (hover.kind === "ice") tooltip("Ice well", "Drag a cube out and drop it into the glass, shaker or stirring glass, or flick it in. The shaker and stirring glass need ice to chill a drink; in the glass it melts in slowly.", WELL_MID.x + 50, WELL[0][1] - 4)
   else if (hover.kind === "glass" && guest.phase === "asking")
@@ -1122,6 +1301,7 @@ function render() {
   drawWellHover()
   for (const cup of Object.values(S.cups)) if (cup.state === "home" || cup.state === "toHome") drawCup(cup)
   for (const tool of Object.values(S.tools)) if (tool.state === "home") drawToolHome(tool)
+  drawHolder()
   for (const cup of Object.values(S.cups)) if (cup.state === "carried") drawCup(cup)
   for (const tool of Object.values(S.tools)) if (tool.state === "carried") drawToolHome(tool)
   drawServeZone()
@@ -1166,7 +1346,7 @@ function frame(now) {
   hover = targetAt(pointer.x, pointer.y)
   trackDwell(dt)
   if (spectro.open && hover && hover.kind === "spectro") spectro.row = hover.row
-  view.style.cursor = S.grab || S.moving || S.stirring ? "grabbing" : hover && hover.kind === "spoon" ? "grab" : S.toolMode ? (pointer.down ? "grabbing" : "grab") : S.held ? (pointer.down ? "grabbing" : hover ? "pointer" : "grab") : hover && hover.kind !== "spectro" && hover.kind !== "modal" ? "pointer" : "default"
+  view.style.cursor = S.grab || S.moving || S.stirring ? "grabbing" : hover && hover.kind === "spoon" ? "grab" : hover && hover.kind === "spoonHome" ? "pointer" : S.toolMode ? (pointer.down ? "grabbing" : "grab") : S.held ? (pointer.down ? "grabbing" : hover ? "pointer" : "grab") : hover && hover.kind !== "spectro" && hover.kind !== "modal" ? "pointer" : "default"
   render()
   requestAnimationFrame(frame)
 }

@@ -102,22 +102,24 @@ const railTip = (id) => ({ x: L.rail.find((r) => r.id === id).x, y: 220 })
   ok(t2.bubbles > 0.05 && t2.notes.sour < t1.notes.sour, `topped with soda: bubbles ${(t2.bubbles * 100).toFixed(0)}%, sour ${t1.notes.sour.toFixed(1)} -> ${t2.notes.sour.toFixed(1)}`)
 }
 {
-  console.log("stir, then pour into the shaker and shake, then strain into the glass")
-  const sim = createSim(L, sizes), mg = sim.S.tools.mixing_glass, sh = sim.S.tools.shaker, rim = sim.toolRim(mg)
+  console.log("stir in the glass with the spoon, then pour it into the shaker and shake, then strain it back")
+  const sim = createSim(L, sizes), g = sim.glass, sh = sim.S.tools.shaker
   for (const [id, secs] of [["rye", 1.2], ["ume", 0.8]]) {
-    sim.pick(id, railTip(id)); sim.aim(rim.cx - 24, rim.y - 26); run(sim, 0.5); sim.press(true); run(sim, secs); sim.press(false); run(sim, 1.2); sim.putBack(railTip(id)); run(sim, 0.3)
+    sim.pick(id, railTip(id)); sim.aim(g.cx - 22, g.top - 26); run(sim, 0.5); sim.press(true); run(sim, secs); sim.press(false); run(sim, 1.2); sim.putBack(railTip(id)); run(sim, 0.3)
   }
-  sim.pick("bitters", railTip("bitters")); sim.aim(rim.cx, rim.y - 30); run(sim, 0.4)
+  sim.pick("bitters", railTip("bitters")); sim.aim(g.cx, g.top - 20); run(sim, 0.4)
   for (let k = 0; k < 3; k++) { sim.press(true); sim.press(false); run(sim, 0.3) }
   run(sim, 1); sim.putBack(railTip("bitters")); run(sim, 0.3)
-  ok(mg.c.dashes.get("bitters") === 3, "3 dashes of bitters in the stirring glass")
-  dropIce(sim, rim, 3); dropIce(sim, sim.toolRim(sh), 3)
-  const before = sim.volOf(mg.c)
-  sim.liftTool("mixing_glass"); run(sim, 0.4); sim.press(true); run(sim, 20); sim.press(false)
-  const stirred = sim.readout(mg.c)
-  sim.strainTool("shaker"); run(sim, 3)
-  ok(sim.volOf(mg.c) < 1e-6 && mg.state === "home", "the stirring glass emptied into the shaker and went back")
-  ok(sim.volOf(sh.c) > before * 0.95, `the shaker caught it (${sim.volOf(sh.c).toFixed(2)} of ${(before / (1 - stirred.dilution)).toFixed(2)})`)
+  dropIce(sim, { cx: g.cx, y: g.rimY }, 3)
+  ok(sim.placeSpoon() && sim.S.spoon.state === "glass", "the spoon goes into the glass")
+  sim.startStir(g.cx, g.top - 10)
+  for (let t = 0; t < 20; t += STEP) { const a = t * 2 * Math.PI; sim.stirAt(g.cx + 12 * Math.cos(a), g.top - 10 + 8 * Math.sin(a)); sim.step() }
+  sim.endStir()
+  const stirred = sim.readout()
+  sim.pickGlass()
+  ok(sim.S.spoon.state === "home", "picking up the glass takes the spoon out")
+  const rim = sim.toolRim(sh)
+  sim.aim(rim.cx - 26, rim.y - 30); run(sim, 0.5); sim.press(true); run(sim, 2.5); sim.press(false); run(sim, 2)
   sim.liftTool("shaker"); run(sim, 0.4); sim.press(true); run(sim, 3); sim.press(false)
   const both = sim.readout(sh.c)
   ok(both.dilution < stirred.dilution + 0.04, `shaking after stirring doesn't double the melted ice (${(stirred.dilution * 100).toFixed(0)}% -> ${(both.dilution * 100).toFixed(0)}%)`)
@@ -125,7 +127,7 @@ const railTip = (id) => ({ x: L.rail.find((r) => r.id === id).x, y: 220 })
   const log = sim.S.glass.log.join(", ")
   ok(/Stirred/.test(log) && /Shaken/.test(log) && sim.S.glass.shaken, "the glass remembers both: " + log)
   const dashes = sim.readout().rows.find((r) => r.id === "bitters")
-  ok(dashes && dashes.dashes === 3, `the dashes came along through both tools (${dashes ? dashes.dashes : 0} dashes, ${dashes ? dashes.parts.toFixed(3) : 0} parts)`)
+  ok(dashes && dashes.dashes === 3, `the dashes came along (${dashes ? dashes.dashes : 0} dashes)`)
 }
 {
   console.log("ice: drop it in, flick it in, miss")
@@ -193,10 +195,10 @@ const railTip = (id) => ({ x: L.rail.find((r) => r.id === id).x, y: 220 })
   ok(g.cx < g0.x - 40 && g.cx - g.w / 2 >= cup1.home.x + cup1.rt + 2, `dropped half over the one-part cup, the glass slid just clear of it (${g.cx}, cup at ${cup1.home.x})`)
   sim.pick("rum", railTip("rum")); sim.aim(g.cx - 22, g.top - 26); run(sim, 0.5); sim.press(true); run(sim, 1.2); sim.press(false); run(sim, 1.5); sim.putBack(railTip("rum")); run(sim, 0.3)
   ok(sim.total() > 1, `a pour aimed at its new spot lands in it (${sim.total().toFixed(2)} parts)`)
-  // drop the shaker right on top of the stirring glass: it slides over to the nearest free spot
-  const mg = sim.S.tools.mixing_glass
-  sim.startMove("tool", "shaker", sh.x, sh.y - 20); sim.dragTo(mg.x, mg.y - 20); run(sim, 0.1); sim.endMove()
-  ok(Math.abs(sh.home.x - mg.home.x) >= (sh.w + mg.w) / 2, `dropped on the stirring glass, the shaker slid clear (${sh.home.x} vs ${mg.home.x})`)
+  // drop the shaker right on top of the spoon's holder: it slides over to the nearest free spot
+  const sp = sim.S.spoon.home
+  sim.startMove("tool", "shaker", sh.x, sh.y - 20); sim.dragTo(sp.x, sp.y - 20); run(sim, 0.1); sim.endMove()
+  ok(Math.abs(sh.home.x - sp.x) >= sh.w / 2 + 8, `dropped on the spoon holder, the shaker slid clear (${sh.home.x} vs ${sp.x})`)
   // pour into the shaker at its new spot, then pour it by hand into the glass
   const rim = sim.toolRim(sh)
   sim.pick("yuzu", railTip("yuzu")); sim.aim(rim.cx - 24, rim.y - 26); run(sim, 0.5); sim.press(true); run(sim, 0.8); sim.press(false); run(sim, 1.5); sim.putBack(railTip("yuzu")); run(sim, 0.3)
@@ -227,28 +229,30 @@ const railTip = (id) => ({ x: L.rail.find((r) => r.id === id).x, y: 220 })
   ok(sim.total() > 1.8 && /Shaken 1\d s/.test(sim.S.glass.log.join(",")), `poured into the glass: ${sim.total().toFixed(2)} parts, "${sim.S.glass.log.join(", ")}"`)
 }
 {
-  console.log("stir with the spoon: circles stir, wiggling doesn't")
-  const sim = createSim(L, sizes), mg = sim.S.tools.mixing_glass, rim = sim.toolRim(mg)
+  console.log("stir with the spoon in the glass: circles stir, wiggling doesn't")
+  const sim = createSim(L, sizes), g = sim.glass
   for (const [id, secs] of [["rye", 1.2], ["glow", 0.2]]) {
-    sim.pick(id, railTip(id)); sim.aim(rim.cx - 24, rim.y - 26); run(sim, 0.5); sim.press(true); run(sim, secs); sim.press(false); run(sim, 1.2); sim.putBack(railTip(id)); run(sim, 0.3)
+    sim.pick(id, railTip(id)); sim.aim(g.cx - 22, g.top - 26); run(sim, 0.5); sim.press(true); run(sim, secs); sim.press(false); run(sim, 1.2); sim.putBack(railTip(id)); run(sim, 0.3)
   }
-  dropIce(sim, rim, 3)
-  const wiggle = sim.startStir("mixing_glass", rim.cx, rim.y - 10)
-  for (let t = 0; t < 5; t += STEP) { sim.stirAt(rim.cx + 15 * Math.sin(t * 2 * Math.PI * 2), rim.y - 10); sim.step() }
+  dropIce(sim, { cx: g.cx, y: g.rimY }, 3)
+  ok(!sim.startStir(g.cx, g.top - 10), "no stirring before the spoon is in the glass")
+  sim.placeSpoon()
+  const x0 = g.cx, y0 = g.top - 10
+  ok(sim.startStir(x0, y0), "press on the spoon in the glass")
+  for (let t = 0; t < 5; t += STEP) { sim.stirAt(x0 + 15 * Math.sin(t * 2 * Math.PI * 2), y0); sim.step() }
   sim.endStir()
-  ok(wiggle && mg.c.techT < 0.5, `5 s of wiggling back and forth: stirred ${mg.c.techT.toFixed(1)} s (none)`)
-  sim.startStir("mixing_glass", rim.cx, rim.y - 10)
-  for (let t = 0; t < 20; t += STEP) { const a = t * 2 * Math.PI * 1; sim.stirAt(rim.cx + 12 * Math.cos(a), rim.y - 10 + 8 * Math.sin(a)); sim.step() }
+  ok(sim.S.glass.stirT < 0.5, `5 s of wiggling back and forth: stirred ${sim.S.glass.stirT.toFixed(1)} s (none)`)
+  sim.startStir(x0, y0)
+  for (let t = 0; t < 20; t += STEP) { const a = t * 2 * Math.PI; sim.stirAt(x0 + 12 * Math.cos(a), y0 + 8 * Math.sin(a)); sim.step() }
   sim.endStir()
-  const r = sim.readout(mg.c)
-  ok(mg.c.techT > 18 && r.chill > 0.85 && r.dilution > 0.15 && !mg.c.shaken, `20 s of circles, one a second: stirred ${mg.c.techT.toFixed(1)} s, cold ${r.chill.toFixed(2)}, ${(r.dilution * 100).toFixed(0)}% melted`)
-  sim.startStir("mixing_glass", rim.cx, rim.y - 10)
-  for (let t = 0; t < 3; t += STEP) { const a = -t * 2 * Math.PI * 1.2; sim.stirAt(rim.cx + 10 * Math.cos(a), rim.y - 10 + 10 * Math.sin(a)); sim.step() }
+  const r = sim.readout()
+  ok(sim.S.glass.stirT > 18 && r.chill > 0.85 && r.dilution > 0.15 && !sim.S.glass.shaken, `20 s of circles, one a second: stirred ${sim.S.glass.stirT.toFixed(1)} s, cold ${r.chill.toFixed(2)}, ${(r.dilution * 100).toFixed(0)}% melted`)
+  ok(sim.S.glass.log.includes("Stirred 20 s"), "its method line: " + sim.S.glass.log.join(", "))
+  sim.startStir(x0, y0)
+  for (let t = 0; t < 3; t += STEP) { const a = -t * 2 * Math.PI * 1.2; sim.stirAt(x0 + 10 * Math.cos(a), y0 + 10 * Math.sin(a)); sim.step() }
   sim.endStir()
-  ok(mg.c.techT > 20, "the other way round stirs too")
-  const before = mg.c.techT; sim.handTool("mixing_glass"); run(sim, 0.2)
-  for (let t = 0; t < 3; t += STEP) { sim.aim(300 + 20 * Math.sin(t * 2 * Math.PI * 3), 120); sim.step() }
-  ok(Math.abs(mg.c.techT - before) < 1e-9, "moving the stirring glass about in hand doesn't stir it")
+  ok(sim.S.glass.stirT > 20, "the other way round stirs too")
+  sim.homeSpoon(); ok(sim.S.spoon.state === "home" && !sim.startStir(x0, y0), "back in its holder, it doesn't stir")
 }
 console.log(fails ? `${fails} failed` : "all passed")
 process.exit(fails ? 1 : 0)

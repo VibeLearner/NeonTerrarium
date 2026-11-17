@@ -33,6 +33,7 @@ await Promise.all([
 const sizes = Object.fromEntries(["glass", "cup_quarter", "cup_half", "cup_one", "shaker", "mixing_glass"].map((n) => [n, { w: IMG[n].width, h: IMG[n].height }]))
 const EXT = 0, CW = W                     // the canvas is the scene, 480x270
 view.width = CW; view.height = H
+MAIN.imageSmoothingEnabled = false   // (again: resizing a canvas resets this, and anything drawn scaled would blur)
 const sim = createSim(L, sizes)
 const S = sim.S, glass = sim.glass
 
@@ -1681,6 +1682,7 @@ function drawClosedCard() {
 function render() {
   buttons = []
   MAIN.setTransform(1, 0, 0, 1, EXT, 0)          // everything below is in the scene's own coordinates
+  MAIN.imageSmoothingEnabled = false              // scaled sprites (garnish picker, served glass, shop icons) stay sharp
   ctx.drawImage(IMG.bg, -EXT, 0)
   drawScreen()
   drawHUD()

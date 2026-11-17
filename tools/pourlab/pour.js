@@ -1026,7 +1026,6 @@ function drawBubble() {
   const g = guest.g, x = 374, w = 103, inner = w - 10
   const lines = []                                   // [text, color]
   if (guest.phase === "asking") {
-    for (const l of wrap(g.crowdName + " crowd", inner)) lines.push([l, GOLD])
     if (g.mood) for (const l of wrap(g.moodLine || g.mood.name + ".", inner)) lines.push([l, "#FFB3D9"])
     for (const s of guest.said) for (const l of wrap(s.text, inner)) lines.push([l, CREAM])
   } else if (guest.phase === "served") {
@@ -1296,8 +1295,7 @@ function drawRecipe(P) {
   }
   const r = recipes[book.page[1]]
   useFont(false); text(`No. ${r.no}`, P.x + 8, P.y + 22, EINK); useFont(true)
-  text(`${r.crowd} crowd`, P.x + 8, P.y + 32, INK2)
-  text(`${r.tier}, ${r.score}`, P.x + 8, P.y + 41, r.score >= 65 ? "#2E6B4A" : r.score >= 40 ? INK2 : "#8A3A3A")
+  text(`${r.tier}, ${r.score}`, P.x + 8, P.y + 34, r.score >= 65 ? "#2E6B4A" : r.score >= 40 ? INK2 : "#8A3A3A")
   // the drink itself: a small tumbler in its color
   const gx = Math.round(P.x + P.w - 26), gy = P.y + 22
   fill(gx + 1, gy + 6, 14, 13, rgbStr(mixRgb(r.color, [200, 208, 192], 0.2))); fill(gx + 1, gy + 6, 14, 1, rgbStr(mixRgb(r.color, [255, 255, 255], 0.35)))

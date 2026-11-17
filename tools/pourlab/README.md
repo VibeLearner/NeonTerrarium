@@ -11,7 +11,7 @@ with `fetch`, so opening the file directly won't work):
 ## How to play
 
 Everything is done by hand: there are no action buttons at the bar. Point at anything (a bottle, cup, tool, the ice
-well, the glass, the screen) to see a card saying what it is and does.
+well, the glass) to see a card saying what it is and does.
 
 **The screen** hangs from the top shelf on the left. It lists everything in the drink in one list: what's in the
 glass, and anything still in the shaker, marked with a gold [SHKR] tag next to its amount. The taste profile beside

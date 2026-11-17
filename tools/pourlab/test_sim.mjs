@@ -183,5 +183,31 @@ const railTip = (id) => ({ x: L.rail.find((r) => r.id === id).x, y: 220 })
   sim.pick("soda", railTip("soda")); sim.aim(g.cx - 22, g.top - 26); run(sim, 0.5); sim.press(true); run(sim, 1.0); sim.press(false); run(sim, 1.5)
   ok(sim.total() > 0.5, "and it catches a pour again (" + sim.total().toFixed(2) + ")")
 }
+{
+  console.log("move things around the counter, and pour from a tool by hand")
+  const sim = createSim(L, sizes), g = sim.glass, sh = sim.S.tools.shaker
+  const g0 = { x: g.cx, y: g.base }
+  ok(sim.startMove("glass", "glass", g0.x, g0.y - 20), "the glass can be picked up to move")
+  sim.dragTo(g0.x - 70, g0.y - 20); run(sim, 0.1); sim.endMove()
+  const cup1 = sim.S.cups.cup_one
+  ok(g.cx < g0.x - 40 && g.cx - g.w / 2 >= cup1.home.x + cup1.rt + 2, `dropped half over the one-part cup, the glass slid just clear of it (${g.cx}, cup at ${cup1.home.x})`)
+  sim.pick("rum", railTip("rum")); sim.aim(g.cx - 22, g.top - 26); run(sim, 0.5); sim.press(true); run(sim, 1.2); sim.press(false); run(sim, 1.5); sim.putBack(railTip("rum")); run(sim, 0.3)
+  ok(sim.total() > 1, `a pour aimed at its new spot lands in it (${sim.total().toFixed(2)} parts)`)
+  // drop the shaker right on top of the stirring glass: it slides over to the nearest free spot
+  const mg = sim.S.tools.mixing_glass
+  sim.startMove("tool", "shaker", sh.x, sh.y - 20); sim.dragTo(mg.x, mg.y - 20); run(sim, 0.1); sim.endMove()
+  ok(Math.abs(sh.home.x - mg.home.x) >= (sh.w + mg.w) / 2, `dropped on the stirring glass, the shaker slid clear (${sh.home.x} vs ${mg.home.x})`)
+  // pour into the shaker at its new spot, then pour it by hand into the glass
+  const rim = sim.toolRim(sh)
+  sim.pick("yuzu", railTip("yuzu")); sim.aim(rim.cx - 24, rim.y - 26); run(sim, 0.5); sim.press(true); run(sim, 0.8); sim.press(false); run(sim, 1.5); sim.putBack(railTip("yuzu")); run(sim, 0.3)
+  const inShaker = sim.volOf(sh.c), before = sim.total()
+  ok(inShaker > 0.5, `filled the shaker where it now stands (${inShaker.toFixed(2)})`)
+  dropIce(sim, rim, 2)
+  sim.handTool("shaker"); ok(sim.S.held && sim.S.held.kind === "tool", "the shaker is in hand to pour")
+  sim.aim(g.cx - 26, g.top - 30); run(sim, 0.5); sim.press(true); run(sim, 2); sim.press(false); run(sim, 2)
+  ok(sim.total() - before > inShaker * 0.9, `poured by hand into the glass (${(sim.total() - before).toFixed(2)} of ${inShaker.toFixed(2)})`)
+  ok(sh.c.ice === 2, "the strainer kept the ice in the shaker")
+  ok(!sim.S.held && sh.state === "home" && sh.x === sh.home.x, "the empty shaker went back to its new spot")
+}
 console.log(fails ? `${fails} failed` : "all passed")
 process.exit(fails ? 1 : 0)

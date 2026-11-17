@@ -28,6 +28,9 @@ ice, how cold and diluted it is, and buttons to pick it up, taste it or dump it.
   dashes is the most a drink takes.
 - **Measuring cups** (quarter, half, one part): click one to bring it beside the glass, pour into it (it brims
   over past its measure), then click it to pick it up and pour it wherever you aim. It goes back once it's empty.
+- **Move things around:** press and drag the glass, the shaker, the stirring glass or a measuring cup to slide it
+  somewhere else on the counter. It settles where you let go (nudged clear of anything already there, and never
+  into the ice well). A click without dragging still does what it always did.
 - **The glass** can be picked up too: click it, then hold to pour it into the shaker or stirring glass (handy when
   a drink went into the glass first). Its ice tumbles out with it. Click its mat to set it down; once it's empty it
   goes back by itself.
@@ -49,6 +52,8 @@ ice, how cold and diluted it is, and buttons to pick it up, taste it or dump it.
 - **Both:** a lifted tool can pour into the other one, so you can stir and then shake (or the other way round).
   Melted ice isn't counted twice: the second technique only adds water beyond what the first already put in.
   The drink remembers both ("Stirred 20 s, shaken 3 s").
+- **Pour a tool by hand:** "Pick it up to pour" (or "Pour it by hand" once it's lifted) puts the shaker or
+  stirring glass in your hand like the glass: hold to pour it wherever you aim, and the strainer keeps the ice in.
 - While a tool is lifted you can also **Taste** it, **Put down** to keep it for later, or **Dump** it out.
 
 **The guest**

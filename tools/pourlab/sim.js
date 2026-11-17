@@ -126,6 +126,7 @@ export function createSim(L, sizes) {
   const [col0, col1] = glass.inner(glass.bottomY)
   const N = col1 - col0 + 1, ROWS = Math.ceil(glass.bottomY - topY) + 4
   glass.col0 = col0; glass.N = N; glass.ROWS = ROWS
+  glass.base = L.GLASS_BASE                          // where it stands: (cx, base) is the middle of its foot
 
   // ---------------------------------------------------------------- state
   const S = {
@@ -145,6 +146,7 @@ export function createSim(L, sizes) {
     cups: {}, activeCup: null,
     tools: {}, toolMode: null,  // the shaker and stirring glass; which one is lifted and in use
     lastInto: "glass",         // the vessel something last went into (the page's panel follows it)
+    moving: null,               // the glass, a tool or a cup being slid somewhere else on the counter
     glassHeld: false,           // the glass is off its mat, in hand
     grab: null,                 // a cube held from the ice well: where it is, and where the pointer has been lately
     thrown: [],                 // cubes in the air, or landed on the counter and melting away
@@ -220,7 +222,13 @@ export function createSim(L, sizes) {
   }
 
   // ---------------------------------------------------------------- picking things up and putting them back
+  // a tool in hand goes straight back to its spot when something else is picked up
+  function settleTool() {
+    const h = S.held; if (!h || h.kind !== "tool") return
+    const t = S.tools[h.id]; t.state = "home"; t.x = t.home.x; t.y = t.home.y; t.angle = 0; S.held = null
+  }
   function pick(id, from) {
+    settleTool()
     const g = ing[id]
     S.held = { kind: g.dash ? "dasher" : "bottle", id, x: from.x, y: from.y, tx: from.x, ty: from.y, angle: 0, shake: 0, back: null }
     S.pressing = false
@@ -228,7 +236,8 @@ export function createSim(L, sizes) {
   function putBack(railPos) {
     if (!S.held) return
     if (S.held.kind === "cup") { returnCup(); return }
-    if (S.held.kind === "glass") railPos = glassLip            // the glass goes back on its mat
+    if (S.held.kind === "glass") railPos = glassLip()          // the glass goes back where it stood
+    if (S.held.kind === "tool") railPos = homeLip(S.tools[S.held.id])
     S.held.back = { x: railPos.x, y: railPos.y, t: 0 }
     S.pressing = false
   }
@@ -259,6 +268,7 @@ export function createSim(L, sizes) {
   // times are the pointer events' own clock in seconds when the page passes them (the simulation's clock only moves
   // once per drawn frame, too coarse to time a flick); the tests leave them out and use the simulation's clock
   function grabIce(x, y, t = S.t) {
+    settleTool()
     if (S.held) { if (S.held.kind === "cup") returnCup(); else S.held = null }
     S.grab = { x, y, samples: [{ x, y, t }] }
   }
@@ -284,7 +294,7 @@ export function createSim(L, sizes) {
   }
   // the openings a cube can drop into: the glass, and the tools on the counter (or lifted, waiting)
   function iceTargets() {
-    const list = S.glassHeld ? [] : [{ name: "glass", cx: glass.cx, y: glass.rimY, hw: glass.hw(glass.rimY) - 2, side: glass.hw(glass.rimY) + 2, bottom: L.GLASS_BASE }]
+    const list = S.glassHeld ? [] : [{ name: "glass", cx: glass.cx, y: glass.rimY, hw: glass.hw(glass.rimY) - 2, side: glass.hw(glass.rimY) + 2, bottom: glass.base }]
     for (const tool of Object.values(S.tools)) if (tool.state === "home" || (tool.state === "ready" && tool.id !== "shaker")) {   // not a capped shaker
       const rim = toolRim(tool); list.push({ name: tool.id, tool, cx: rim.cx, y: rim.y, hw: rim.hw, side: tool.rt + 2, bottom: tool.y })
     }
@@ -359,7 +369,10 @@ export function createSim(L, sizes) {
     for (const c of Object.values(S.cups)) if (c !== S.cups[id] && (c.state === "active" || c.state === "toMeasure")) sendHome(c)
     const cup = S.cups[id]
     if (cup.state !== "home") return
-    moveCup(cup, "toMeasure", { ...MEASURE }); S.activeCup = id
+    // beside the glass, wherever the glass is now (the left side if there's room, else the right)
+    const y = glass.base + 2, left = freeSpot("cup", id, glass.cx - 40, y, cup.rt + 2), right = freeSpot("cup", id, glass.cx + 40, y, cup.rt + 2)
+    cup.spot = Math.abs(left - (glass.cx - 40)) <= Math.abs(right - (glass.cx + 40)) ? { x: left, y } : { x: right, y }
+    moveCup(cup, "toMeasure", { ...cup.spot }); S.activeCup = id
   }
   function sendHome(cup) { clearContents(cup.c); moveCup(cup, "toHome", { ...cup.home }); if (S.activeCup === cup.id) S.activeCup = null }
   // a filled cup is picked up like a bottle and poured wherever you aim; an empty one goes back to its place
@@ -373,27 +386,101 @@ export function createSim(L, sizes) {
   }
   function returnCup() {
     const cup = S.cups[S.held.id]; S.held = null; S.pressing = false
-    moveCup(cup, "toMeasure", { ...MEASURE })
+    moveCup(cup, "toMeasure", { ...(cup.spot || MEASURE) })
   }
 
   // ---------------------------------------------------------------- the glass itself: pick it up and pour it out
   // (into the shaker or stirring glass, say, if the drink went into the glass first). Held by the right end of its rim.
-  const glassLip = { x: glass.cx + L.glass.rt + 1, y: glass.rimY }
+  const glassLip = () => ({ x: glass.cx + L.glass.rt + 1, y: glass.rimY })
   function pickGlass() {
     if (volOf(S.glass) < 0.01 && !S.ice.length) { say("The glass is empty."); return }
+    settleTool()
     if (S.held) { if (S.held.kind === "cup") returnCup(); else S.held = null }
-    S.held = { kind: "glass", id: "glass", x: glassLip.x, y: glassLip.y, tx: glassLip.x, ty: glassLip.y, angle: 0, back: null }
+    const lip = glassLip()
+    S.held = { kind: "glass", id: "glass", x: lip.x, y: lip.y, tx: lip.x, ty: lip.y, angle: 0, back: null }
     S.glassHeld = true; S.pressing = false
   }
   // set straight down, no animation (when serving or emptying)
   function dropGlass() { if (S.held && S.held.kind === "glass") { S.held = null; S.glassHeld = false; S.pressing = false } }
+
+  // ---------------------------------------------------------------- moving things around the counter
+  // Press and drag the glass, a tool or a measuring cup to slide it somewhere else on the counter. It lifts a little
+  // while it's carried and settles where you let go: on the counter top, clear of the ice well, never on top of
+  // something else (it slides over to the nearest free spot).
+  const SPOT = { xmin: 62, xmax: 474, ymin: 199, ymax: 214 }   // where a foot can stand: the counter top, right of the well
+  function things() {
+    const list = []
+    if (!S.glassHeld) list.push({ kind: "glass", id: "glass", x: glass.cx, y: glass.base, r: glass.w / 2 })
+    for (const t of Object.values(S.tools)) if (t.state === "home") list.push({ kind: "tool", id: t.id, x: t.home.x, y: t.home.y, r: t.w / 2 })
+    for (const c of Object.values(S.cups)) {
+      if (c.state === "home" || c.state === "toHome") list.push({ kind: "cup", id: c.id, x: c.home.x, y: c.home.y, r: c.rt + 2 })
+      if (c.state === "active" || c.state === "toMeasure") list.push({ kind: "cup", id: c.id, x: c.to ? c.to.x : c.x, y: c.to ? c.to.y : c.y, r: c.rt + 2 })
+    }
+    return list
+  }
+  // the nearest x (on this row) where something r wide fits without touching anything else
+  function freeSpot(kind, id, x, y, r) {
+    const others = things().filter((o) => !(o.kind === kind && o.id === id) && Math.abs(o.y - y) < 12)
+    const ok = (xx) => xx - r >= SPOT.xmin && xx + r <= SPOT.xmax && others.every((o) => Math.abs(o.x - xx) >= o.r + r + 1)
+    for (let d = 0; d <= 420; d += 1) for (const xx of [x - d, x + d]) if (ok(xx)) return xx
+    return clamp(x, SPOT.xmin + r, SPOT.xmax - r)
+  }
+  function moveGlass(cx, base) {
+    const dx = cx - glass.cx, dy = base - glass.base
+    if (!dx && !dy) return
+    glass.left += dx; glass.top += dy; glass.cx += dx; glass.rimY += dy; glass.bottomY += dy; glass.col0 += dx; glass.base += dy
+    for (const c of S.ice) { c.x += dx; c.y += dy }
+    for (const p of S.particles) if (p.inGlass) { p.x += dx; p.y += dy }
+    // a shove makes the drink slosh the other way
+    for (let i = 0; i < N; i++) S.waveV[i] += ((i - (N - 1) / 2) / N) * clamp(dx, -6, 6) * 22
+  }
+  function canMove(kind, id) {
+    if (kind === "glass") return !S.held && !S.glassHeld && !S.toolMode
+    if (kind === "tool") return !S.held && S.tools[id].state === "home"
+    if (kind === "cup") { const c = S.cups[id]; return !S.held && (c.state === "home" || c.state === "active") }
+    return false
+  }
+  function posOf(kind, id) {
+    if (kind === "glass") return { x: glass.cx, y: glass.base }
+    const o = kind === "tool" ? S.tools[id] : S.cups[id]; return { x: o.x, y: o.y }
+  }
+  function setPos(kind, id, x, y) {
+    if (kind === "glass") return moveGlass(x, y)
+    const o = kind === "tool" ? S.tools[id] : S.cups[id]; o.x = x; o.y = y
+  }
+  function startMove(kind, id, px, py) {
+    if (!canMove(kind, id)) return false
+    const p = posOf(kind, id)
+    S.moving = { kind, id, ox: p.x - px, oy: p.y - py, from: p }
+    if (kind === "tool") S.tools[id].state = "carried"
+    if (kind === "cup") { const c = S.cups[id]; S.moving.was = c.state; c.state = "carried" }
+    return true
+  }
+  function dragTo(px, py) {
+    const m = S.moving; if (!m) return
+    // follows the pointer; held within the counter's rows so it never sinks behind the rail or climbs the back wall
+    setPos(m.kind, m.id, clamp(px + m.ox, SPOT.xmin - 20, SPOT.xmax + 4), clamp(py + m.oy, SPOT.ymin - 6, SPOT.ymax))
+  }
+  function endMove() {
+    const m = S.moving; if (!m) return
+    S.moving = null
+    const p = posOf(m.kind, m.id), y = Math.round(clamp(p.y, SPOT.ymin, SPOT.ymax))
+    const r = m.kind === "glass" ? glass.w / 2 : m.kind === "tool" ? S.tools[m.id].w / 2 : S.cups[m.id].rt + 2
+    const x = Math.round(freeSpot(m.kind, m.id, p.x, y, r))
+    setPos(m.kind, m.id, x, y)
+    if (m.kind === "tool") { const t = S.tools[m.id]; t.home = { x, y }; t.state = "home" }
+    if (m.kind === "cup") {
+      const c = S.cups[m.id]; c.state = m.was
+      if (m.was === "home") c.home = { x, y }; else c.spot = { x, y }
+    }
+  }
 
   // ---------------------------------------------------------------- tools: shake or stir, then strain
   function liftTool(id) {
     const tool = S.tools[id]
     if (tool.state !== "home") return
     if (volOf(tool.c) < 0.01) { say(id === "shaker" ? "Pour something into the shaker first." : "Pour something into the stirring glass first."); return }
-    if (S.held) S.held = null
+    settleTool(); if (S.held) S.held = null
     moveTool(tool, "lift", { x: tool.home.x + (id === "shaker" ? 2 : 0), y: tool.home.y - (id === "shaker" ? 30 : 20) })   // straight up off its spot
     S.toolMode = id; S.pressing = false; tool.warned = false
   }
@@ -406,11 +493,28 @@ export function createSim(L, sizes) {
     if (into !== "glass" && (!other || other === tool || other.state !== "home")) return
     S.toolMode = null; S.pressing = false
     // its method goes in the drink's log, and travels with the drink
-    if (tool.c.techT > 0.3) tool.c.log.push(`${tool.method === "shake" ? "Shaken" : "Stirred"} ${Math.round(tool.c.techT)} s`)
-    tool.c.techT = 0
+    logTechnique(tool)
     // place it so the turned lip ends up just above the middle of what it pours into
     const lip = lipOffset(tool, 1.9), rim = other ? toolRim(other) : { cx: glass.cx, y: glass.top }
     moveTool(tool, "strainUp", { x: rim.cx - 3 - lip.x, y: rim.y - 6 - lip.y })
+  }
+  // pick a tool up to pour it by hand, like the glass: held by its pouring lip, the strainer keeps the ice in
+  function logTechnique(tool) {
+    if (tool.c.techT > 0.3) tool.c.log.push(`${tool.method === "shake" ? "Shaken" : "Stirred"} ${Math.round(tool.c.techT)} s`)
+    tool.c.techT = 0
+  }
+  const homeLip = (tool) => { const o = lipOffset(tool, 0); return { x: tool.home.x + o.x, y: tool.home.y + o.y } }
+  function handTool(id) {
+    const tool = S.tools[id]
+    if (!(tool.state === "home" || tool.state === "ready")) return
+    if (volOf(tool.c) < 0.01) { say(id === "shaker" ? "The shaker is empty." : "The stirring glass is empty."); return }
+    settleTool()
+    if (S.held) { if (S.held.kind === "cup") returnCup(); else if (S.held.kind === "glass") dropGlass(); else S.held = null }
+    if (S.toolMode === id) S.toolMode = null
+    logTechnique(tool)
+    const o = lipOffset(tool, 0), lip = { x: tool.x + o.x, y: tool.y + o.y }
+    tool.state = "hand"; S.pressing = false
+    S.held = { kind: "tool", id, x: lip.x, y: lip.y, tx: lip.x, ty: lip.y, angle: 0, back: null }
   }
   function emptyTool(id) { const tool = S.tools[id]; if (tool && tool.state === "home") clearContents(tool.c) }
   function dumpTool() { const tool = S.tools[S.toolMode]; if (!tool) return; clearContents(tool.c); putToolDown() }
@@ -466,7 +570,11 @@ export function createSim(L, sizes) {
       h.back.t += dt / 0.22
       h.x = lerp(h.x, h.back.x, Math.min(1, h.back.t)); h.y = lerp(h.y, h.back.y, Math.min(1, h.back.t))
       h.angle = lerp(h.angle, 0, Math.min(1, dt * 14))
-      if (h.back.t >= 1) { S.held = null; if (h.kind === "glass") S.glassHeld = false }
+      if (h.back.t >= 1) {
+        S.held = null
+        if (h.kind === "glass") S.glassHeld = false
+        if (h.kind === "tool") { const tool = S.tools[h.id]; tool.state = "home"; tool.x = tool.home.x; tool.y = tool.home.y; tool.angle = 0 }
+      }
       return
     }
     const k = 1 - Math.exp(-dt * 16)
@@ -490,6 +598,10 @@ export function createSim(L, sizes) {
         S.thrown.push({ x: h.x + dx * 3, y: h.y + dy * 3, x0: h.x, vx: dx * 50, vy: dy * 50 + 20, rot: 0, spin: 6, state: "fly", life: 1.2 })
       }
       if (volOf(S.glass) <= 1e-6 && !S.ice.length && !S.pressing && h.angle < 0.3) { emptyGlass(); putBack(); return }
+    } else if (h.kind === "tool") {
+      const tool = S.tools[h.id]; source = tool.c
+      flow = volOf(tool.c) > 1e-6 ? 3 * f : 0
+      if (volOf(tool.c) <= 1e-6 && !S.pressing && h.angle < 0.3) { putBack(); return }
     } else if (h.kind === "cup") {
       const cup = S.cups[h.id]; source = cup.c
       flow = volOf(cup.c) > 1e-6 ? 3 * f : 0
@@ -709,7 +821,7 @@ export function createSim(L, sizes) {
     S, L, ing, glass, MEASURE, CAP,
     step, pick, putBack, aim, press, addIce, grabIce, moveIce, releaseIce, activateCup, clickActiveCup, sendHome, emptyGlass,
     liftTool, putToolDown, strainTool, dumpTool, emptyTool, toolBox, toolRim, toolLip,
-    pickGlass, dropGlass, glassLip,
+    pickGlass, dropGlass, glassLip, handTool, startMove, dragTo, endMove, canMove, freeSpot,
     total, levelParts, surfaceY, volOf, cupRim, compColor, srgb, readout, tasteOf, say,
   }
 }

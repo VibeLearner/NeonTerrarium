@@ -808,6 +808,13 @@ function gauge(label, x, y, w, f, value, color) {
 // in it, and its taste profile as it stands. It hangs above the counter, clear of everything you can pick up, and
 // draws behind the action, so a bottle or a stream in front of it is never hidden. Click it for the full breakdown.
 const SCREEN = { x: 4, y: 43, w: 260, h: 109 }   // under the shelf and the DRINKS sign, left of the guest buttons
+// tiny 3x4 letters for the SHKR tag on the screen (much smaller than the screen's own font)
+const MICRO = { S: [".##", "#..", "..#", "##."], H: ["#.#", "###", "#.#", "#.#"], K: ["#.#", "##.", "##.", "#.#"], R: ["##.", "#.#", "##.", "#.#"] }
+const microW = (str) => str.length * 4 - 1
+function micro(str, x, y, col) {
+  ctx.fillStyle = col
+  ;[...str].forEach((ch, i) => (MICRO[ch] || []).forEach((row, r) => [...row].forEach((v, k) => { if (v === "#") ctx.fillRect(x + i * 4 + k, y + r, 1, 1) })))
+}
 const listScroll = { y: 0, target: 0, focus: null, ids: [], bar: false, wheel: 0 }
 // the scroll bar sits on the divider between the list and the profile: a track, a bright thumb, an arrow at each end
 function scrollArrows(x, top, area, off, max, used) {
@@ -880,7 +887,7 @@ function drawScreenBody() {
   // wheel over the screen, or the little arrows), the divider beside it shows where you are, and a new ingredient
   // scrolls itself into view
   // a shaker row carries a bracketed SHKR tag just left of its amount
-  const TAG = "SHKR", tagW = textW(TAG) + 6
+  const TAG = "SHKR", tagW = microW(TAG) + 6
   const nameW = (amt, tag) => colR - (P.x + 11) - textW(amt) - 5 - (tag ? tagW + 3 : 0)
   const heights = rows.map(([name, amt, , tag]) => wrap(name, nameW(amt, tag)).length * LH)
   const top = y, area = Math.floor((bottom - 2 - top) / LH) * LH, used = heights.reduce((a2, b2) => a2 + b2, 0), max = Math.max(0, used - area)
@@ -905,9 +912,9 @@ function drawScreenBody() {
       text(amt, colR, y, HOLO.value, "right")
       if (tag) {
         const tx = colR - textW(amt) - 4 - tagW, col = "#FFC94A"
-        fill(tx, y - 1, 1, 8, col); fill(tx, y - 1, 2, 1, col); fill(tx, y + 6, 2, 1, col)                       // [
-        fill(tx + tagW - 1, y - 1, 1, 8, col); fill(tx + tagW - 2, y - 1, 2, 1, col); fill(tx + tagW - 2, y + 6, 2, 1, col)   // ]
-        text(TAG, tx + 3, y, col)
+        fill(tx, y, 1, 6, col); fill(tx, y, 2, 1, col); fill(tx, y + 5, 2, 1, col)                               // [
+        fill(tx + tagW - 1, y, 1, 6, col); fill(tx + tagW - 2, y, 2, 1, col); fill(tx + tagW - 2, y + 5, 2, 1, col)   // ]
+        micro(TAG, tx + 3, y + 1, col)
       }
     }
     y += lines.length * LH

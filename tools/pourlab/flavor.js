@@ -1,3 +1,4 @@
+import { pickLine } from "./voices.js"
 // Neon Dome flavor model, from the "Neon Dome: Drink Crafting Design" doc. No drawing: it takes what's in a vessel
 // and how it was made, and returns how the drink tastes, why, and what a guest makes of it.
 //
@@ -204,9 +205,11 @@ export function request(g) {
   const said = axes.slice(0, 3).map((a) => {
     const target = a.ax === "balance" || (a.hi >= 10 && a.lo > 0) ? (a.lo + 10) / 2 : (a.lo + a.hi) / 2
     const lv = a.lo <= 0 && a.hi <= 1 ? 0 : levelOf(target)
-    const text = PHRASES[a.ax][lv]
+    // in the guest's own crowd's words (voices.js), never the same wording twice in a row
+    const text = pickLine(g.crowd, "ask", a.ax, lv) || PHRASES[a.ax][lv]
     return { ax: a.ax, level: lv, text: text[0].toUpperCase() + text.slice(1) + "." }
   })
+  if (g.mood) g.moodLine = pickLine(g.crowd, "mood", g.mood.id) || g.mood.name + "."
   return said
 }
 
@@ -233,12 +236,12 @@ export function score(g, t) {
 export function feedback(g, t, s) {
   const lines = [], arrows = {}
   const bad = s.misses.filter((m) => m.miss > 0.35).sort((a, b) => b.cost - a.cost).slice(0, 2)
-  for (const m of bad) { lines.push(m.dir > 0 ? MORE[m.ax] : LESS[m.ax]); arrows[m.ax] = m.dir }
+  for (const m of bad) { lines.push(pickLine(g.crowd, m.dir > 0 ? "more" : "less", m.ax) || (m.dir > 0 ? MORE[m.ax] : LESS[m.ax])); arrows[m.ax] = m.dir }
   if (lines.length < 2 && s.score >= 65) {
     const good = s.misses.filter((m) => m.miss === 0 && SPOT_ON[m.ax]).sort((a, b) => b.w - a.w)[0]
-    if (good) { lines.push(SPOT_ON[good.ax]); arrows[good.ax] = 0 }
+    if (good) { lines.push(pickLine(g.crowd, "spot", good.ax) || SPOT_ON[good.ax]); arrows[good.ax] = 0 }
   }
-  return { lines: [s.line, ...lines], arrows }
+  return { lines: [pickLine(g.crowd, "tier", s.tier) || s.line, ...lines], arrows }
 }
 
 // cost of the drink in dome credits (for later rounds: menu prices)

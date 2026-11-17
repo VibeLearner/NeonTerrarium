@@ -766,8 +766,7 @@ function castShadows(c, list) {
     const L = Math.round(f.ry * 2 + 5)
     for (let t = 0; t <= L; t++) c.ellipse(f.x + Math.round(t * 0.4), f.cy + t, Math.max(2, Math.round(f.rx - t * 0.25)), f.ry, "0")
   }
-  // the guest's forearms and hands shade the counter in front of them
-  c.ellipse(GX, CT + 14, 26, 3, "0"); c.ellipse(GX - 30, CT + 7, 12, 2, "0"); c.ellipse(GX + 32, CT + 7, 12, 2, "0")
+  // (the guest is drawn by the page, with their own shadow on the counter)
 }
 function contactShadows(c, list) { for (const f of footprints(list)) c.ellipse(f.x, f.cy + 1, f.rx + 1, f.ry, "0") }
 // sprite heights, so a reflection can be flipped about each object's base
@@ -831,12 +830,9 @@ function barScene(name, hover) { return scene(name, { w: W, h: H, bg: "3", world
   layer("near rail", nearRail),
   layer("depth haze", { opacity: 0.28 }, rect(0, 108, W, CT - 108, "s")),
   layer("dome", struts, lightRig, stamp("mirror_ball", 196, 78)),
-  layer("guest", stamp("guest", GX, VPY - Math.round(9 * GS) + GUEST_H)),
   layer("counter", counterTop),
   layer("reflections", { opacity: 0.35 }, reflections),
-  layer("guest reflection", { opacity: 0.5 }, guestReflection),
   layer("far edge", farEdge),
-  layer("guest arms", guestArms, stamp("guest_hands", GX, CT + 9)),
   layer("mat", barMat),
   layer("ice well", iceWell),
   layer("tool reflections", { opacity: 0.28 }, ...toolReflections(0, 5)),
@@ -873,12 +869,9 @@ const bgScene = (name, ox) => scene(name, { w: W + ox, h: H, bg: "3", world: { l
   layer("near rail", { x: ox }, nearRail),
   layer("depth haze", { x: ox, opacity: 0.28 }, rect(X0, 108, W - X0, CT - 108, "s")),
   layer("dome", { x: ox }, struts, lightRig, stamp("mirror_ball", 196, 78)),
-  layer("guest", { x: ox }, stamp("guest", GX, VPY - Math.round(9 * GS) + GUEST_H)),
   layer("counter", { x: ox }, counterTop),
   layer("reflections", { x: ox, opacity: 0.35 }, reflections),
-  layer("guest reflection", { x: ox, opacity: 0.5 }, guestReflection),
   layer("far edge", { x: ox }, farEdge),
-  layer("guest arms", { x: ox }, guestArms, stamp("guest_hands", GX, CT + 9)),
   layer("mat", { x: ox }, barMat),
   layer("ice well", { x: ox }, iceWell),
   layer("tool reflections", { x: ox, opacity: 0.28 }, ...toolReflections(0, 5, STATIC_TOOLS())),

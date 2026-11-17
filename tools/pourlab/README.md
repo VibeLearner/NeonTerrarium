@@ -55,6 +55,14 @@ between the two, it shows only what's in the glass.
 
 **The guest**
 
+- Every guest is a new person, drawn in code from a seed (`guestgen.js`) in a visual-novel pixel style: anime eyes,
+  locked hair with a shine, flat light-and-shadow shading, colored outlines. Their crowd sets their clothes (hi-vis and
+  hard hats, hoodies and knits, suits and lanyards, long coats and jewelry) and how they react.
+- Served, they reach for the glass, lift it, drink with their eyes closed, set it down and react: a raised brow and a
+  small smile from luxury, a polished thumbs up from commercial, a warm grin from residential, a fist pump (or a
+  tongue-out shudder) from industrial.
+- They talk in their crowd's voice (`voices.js`): several ways to ask for each taste at each strength, never the
+  same line twice in a row, always with a plain cue word (sweet, tart, bitter, smoke, heat, fresh, kick, smooth, layers).
 - The guest's bubble says what they want: their crowd, maybe a mood, and three things that matter most to them.
 - **Serve** by sliding the glass over to the guest (drag it to the ring in front of their hands) once it holds at
   least the minimum drink amount: 2.5 parts. The small lights on the sides of the glass show it: red until there
@@ -87,6 +95,9 @@ There is no timer, money or menu yet: those come next round.
 | `flavor.js` | the taste model from the design doc: notes, masking, carrying, fused notes, Complexity, Balance, crowds, guests, scoring |
 | `test_sim.mjs`, `test_flavor.mjs` | check the numbers with no screen: `node tools/pourlab/test_sim.mjs` |
 | `art/neon_dome.px.js` | the bar, drawn in code with pxl (no image tools); `art/font5x7.px.js` is pxl's 5x7 font |
+| `guestgen.js` | the guest generator: a look per seed and crowd, poses, expressions, cel shading, outlines |
+| `voices.js` | how each crowd asks and reacts, with several wordings per taste and strength, picked without repeats |
+| `guests.html`, `guests.js` | the generator's preview page: lineups per crowd, animated through a drink, every frame, roll new faces, save a PNG sheet. Open http://localhost:8000/tools/pourlab/guests.html |
 | `font_small.js` | the smaller hand-drawn pixel font used on the hanging screen (capitals 6 pixels tall, lowercase 4) |
 | `export_layout.mjs` | reads the art file and writes `assets/layout.json` (positions, sizes, ingredients) and `assets/font5x7.json` |
 | `assets/` | what the page loads: `pour_bg.png` (everything that never moves), `pour_front.png` (the rail's front plate), `sprites/` (bottles and their hover look, the glass, cups, shaker and its cap, the stirring glass, no longer used: the bar spoon is drawn in code), `neon_dome.png` (the whole scene, for reference) |

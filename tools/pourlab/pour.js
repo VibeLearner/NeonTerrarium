@@ -4,6 +4,7 @@
 import { FONT_SMALL } from "./font_small.js"
 import { createSim, STEP, FILL_LINE, MAX_PARTS, SHORT, rng } from "./sim.js"
 import { BASE, FUSED, LABEL, PARENTS, CROWDS, makeGuest, request, score, feedback } from "./flavor.js"
+import { BOX as GBOX, makeLook, frameCanvases, REACTIONS } from "./guestgen.js"
 
 const W = 480, H = 270
 const view = document.getElementById("view")
@@ -194,7 +195,8 @@ let crowdPick = null                                 // null: any crowd
 const guest = { g: null, said: [], phase: "asking", t: 0, result: null, back: 1 }
 function newGuest() {
   guest.g = makeGuest(GR, crowdPick); guest.said = request(guest.g)
-  guest.phase = "asking"; guest.t = 0; guest.result = null; guest.saved = false
+  guest.look = makeLook(Math.floor(GR() * 1e9), guest.g.crowd)             // a new face for each guest (guestgen.js)
+  guest.phase = "asking"; guest.t = 0; guest.result = null; guest.saved = false; guest.enter = 0
 }
 newGuest(); guest.back = 1
 function nextGuest() {
@@ -210,14 +212,20 @@ function serve() {
   sim.homeSpoon()
   const t = sim.tasteOf(S.glass), s = score(guest.g, t)
   guest.result = { t, s, fb: feedback(guest.g, t, s) }
+  const vs = REACTIONS[guest.g.crowd][s.tier]; guest.reaction = vs[Math.floor(GR() * vs.length)]
   guest.phase = "served"; guest.t = 0
   closeSpectro()
 }
-// where the glass sits: on its mat, or slid across to the guest's hands (smaller, a little farther away)
+// where the glass sits: on its mat, slid across to the guest's hands (smaller, a little farther away), or in their
+// hand: lifted, at their lips, set down (the guest's frame says where its base goes and how far it tips)
 const SERVED = { x: 330, y: 192, s: 0.85 }           // the guest's hands
 function glassPose() {
   const sx = SERVED.x - glass.cx, sy = SERVED.y - glass.base
-  if (guest.phase !== "asking") { const e = ease(Math.min(1, guest.t / 0.6)); return { dx: sx * e, dy: sy * e, s: 1 + (SERVED.s - 1) * e } }
+  if (guest.phase !== "asking") {
+    const gc = guest.phase === "served" && guest.t < T_REACH ? null : guestCanvases(), g = gc && gc.glass
+    if (g) return { bx: GBOX.x + g.x, by: GBOX.y + g.y, a: g.a, s: SERVED.s }
+    const e = ease(Math.min(1, guest.t / 0.6)); return { dx: sx * e, dy: sy * e, s: 1 + (SERVED.s - 1) * e }
+  }
   if (guest.back < 1) { const e = 1 - ease(guest.back); return { dx: sx * e, dy: sy * e, s: 1 + (SERVED.s - 1) * e } }
   return { dx: 0, dy: 0, s: 1 }
 }
@@ -701,6 +709,10 @@ function drawGlass() {
   if (h) { const lip = sim.glassLip(); ctx.save(); ctx.translate(Math.round(h.x), Math.round(h.y)); ctx.rotate(h.angle); ctx.drawImage(glassLayer, -lip.x, -lip.y); ctx.restore(); return }
   const lift = S.moving && S.moving.kind === "glass" ? 5 : 0
   if (guest.phase === "asking" && guest.back >= 1) drawShadow(glass.cx, glass.base - 1 - glass.ryB, 13, glass.ryB, lift ? 0.3 : 0.45)
+  if (pose.bx !== undefined) {               // in the guest's hand: its base at the hand, tipped toward their lips
+    ctx.save(); ctx.translate(Math.round(pose.bx), Math.round(pose.by)); ctx.rotate(pose.a); ctx.scale(pose.s, pose.s)
+    ctx.drawImage(glassLayer, -glass.cx, -glass.base); ctx.restore(); return
+  }
   const ox = Math.round(glass.cx + pose.dx - glass.cx * pose.s), oy = Math.round(glass.base + pose.dy - glass.base * pose.s) - lift
   ctx.drawImage(glassLayer, 0, 0, W, H, ox, oy, Math.round(W * pose.s), Math.round(H * pose.s))
 }
@@ -967,14 +979,55 @@ function drawScreenBody() {
   SCREEN.layout = { colR, leftW, lx, labelW, bx, barEnd: bx + BAR, valLeft: vx - valW, status, rows: rows.length, rowsBottom: rowsEnd, statusTop: bottom }     // for the layout check in the tests
 }
 
+// ---------------------------------------------------------------- the guest (guestgen.js)
+// While asking they wait (blinking now and then). Served: the glass slides over, they reach for it, lift it, drink with
+// their eyes closed, set it down, and react the way their crowd does (REACTIONS): a raised brow in luxury, a fist pump
+// in industrial. The first moments of a reaction bounce, pump or shudder; then they hold the expression.
+const T_REACH = 0.6, T_LIFT = 0.95, T_DRINK = 1.35, T_DOWN = 2.45, SIP_DONE = 2.75
+function blinkNow() { const p = ((S.t + (guest.look ? guest.look.seed % 97 : 0) * 0.37) % 4.3); return p < 0.13 }
+function guestFrameNow() {
+  const t = guest.t
+  if (guest.phase === "asking") return { pose: "idle", blink: blinkNow() }
+  if (guest.phase === "served") {
+    if (t < T_REACH) return { pose: "idle", expr: { look: [0, 2] } }
+    if (t < T_LIFT) return { pose: "reach", expr: { look: [0, 2] } }
+    if (t < T_DRINK) return { pose: "lift", expr: { look: [0, 1] } }
+    if (t < T_DOWN) return { pose: "drink", expr: { eyes: "closed" } }
+    return { pose: "down", expr: { look: [0, 1] } }
+  }
+  const v = guest.reaction || { eyes: "open", mouth: "flat", hold: "down", gesture: "rest" }, rt = t - SIP_DONE
+  const beat = Math.floor(rt * 5), lively = rt < 1.8, tick = Math.floor(rt * 3) % 2
+  const eyes = (v.eyes === "open" || v.eyes === "half") && blinkNow() ? "closed" : v.eyes
+  return {
+    pose: v.hold === "toast" ? "toast" : "down",
+    gesture: v.pump && lively ? (beat % 2 ? "fist2" : "fist") : v.gesture,
+    expr: { eyes, brows: v.brows, mouth: v.mouth, fx: v.fx, blush: v.blush },
+    bob: v.bounce && lively ? (beat % 2 ? -v.bounce : 0) : 0,
+    headX: v.shudder && rt < 1 ? (beat % 2 ? 1 : -1) : 0,
+    tick,
+  }
+}
+const mkCanvas = (w, h) => { const c = document.createElement("canvas"); c.width = w; c.height = h; return c }
+function guestCanvases() { return guest.look ? frameCanvases(guest.look, guestFrameNow(), mkCanvas) : null }
+function drawGuestBody() {
+  const g = guestCanvases(); if (!g) return
+  ctx.globalAlpha = Math.min(1, guest.enter / 0.35)
+  // their shadow on the counter, under the forearms
+  ctx.globalAlpha *= 0.35; fill(GBOX.x + 20, CT_FAR + 9, GBOX.w - 40, 3, "#140C10"); ctx.globalAlpha = Math.min(1, guest.enter / 0.35)
+  ctx.drawImage(g.body, GBOX.x, GBOX.y)
+  ctx.globalAlpha = 1
+}
+function drawGuestFront() { const g = guestCanvases(); if (g && g.glass) ctx.drawImage(g.front, GBOX.x, GBOX.y) }
+const CT_FAR = 186
+
 // the guest's speech bubble, beside their head: what they want, then how they liked it
-const HEAD = { x: 352, y: 96 }
+const HEAD = { x: 362, y: 92 }
 function drawBubble() {
-  const g = guest.g, x = 380, w = 97, inner = w - 10
+  const g = guest.g, x = 374, w = 103, inner = w - 10
   const lines = []                                   // [text, color]
   if (guest.phase === "asking") {
     for (const l of wrap(g.crowdName + " crowd", inner)) lines.push([l, GOLD])
-    if (g.mood) for (const l of wrap(g.mood.name + ".", inner)) lines.push([l, "#FFB3D9"])
+    if (g.mood) for (const l of wrap(g.moodLine || g.mood.name + ".", inner)) lines.push([l, "#FFB3D9"])
     for (const s of guest.said) for (const l of wrap(s.text, inner)) lines.push([l, CREAM])
   } else if (guest.phase === "served") {
     lines.push([".".repeat(1 + (Math.floor(guest.t * 3) % 3)), CREAM])
@@ -983,13 +1036,14 @@ function drawBubble() {
     lines.push([`${s.tier} (${Math.round(s.score)})`, s.score >= 85 ? "#FFE27A" : s.score >= 65 ? "#9CF0B0" : s.score >= 40 ? "#E9C08A" : "#FF8A7A"])
     for (const l of fb.lines) for (const w2 of wrap(l, inner)) lines.push([w2, CREAM])
   }
-  const t = guest.phase === "asking" ? guest.t : guest.phase === "served" ? 1 : guest.t - 1.2
+  const t = guest.phase === "asking" ? guest.t : guest.phase === "served" ? 1 : guest.t - SIP_DONE
   const pop = ease(Math.min(1, t / 0.2)), h = 8 + lines.length * 9
-  const y = 58 + Math.round((1 - pop) * 4)
+  const y = 32 + Math.round((1 - pop) * 4)
   ctx.globalAlpha = pop
   fill(x, y, w, h, "rgba(26,16,30,0.9)"); frame1(x, y, w, h, "rgba(255,111,181,0.75)")
   // the tail points at the guest's head
-  for (let k = 0; k < 7; k++) fill(x - 1 - k * 4 / 1.5, HEAD.y - 4 + Math.round(k * 0.7), 2, Math.max(1, 6 - k), "rgba(255,111,181,0.75)")
+  const ty = Math.min(HEAD.y - 4, y + h - 10)
+  for (let k = 0; k < 7; k++) fill(x - 1 - k * 4 / 1.5, ty + Math.round(k * 0.7), 2, Math.max(1, 6 - k), "rgba(255,111,181,0.75)")
   let ly = y + 5
   for (const [s, c] of lines) { text(s, x + 5, ly, c); ly += 9 }
   ctx.globalAlpha = 1
@@ -1311,6 +1365,7 @@ function render() {
   MAIN.setTransform(1, 0, 0, 1, EXT, 0)          // everything below is in the scene's own coordinates
   ctx.drawImage(IMG.bg, -EXT, 0)
   drawScreen()
+  drawGuestBody()
   drawWellHover()
   for (const cup of Object.values(S.cups)) if (cup.state === "home" || cup.state === "toHome") drawCup(cup)
   for (const tool of Object.values(S.tools)) if (tool.state === "home") drawToolHome(tool)
@@ -1319,6 +1374,7 @@ function render() {
   for (const tool of Object.values(S.tools)) if (tool.state === "carried") drawToolHome(tool)
   drawServeZone()
   if (!S.glassHeld) drawGlass()
+  drawGuestFront()
   for (const cup of Object.values(S.cups)) if (cup.state === "active" || cup.state === "toMeasure") drawCup(cup)
   drawStream()
   drawRail()
@@ -1343,8 +1399,9 @@ function update(dt) {
   if (key !== settle.key) { settle.key = key; settle.t = 0; settle.done = false }
   else if (!settle.done && (settle.t += dt) > 0.6 && !S.pressing && sim.volOf(c) > 0.3) { settle.done = true; noteDiscoveries(sim.tasteOf(c)) }
   if (guest.back < 1) guest.back = Math.min(1, guest.back + dt / 0.4)
+  guest.enter = (guest.enter || 0) + dt
   // the guest takes a sip, then says what they think; the spectrograph opens with their arrows on it
-  if (guest.phase === "served" && guest.t >= 1.2) {
+  if (guest.phase === "served" && guest.t >= SIP_DONE) {
     guest.phase = "reacting"
     openSpectro("served")
     noteDiscoveries(guest.result.t)

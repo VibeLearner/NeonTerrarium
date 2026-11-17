@@ -6,7 +6,7 @@
  "VPX": 240,
  "VPY": 100,
  "GX": 334,
- "POUR_X": 228,
+ "POUR_X": 232,
  "GLASS_BASE": 210,
  "TOOL_BASE": 206,
  "RAIL_TOP": 254,
@@ -26,62 +26,62 @@
   },
   {
    "id": "rye",
-   "x": 54,
+   "x": 53,
    "floor": 282
   },
   {
    "id": "rum",
-   "x": 92,
+   "x": 90,
    "floor": 282
   },
   {
    "id": "coffee",
-   "x": 127,
+   "x": 125,
    "floor": 282
   },
   {
    "id": "yuzu",
-   "x": 162,
+   "x": 167,
    "floor": 282
   },
   {
    "id": "ume",
-   "x": 195,
+   "x": 200,
    "floor": 282
   },
   {
    "id": "lemongrass",
-   "x": 260,
+   "x": 264,
    "floor": 282
   },
   {
    "id": "glow",
-   "x": 299,
+   "x": 302,
    "floor": 274
   },
   {
    "id": "ginger",
-   "x": 338,
+   "x": 341,
    "floor": 282
   },
   {
    "id": "shiso",
-   "x": 371,
+   "x": 373,
    "floor": 282
   },
   {
    "id": "soda",
-   "x": 400,
+   "x": 402,
    "floor": 282
   },
   {
    "id": "bitters",
-   "x": 429,
+   "x": 430,
    "floor": 266
   },
   {
    "id": "chili",
-   "x": 460,
+   "x": 461,
    "floor": 266
   }
  ],
@@ -92,7 +92,8 @@
    "tag": "RCE",
    "liquid": "#D6ECEC",
    "top": "spout",
-   "dash": false
+   "dash": false,
+   "alcohol": true
   },
   {
    "id": "rye",
@@ -100,7 +101,8 @@
    "tag": "RYE",
    "liquid": "#B8682A",
    "top": "spout",
-   "dash": false
+   "dash": false,
+   "alcohol": true
   },
   {
    "id": "rum",
@@ -108,7 +110,8 @@
    "tag": "RUM",
    "liquid": "#D99A3A",
    "top": "spout",
-   "dash": false
+   "dash": false,
+   "alcohol": true
   },
   {
    "id": "coffee",
@@ -116,7 +119,8 @@
    "tag": "COF",
    "liquid": "#3B2418",
    "top": "spout",
-   "dash": false
+   "dash": false,
+   "alcohol": true
   },
   {
    "id": "yuzu",
@@ -124,7 +128,8 @@
    "tag": "YUZ",
    "liquid": "#F0DC72",
    "top": "cap",
-   "dash": false
+   "dash": false,
+   "alcohol": false
   },
   {
    "id": "ume",
@@ -132,7 +137,8 @@
    "tag": "UME",
    "liquid": "#C2577E",
    "top": "spout",
-   "dash": false
+   "dash": false,
+   "alcohol": false
   },
   {
    "id": "lemongrass",
@@ -140,7 +146,8 @@
    "tag": "LEM",
    "liquid": "#B6D684",
    "top": "spout",
-   "dash": false
+   "dash": false,
+   "alcohol": false
   },
   {
    "id": "glow",
@@ -148,7 +155,8 @@
    "tag": "GLO",
    "liquid": "#FF8AD0",
    "top": "spout",
-   "dash": false
+   "dash": false,
+   "alcohol": false
   },
   {
    "id": "ginger",
@@ -156,7 +164,8 @@
    "tag": "GIN",
    "liquid": "#E8782C",
    "top": "crown",
-   "dash": false
+   "dash": false,
+   "alcohol": false
   },
   {
    "id": "shiso",
@@ -164,7 +173,8 @@
    "tag": "SHI",
    "liquid": "#B9A2E0",
    "top": "crown",
-   "dash": false
+   "dash": false,
+   "alcohol": false
   },
   {
    "id": "soda",
@@ -172,7 +182,8 @@
    "tag": "SOD",
    "liquid": "#CFE6F0",
    "top": "crown",
-   "dash": false
+   "dash": false,
+   "alcohol": false
   },
   {
    "id": "bitters",
@@ -180,7 +191,8 @@
    "tag": "BIT",
    "liquid": "#7A2A2A",
    "top": "dasher",
-   "dash": true
+   "dash": true,
+   "alcohol": false
   },
   {
    "id": "chili",
@@ -188,7 +200,8 @@
    "tag": "CHI",
    "liquid": "#D23A2A",
    "top": "dasher",
-   "dash": true
+   "dash": true,
+   "alcohol": false
   }
  ],
  "tools": [

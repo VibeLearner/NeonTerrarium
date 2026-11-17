@@ -20,6 +20,8 @@ breakdown.
 
 **Pouring**
 
+- **The rail:** the drinks with alcohol (rice spirit, rye, rum, coffee liqueur) stand at the left end with amber
+  tapes; a post on the rail separates them from the drinks without alcohol (cream tapes). A bottle's card says which.
 - **Click a bottle** on the rail to pick it up. It follows the pointer, held by its spout, resting tipped just
   short of pouring. **Hold** anywhere to pour; let go to stop. Each bottle pours at its own rate.
 - **Click its slot** in the rail (a faint ghost of it shows there), anywhere along the rail, right-click or Escape to
@@ -31,6 +33,9 @@ breakdown.
   go, or **flick** it there (let go while moving: it flies at your flick's speed and angle). A gentle steer forgives
   near misses. The glass takes 4 cubes, a tool 6.
 - **Move things around:** press and drag the glass, a tool or a cup to slide it somewhere else on the counter.
+- **Empty** the glass or a tool by double-clicking it: everything goes, ice too.
+- **Info cards:** a bottle's card shows as soon as you point at it; anything else (the glass, a tool, the spoon, a
+  cup, the ice well, the screen) shows its card once the pointer has rested on it for about 2 seconds.
 
 **Technique** (the three ways to make a drink, from the design doc)
 
@@ -39,8 +44,10 @@ breakdown.
   up, then **move it back and forth**: the cap goes on and it shakes, frosting over. About 10 seconds gets it cold.
   Shaking knocks most of the fizz out, so add soda after. **Hold** to pour it (into the glass, or the stirring
   glass); the strainer keeps the ice in.
-- **Stir:** the same with the stirring glass: move it about and the spoon turns. Slower and gentler (about 20
-  seconds), and it keeps the fizz.
+- **Stir:** pour into the stirring glass and add ice, then **press on the spoon** sticking out of it and **move the
+  mouse in circles** (either way round, about one circle a second or faster). Back and forth doesn't count. Slower
+  and gentler than shaking (about 20 seconds), it waters the drink down less and keeps the fizz. To pour it, click
+  the glass part to pick it up and hold.
 - **Both:** pour one tool into the other to stir and then shake. Melted ice isn't counted twice, and the drink
   remembers both ("Stirred 20 s, shaken 3 s").
 - **The glass** can be picked up and poured too (click it), into a tool or out.
@@ -49,8 +56,12 @@ breakdown.
 
 - The guest's bubble says what they want: their crowd, maybe a mood, and three things that matter most to them.
 - **Serve** by sliding the glass over to the guest (drag it to the ring in front of their hands) once it holds at
-  least the minimum drink amount, the gold MIN mark: 2.5 parts (it holds up to 8). They react in the same vibe
+  least the minimum drink amount: 2.5 parts. The small lights on the sides of the glass show it: red until there
+  is enough, green after (it holds up to 8). They react in the same vibe
   words, and the full taste breakdown opens with their arrows: gold for more, pink for less, green for spot on.
+- **The screen** hanging from the shelf shows what's in the glass or the tool you're using, in a small font. When
+  the list is longer than the screen, it scrolls: the mouse wheel over the screen, or the little arrows on the
+  divider. A new ingredient scrolls itself into view.
 - The full taste breakdown (click the screen) has one bar per note, built from the ingredients that give it; a
   hollow piece is what got hidden, a glowing piece what got boosted. Depth, Brightness and Toasted grow from two
   notes being close. Complexity and Balance are dials. Point at a bar to read what made it.
@@ -71,6 +82,7 @@ There is no timer, money or menu yet: those come next round.
 | `flavor.js` | the taste model from the design doc: notes, masking, carrying, fused notes, Complexity, Balance, crowds, guests, scoring |
 | `test_sim.mjs`, `test_flavor.mjs` | check the numbers with no screen: `node tools/pourlab/test_sim.mjs` |
 | `art/neon_dome.px.js` | the bar, drawn in code with pxl (no image tools); `art/font5x7.px.js` is pxl's 5x7 font |
+| `font_small.js` | the smaller hand-drawn pixel font used on the hanging screen (capitals 6 pixels tall, lowercase 4) |
 | `export_layout.mjs` | reads the art file and writes `assets/layout.json` (positions, sizes, ingredients) and `assets/font5x7.json` |
 | `assets/` | what the page loads: `pour_bg.png` (everything that never moves), `pour_front.png` (the rail's front plate), `sprites/` (bottles and their hover look, the glass, cups, shaker and its cap, the stirring glass with and without its spoon), `neon_dome.png` (the whole scene, for reference) |
 

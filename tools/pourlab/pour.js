@@ -1,6 +1,7 @@
 // Neon Dome pour lab: drawing and input. The simulation lives in sim.js and the taste model in flavor.js; this file
 // draws them at the scene's own 480x270 pixels, scaled up crisply (nearest-neighbor, no blur), and turns clicks and
 // holds into actions. It also runs the test guest: they ask in vibe words, you serve, they react.
+import { FONT_SMALL } from "./font_small.js"
 import { createSim, STEP, FILL_LINE, MAX_PARTS, SHORT, rng } from "./sim.js"
 import { BASE, FUSED, LABEL, PARENTS, CROWDS, makeGuest, request, score, feedback } from "./flavor.js"
 
@@ -54,21 +55,29 @@ const spriteAt = (name, x, feet, alpha = 1) => {
 }
 
 // ---------------------------------------------------------------- the 5x7 pixel font (from pxl's library)
-const GLYPH = {}
-for (const [ch, s] of Object.entries(FONT)) {
-  const rows = s.split(" ")
-  let a = 5, b = -1
-  for (const r of rows) for (let x = 0; x < 5; x++) if (r[x] === "#") { a = Math.min(a, x); b = Math.max(b, x) }
-  GLYPH[ch] = { rows, a, w: b - a + 1 }
+// and a smaller one for the hanging screen (font_small.js); text() and textW() use whichever is current
+function glyphs(font) {
+  const out = {}
+  for (const [ch, s] of Object.entries(font)) {
+    const rows = s.split(" ")
+    let a = 5, b = -1
+    for (const r of rows) for (let x = 0; x < 5; x++) if (r[x] === "#") { a = Math.min(a, x); b = Math.max(b, x) }
+    out[ch] = { rows, a, w: b - a + 1 }
+  }
+  return out
 }
-function textW(s) { let w = 0; for (const ch of s) w += (ch === " " ? 3 : (GLYPH[ch] ? GLYPH[ch].w : 3)) + 1; return Math.max(0, w - 1) }
+const GLYPH_BIG = glyphs(FONT), GLYPH_SMALL = glyphs(FONT_SMALL)
+let GLYPH = GLYPH_BIG, SPACE = 3
+function useFont(small) { GLYPH = small ? GLYPH_SMALL : GLYPH_BIG; SPACE = small ? 2 : 3 }
+function textW(s) { let w = 0; for (const ch of s) w += (ch === " " ? SPACE : (GLYPH[ch] ? GLYPH[ch].w : 3)) + 1; return Math.max(0, w - 1) }
+const textWSmall = (s) => { const g = GLYPH; useFont(true); const w = textW(s); useFont(g === GLYPH_SMALL); return w }
 function text(s, x, y, color, align = "left") {
   if (align === "right") x -= textW(s); else if (align === "center") x -= Math.round(textW(s) / 2)
   ctx.fillStyle = typeof color === "string" ? color : rgbStr(color)
   x = Math.round(x); y = Math.round(y)
   for (const ch of s) {
     const g = GLYPH[ch]
-    if (!g) { x += 4; continue }
+    if (!g) { x += SPACE + 1; continue }
     for (let r = 0; r < 7; r++) for (let c = g.a; c < g.a + g.w; c++) if (g.rows[r][c] === "#") ctx.fillRect(x + c - g.a, y + r, 1, 1)
     x += g.w + 1
   }
@@ -131,6 +140,8 @@ function hitBottle(id, x, y) {
 function railTip(id) { const b = bottleBox(id), t = tipOf(id); return { x: b.x + t.x, y: b.y + t.y } }
 function cupBox(cup) { return { x: Math.round(cup.x - (cup.rt + 2)), y: Math.round(cup.y - cup.h), w: cup.w, h: cup.h } }
 function toolBoxOf(tool) { const b = sim.toolBox(tool); return { x: b.left, y: b.top, w: tool.w, h: tool.h } }
+// the bar spoon's handle, sticking up out of the stirring glass: press on it and circle the mouse to stir
+function spoonBox(tool) { const b = toolBoxOf(tool); return { x: b.x + 11, y: b.y - 3, w: 16, h: tool.top + tool.ryT + 5 } }
 // the ice well's opening, in the counter's perspective (the same numbers the art used)
 const proj = (xn, y) => L.VPX + (xn - L.VPX) * (y - L.VPY) / (L.NEAR - L.VPY)
 const WELL = [[proj(L.WELL.xa, L.WELL.far), L.WELL.far], [proj(L.WELL.xb, L.WELL.far), L.WELL.far], [proj(L.WELL.xb, L.WELL.near), L.WELL.near], [proj(L.WELL.xa, L.WELL.near), L.WELL.near]]
@@ -179,7 +190,7 @@ function nextGuest() {
 }
 function serve() {
   if (guest.phase !== "asking") return
-  if (sim.total() < FILL_LINE - 0.05) { sim.say(`Pour at least the minimum drink amount first: ${FILL_LINE} parts, the gold MIN mark on the glass.`); return }
+  if (sim.total() < FILL_LINE - 0.05) { sim.say(`Pour at least the minimum drink amount first: ${FILL_LINE} parts, the lights on the glass turn green.`); return }
   dropHeld()
   if (S.toolMode) sim.putToolDown()
   const t = sim.tasteOf(S.glass), s = score(guest.g, t)
@@ -291,6 +302,8 @@ function targetAt(x, y) {
     if (cup.state === "home" && inBox(x, y, cupBox(cup))) return { kind: "cup", id: cup.id }
     if (cup.state === "active" && !S.held && inBox(x, y, cupBox(cup))) return { kind: "activeCup", id: cup.id }
   }
+  const mg = S.tools.mixing_glass
+  if (!S.held && mg && mg.state === "home" && inBox(x, y, spoonBox(mg))) return { kind: "spoon", id: "mixing_glass" }
   if (!S.held && inBox(x, y, { x: glass.left, y: glass.top, w: glass.w, h: glass.h })) return { kind: "glass" }
   if (!S.held) for (const tool of Object.values(S.tools)) if (tool.state === "home" && y < L.RAIL_TOP - 2 && inBox(x, y, toolBoxOf(tool))) return { kind: "tool", id: tool.id }
   return null
@@ -303,6 +316,18 @@ const clampAim = (p) => ({ x: clamp(p.x, 12, W - 12), y: clamp(p.y, 66, 214) })
 // clicking always did (pick up, lift, set beside the glass)
 const MOVABLE = { glass: "glass", tool: "tool", cup: "cup", activeCup: "cup" }
 let pending = null
+// a second click on the same glass or tool soon after the first empties it (the first click picked it up: it goes
+// straight back down, empty)
+const DOUBLE_MS = 400, NAMES = { glass: "the glass", shaker: "the shaker", mixing_glass: "the stirring glass" }
+let lastClick = null
+function doubleClick(e, p) {
+  const lc = lastClick; lastClick = null
+  if (!lc || e.timeStamp - lc.t > DOUBLE_MS || Math.hypot(p.x - lc.x, p.y - lc.y) > 6) return false
+  const id = lc.id
+  if (S.held && (S.held.kind === "glass" || (S.held.kind === "tool" && S.held.id === id))) { if (S.held.kind === "glass") sim.dropGlass(); else sim.putBack(null) }
+  if (sim.emptyVessel(id)) sim.say(`Emptied ${NAMES[id]}.`)
+  return true
+}
 function clickThing(t) {
   if (t.kind === "cup") sim.activateCup(t.id)
   else if (t.kind === "activeCup") sim.clickActiveCup()
@@ -317,6 +342,7 @@ view.addEventListener("pointerdown", (e) => {
   if (book.open || (t && t.kind === "spectro")) return
   if (e.button === 2) { putBackHeld(); return }
   if (guest.phase !== "asking") { sim.say("Click Next guest to serve someone new."); return }
+  if (e.button === 0 && doubleClick(e, p)) return
   if (t && t.kind === "screen") { const c = focusContents(); if (sim.volOf(c) > 0.01) openSpectro(focus); else sim.say("Nothing in it to taste yet."); return }
   if (t && t.kind === "ice") { sim.grabIce(p.x, p.y, e.timeStamp / 1000); return }      // a cube from the well, to drag or flick
   if (S.toolMode) { sim.press(true); return }                     // hold anywhere to shake or stir
@@ -324,6 +350,7 @@ view.addEventListener("pointerdown", (e) => {
     dropHeld()                                                     // swap: the one in hand goes straight back
     sim.pick(t.id, railTip(t.id)); const a = clampAim(p); sim.aim(a.x, a.y)
   } else if (t && t.kind === "rail") putBackHeld()
+  else if (t && t.kind === "spoon") sim.startStir(t.id, p.x, p.y)
   else if (t && MOVABLE[t.kind] && sim.canMove(MOVABLE[t.kind], t.id || "glass")) pending = { t, x: p.x, y: p.y, moving: false }   // a click or a drag: decided when it moves or lets go
   else if (t && t.kind === "cup") sim.activateCup(t.id)
   else if (t && t.kind === "activeCup") sim.clickActiveCup()
@@ -335,23 +362,34 @@ view.addEventListener("pointerdown", (e) => {
 view.addEventListener("pointermove", (e) => {
   const p = toScene(e); pointer.x = p.x; pointer.y = p.y
   if (S.held && !S.held.back) { const a = clampAim(p); sim.aim(a.x, a.y) }
+  if (S.stirring) sim.stirAt(p.x, p.y)
   if (S.grab) sim.moveIce(clamp(p.x, 2, W - 2), clamp(p.y, 2, H - 2), e.timeStamp / 1000)
   if (pending && !pending.moving && Math.hypot(p.x - pending.x, p.y - pending.y) > 3)
     pending.moving = sim.startMove(MOVABLE[pending.t.kind], pending.t.id || "glass", pending.x, pending.y)
   if (pending && pending.moving) sim.dragTo(p.x, p.y)
 })
 const release = (e, cancelled = false) => {
+  if (S.stirring) { sim.endStir(); pointer.down = false; return }
   if (pending) {
     const pd = pending; pending = null; pointer.down = false
     if (pd.moving) { const toGuest = pd.t.kind === "glass" && !cancelled && overServe(); sim.endMove(); if (toGuest) serve() }
-    else if (!cancelled) clickThing(pd.t)
+    else if (!cancelled) { clickThing(pd.t); if (pd.t.kind === "glass" || pd.t.kind === "tool") lastClick = { id: pd.t.id || "glass", t: e.timeStamp, x: pd.x, y: pd.y } }
     return
   }
   pointer.down = false; if (S.grab) { sim.releaseIce(e.timeStamp / 1000); return } if (S.toolMode || (S.held && S.held.kind !== "dasher")) sim.press(false) }
 view.addEventListener("pointerup", release)
 view.addEventListener("pointercancel", (e) => release(e, true))
 view.addEventListener("pointerleave", () => { pointer.x = -99; pointer.y = -99 })
-view.addEventListener("wheel", (e) => { if (book.open) { e.preventDefault(); book.scroll += e.deltaY * 0.25 } }, { passive: false })
+view.addEventListener("wheel", (e) => {
+  if (book.open) { e.preventDefault(); book.scroll += e.deltaY * 0.25; return }
+  const p = toScene(e)
+  if (!spectro.open && inBox(p.x, p.y, SCREEN)) {
+    e.preventDefault()
+    // a row per notch of a mouse wheel; a trackpad's many small nudges add up to a row
+    listScroll.wheel += e.deltaY
+    while (Math.abs(listScroll.wheel) >= 30) { const d = Math.sign(listScroll.wheel); listScroll.target += d * 8; listScroll.wheel -= d * 30 }
+  }
+}, { passive: false })
 view.addEventListener("contextmenu", (e) => { e.preventDefault(); putBackHeld() })
 addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return
@@ -422,7 +460,7 @@ function drawMixLiquid(tool, left, top) {
 }
 // the bar spoon, turning in the stirring glass: its bowl circles near the bottom, the handle leans out of the top
 function drawSpoon(tool, left, top) {
-  const cx = left + tool.cx, base = top + tool.top + tool.ryT + L.vessels[tool.id].h - 6, a = tool.stir * 9
+  const cx = left + tool.cx, base = top + tool.top + tool.ryT + L.vessels[tool.id].h - 6, a = tool.spoonA ?? tool.stir * 9
   const bx = cx + Math.cos(a) * 7, by = base + Math.sin(a) * 2, tx = cx + 4 + Math.cos(a) * 2, ty = top + 1
   line(bx, by, tx, ty, "#DCE6EC"); line(bx + 1, by, tx + 1, ty, "#8A98A2")
   fill(tx - 1, ty - 1, 4, 2, "#C9D3DA"); fill(bx - 1, by, 3, 2, "#C9D3DA")
@@ -431,9 +469,11 @@ function drawToolHome(tool) {
   const b = toolBoxOf(tool), img = IMG[tool.id], ryB = Math.max(2, Math.round(tool.rb * K)), carried = tool.state === "carried"
   drawShadow(tool.x, tool.y - 1 - ryB, tool.rb + 1, ryB, carried ? 0.25 : 0.4)
   if (carried) b.y -= 5; else drawReflection(img, b.x, tool.y)
-  if (hover && hover.kind === "tool" && hover.id === tool.id) ctx.drawImage(OUTLINE[tool.id], b.x - 1, b.y - 1)
+  if (hover && (hover.kind === "tool" || hover.kind === "spoon") && hover.id === tool.id && !S.stirring) ctx.drawImage(OUTLINE[tool.id], b.x - 1, b.y - 1)
   if (tool.id === "mixing_glass") drawMixLiquid(tool, b.x, b.y)
-  ctx.drawImage(img, b.x, b.y)
+  // being stirred: the spoon turns with the circles you make
+  if (S.stirring && S.stirring.id === tool.id) { drawSpoon(tool, b.x, b.y); ctx.drawImage(IMG.mixing_glass_bare, b.x, b.y) }
+  else ctx.drawImage(img, b.x, b.y)
   if (tool.id === "shaker" && sim.volOf(tool.c) > 0.001) {
     const rim = sim.toolRim(tool), f = Math.min(1, sim.volOf(tool.c) / 6)
     drawOpening(Math.round(rim.cx), Math.round(rim.y), rim.hw + 1, tool.ryT, (1 - f) * 8, sim.srgb(sim.compColor(tool.c.parts)))
@@ -542,14 +582,15 @@ function drawIce() {
       px(x0 + x, y0 + y, cubePx(x, y, c.state === "in" && sim.total() > 0.15 && y0 + y > s + S.wave[clamp(x0 + x - glass.col0, 0, glass.N - 1)] ? mean : null))
   }
 }
+// the minimum drink amount: a small light on each side of the glass at that height, red until there's enough, then green
 function drawFillLine() {
   const y = Math.round(glass.bottomY - FILL_LINE * glass.ppp), [il, ir] = glass.inner(y)
-  const near = Math.abs(sim.total() - FILL_LINE) < 0.06
-  ctx.globalAlpha = near ? 1 : 0.6
-  for (let x = il; x <= ir; x += 2) px(x, y, GOLD)
-  px(il - 3, y, GOLD); px(il - 4, y, GOLD); px(ir + 3, y, GOLD); px(ir + 4, y, GOLD)
-  text("MIN", ir + 7, y - 3, GOLD)          // the minimum drink amount
-  ctx.globalAlpha = 1
+  const ok = sim.total() >= FILL_LINE - 0.05
+  const [core, glow] = ok ? ["#7CFFA0", "#2E9A58"] : ["#FF5A6E", "#9A2E44"]
+  for (const x of [il - 5, ir + 3]) {
+    ctx.globalAlpha = 0.45; ctx.fillStyle = glow; ctx.fillRect(x - 1, y - 2, 4, 4)
+    ctx.globalAlpha = 1; ctx.fillStyle = core; ctx.fillRect(x, y - 1, 2, 2)
+  }
 }
 // the glass and everything in it is painted on its own layer, so it can slide across to the guest and shrink a
 // little with distance while staying crisp (scaled pixel for pixel, never blurred)
@@ -654,11 +695,17 @@ function drawLabels() {
     const v = sim.volOf(cup.c)
     tag(`${v.toFixed(2)} / ${cup.cap.toFixed(2)}`, cup.x, cupBox(cup).y - 12, v >= cup.cap - 0.005 ? "#FFC94A" : CREAM)
   }
+  // one tag over each tool; when two tools stand close, the second tag goes up a row so they never overlap
+  const placed = []
   for (const tool of Object.values(S.tools)) if (tool.state === "home" && (sim.volOf(tool.c) > 0.05 || tool.c.ice)) {
     const v = sim.volOf(tool.c), bits = []
     if (v > 0.05) bits.push(`${v.toFixed(2)} parts`)
     bits.push(tool.c.ice ? `${tool.c.ice} ice` : "no ice")
-    tag(bits.join(", "), tool.x, toolBoxOf(tool).y - 11, tool.c.ice ? CREAM : "#E9A08A")
+    const str = bits.join(", "), w = textW(str) + 6, cx = clamp(tool.x, w / 2 + 2, W - w / 2 - 2)
+    let y = toolBoxOf(tool).y - 11
+    while (placed.some((p) => cx - w / 2 < p.x1 + 2 && cx + w / 2 > p.x0 - 2 && y < p.y + 11 && y + 10 > p.y - 1)) y -= 11
+    placed.push({ x0: cx - w / 2, x1: cx + w / 2, y })
+    tag(str, cx, y, tool.c.ice ? CREAM : "#E9A08A")
   }
   ctx.globalAlpha = 1
 }
@@ -687,7 +734,27 @@ function followFocus() {
   else if (S.lastInto) { if (VESSELS.some(([id]) => id === S.lastInto)) focus = S.lastInto; S.lastInto = null }
 }
 const focusContents = () => (focus === "glass" ? S.glass : S.tools[focus].c)
+const listScroll = { y: 0, target: 0, focus: null, ids: [], bar: false, wheel: 0 }
+// the scroll bar sits on the divider between the list and the profile: a track, a bright thumb, an arrow at each end
+function scrollArrows(x, top, area, off, max, used) {
+  listScroll.bar = true
+  const P = SCREEN, up = { x: x - 3, y: P.y + 19, w: 7, h: 6 }, dn = { x: x - 3, y: top + area - 5, w: 7, h: 6 }
+  const t0 = up.y + up.h + 1, t1 = dn.y - 1, len = t1 - t0
+  fill(x, t0, 1, len, "rgba(95,243,232,0.2)")
+  const th = Math.max(6, Math.round(len * area / used)), ty = t0 + Math.round((len - th) * off / max)
+  fill(x - 1, ty, 3, th, "rgba(95,243,232,0.75)")
+  for (const [b, dir, can] of [[up, -1, off > 0], [dn, 1, off < max]]) {
+    const col = can ? (hover && hover.kind === "button" && hover.key === "scroll" + dir ? HOLO.value : "rgba(95,243,232,0.8)") : "rgba(95,243,232,0.25)"
+    for (let r = 0; r < 3; r++) { const yy = dir < 0 ? b.y + 1 + r : b.y + 3 - r; fill(b.x + 3 - r, yy, 1 + r * 2, 1, col) }
+    if (can) buttons.push({ ...b, key: "scroll" + dir, act: () => { listScroll.target += dir * 2 * LH } })
+  }
+}
 function drawScreen() {
+  useFont(true)
+  try { drawScreenBody() } finally { useFont(false) }
+}
+const LH = 8                      // the screen's line pitch, in its small font
+function drawScreenBody() {
   const P = SCREEN, free = !S.held && !S.grab && !S.moving && guest.phase === "asking"
   // the two cables up to the shelf, then the bezel
   for (const cx of [P.x + 24, P.x + 200]) { fill(cx, 33, 1, P.y - 33, "#2A2F35"); fill(cx + 1, 33, 1, P.y - 33, "#4A525A") }
@@ -712,7 +779,7 @@ function drawScreen() {
   // the columns, measured from the text itself: the taste profile on the right is as wide as its longest label plus
   // a bar; the contents on the left get the rest
   const labelW = Math.max(...SPEC_ROWS.map((n) => textW(LABEL[n]))), BAR = 50, valW = textW("10.0")
-  const colR = P.x + P.w - 4 - valW - 4 - BAR - 4 - labelW - 7   // the left column's right edge
+  const colR = P.x + P.w - 4 - valW - 4 - BAR - 4 - labelW - 9   // the left column's right edge
   const leftW = colR - (P.x + 5)                            // room for text in the left column
   // status lines under the contents, wrapped to the column so they never run into the profile
   const status = []
@@ -723,37 +790,59 @@ function drawScreen() {
     else say2(c.techT > 0.05 ? `${verb} ${c.techT.toFixed(1)} s` : c.log.length ? c.log[c.log.length - 1] : `Not ${verb.toLowerCase()} yet`, tool.working ? "#FFC94A" : HOLO.dim)
     if (r.total > 0.01) say2(`Cold ${r.chill.toFixed(1)}, ${Math.round(r.dilution * 100)}% melted`, HOLO.dim)
   } else if (guest.phase === "asking") {
-    const left = FILL_LINE - r.total
     if (r.full) say2("Full to the rim", "#FF8AA8")
-    else if (left > 0.05) { say2("Minimum drink amount", HOLO.dim); say2(`${left.toFixed(2)} parts to go`, HOLO.dim) }
-    else { say2("Ready to serve.", "#9CF0B0"); say2("Slide it to the guest.", "#9CF0B0") }
   }
-  const bottom = P.y + P.h - 3 - status.length * 9
+  const bottom = P.y + P.h - 3 - status.length * LH
+  listScroll.bar = false
   // left: what's in it; a long name wraps under itself, its amount stays on the first line
   let y = P.y + 21
   const ice = tool ? c.ice : r.ice
   const rows = r.rows.filter((row) => row.parts >= 0.04 || row.dashes).map((row) => [row.name, row.dashes ? `${row.dashes} dash${row.dashes > 1 ? "es" : ""}` : row.parts.toFixed(2), row.id])
   if (ice) rows.push(["Ice", `${ice} cube${ice > 1 ? "s" : ""}`, null])
   if (!rows.length) text("Empty", P.x + 5, y, HOLO.dim)
-  // measure every row first; if they don't all fit, keep as many as fit with a "+n more" line under them
+  // every row is measured; when they don't all fit between the tabs and the status lines, the list scrolls (mouse
+  // wheel over the screen, or the little arrows), the divider beside it shows where you are, and a new ingredient
+  // scrolls itself into view
   const nameW = (amt) => colR - (P.x + 11) - textW(amt) - 5
-  const heights = rows.map(([name, amt]) => wrap(name, nameW(amt)).length * 9)
-  let shown = rows.length, used = heights.reduce((a2, b2) => a2 + b2, 0)
-  if (y + used > bottom) { while (shown > 0 && y + used + 9 > bottom) used -= heights[--shown] }
+  const heights = rows.map(([name, amt]) => wrap(name, nameW(amt)).length * LH)
+  const top = y, area = Math.floor((bottom - 2 - top) / LH) * LH, used = heights.reduce((a2, b2) => a2 + b2, 0), max = Math.max(0, used - area)
+  const ids = rows.map((row) => row[0])
+  if (listScroll.focus !== focus) { listScroll.focus = focus; listScroll.y = listScroll.target = 0; listScroll.ids = ids }
+  const added = ids.findIndex((n) => !listScroll.ids.includes(n))
+  if (added >= 0) {
+    const at = heights.slice(0, added).reduce((a2, b2) => a2 + b2, 0)
+    if (at < listScroll.target) listScroll.target = at; else if (at + heights[added] > listScroll.target + area) listScroll.target = at + heights[added] - area
+  }
+  listScroll.ids = ids
+  listScroll.target = clamp(Math.round(listScroll.target / LH) * LH, 0, max)     // it rests on whole rows
+  listScroll.y += (listScroll.target - listScroll.y) * 0.35
+  if (Math.abs(listScroll.target - listScroll.y) < 0.5) listScroll.y = listScroll.target
+  const off = Math.round(listScroll.y)
+  ctx.save(); ctx.beginPath(); ctx.rect(P.x + 1, top - 1, colR - P.x + 1, area + 1); ctx.clip()
+  y = top - off
   for (let k = 0; k < rows.length; k++) {
     const [name, amt, id] = rows[k], lines = wrap(name, nameW(amt))
-    if (k >= shown) { text(`+${rows.length - k} more`, P.x + 5, y, HOLO.dim); break }
-    if (id) fill(P.x + 5, y + 2, 3, 3, liquidOf(id))
-    lines.forEach((l, n) => text(l, P.x + 11, y + n * 9, id === "water" || !id ? HOLO.dim : HOLO.text))
-    text(amt, colR, y, HOLO.value, "right"); y += lines.length * 9
+    if (y + lines.length * LH > top - LH && y < top + area) {
+      if (id) fill(P.x + 5, y + 2, 3, 3, liquidOf(id))
+      lines.forEach((l, n) => text(l, P.x + 11, y + n * LH, id === "water" || !id ? HOLO.dim : HOLO.text))
+      text(amt, colR, y, HOLO.value, "right")
+    }
+    y += lines.length * LH
   }
-  const rowsEnd = rows.length ? y + (shown < rows.length ? 9 : 0) : y + 9
-  status.forEach(([t2, col], k) => text(t2, P.x + 5, bottom + k * 9, col))
-  // right: the taste profile, a row per note: label, a bar built from what each ingredient gives (in its color), the value
-  fill(colR + 3, P.y + 19, 1, P.h - 21, "rgba(95,243,232,0.2)")
-  const t = r.total > 0.01 ? sim.tasteOf(c) : null, lx = colR + 7, bx = lx + labelW + 4, vx = P.x + P.w - 4
+  ctx.restore()
+  if (max > 0) {
+    // fades at the cut edges, so a half-hidden row reads as "more this way"
+    if (off > 0) fill(P.x + 1, top - 1, colR - P.x, 2, "rgba(6,22,30,0.9)")
+    if (off < max) fill(P.x + 1, top + area - 2, colR - P.x, 2, "rgba(6,22,30,0.9)")
+    scrollArrows(colR + 4, top, area, off, max, used)
+  }
+  const rowsEnd = rows.length ? Math.min(top + used, top + area) : top + LH
+  status.forEach(([t2, col], k) => text(t2, P.x + 5, bottom + k * LH, col))
+  // right: the taste profile, a row per note (the divider is drawn here unless the list's scroll bar took its place): label, a bar built from what each ingredient gives (in its color), the value
+  if (!listScroll.bar) fill(colR + 4, P.y + 19, 1, P.h - 21, "rgba(95,243,232,0.2)")
+  const t = r.total > 0.01 ? sim.tasteOf(c) : null, lx = colR + 9, bx = lx + labelW + 4, vx = P.x + P.w - 4
   SPEC_ROWS.forEach((n, k) => {
-    const yy = P.y + 19 + k * 9, v = t ? t.notes[n] : 0, on = v > 0.05
+    const yy = P.y + 19 + k * LH, v = t ? t.notes[n] : 0, on = v > 0.05
     if (k === BASE.length) fill(lx, yy - 1, vx - lx, 1, "rgba(95,243,232,0.12)")   // the three combined notes below
     text(LABEL[n], lx, yy, on ? HOLO.text : HOLO.dim)
     fill(bx, yy + 3, BAR, 1, HOLO.track)
@@ -986,21 +1075,35 @@ function tooltip(title, body, cx, bottom) {
   text(title, x + 5, y + 4, "#FFC94A")
   lines.forEach((l, i) => text(l, x + 5, y + 14 + i * 9, CREAM))
 }
+// bottles show their card at once; anything else only after the pointer has rested on it for about 2 seconds
+const DWELL = 2, dwell = { key: "", x: 0, y: 0, t: 0 }
+function trackDwell(dt) {
+  const key = hover ? hover.kind + ":" + (hover.id || "") : ""
+  if (key !== dwell.key || Math.hypot(pointer.x - dwell.x, pointer.y - dwell.y) > 3 || pointer.down) { dwell.key = key; dwell.x = pointer.x; dwell.y = pointer.y; dwell.t = 0 }
+  else dwell.t += dt
+}
 function drawTooltip() {
-  if (!hover || S.pressing || S.moving || book.open) return
-  if (hover.kind === "bottle") { const b = bottleBox(hover.id); tooltip(ingOf[hover.id].name, DESC[hover.id], b.x + b.w / 2, b.y - 8) }
+  if (!hover || S.pressing || S.moving || S.stirring || book.open) return
+  if (hover.kind !== "bottle" && dwell.t < DWELL) return
+  if (hover.kind === "bottle") { const b = bottleBox(hover.id); tooltip(ingOf[hover.id].name, (ingOf[hover.id].alcohol ? "Alcohol. " : "No alcohol. ") + DESC[hover.id], b.x + b.w / 2, b.y - 8) }
   else if (hover.kind === "cup") { const cup = S.cups[hover.id]; tooltip(`${CUP_NAME[cup.id]} measuring cup`, `Holds exactly ${CUP_NAME[cup.id].toLowerCase()} part. Click to set it beside the glass, pour a bottle into it, then click it to pick it up and pour the measure. Drag it to move it.`, cup.x, cupBox(cup).y - 4) }
   else if (hover.kind === "activeCup") tooltip("Measuring cup", sim.volOf(S.cups[hover.id].c) > 0.001 ? "Click to pick it up, then hold to pour it." : "Pour a bottle into it, or click to put it away.", S.cups[hover.id].x, cupBox(S.cups[hover.id]).y - 14)
   else if (hover.kind === "tool") {
     const tool = S.tools[hover.id], has = sim.volOf(tool.c) > 0.004
     tooltip(tool.id === "shaker" ? "Shaker" : "Stirring glass", (tool.id === "shaker"
       ? "Shaking chills a drink fast, waters it down more, and knocks out most of the fizz (add soda after). "
-      : "Stirring chills a drink gently and keeps it clear and fizzy. ") + (tool.c.ice ? "" : "It needs ice to work: drag or flick some in. ") + "Pour bottles into it, then click to pick it up: move it about to " + (tool.id === "shaker" ? "shake" : "stir") + " it, hold to pour it. Drag it to move it.", tool.x, toolBoxOf(tool).y - 14)
+      : "Stirring chills a drink gently and keeps it clear and fizzy. ") + (tool.c.ice ? "" : "It needs ice to work: drag or flick some in. ") + (tool.id === "shaker"
+        ? "Pour bottles into it, then click to pick it up: move it about to shake it, hold to pour it. Drag it to move it. Double-click to empty it."
+        : "Pour bottles into it. To stir, press on the spoon and move the mouse in circles. Click the glass to pick it up and pour it. Drag it to move it. Double-click to empty it."), tool.x, toolBoxOf(tool).y - 14)
+  }
+  else if (hover.kind === "spoon") {
+    const tool = S.tools[hover.id]
+    tooltip("Bar spoon", "Press and hold on it, then move the mouse in circles to stir. Back and forth doesn't stir." + (tool.c.ice ? "" : " Put ice in first, or the drink won't get cold."), tool.x, spoonBox(tool).y - 4)
   }
   else if (hover.kind === "screen") tooltip("The screen", "What's in the glass or the tool you're using, and how it tastes right now. Click it for the full breakdown.", SCREEN.x + SCREEN.w / 2 + 40, SCREEN.y + SCREEN.h + 62)
   else if (hover.kind === "ice") tooltip("Ice well", "Drag a cube out and drop it into the glass, shaker or stirring glass, or flick it in. The shaker and stirring glass need ice to chill a drink; in the glass it melts in slowly.", WELL_MID.x + 50, WELL[0][1] - 4)
   else if (hover.kind === "glass" && guest.phase === "asking")
-    tooltip("The glass", `The gold MIN mark is the minimum drink amount: ${FILL_LINE} parts. Guests won't take a smaller drink. It holds up to ${MAX_PARTS} parts.` + " Slide it over to the guest to serve it. Click to pick it up and pour it out. Drag it to move it.", glass.cx, glass.top - 4)
+    tooltip("The glass", `The lights on its sides mark the minimum drink amount: ${FILL_LINE} parts. They turn from red to green once there's enough. Guests won't take a smaller drink. It holds up to ${MAX_PARTS} parts.` + " Slide it over to the guest to serve it. Click to pick it up and pour it out. Drag it to move it. Double-click to empty it.", glass.cx, glass.top - 4)
 }
 function drawNotice() {
   if (!S.notice) return
@@ -1057,15 +1160,17 @@ function update(dt) {
   }
 }
 function frame(now) {
-  acc += Math.min(0.1, (now - last) / 1000); last = now
+  const dt = Math.min(0.1, (now - last) / 1000)
+  acc += dt; last = now
   while (acc >= STEP) { sim.step(); update(STEP); acc -= STEP }
   followFocus()
   hover = targetAt(pointer.x, pointer.y)
+  trackDwell(dt)
   if (spectro.open && hover && hover.kind === "spectro") spectro.row = hover.row
-  view.style.cursor = S.grab || S.moving ? "grabbing" : S.toolMode ? (pointer.down ? "grabbing" : "grab") : S.held ? (pointer.down ? "grabbing" : hover ? "pointer" : "grab") : hover && hover.kind !== "spectro" && hover.kind !== "modal" ? "pointer" : "default"
+  view.style.cursor = S.grab || S.moving || S.stirring ? "grabbing" : hover && hover.kind === "spoon" ? "grab" : S.toolMode ? (pointer.down ? "grabbing" : "grab") : S.held ? (pointer.down ? "grabbing" : hover ? "pointer" : "grab") : hover && hover.kind !== "spectro" && hover.kind !== "modal" ? "pointer" : "default"
   render()
   requestAnimationFrame(frame)
 }
 requestAnimationFrame(frame)
 // a handle for the browser console and the node test harness: the simulation, the guest, and today's buttons
-globalThis.pourlab = { sim, guest, spectro, book, SCREEN, textW, get buttons() { return buttons } }
+globalThis.pourlab = { sim, guest, spectro, book, SCREEN, textW: textWSmall, get buttons() { return buttons } }

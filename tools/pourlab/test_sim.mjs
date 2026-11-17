@@ -226,5 +226,29 @@ const railTip = (id) => ({ x: L.rail.find((r) => r.id === id).x, y: 220 })
   sim.aim(g.cx - 26, g.top - 30); run(sim, 0.6); sim.press(true); run(sim, 2.5); sim.press(false); run(sim, 2)
   ok(sim.total() > 1.8 && /Shaken 1\d s/.test(sim.S.glass.log.join(",")), `poured into the glass: ${sim.total().toFixed(2)} parts, "${sim.S.glass.log.join(", ")}"`)
 }
+{
+  console.log("stir with the spoon: circles stir, wiggling doesn't")
+  const sim = createSim(L, sizes), mg = sim.S.tools.mixing_glass, rim = sim.toolRim(mg)
+  for (const [id, secs] of [["rye", 1.2], ["glow", 0.2]]) {
+    sim.pick(id, railTip(id)); sim.aim(rim.cx - 24, rim.y - 26); run(sim, 0.5); sim.press(true); run(sim, secs); sim.press(false); run(sim, 1.2); sim.putBack(railTip(id)); run(sim, 0.3)
+  }
+  dropIce(sim, rim, 3)
+  const wiggle = sim.startStir("mixing_glass", rim.cx, rim.y - 10)
+  for (let t = 0; t < 5; t += STEP) { sim.stirAt(rim.cx + 15 * Math.sin(t * 2 * Math.PI * 2), rim.y - 10); sim.step() }
+  sim.endStir()
+  ok(wiggle && mg.c.techT < 0.5, `5 s of wiggling back and forth: stirred ${mg.c.techT.toFixed(1)} s (none)`)
+  sim.startStir("mixing_glass", rim.cx, rim.y - 10)
+  for (let t = 0; t < 20; t += STEP) { const a = t * 2 * Math.PI * 1; sim.stirAt(rim.cx + 12 * Math.cos(a), rim.y - 10 + 8 * Math.sin(a)); sim.step() }
+  sim.endStir()
+  const r = sim.readout(mg.c)
+  ok(mg.c.techT > 18 && r.chill > 0.85 && r.dilution > 0.15 && !mg.c.shaken, `20 s of circles, one a second: stirred ${mg.c.techT.toFixed(1)} s, cold ${r.chill.toFixed(2)}, ${(r.dilution * 100).toFixed(0)}% melted`)
+  sim.startStir("mixing_glass", rim.cx, rim.y - 10)
+  for (let t = 0; t < 3; t += STEP) { const a = -t * 2 * Math.PI * 1.2; sim.stirAt(rim.cx + 10 * Math.cos(a), rim.y - 10 + 10 * Math.sin(a)); sim.step() }
+  sim.endStir()
+  ok(mg.c.techT > 20, "the other way round stirs too")
+  const before = mg.c.techT; sim.handTool("mixing_glass"); run(sim, 0.2)
+  for (let t = 0; t < 3; t += STEP) { sim.aim(300 + 20 * Math.sin(t * 2 * Math.PI * 3), 120); sim.step() }
+  ok(Math.abs(mg.c.techT - before) < 1e-9, "moving the stirring glass about in hand doesn't stir it")
+}
 console.log(fails ? `${fails} failed` : "all passed")
 process.exit(fails ? 1 : 0)

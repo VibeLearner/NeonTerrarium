@@ -747,15 +747,21 @@ const toolReflections = (from, to, list = TOOLS()) => list.map(([n, x, y]) => cl
 
 
 // ================================================================ the speed rail
-// bottles laid out left to right with even gaps, and one wider gap under the glass so nothing stands in front of the pour
-const GAP_AFTER = 5, POUR_GAP = 30
+// bottles laid out left to right with even gaps, and one wider gap under the glass so nothing stands in front of the pour.
+// The drinks with alcohol stand together at the left end, the rest after them; a small gap and a post mark where
+// one group ends (their rail tapes differ too: amber for alcohol, cream for the rest)
+const GAP_AFTER = 5, POUR_GAP = 30, GROUP_GAP = 8
+const ALCOHOL = new Set(["rice", "rye", "rum", "coffee"])
+const GROUP_END = INGREDIENTS.findIndex((ing) => !ALCOHOL.has(ing.id)) - 1      // the last bottle with alcohol
 const RAIL_X = (() => {
   const ws = INGREDIENTS.map((ing) => 2 * Math.max(...bottleProfile(ing.big.segs)) + 3)
-  const g = (W - 12 - ws.reduce((a, b) => a + b, 0) - POUR_GAP) / (ws.length - 1)
+  const g = (W - 12 - ws.reduce((a, b) => a + b, 0) - POUR_GAP - GROUP_GAP) / (ws.length - 1)
   const xs = []; let x = 6
-  ws.forEach((w, k) => { xs.push(Math.round(x + w / 2)); x += w + g + (k === GAP_AFTER ? POUR_GAP : 0) })
+  ws.forEach((w, k) => { xs.push(Math.round(x + w / 2)); x += w + g + (k === GAP_AFTER ? POUR_GAP : 0) + (k === GROUP_END ? GROUP_GAP : 0) })
   return xs
 })()
+// the post between the two groups, halfway between the last bottle with alcohol and the first without
+const GROUP_POST = Math.round((RAIL_X[GROUP_END] + RAIL_X[GROUP_END + 1]) / 2)
 const railX = (k) => RAIL_X[k]
 const POUR_X = Math.round((RAIL_X[GAP_AFTER] + RAIL_X[GAP_AFTER + 1]) / 2)
 function railBack(c) { c.rect(X0, NEAR + 4, W - X0, H - NEAR - 4, "0"); c.hline(X0, NEAR + 4, W - X0, "K") }
@@ -771,9 +777,12 @@ function railFront(c) {
   // shows when the player points at the bottle)
   INGREDIENTS.forEach((ing, k) => {
     const x = railX(k), word = RAIL_WORD[ing.id], w = word.length * 4 - 1, left = Math.round(x - w / 2)
-    c.rect(left - 2, RAIL_TOP + 5, w + 4, 7, "c"); c.hline(left - 2, RAIL_TOP + 11, w + 4, "p")
+    const alc = ALCOHOL.has(ing.id)
+    c.rect(left - 2, RAIL_TOP + 5, w + 4, 7, alc ? "y" : "c"); c.hline(left - 2, RAIL_TOP + 11, w + 4, alc ? "g" : "p")
     c.text(left, RAIL_TOP + 6, word, "1")
   })
+  // the divider post on the rail's face, between the drinks with alcohol and those without
+  c.rect(GROUP_POST - 1, RAIL_TOP + 1, 3, H - RAIL_TOP - 1, "e"); c.rect(GROUP_POST, RAIL_TOP + 1, 1, H - RAIL_TOP - 1, "f"); c.px(GROUP_POST, RAIL_TOP + 1, "F")
 }
 
 // ================================================================ the scene

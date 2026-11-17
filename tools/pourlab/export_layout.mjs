@@ -13,7 +13,7 @@ vm.runInContext(src + `
 ;globalThis.__layout = {
   W, H, CT, NEAR, VPX, VPY, GX, POUR_X, GLASS_BASE, TOOL_BASE, RAIL_TOP, BOTTLE_FLOOR, WELL, K,
   rail: INGREDIENTS.map((ing, k) => ({ id: ing.id, x: RAIL_X[k], floor: BOTTLE_FLOOR - lift(ing) })),
-  ingredients: INGREDIENTS.map((ing) => ({ id: ing.id, name: ing.name, tag: ing.tag, liquid: ing.liquid, top: ing.top, dash: !!ing.dash })),
+  ingredients: INGREDIENTS.map((ing) => ({ id: ing.id, name: ing.name, tag: ing.tag, liquid: ing.liquid, top: ing.top, dash: !!ing.dash, alcohol: ALCOHOL.has(ing.id) })),
   tools: TOOLS().map(([n, x, y]) => ({ id: n, x, y })),
   glass: { rt: 13, rb: 12, h: 40, cx: 14 },
   cups: { cup_quarter: { rt: 9, rb: 7, h: 13 }, cup_half: { rt: 10, rb: 8, h: 17 }, cup_one: { rt: 11, rb: 9, h: 21 } },

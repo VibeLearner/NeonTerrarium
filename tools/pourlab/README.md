@@ -57,7 +57,10 @@ between the two, it shows only what's in the glass.
 
 - Every guest is a new person, drawn in code from a seed (`guestgen.js`) in a visual-novel pixel style: anime eyes,
   locked hair with a shine, flat light-and-shadow shading, colored outlines. Their crowd sets their clothes (hi-vis and
-  hard hats, hoodies and knits, suits and lanyards, long coats and jewelry) and how they react.
+  hard hats, hoodies and knits, suits and lanyards, long coats and jewelry) and how they react. Each guest is tagged
+  female or male: only men get beards or stubble; women get inked lashes, lip color more often, a lighter build and
+  longer hairstyles more often. Only one thing goes around the neck: a scarf, or headphones (or ear defenders) resting
+  with a cup on each collarbone.
 - Served, they reach for the glass, lift it, drink with their eyes closed, set it down and react: a raised brow and a
   small smile from luxury, a polished thumbs up from commercial, a warm grin from residential, a fist pump (or a
   tongue-out shudder) from industrial.

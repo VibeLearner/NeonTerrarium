@@ -53,7 +53,7 @@ function build() {
       const list = mode === "frames" ? ALL_FRAMES(c, tier, k) : [null]
       for (const [j, f] of list.entries()) {
         const fig = document.createElement("figure"), cv = mk(BOX.w * zoom, (CLIP_Y + 18) * zoom), cap = document.createElement("figcaption")
-        cap.textContent = mode === "frames" ? ["wait", "blink", "reach", "lift", "drink", tier][j] : `${look.top}, ${look.hairStyle}${look.hat ? ", " + look.hat : ""}`
+        cap.textContent = mode === "frames" ? ["wait", "blink", "reach", "lift", "drink", tier][j] : `${look.gender}, ${look.top}, ${look.hairStyle}${look.hat ? ", " + look.hat : ""}`
         fig.append(cv, cap); row.append(fig)
         figures.push({ cv, look, crowd: c, k, fixed: f, zoom, tier, mode })
         if (f) paint(cv, look, f, zoom)

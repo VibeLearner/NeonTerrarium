@@ -214,27 +214,37 @@ const CROWD_STYLE = {
 export function makeLook(seed, crowd) {
   const R = rng(seed * 7919 + 13), C = CROWD_STYLE[crowd]
   const L = { seed, crowd }
-  L.S = 46 + pick(R, [-3, -2, 0, 0, 2, 3])                          // shoulder reach from the middle
+  L.gender = R() < 0.5 ? "female" : "male"                          // a tag: beards, lashes, lips, hair odds and build follow it
+  const fem = L.gender === "female"
+  L.S = 46 + pick(R, [-3, -2, 0, 0, 2, 3]) - (fem ? 3 : 0)          // shoulder reach from the middle
   L.skin = ramp(pick(R, SKIN))
   L.rw = 21 + Math.floor(R() * 3)                                   // face half width
-  L.chin = C.chin[0] + Math.floor(R() * (C.chin[1] - C.chin[0] + 1)) // chin half width: pointed to square
+  L.chin = Math.max(2, C.chin[0] + Math.floor(R() * (C.chin[1] - C.chin[0] + 1)) - (fem ? 1 : 0)) // chin half width: pointed to square
   L.jaw = 0.55 + R() * 0.4                                          // how soon the jaw turns in
   L.eyeGap = 9 + Math.floor(R() * 2)
   L.iris = ramp(pick(R, IRIS))
-  L.lashes = chance(R, 0.45)
-  L.browThick = chance(R, 0.4) ? 2 : C.brows
+  L.lashes = fem || chance(R, 0.12)
+  L.browThick = fem ? 1 : chance(R, 0.45) ? 2 : C.brows
   L.mouthW = 5 + Math.floor(R() * 2)
-  L.lip = chance(R, crowd === "luxury" ? 0.5 : 0.25) ? ramp(pick(R, crowd === "luxury" ? ["#9A2E44", "#B4505E", "#6A1E36"] : ["#C2577E", "#B4505E", "#A86A5A"])) : null
+  L.lip = chance(R, fem ? (crowd === "luxury" ? 0.9 : 0.7) : 0.04) ? ramp(pick(R, crowd === "luxury" ? ["#9A2E44", "#B4505E", "#6A1E36"] : ["#C2577E", "#B4505E", "#A86A5A"])) : null
   L.hair = ramp(chance(R, C.dyed) ? pick(R, HAIR_DYED) : pick(R, C.hair))
-  L.hairStyle = weighted(R, C.hairs)
+  // hairstyle odds lean by gender, without ruling anything out (bald and beards aside)
+  const FEM_HAIR = ["long", "bob", "ponytail", "bun", "updo", "braids", "curly", "waves"], MASC_HAIR = ["short", "spiky", "buzz", "sidepart", "slick", "mohawk", "messy", "bald"]
+  L.hairStyle = weighted(R, C.hairs.map(([h, w]) => [h, fem ? (h === "bald" ? 0 : FEM_HAIR.includes(h) ? w * 3 : MASC_HAIR.includes(h) ? (h === "short" || h === "sidepart" ? w * 0.6 : w * 0.3) : w) : (MASC_HAIR.includes(h) ? w * 3 : FEM_HAIR.includes(h) ? w * 0.25 : w)]))
   L.hat = weighted(R, C.hats)
   L.top = weighted(R, C.tops)
   L.cloth = ramp(pick(R, C.cloth))
   L.under = ramp(pick(R, C.under))
   L.accent = ramp(pick(R, C.accent))
+  const far = (a, b) => Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]) > 150
+  L.scarfCol = far(L.accent[2], L.cloth[2]) ? L.accent : ramp(["#B8433A", "#E6D6AE", "#35558A", "#2F6A4C", "#7A3E78"].find((h) => far(hexRgb(h), L.cloth[2])) || "#E6D6AE")
   L.extras = {}
   for (const [k, p] of Object.entries(C.extras)) L.extras[k] = chance(R, p)
+  if (fem) { L.extras.beard = false; L.extras.stubble = false }
   if (L.extras.beard) L.extras.stubble = false
+  // one thing around the neck at a time
+  if (L.extras.scarf && (L.extras.headphones || L.extras.earmuffs)) L.extras.scarf = false
+  if (L.extras.earmuffs) L.extras.headphones = false
   if (L.hairStyle === "bald" && L.hat && L.hat !== "hardhat") L.hat = null
   if (L.extras.arglasses) L.extras.glasses = false
   if (L.extras.shades) { L.extras.monocle = false; L.extras.glasses = false }
@@ -360,14 +370,22 @@ function collarOver(ctx, ids) {
     for (const s of [-1, 1]) poly(B, id, [[hx + s * (nw - 1), hy + 22], [hx + s * (nw + 9), y0 - 2], [hx + s * (nw + 12), y0 + 12], [hx + s * (nw + 2), y0 + 6]], below)
   }
   if (L.extras.scarf) {
-    const id = B.shape(L.accent, { shade: 3, lit: 2 })
-    capsule(B, id, hx - nw - 4, y0, hx + nw + 4, y0, 4, 4, below)
-    capsule(B, id, hx + nw - 1, y0 + 2, hx + nw + 3, y0 + 22, 3.5, 3, below)
+    // a knit scarf wrapped once round the neck, one end hanging down the front
+    const col = L.scarfCol || L.accent, id = B.shape(col, { shade: 3, deep: 1, lit: 2 }), stripe = B.shape(ramp(rgbToHex(col[1])), { shade: 1 })
+    ellipse(B, id, hx, y0 + 1, nw + 8, 6, below)
+    capsule(B, id, hx + 5, y0 + 4, hx + 8, y0 + 23, 5, 4.5, below)
+    for (const sy of [y0 + 15, y0 + 18]) capsule(B, stripe, hx + 4, sy, hx + 12, sy + 1, 0.8, 0.8, (x, y) => B.at(x, y) === id)
+    for (let fx = -3; fx <= 3; fx += 2) capsule(B, id, hx + 8 + fx, y0 + 26, hx + 8 + fx, y0 + 29, 0.7, 0.7, below)
+    ctx.scarfId = id
   }
   if (L.extras.earmuffs || (L.extras.headphones && L.phonesOnNeck)) {
-    const band = B.shape(ramp("#3A3F48"), { shade: 2 }), cup = B.shape(L.extras.earmuffs ? ramp("#3A3A36") : L.accent, { shade: 3, lit: 2 })
-    capsule(B, band, hx - nw - 6, y0 - 1, hx + nw + 6, y0 - 1, 2, 2, below)
-    for (const s of [-1, 1]) ellipse(B, cup, hx + s * (nw + 7), y0 + 2, 4.5, 5.5, below)
+    // worn around the neck: the band runs behind the neck (only its ends show), a cup rests on each collarbone
+    const band = B.shape(ramp("#3A3F48"), { shade: 2 }), cup = B.shape(L.extras.earmuffs ? ramp(rgbToHex(L.hatCol[2])) : L.accent, { shade: 3, lit: 2 }), pad = B.shape(ramp("#2A2E36"), { shade: 1 })
+    for (const s of [-1, 1]) {
+      capsule(B, band, hx + s * (nw + 1), y0 - 4, hx + s * (nw + 5), y0 - 1, 1.6, 1.6, below)
+      ellipse(B, pad, hx + s * (nw + 6), y0 + 3, 3, 5, below)
+      ellipse(B, cup, hx + s * (nw + 8), y0 + 3, 4, 5.5, below)
+    }
   }
 }
 
@@ -549,12 +567,17 @@ function eye(ctx, C, cx, y, side, kind, look = [0, 0]) {
   let t = EYES[kind] || EYES.open
   if ((kind === "open" || kind === "half" || kind === "wide") && (look[0] || look[1])) t = shiftIris(t, side < 0 ? -look[0] : look[0], look[1])
   if (kind === "side") t = shiftIris(EYES.open, side > 0 ? 1 : -2, 0)
-  const lash = mixc(L.hair[0], INKLINE, 0.6)
+  const fem = L.gender === "female", lash = fem ? INKLINE : mixc(L.hair[0], INKLINE, 0.6)
   const map = { L: lash, i: L.iris[0], m: L.iris[2], n: L.iris[3], p: mixc(L.iris[0], INKLINE, 0.6), h: hexRgb("#FFFFFF"), w: hexRgb("#F6F2EE"), s: mixc(L.skin[0], L.skin[1], 0.5) }
   stamp(C, B, cx - 4, y - 3, t, map, ok, side < 0)
   if (L.lashes && (kind === "open" || kind === "wide" || kind === "half" || kind === "side")) {
     const top = kind === "half" ? y - 1 : y - 3
     P(C, B, side < 0 ? cx - 5 : cx + 4, top, lash, ok); P(C, B, side < 0 ? cx - 6 : cx + 5, top - 1, lash, ok)
+    if (fem && kind !== "half") {
+      for (let i = 0; i <= 3; i++) P(C, B, side < 0 ? cx - 1 - i : cx + i, top - 1, lash, ok)   // thicker lash line
+      P(C, B, side < 0 ? cx - 7 : cx + 6, top - 2, lash, ok)                                     // the flick
+      P(C, B, side < 0 ? cx - 4 : cx + 3, y + 3, lash, ok)                                       // lower lash at the outer corner
+    }
   }
 }
 function shiftIris(t, dx, dy) {

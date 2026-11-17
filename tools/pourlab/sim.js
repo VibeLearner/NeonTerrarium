@@ -11,6 +11,7 @@
 //   state        what something is doing right now (a tool at home, lifted, being strained...); the code moves
 //                things from one state to the next
 import { taste, METHOD, SHAKE_FIZZ_LEFT, INGREDIENTS as FLAVOR, MAX_DASHES } from "./flavor.js"
+import { ITEMS } from "./catalog.js"
 
 export const STEP = 1 / 120
 const GRAV = 520                      // px/s², tuned by feel: a stream falls about 50 px in a third of a second
@@ -29,18 +30,11 @@ const MAX_THROW = 950                 // px/s: the fastest a flick can send a cu
 
 // Pour rates (lab choice: the design doc says each bottle has its own rate, not what they are).
 // flow: parts per second at full tilt. thick: syrups fall in a heavier, steadier stream.
-export const INGREDIENT_RULES = {
-  rice: { flow: 1.6 }, rye: { flow: 1.5 }, rum: { flow: 1.6 }, coffee: { flow: 1.2, thick: true },
-  yuzu: { flow: 1.8 }, ume: { flow: 1.4 }, lemongrass: { flow: 1.1, thick: true }, glow: { flow: 0.9, thick: true },
-  ginger: { flow: 1.6 }, shiso: { flow: 2.0 }, soda: { flow: 2.2 },
-  bitters: { dash: true }, chili: { dash: true },
-}
+// (The rates live in the catalog, catalog.js, with everything else about each bottle.)
+export const INGREDIENT_RULES = Object.fromEntries(Object.entries(ITEMS).filter(([, it]) => it.group !== "garnish")
+  .map(([id, it]) => [id, it.dash ? { dash: true } : { flow: it.flow || 1.4, thick: !!it.thick }]))
 // Names for the readout: the bottles' full names, plus melted ice.
-export const SHORT = {
-  rice: "Clear Grid rice spirit", rye: "Ashline smoked rye", rum: "Neon Cane rum", coffee: "Night Shift coffee liqueur",
-  yuzu: "Yuzu juice", ume: "Ume ferment", lemongrass: "Lemongrass cordial", glow: "Glow syrup", ginger: "Ginger fire",
-  shiso: "Shiso tonic", soda: "Soda water", bitters: "Static bitters", chili: "Chili tincture", water: "Melted ice",
-}
+export const SHORT = { ...Object.fromEntries(Object.entries(ITEMS).map(([id, it]) => [id, it.name])), water: "Melted ice" }
 const isFizzy = (id) => FLAVOR[id].tags.includes("fizz")
 
 export const hexRgb = (h) => [1, 3, 5].map((k) => parseInt(h.slice(k, k + 2), 16))
@@ -91,7 +85,7 @@ export function tasteOf(c) {
   const fz = fizzyOf(c)
   const parts = new Map([...c.parts].filter(([, v]) => v > 1e-6))
   const vol = volOf(c)
-  return taste({ parts, chill: vol > 0 ? c.chillVol / vol : 0, fizz: fz > 0 ? c.fizzKeep / fz : 1, shaken: c.shaken })
+  return taste({ parts, chill: vol > 0 ? c.chillVol / vol : 0, fizz: fz > 0 ? c.fizzKeep / fz : 1, shaken: c.shaken, garnish: c.garnish || null })
 }
 
 export function createSim(L, sizes) {
@@ -599,7 +593,7 @@ export function createSim(L, sizes) {
 
   function emptyGlass() {
     homeSpoon()
-    clearContents(S.glass); S.ice = []
+    clearContents(S.glass); S.glass.garnish = null; S.ice = []
     S.wave.fill(0); S.waveV.fill(0); S.swirls = []; S.bubbles = []; S.foam = 0; S.overflow = 0
     S.fieldReady = false
     S.particles = S.particles.filter((p) => !p.inGlass)

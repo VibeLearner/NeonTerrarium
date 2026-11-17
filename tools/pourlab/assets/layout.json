@@ -85,123 +85,448 @@
    "floor": 266
   }
  ],
+ "slots": [
+  {
+   "x": 18,
+   "group": "spirit"
+  },
+  {
+   "x": 55,
+   "group": "spirit"
+  },
+  {
+   "x": 95,
+   "group": "spirit"
+  },
+  {
+   "x": 132,
+   "group": "spirit"
+  },
+  {
+   "x": 179,
+   "group": "mixer"
+  },
+  {
+   "x": 213,
+   "group": "mixer"
+  },
+  {
+   "x": 250,
+   "group": "mixer"
+  },
+  {
+   "x": 291,
+   "group": "mixer"
+  },
+  {
+   "x": 332,
+   "group": "mixer"
+  },
+  {
+   "x": 366,
+   "group": "mixer"
+  },
+  {
+   "x": 397,
+   "group": "mixer"
+  },
+  {
+   "x": 428,
+   "group": "mixer"
+  },
+  {
+   "x": 461,
+   "group": "mixer"
+  }
+ ],
+ "GROUP_POST": 156,
  "ingredients": [
   {
    "id": "rice",
    "name": "Clear Grid rice spirit",
-   "tag": "RCE",
    "liquid": "#D6ECEC",
+   "glass": "#BFE3E6",
    "top": "spout",
    "dash": false,
-   "alcohol": true
+   "lift": 0
   },
   {
    "id": "rye",
    "name": "Ashline smoked rye",
-   "tag": "RYE",
    "liquid": "#B8682A",
+   "glass": "#C98A4C",
    "top": "spout",
    "dash": false,
-   "alcohol": true
+   "lift": 0
   },
   {
    "id": "rum",
    "name": "Neon Cane rum",
-   "tag": "RUM",
    "liquid": "#D99A3A",
+   "glass": "#E2B266",
    "top": "spout",
    "dash": false,
-   "alcohol": true
+   "lift": 0
   },
   {
    "id": "coffee",
    "name": "Night Shift coffee liqueur",
-   "tag": "COF",
    "liquid": "#3B2418",
+   "glass": "#4A3020",
    "top": "spout",
    "dash": false,
-   "alcohol": true
+   "lift": 0
   },
   {
    "id": "yuzu",
    "name": "Yuzu juice",
-   "tag": "YUZ",
    "liquid": "#F0DC72",
+   "glass": "#F4E9A8",
    "top": "cap",
    "dash": false,
-   "alcohol": false
+   "lift": 0
   },
   {
    "id": "ume",
    "name": "Ume ferment",
-   "tag": "UME",
    "liquid": "#C2577E",
+   "glass": "#B85C7E",
    "top": "spout",
    "dash": false,
-   "alcohol": false
+   "lift": 0
   },
   {
    "id": "lemongrass",
    "name": "Lemongrass cordial",
-   "tag": "LEM",
    "liquid": "#B6D684",
+   "glass": "#CFE3A8",
    "top": "spout",
    "dash": false,
-   "alcohol": false
+   "lift": 0
   },
   {
    "id": "glow",
    "name": "Glow syrup",
-   "tag": "GLO",
    "liquid": "#FF8AD0",
+   "glass": "#FFB8E2",
    "top": "spout",
    "dash": false,
-   "alcohol": false
+   "lift": 8
   },
   {
    "id": "ginger",
    "name": "Ginger fire",
-   "tag": "GIN",
    "liquid": "#E8782C",
+   "glass": "#EE9A5A",
    "top": "crown",
    "dash": false,
-   "alcohol": false
+   "lift": 0
   },
   {
    "id": "shiso",
    "name": "Shiso tonic",
-   "tag": "SHI",
    "liquid": "#B9A2E0",
+   "glass": "#CDBDEA",
    "top": "crown",
    "dash": false,
-   "alcohol": false
+   "lift": 0
   },
   {
    "id": "soda",
    "name": "Soda water",
-   "tag": "SOD",
    "liquid": "#CFE6F0",
+   "glass": "#B8DCEC",
    "top": "crown",
    "dash": false,
-   "alcohol": false
+   "lift": 0
   },
   {
    "id": "bitters",
    "name": "Static bitters",
-   "tag": "BIT",
    "liquid": "#7A2A2A",
+   "glass": "#5C3A2A",
    "top": "dasher",
    "dash": true,
-   "alcohol": false
+   "lift": 16
   },
   {
    "id": "chili",
    "name": "Chili tincture",
-   "tag": "CHI",
    "liquid": "#D23A2A",
+   "glass": "#E06A50",
    "top": "dasher",
    "dash": true,
-   "alcohol": false
+   "lift": 16
+  },
+  {
+   "id": "agave",
+   "name": "Dustline agave",
+   "liquid": "#E8DCA8",
+   "glass": "#D8E4C0",
+   "top": "spout",
+   "dash": false,
+   "lift": 0
+  },
+  {
+   "id": "gin",
+   "name": "Circuit gin",
+   "liquid": "#CFEFE8",
+   "glass": "#A8DCD0",
+   "top": "spout",
+   "dash": false,
+   "lift": 0
+  },
+  {
+   "id": "brandy",
+   "name": "Orchard brandy",
+   "liquid": "#A8501E",
+   "glass": "#C07A40",
+   "top": "spout",
+   "dash": false,
+   "lift": 0
+  },
+  {
+   "id": "shochu",
+   "name": "Lowline barley shochu",
+   "liquid": "#EEEAD8",
+   "glass": "#E0DCC8",
+   "top": "spout",
+   "dash": false,
+   "lift": 0
+  },
+  {
+   "id": "lychee",
+   "name": "Pearl lychee liqueur",
+   "liquid": "#F4D8DE",
+   "glass": "#F2C8D4",
+   "top": "spout",
+   "dash": false,
+   "lift": 0
+  },
+  {
+   "id": "amaro",
+   "name": "Undergrid amaro",
+   "liquid": "#4A1E14",
+   "glass": "#5A2E20",
+   "top": "spout",
+   "dash": false,
+   "lift": 0
+  },
+  {
+   "id": "cream",
+   "name": "Moonmilk cream liqueur",
+   "liquid": "#E8DCC8",
+   "glass": "#D8CCB8",
+   "top": "cap",
+   "dash": false,
+   "lift": 0
+  },
+  {
+   "id": "anise",
+   "name": "Greenwire anise",
+   "liquid": "#9FD86A",
+   "glass": "#B8E890",
+   "top": "spout",
+   "dash": false,
+   "lift": 0
+  },
+  {
+   "id": "whiskey",
+   "name": "Copper corn whiskey",
+   "liquid": "#C87A2A",
+   "glass": "#D89A4A",
+   "top": "spout",
+   "dash": false,
+   "lift": 0
+  },
+  {
+   "id": "bloom",
+   "name": "Bloom elderflower liqueur",
+   "liquid": "#F0E6A0",
+   "glass": "#F4F0C8",
+   "top": "spout",
+   "dash": false,
+   "lift": 0
+  },
+  {
+   "id": "passion",
+   "name": "Passionfruit pulp",
+   "liquid": "#F2B830",
+   "glass": "#F4CC70",
+   "top": "cap",
+   "dash": false,
+   "lift": 0
+  },
+  {
+   "id": "shrub",
+   "name": "Berry shrub",
+   "liquid": "#9A2A5A",
+   "glass": "#B04A72",
+   "top": "spout",
+   "dash": false,
+   "lift": 0
+  },
+  {
+   "id": "peach",
+   "name": "Peach nectar",
+   "liquid": "#F4A878",
+   "glass": "#F4C0A0",
+   "top": "cap",
+   "dash": false,
+   "lift": 0
+  },
+  {
+   "id": "pineapple",
+   "name": "Pineapple juice",
+   "liquid": "#F4E070",
+   "glass": "#F4E8A8",
+   "top": "crown",
+   "dash": false,
+   "lift": 0
+  },
+  {
+   "id": "grapefruit",
+   "name": "Pink grapefruit",
+   "liquid": "#F4A098",
+   "glass": "#F4C0B8",
+   "top": "cap",
+   "dash": false,
+   "lift": 0
+  },
+  {
+   "id": "coconut",
+   "name": "Coconut cream",
+   "liquid": "#F2EEE6",
+   "glass": "#E8E4DC",
+   "top": "cap",
+   "dash": false,
+   "lift": 0
+  },
+  {
+   "id": "orgeat",
+   "name": "Orgeat",
+   "liquid": "#F0E2C8",
+   "glass": "#E8DCC0",
+   "top": "spout",
+   "dash": false,
+   "lift": 0
+  },
+  {
+   "id": "honey",
+   "name": "Honey syrup",
+   "liquid": "#E8A830",
+   "glass": "#F0C060",
+   "top": "spout",
+   "dash": false,
+   "lift": 8
+  },
+  {
+   "id": "rose",
+   "name": "Rose water",
+   "liquid": "#F4A0B8",
+   "glass": "#F4C0D0",
+   "top": "dasher",
+   "dash": true,
+   "lift": 16
+  },
+  {
+   "id": "lavender",
+   "name": "Lavender syrup",
+   "liquid": "#B8A0E8",
+   "glass": "#CCC0F0",
+   "top": "spout",
+   "dash": false,
+   "lift": 0
+  },
+  {
+   "id": "hibiscus",
+   "name": "Hibiscus tea",
+   "liquid": "#C02A4A",
+   "glass": "#D05A70",
+   "top": "crown",
+   "dash": false,
+   "lift": 0
+  },
+  {
+   "id": "matcha",
+   "name": "Matcha",
+   "liquid": "#8CC46A",
+   "glass": "#A8D88A",
+   "top": "cap",
+   "dash": false,
+   "lift": 0
+  },
+  {
+   "id": "lapsang",
+   "name": "Smoked black tea",
+   "liquid": "#6A3A1E",
+   "glass": "#7A4A2A",
+   "top": "spout",
+   "dash": false,
+   "lift": 0
+  },
+  {
+   "id": "cola",
+   "name": "Cyber cola",
+   "liquid": "#3A1A10",
+   "glass": "#4A2A1A",
+   "top": "crown",
+   "dash": false,
+   "lift": 0
+  },
+  {
+   "id": "tonic",
+   "name": "Quinine tonic",
+   "liquid": "#E8F4F0",
+   "glass": "#D0E8E8",
+   "top": "crown",
+   "dash": false,
+   "lift": 0
+  },
+  {
+   "id": "pandan",
+   "name": "Pandan syrup",
+   "liquid": "#5AB86A",
+   "glass": "#80CC88",
+   "top": "spout",
+   "dash": false,
+   "lift": 0
+  },
+  {
+   "id": "miso",
+   "name": "Miso caramel",
+   "liquid": "#B8702A",
+   "glass": "#C88A4A",
+   "top": "cap",
+   "dash": false,
+   "lift": 0
+  },
+  {
+   "id": "mint",
+   "name": "Mint cordial",
+   "liquid": "#9AE8C0",
+   "glass": "#B8F0D8",
+   "top": "spout",
+   "dash": false,
+   "lift": 0
+  },
+  {
+   "id": "cardamom",
+   "name": "Cardamom tincture",
+   "liquid": "#D8C070",
+   "glass": "#E8D890",
+   "top": "dasher",
+   "dash": true,
+   "lift": 16
+  },
+  {
+   "id": "cacao",
+   "name": "Cacao bitters",
+   "liquid": "#3A1E14",
+   "glass": "#4A2A1A",
+   "top": "dasher",
+   "dash": true,
+   "lift": 16
   }
  ],
  "tools": [

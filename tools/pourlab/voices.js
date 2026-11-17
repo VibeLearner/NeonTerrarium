@@ -466,6 +466,178 @@ const X = {
   },
 }
 
+// ---------------------------------------------------------------- the newer notes and garnishes
+// Fruity, Floral and Creamy came with the bought ingredients, and garnishes with the supplier. Same rules: a plain cue
+// for the note (fruit or fruity, flower or floral, cream or creamy) and for how much, in each crowd's own voice.
+// garnish[family]: how they ask for something on top (citrus, herb, fruit, rim, flower, spice, smoke, roast, sweet).
+// garnishMiss.none / .other: what they say when it's missing, or not the kind they asked for.
+const NEWER = {
+  industrial: {
+    ask: {
+      fruity: [
+        ["no fruit, I'm not at a picnic", "keep the fruit out of it", "zero fruit, just the hard stuff"],
+        ["a hint of fruit, barely there", "a speck of fruit", "just a whiff of fruit"],
+        ["some fruit, like a canteen fruit cup", "fruity enough to notice", "a fair bit of fruit"],
+        ["properly fruity, like a crate of busted peaches", "loads of fruit", "real fruity, fruit-truck fruity"],
+        ["as fruity as a burst juice tank", "max fruit, flood it", "all the fruit you've got"],
+      ],
+      floral: [
+        ["no flowers, I'm not a florist", "nothing floral", "keep the flower stuff away"],
+        ["a whiff of flowers, no more", "barely floral", "one petal's worth of flower"],
+        ["some flowers, like the weeds by the loading bay", "floral, a bit", "some flower in it"],
+        ["really floral, like the greenhouse vents", "plenty of flowers", "floral, heavy on it"],
+        ["as floral as a burst perfume crate", "max flowers", "drown it in flowers"],
+      ],
+      creamy: [
+        ["no cream, it sits like grease", "nothing creamy", "skip the cream"],
+        ["a splash of cream", "barely creamy", "a dribble of cream"],
+        ["some cream, like a vending machine latte", "creamy enough", "a bit of cream in it"],
+        ["really creamy, thick as a canteen milkshake", "plenty of cream", "creamy, proper creamy"],
+        ["as creamy as you can pour it", "max cream", "all cream, no compromise"],
+      ],
+    },
+    more: { fruity: ["More fruit next time.", "Where's the fruit?", "Needed more fruit, boss."], floral: ["Couldn't smell the flowers.", "More flower next time.", "Needed more floral."], creamy: ["Needed more cream.", "Thin. More cream.", "Could be creamier."] },
+    less: { fruity: ["Too much fruit, tastes like a juice box.", "Ease off the fruit.", "Way too fruity."], floral: ["Too floral, like drinking soap.", "Tone the flowers down.", "Too many flowers in that."], creamy: ["Too creamy, sits heavy.", "Less cream, it's gluey.", "Way too much cream."] },
+    spot: { fruity: ["Fruit's spot on.", "That fruit hit right.", "Good fruit in that."], floral: ["The flowers work, weirdly.", "Flower bit's right.", "Floral's just right."], creamy: ["Cream's perfect.", "Good and creamy.", "Creamy, just right."] },
+    garnish: {
+      citrus: ["stick some citrus peel on it", "a citrus slice on the rim, whatever", "throw a bit of citrus on top"],
+      herb: ["shove a green sprig in it", "an herb sprig on top", "something leafy on top, an herb"],
+      fruit: ["a bit of fruit on a stick", "stab some fruit on top", "fruit on a pick, on top"],
+      rim: ["something on the rim", "crust the rim with something", "do the rim thing"],
+      flower: ["a flower on top, for the photo", "stick a flower on it", "a flower floating on top"],
+      spice: ["some spice on top", "dust it with spice", "spice sprinkled on top"],
+      smoke: ["something smoking on top", "a smoking sprig on it", "top it with something that smokes"],
+      roast: ["roasted beans on top", "a few roasted beans on it", "top it with roasted beans"],
+      sweet: ["something sweet on top", "a sweet thing on top", "stick a sweet on top"],
+    },
+    garnishMiss: { none: ["Forgot the garnish.", "No garnish? I asked.", "Where's the thing on top?"], other: ["Wrong garnish.", "That's not the garnish I said.", "Wrong thing on top."] },
+  },
+  residential: {
+    ask: {
+      fruity: [
+        ["nothing fruity, I had fruit salad all week", "no fruit for me, thank you", "keep the fruit in the bowl, please"],
+        ["just a little fruit, like a jam smear", "a hint of fruit", "a touch of fruit, love"],
+        ["fruity, like Sunday smoothies", "some fruit, like the corner shop's punch", "nicely fruity"],
+        ["really fruity, like a summer orchard", "lots of fruit, like my aunt's fruit cake", "properly fruity, please"],
+        ["as fruity as a whole market stall", "all the fruit in the building", "as much fruit as it'll hold"],
+      ],
+      floral: [
+        ["no flowers, they make me sneeze", "nothing floral, please", "skip the flowers, dear"],
+        ["a hint of flowers, like a window box", "just a touch floral", "barely floral, like a spring breeze"],
+        ["floral, like the community garden", "some flowers, like Grandma's perfume", "nicely floral"],
+        ["really floral, like a wedding bouquet", "lots of flowers, please", "very floral, like the rooftop roses"],
+        ["as floral as a flower show", "flowers, flowers, all the flowers", "as floral as you can go"],
+      ],
+      creamy: [
+        ["nothing creamy for me", "no cream tonight, thanks", "skip the cream, sweetheart"],
+        ["a little splash of cream", "just a touch creamy", "a hint of cream, like in my tea"],
+        ["creamy, like a warm rice pudding", "some cream, like a milky coffee", "nicely creamy"],
+        ["really creamy, like a bakery cake", "lots of cream, please", "very creamy, like a milkshake"],
+        ["as creamy as a whole cream jug", "creamiest you can make it", "as much cream as it'll take"],
+      ],
+    },
+    more: { fruity: ["A bit more fruit would be lovely.", "I wanted it fruitier.", "Needs more fruit, love."], floral: ["I could hardly smell the flowers.", "A touch more floral next time.", "More flowers, I think."], creamy: ["A bit creamier next time.", "More cream, I'd say.", "I wanted it creamier, dear."] },
+    less: { fruity: ["A bit too fruity for me.", "Bit much on the fruit.", "Less fruit next time, love."], floral: ["Too floral, like a soap shop.", "A bit much on the flowers.", "Less flowers next time."], creamy: ["A bit too creamy for me.", "Too much cream, I'm stuffed.", "Less cream next time, dear."] },
+    spot: { fruity: ["Oh, that fruit is lovely.", "The fruit is just right.", "Fruity, just how I like it."], floral: ["Those flowers are so pretty.", "Floral, just right.", "Lovely flower notes."], creamy: ["Creamy, just like home.", "That cream is perfect.", "Lovely and creamy."] },
+    garnish: {
+      citrus: ["with a little citrus peel on top", "a slice of citrus on it, please", "a twist of citrus, like Mum did"],
+      herb: ["a little sprig of herb on top", "something green on top, a sprig", "an herb on top, from the window box"],
+      fruit: ["a bit of fruit on a stick, please", "with fruit on top", "a little fruit on a pick"],
+      rim: ["something nice on the rim", "a rim, like on taco night", "do the rim, please"],
+      flower: ["a pretty flower on top", "a little flower on it, please", "with a flower floating on it"],
+      spice: ["a little spice sprinkled on top", "dust some spice on it, please", "a pinch of spice on top"],
+      smoke: ["something smoky on top, for the show", "a little smoking sprig on it", "a smoky garnish, please"],
+      roast: ["a few roasted beans on top", "coffee beans on top, like the cafe does", "roasted beans on it, please"],
+      sweet: ["a sweet treat on top", "something sweet on top, please", "a little sweet on it"],
+    },
+    garnishMiss: { none: ["Oh, no garnish this time?", "I did ask for a garnish, love.", "You forgot my garnish."], other: ["Not quite the garnish I meant.", "Oh, a different garnish. Fine.", "That's not the garnish I asked for."] },
+  },
+  commercial: {
+    ask: {
+      fruity: [
+        ["zero fruit, no fruit", "nothing fruity, please", "fruit-free, thanks"],
+        ["a hint of fruit, minimal", "a trace of fruit", "light on the fruit"],
+        ["fruity, mid-range", "moderately fruity", "some fruit, nothing extreme"],
+        ["fruity, clearly fruity", "high fruit content", "really fruity, make it obvious"],
+        ["maximum fruit", "fruit at full capacity", "as fruity as possible"],
+      ],
+      floral: [
+        ["no florals", "nothing floral, it's a meeting night", "zero flowers"],
+        ["a light floral note", "floral, but only just", "a hint of florals"],
+        ["floral, like a hotel lobby", "moderately floral", "some florals"],
+        ["strongly floral", "really floral, a statement", "floral, front and center"],
+        ["maximum floral", "florals at full volume", "as floral as possible"],
+      ],
+      creamy: [
+        ["no cream", "nothing creamy, I have a call later", "cream-free"],
+        ["a light touch of cream", "minimal cream", "a hint of cream"],
+        ["creamy, like a flat white", "moderately creamy", "some cream"],
+        ["really creamy", "high cream", "creamy, clearly creamy"],
+        ["maximum cream", "cream at full capacity", "as creamy as possible"],
+      ],
+    },
+    more: { fruity: ["Underdelivered on fruit.", "More fruit, next round.", "Fruit was below target."], floral: ["Florals were missing.", "Floral was under-resourced.", "Below target on flowers."], creamy: ["Needed more cream, frankly.", "Cream was below target.", "More cream next round."] },
+    less: { fruity: ["Overdid the fruit.", "Fruit was over target.", "Dial the fruit back."], floral: ["Florals were overpowering.", "Too floral for a work night.", "Dial back the flowers."], creamy: ["Overdid the cream.", "Cream was over target.", "Too creamy, too heavy."] },
+    spot: { fruity: ["Fruit was on target.", "Fruit, nailed it.", "Excellent fruit balance."], floral: ["Florals on point.", "The floral note, nailed it.", "Good floral work."], creamy: ["Cream on target.", "Creamy, exactly right.", "Excellent cream level."] },
+    garnish: {
+      citrus: ["citrus garnish, please", "finish it with citrus peel", "a citrus twist on top"],
+      herb: ["an herb garnish", "finish with an herb sprig", "a sprig of herb, for presentation"],
+      fruit: ["a fruit garnish", "finish it with fruit on a pick", "fruit on top, for the photo"],
+      rim: ["a rimmed glass", "rim it, please", "something on the rim, for presentation"],
+      flower: ["a flower garnish", "finish with a flower", "a flower on top, it photographs well"],
+      spice: ["a spice garnish", "finish with a dusting of spice", "spice on top, please"],
+      smoke: ["a smoking garnish, for the wow factor", "finish with something smoking", "a smoke garnish"],
+      roast: ["a roasted bean garnish", "finish with roasted beans", "beans on top, roasted"],
+      sweet: ["a sweet garnish", "finish it with something sweet", "a sweet on top"],
+    },
+    garnishMiss: { none: ["Missing the garnish I asked for.", "No garnish. Noted.", "The garnish didn't ship."], other: ["Wrong garnish spec.", "Garnish was off-brief.", "Not the garnish I ordered."] },
+  },
+  luxury: {
+    ask: {
+      fruity: [
+        ["no fruit, if you would", "nothing fruity", "spare me the fruit"],
+        ["the faintest suggestion of fruit", "a whisper of fruit", "a hint of fruit, very discreet"],
+        ["fruity, like a good old port", "a measured amount of fruit", "some fruit, nothing showy"],
+        ["generously fruity, like an orchard in late summer", "rich with fruit", "decidedly fruity"],
+        ["as fruity as a vintage preserve", "an extravagance of fruit", "fruit, as much as you dare"],
+      ],
+      floral: [
+        ["no florals, please", "nothing floral this evening", "keep the flowers in the vase"],
+        ["a whisper of flowers", "the faintest floral note", "barely floral, like a pressed flower"],
+        ["floral, like an old conservatory", "a measured floral note", "some flowers, tastefully"],
+        ["richly floral, like a spring gala", "decidedly floral", "generous with the flowers"],
+        ["as floral as a royal garden", "an extravagance of flowers", "flowers, as many as you dare"],
+      ],
+      creamy: [
+        ["no cream, if you would", "nothing creamy this evening", "spare me the cream"],
+        ["a whisper of cream", "the faintest touch of cream", "barely creamy, a mere suggestion"],
+        ["creamy, like a fine custard", "a measured amount of cream", "some cream, tastefully"],
+        ["richly creamy, like a good custard tart", "decidedly creamy", "generous with the cream"],
+        ["as creamy as the finest dessert trolley", "an extravagance of cream", "cream, as much as you dare"],
+      ],
+    },
+    more: { fruity: ["Wanting for fruit, I'm afraid.", "A touch more fruit, perhaps.", "The fruit was rather shy."], floral: ["The flowers were rather shy.", "A touch more floral, perhaps.", "Wanting for flowers, I'm afraid."], creamy: ["Wanting for cream, I'm afraid.", "A touch more cream, perhaps.", "The cream was rather shy."] },
+    less: { fruity: ["Rather too fruity.", "The fruit was a little loud.", "Less fruit, I think."], floral: ["Rather too floral, like a perfume counter.", "The flowers were a little loud.", "Fewer flowers, I think."], creamy: ["Rather too creamy.", "The cream was a little heavy.", "Less cream, I think."] },
+    spot: { fruity: ["The fruit is exquisite.", "Beautifully fruity.", "The fruit is judged perfectly."], floral: ["The florals are exquisite.", "Beautifully floral.", "The flowers are judged perfectly."], creamy: ["The cream is exquisite.", "Beautifully creamy.", "The cream is judged perfectly."] },
+    garnish: {
+      citrus: ["finished with a citrus twist", "a twist of citrus peel, if you would", "with a sliver of citrus on top"],
+      herb: ["finished with a sprig of herb", "an herb sprig, if you would", "with a fresh herb on top"],
+      fruit: ["finished with fruit on a pick", "a piece of fruit on top, if you would", "with a little fruit on top"],
+      rim: ["a rimmed glass, if you would", "finished with something on the rim", "with the rim dressed"],
+      flower: ["finished with a single flower", "a flower on top, if you would", "with an edible flower on top"],
+      spice: ["finished with a little spice on top", "a dusting of spice, if you would", "with spice grated over the top"],
+      smoke: ["finished with something gently smoking", "a smoking sprig, if you would", "with a wisp of smoke on top"],
+      roast: ["finished with roasted beans", "three roasted beans on top, if you would", "with a few roasted beans"],
+      sweet: ["finished with something sweet", "a little sweet on top, if you would", "with a sweet on a pick"],
+    },
+    garnishMiss: { none: ["No garnish, I see.", "I had hoped for the garnish.", "The garnish seems to have been forgotten."], other: ["Not quite the garnish I had in mind.", "An unexpected garnish.", "A different garnish than I asked for."] },
+  },
+}
+for (const [crowd, v] of Object.entries(NEWER)) {
+  const into = { industrial: I, residential: R, commercial: C, luxury: X }[crowd]
+  for (const [kind, sets] of Object.entries(v)) into[kind] = { ...(into[kind] || {}), ...sets }
+}
+
 export const VOICES = { industrial: I, residential: R, commercial: C, luxury: X }
 
 // ---------------------------------------------------------------- picking lines without repeats

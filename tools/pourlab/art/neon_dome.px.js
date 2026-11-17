@@ -49,7 +49,7 @@ const TOP = 13
 // the speed rail: its front plate's top, and the trough floor the bottles stand in (below the screen's edge)
 const RAIL_TOP = 254, BOTTLE_FLOOR = 282
 // the short dashers stand on a riser at the end of the rail, the round Glow syrup on a smaller one
-const lift = (ing) => (ing.dash ? 16 : ing.id === "glow" ? 8 : 0)
+const lift = (ing) => (ing.dash ? 16 : ing.lift || (ing.id === "glow" ? 8 : 0))
 function drawBottle(c, spec) {
   const rows = bottleProfile(spec.segs), n = rows.length, mh = Math.max(...rows), cx = mh + 4
   const level = Math.round(n * (1 - spec.fill))
@@ -132,7 +132,71 @@ const INGREDIENTS = [
     segs: [[3, 1, 1], [2, 1, 4], [20, 4, 4]], label: [17, 12, "#F2E4C8", "#7A2A2A"] },
   { id: "chili", name: "Chili tincture", tag: "CHI", liquid: "#D23A2A", glass: "#E06A50", fill: 0.7, top: "dasher", dash: true,
     segs: [[4, 1, 1], [1, 1, 3], ["bulb", 6], [2, 5, 5]], label: null },
+  // ---- bought at the supplier: 10 spirits (alcohol) and 20 flavors. Each its own silhouette and color; no body
+  // wider than 6 before scaling, so any bottle fits any rail slot without touching its neighbors.
+  { id: "agave", name: "Dustline agave", liquid: "#E8DCA8", glass: "#D8E4C0", fill: 0.74, top: "spout",
+    segs: [[3, 1, 1], [3, 1, 5], [32, 5, 5]], label: [21, 9, "#3A2A1A", "#E8B060"] },
+  { id: "gin", name: "Circuit gin", liquid: "#CFEFE8", glass: "#A8DCD0", fill: 0.78, top: "spout",
+    segs: [[6, 1, 1], [3, 1, 4], [30, 4, 5]], label: [20, 8, "#F2E4C8", "#2F6B68"] },
+  { id: "brandy", name: "Orchard brandy", liquid: "#A8501E", glass: "#C07A40", fill: 0.7, top: "spout",
+    segs: [[5, 1, 1], [2, 1, 5], [26, 5, 6]], label: [18, 8, "#E8D8B0", "#A8501E"] },
+  { id: "shochu", name: "Lowline barley shochu", liquid: "#EEEAD8", glass: "#E0DCC8", fill: 0.82, top: "spout",
+    segs: [[3, 2, 2], [2, 2, 5], [32, 5, 5]], label: [22, 10, "#262E26", "#C9D7E8"] },
+  { id: "lychee", name: "Pearl lychee liqueur", liquid: "#F4D8DE", glass: "#F2C8D4", fill: 0.7, top: "spout",
+    segs: [[4, 1, 1], [6, 1, 4], [26, 4, 5]], label: [19, 7, "#F2E4C8", "#E6A9CF"] },
+  { id: "amaro", name: "Undergrid amaro", liquid: "#4A1E14", glass: "#5A2E20", fill: 0.8, top: "spout",
+    segs: [[3, 2, 2], [3, 2, 6], [26, 6, 6]], label: [19, 10, "#E8D8B0", "#7A2A2A"] },
+  { id: "cream", name: "Moonmilk cream liqueur", liquid: "#E8DCC8", glass: "#D8CCB8", fill: 0.85, top: "cap", cap: "#3B2418",
+    segs: [[3, 2, 2], [4, 2, 5], [24, 5, 5]], label: [18, 9, "#3B2418", "#E8DCC8"] },
+  { id: "anise", name: "Greenwire anise", liquid: "#9FD86A", glass: "#B8E890", fill: 0.66, top: "spout",
+    segs: [[9, 1, 1], [3, 1, 3], [28, 3, 4]], label: [20, 8, "#1C231E", "#9FD86A"] },
+  { id: "whiskey", name: "Copper corn whiskey", liquid: "#C87A2A", glass: "#D89A4A", fill: 0.76, top: "spout",
+    segs: [[5, 1, 1], [2, 1, 6], [27, 6, 6]], label: [20, 9, "#1C231E", "#E8B060"] },
+  { id: "bloom", name: "Bloom elderflower liqueur", liquid: "#F0E6A0", glass: "#F4F0C8", fill: 0.72, top: "spout",
+    segs: [[7, 1, 1], [5, 1, 5], [24, 5, 4]], label: [18, 8, "#4F9C96", "#F2E4C8"] },
+  { id: "passion", name: "Passionfruit pulp", liquid: "#F2B830", glass: "#F4CC70", fill: 0.74, top: "cap", cap: "#5A2E4A",
+    segs: [[3, 2, 2], [4, 2, 5], [28, 5, 5]], label: [20, 8, "#5A2E4A", "#F2B830"] },
+  { id: "shrub", name: "Berry shrub", liquid: "#9A2A5A", glass: "#B04A72", fill: 0.7, top: "spout",
+    segs: [[4, 1, 1], [3, 1, 4], [28, 4, 4]], label: [20, 8, "#F2E4C8", "#9A2A5A"] },
+  { id: "peach", name: "Peach nectar", liquid: "#F4A878", glass: "#F4C0A0", fill: 0.78, top: "cap", cap: "#F2E4C8",
+    segs: [[3, 2, 2], [2, 2, 5], [26, 5, 6]], label: [19, 8, "#E8822A", "#F2E4C8"] },
+  { id: "pineapple", name: "Pineapple juice", liquid: "#F4E070", glass: "#F4E8A8", fill: 0.8, top: "crown", cap: "#E8B060",
+    segs: [[3, 2, 2], [3, 2, 5], [30, 5, 5]], label: [21, 8, "#2F6B68", "#F4E070"] },
+  { id: "grapefruit", name: "Pink grapefruit", liquid: "#F4A098", glass: "#F4C0B8", fill: 0.76, top: "cap", cap: "#E8786A",
+    segs: [[3, 2, 2], [4, 2, 5], [30, 5, 5]], label: [21, 8, "#F2E4C8", "#E8786A"] },
+  { id: "coconut", name: "Coconut cream", liquid: "#F2EEE6", glass: "#E8E4DC", fill: 0.82, top: "cap", cap: "#5A3A28",
+    segs: [[3, 2, 2], [2, 2, 6], [24, 6, 6]], label: [18, 9, "#5A3A28", "#F2EEE6"] },
+  { id: "orgeat", name: "Orgeat", liquid: "#F0E2C8", glass: "#E8DCC0", fill: 0.7, top: "spout",
+    segs: [[6, 1, 1], [3, 1, 4], [26, 4, 5]], label: [19, 8, "#7A4A30", "#F0E2C8"] },
+  { id: "honey", name: "Honey syrup", liquid: "#E8A830", glass: "#F0C060", fill: 0.72, top: "spout", lift: 8,
+    segs: [[6, 1, 1], [2, 1, 2], ["bulb", 7], [3, 5, 5]], label: null },
+  { id: "rose", name: "Rose water", liquid: "#F4A0B8", glass: "#F4C0D0", fill: 0.66, top: "dasher", dash: true,
+    segs: [[3, 1, 1], [2, 1, 4], [18, 4, 4]], label: [15, 10, "#F2E4C8", "#E06A90"] },
+  { id: "lavender", name: "Lavender syrup", liquid: "#B8A0E8", glass: "#CCC0F0", fill: 0.7, top: "spout",
+    segs: [[5, 1, 1], [3, 1, 4], [28, 4, 5]], label: [20, 8, "#F2E4C8", "#8A6AC8"] },
+  { id: "hibiscus", name: "Hibiscus tea", liquid: "#C02A4A", glass: "#D05A70", fill: 0.78, top: "crown", cap: "#B4304E",
+    segs: [[3, 2, 2], [3, 2, 5], [30, 5, 5]], label: [21, 8, "#F2E4C8", "#C02A4A"] },
+  { id: "matcha", name: "Matcha", liquid: "#8CC46A", glass: "#A8D88A", fill: 0.76, top: "cap", cap: "#2F6B48",
+    segs: [[3, 2, 2], [2, 2, 6], [26, 6, 6]], label: [19, 9, "#F2E4C8", "#2F6B48"] },
+  { id: "lapsang", name: "Smoked black tea", liquid: "#6A3A1E", glass: "#7A4A2A", fill: 0.78, top: "spout",
+    segs: [[4, 1, 1], [3, 1, 5], [28, 5, 5]], label: [20, 8, "#C9D7E8", "#3A2218"] },
+  { id: "cola", name: "Cyber cola", liquid: "#3A1A10", glass: "#4A2A1A", fill: 0.84, top: "crown", cap: "#D83A3A",
+    segs: [[3, 1, 1], [4, 1, 4], [2, 4, 3], [4, 3, 4], [20, 4, 4]], label: [18, 7, "#D83A3A", "#F2E4C8"] },
+  { id: "tonic", name: "Quinine tonic", liquid: "#E8F4F0", glass: "#D0E8E8", fill: 0.84, top: "crown", cap: "#E8EEF0",
+    segs: [[3, 1, 1], [4, 1, 4], [30, 4, 4]], label: [21, 7, "#2F6B68", "#E8F4F0"] },
+  { id: "pandan", name: "Pandan syrup", liquid: "#5AB86A", glass: "#80CC88", fill: 0.7, top: "spout",
+    segs: [[5, 2, 2], [1, 2, 5], [30, 5, 5]], label: [21, 8, "#F2E4C8", "#2F6B48"] },
+  { id: "miso", name: "Miso caramel", liquid: "#B8702A", glass: "#C88A4A", fill: 0.74, top: "cap", cap: "#262E26",
+    segs: [[2, 3, 3], [1, 3, 6], [22, 6, 6]], label: [17, 9, "#262E26", "#E8B060"] },
+  { id: "mint", name: "Mint cordial", liquid: "#9AE8C0", glass: "#B8F0D8", fill: 0.72, top: "spout",
+    segs: [[6, 1, 1], [2, 1, 4], [30, 4, 4]], label: [21, 8, "#2F6B68", "#9AE8C0"] },
+  { id: "cardamom", name: "Cardamom tincture", liquid: "#D8C070", glass: "#E8D890", fill: 0.68, top: "dasher", dash: true,
+    segs: [[4, 1, 1], [1, 1, 3], ["bulb", 6], [2, 5, 5]], label: null },
+  { id: "cacao", name: "Cacao bitters", liquid: "#3A1E14", glass: "#4A2A1A", fill: 0.66, top: "dasher", dash: true,
+    segs: [[3, 1, 1], [2, 1, 4], [20, 4, 4]], label: [16, 10, "#E8D8B0", "#3A1E14"] },
 ]
+// the starter set, in rail order: the rail's 13 slots are laid out for these (any bottle fits any slot on its side)
+const STARTER_ART = INGREDIENTS.slice(0, 13)
 // The bottles are the thing the player handles most, so they're big: 1.8x the profiles above, about twice the
 // glass's height as real bottles are (and nearer to us than it). The rail plate hides their lower bodies.
 // Interactive scale: everything the player picks up shares one size class, a little larger than life. The game
@@ -158,6 +222,154 @@ for (const ing of INGREDIENTS) {
   // hovered: a gold ring round the dark outline, the look the pour page uses for "you can pick this up"
   sprite("bottle_" + ing.id + "_hover", { base: "bottle_" + ing.id, outline: "G" })
 }
+
+// ================================================================ garnishes
+// Ten small icons, 12 px, drawn pixel by pixel (grids, one letter per color) and outlined by pxl. The pour page shows
+// them in the garnish tray's picker and on the glass. Light comes from the upper left like everything else.
+const gridDraw = (c, rows, map, ox = 0, oy = 0) => rows.forEach((r, y) => [...r].forEach((ch, x) => { if (map[ch]) c.px(ox + x, oy + y, map[ch]) }))
+const GARNISH_ART = {
+  twist: { map: { y: "#F4D040", Y: "#FFF0A0", d: "#C8A020" }, rows: [
+    "............",
+    ".......yy...",
+    "......yYYd..",
+    ".....yYd.d..",
+    ".....yd.....",
+    "......yd....",
+    ".......yd...",
+    "......yYd...",
+    ".....yYd....",
+    "....yYd.....",
+    "....yd......",
+    "............"] },
+  mintsprig: { map: { L: "#5FC07A", l: "#A8ECB8", D: "#3A7A4A", s: "#4A8A4A" }, rows: [
+    ".....LL.....",
+    "....LlLD....",
+    "...LlLLD.LL.",
+    "...LLLD.LlLD",
+    "....DDs.LLLD",
+    "..LL..sDDD..",
+    ".LlLD.s.....",
+    ".LLLLDsLL...",
+    "..DDDDsLlL..",
+    "......sLLD..",
+    "......s.....",
+    "......s....."] },
+  rosemary: { map: { g: "#7A9A6A", G: "#A8C098", s: "#5A6A4A", w: "#C9D7E8", W: "#E4E9EE" }, rows: [
+    "....w.......",
+    "...W.w......",
+    "....w.......",
+    ".....s......",
+    "...Gsg......",
+    "....sgG.....",
+    "...Gsg......",
+    "....sgG.....",
+    "...Gsg......",
+    "....sg......",
+    ".....s......",
+    ".....s......"] },
+  cherry: { map: { R: "#B4203A", r: "#F07080", D: "#7A1028", s: "#5A7A3A" }, rows: [
+    ".......ss...",
+    "......s.....",
+    ".....s......",
+    "....s.......",
+    "...s........",
+    "..RRR.......",
+    ".RrRRR......",
+    "RrRRRRD.....",
+    "RRRRRRD.....",
+    "RRRRRDD.....",
+    ".RDDDD......",
+    "............"] },
+  salt: { map: { W: "#F6F8F8", w: "#C8D2D6", d: "#9AA8AE" }, rows: [
+    "............",
+    "............",
+    "............",
+    "............",
+    ".....W......",
+    "....WwW..W..",
+    "...WwWwW.wW.",
+    "..WWwWWwWwW.",
+    ".WwWWwWWWWwW",
+    ".wwddwwdwwdw",
+    "............",
+    "............"] },
+  chilirim: { map: { R: "#D8503A", r: "#F4906A", W: "#F6F8F8", D: "#9A2A1E" }, rows: [
+    "............",
+    "............",
+    "............",
+    "............",
+    ".....R......",
+    "....RWr..R..",
+    "...RrRWR.rR.",
+    "..RWrRRrRWR.",
+    ".RrRRWRRRRrR",
+    ".DDRDDRDDRDD",
+    "............",
+    "............"] },
+  orchid: { map: { P: "#D88AE8", p: "#F4C0F8", D: "#9A4AB0", Y: "#F4D040" }, rows: [
+    "............",
+    "....PP.PP...",
+    "...PpPPpPD..",
+    "...PPPDPPD..",
+    ".PPP.YY.PPP.",
+    "PpPPPYYPPpPD",
+    "PPPDDPPDDPPD",
+    ".DD.PPPD.DD.",
+    "....PpPD....",
+    "....PPDD....",
+    ".....DD.....",
+    "............"] },
+  nutmeg: { map: { N: "#9A6A40", n: "#C89A6A", D: "#6A4A2A", d: "#B07A4A" }, rows: [
+    "............",
+    "....NNNN....",
+    "...NnnNND...",
+    "..NnNNNNND..",
+    "..NNNNNnND..",
+    "..NNNNNNDD..",
+    "...NNDDDD...",
+    "....DDDD....",
+    "............",
+    "..d.d..d.d..",
+    ".d.dd.d.d.d.",
+    "............"] },
+  orange: { map: { O: "#E8822A", o: "#F4B060", w: "#FCE8C8", D: "#B4501E" }, rows: [
+    "............",
+    "....OOOO....",
+    "...OowwoO...",
+    "..OowowowO..",
+    ".OowoowoowD.",
+    ".OwwwwwwwwD.",
+    ".OowoowoowD.",
+    "..OowowowD..",
+    "...DowwoD...",
+    "....DDDD....",
+    "............",
+    "............"] },
+  beans: { map: { B: "#5A3A22", b: "#8A5A36", D: "#2E1A10" }, rows: [
+    "............",
+    "............",
+    "............",
+    "....BBB.....",
+    "...BbDBB....",
+    "...BBDBD....",
+    ".BBB.DD.BBB.",
+    "BbDBB..BbDBB",
+    "BBDBD..BBDBD",
+    ".BDD....BDD.",
+    "............",
+    "............"] },
+}
+for (const [id, a] of Object.entries(GARNISH_ART)) {
+  sprite("garnish_" + id, { w: 14, h: 14, outline: "1" }, (c) => gridDraw(c, a.rows, a.map, 1, 1))
+  sprite("garnish_" + id + "_hover", { base: "garnish_" + id, outline: "G" })
+}
+// the garnish tray on the counter: a low steel dish with little bowls; the page fills them with what's owned
+sprite("garnish_tray", { w: 26, h: 11, pivot: "bottom", outline: "0" }, (c) => {
+  // a lacquered wooden caddy: a light top edge, three steel cups set in it, a darker front face
+  c.rect(1, 4, 24, 6, "M"); c.hline(1, 4, 24, "P"); c.hline(1, 9, 24, "L"); c.vline(24, 4, 6, "L")
+  for (const x of [3, 10, 17]) { c.rect(x, 2, 6, 3, "E"); c.hline(x, 2, 6, "F"); c.hline(x + 1, 3, 4, "e"); c.px(x + 5, 4, "e") }
+})
+sprite("garnish_tray_hover", { base: "garnish_tray", outline: "G" })
 
 // ================================================================ small props, pixel by pixel
 sprite("lantern", { pivot: [4, 0] }, `
@@ -783,9 +995,9 @@ const toolReflections = (from, to, list = TOOLS()) => list.map(([n, x, y]) => cl
 // one group ends (their rail tapes differ too: amber for alcohol, cream for the rest)
 const GAP_AFTER = 5, POUR_GAP = 0, GROUP_GAP = 10
 const ALCOHOL = new Set(["rice", "rye", "rum", "coffee"])
-const GROUP_END = INGREDIENTS.findIndex((ing) => !ALCOHOL.has(ing.id)) - 1      // the last bottle with alcohol
+const GROUP_END = STARTER_ART.findIndex((ing) => !ALCOHOL.has(ing.id)) - 1      // the last bottle with alcohol
 const RAIL_X = (() => {
-  const ws = INGREDIENTS.map((ing) => 2 * Math.max(...bottleProfile(ing.big.segs)) + 3)
+  const ws = STARTER_ART.map((ing) => 2 * Math.max(...bottleProfile(ing.big.segs)) + 3)
   const g = (W - 12 - ws.reduce((a, b) => a + b, 0) - POUR_GAP - GROUP_GAP) / (ws.length - 1)
   const xs = []; let x = 6
   ws.forEach((w, k) => { xs.push(Math.round(x + w / 2)); x += w + g + (k === GAP_AFTER ? POUR_GAP : 0) + (k === GROUP_END ? GROUP_GAP : 0) })
@@ -798,7 +1010,7 @@ const POUR_X = Math.round((RAIL_X[GAP_AFTER] + RAIL_X[GAP_AFTER + 1]) / 2)
 function railBack(c) { c.rect(X0, NEAR + 4, W - X0, H - NEAR - 4, "0"); c.hline(X0, NEAR + 4, W - X0, "K") }
 const RAIL_WORD = { rice: "RICE", rye: "RYE", rum: "RUM", coffee: "COFFEE", yuzu: "YUZU", ume: "UME", lemongrass: "LEMONGRASS",
   glow: "GLOW", ginger: "GINGER", shiso: "SHISO", soda: "SODA", bitters: "BITTERS", chili: "CHILI" }
-function railFront(c) {
+function railFront(c, words = true) {
   c.rect(X0, RAIL_TOP, W - X0, H - RAIL_TOP, "E")
   c.hline(X0, RAIL_TOP, W - X0, "F"); c.hline(X0, RAIL_TOP + 1, W - X0, "f"); c.hline(X0, RAIL_TOP + 2, W - X0, "e")
   for (let y = RAIL_TOP + 5; y < H - 1; y += 4) c.hline(X0, y, W - X0, "e")
@@ -806,7 +1018,7 @@ function railFront(c) {
   for (let x = X0 + 4; x < W; x += 120) { c.rect(x, RAIL_TOP + 6, 2, 2, "f"); c.px(x, RAIL_TOP + 6, "F") }
   // tape labels so the everyday bottles read at a glance: each drink's plain name, whole (the full brand name
   // shows when the player points at the bottle)
-  INGREDIENTS.forEach((ing, k) => {
+  if (words) STARTER_ART.forEach((ing, k) => {
     const x = railX(k), word = RAIL_WORD[ing.id], w = word.length * 4 - 1, left = Math.round(x - w / 2)
     const alc = ALCOHOL.has(ing.id)
     c.rect(left - 2, RAIL_TOP + 5, w + 4, 7, alc ? "y" : "c"); c.hline(left - 2, RAIL_TOP + 11, w + 4, alc ? "g" : "p")
@@ -818,7 +1030,7 @@ function railFront(c) {
 
 // ================================================================ the scene
 // a hovered bottle rises a little out of the rail, as if half lifted
-const railStamps = (hover) => INGREDIENTS.map((ing, k) => stamp("bottle_" + ing.id + (ing.id === hover ? "_hover" : ""), railX(k), BOTTLE_FLOOR - lift(ing) - (ing.id === hover ? 6 : 0)))
+const railStamps = (hover) => STARTER_ART.map((ing, k) => stamp("bottle_" + ing.id + (ing.id === hover ? "_hover" : ""), railX(k), BOTTLE_FLOOR - lift(ing) - (ing.id === hover ? 6 : 0)))
 
 function barScene(name, hover) { return scene(name, { w: W, h: H, bg: "3", world: { light: [-1, -0.6] } },
   layer("sky", skyThroughGlass, cityThroughGlass),
@@ -891,6 +1103,6 @@ const bgScene = (name, ox) => scene(name, { w: W + ox, h: H, bg: "3", world: { l
 bgScene("pour_bg", 0)
 // the wide view for the pour lab: EXT more px of empty bar on the left
 bgScene("pour_bg_wide", EXT)
-scene("pour_front", { w: W, h: H }, layer("rail front", railFront))
+scene("pour_front", { w: W, h: H }, layer("rail front", (c) => railFront(c, false)))
 scene("pour_front_wide", { w: W + EXT, h: H }, layer("rail front", { x: EXT }, railFront))
 barScene("neon_dome_hover", "rum")

@@ -3,7 +3,10 @@
 // holds into actions. It also runs the test guest: they ask in vibe words, you serve, they react.
 import { FONT_SMALL } from "./font_small.js"
 import { createSim, STEP, FILL_LINE, MAX_PARTS, SHORT, rng } from "./sim.js"
-import { BASE, FUSED, LABEL, PARENTS, CROWDS, makeGuest, request, score, feedback } from "./flavor.js"
+import { BASE, FUSED, LABEL, PARENTS, CROWDS, DISCOVERIES, request, score, feedback } from "./flavor.js"
+import { ITEMS, STARTER, BUYABLE, GARNISHES, isGarnish } from "./catalog.js"
+import * as ECO from "./economy.js"
+import { servableGuest } from "./bot.js"
 import { BOX as GBOX, makeLook, frameCanvases, REACTIONS } from "./guestgen.js"
 
 const W = 480, H = 270
@@ -20,7 +23,8 @@ const L = await (await fetch("assets/layout.json" + FRESH)).json()
 const FONT = await (await fetch("assets/font5x7.json" + FRESH)).json()
 const IMG = {}
 const TOOL_IMGS = ["shaker", "shaker_cap", "mixing_glass", "mixing_glass_bare"]
-const names = ["glass", "cup_quarter", "cup_half", "cup_one", ...TOOL_IMGS, ...L.ingredients.flatMap((g) => ["bottle_" + g.id, "bottle_" + g.id + "_hover"])]
+const names = ["glass", "cup_quarter", "cup_half", "cup_one", ...TOOL_IMGS, ...L.ingredients.flatMap((g) => ["bottle_" + g.id, "bottle_" + g.id + "_hover"]),
+  ...GARNISHES.flatMap((id) => ["garnish_" + id, "garnish_" + id + "_hover"]), "garnish_tray", "garnish_tray_hover"]
 await Promise.all([
   loadImg("assets/pour_bg.png").then((i) => (IMG.bg = i)),
   loadImg("assets/pour_front.png").then((i) => (IMG.front = i)),
@@ -43,7 +47,7 @@ const CREAM = hex("#F2E4C8"), WHITE = hex("#FFF6E6"), GOLD = hex("#E8B060"), INK
 const DIM = "#93A297", SOFT = "#B8C8BC"
 // the hologram's colors: cyan light on a dark glass
 const HOLO = { edge: "#5FF3E8", title: "#8FFFF4", text: "#CFF7F2", dim: "#5FA8A8", value: "#FFFFFF", track: "#1F4C54", lost: "#FF8AA8", glow: "#FFE27A" }
-const FUSED_COLOR = { depth: hex("#B77CFF"), brightness: hex("#FFE96A"), toasted: hex("#FF9F4A") }
+const FUSED_COLOR = { depth: hex("#B77CFF"), brightness: hex("#FFE96A"), toasted: hex("#FF9F4A"), juicy: hex("#FF6A8A"), velvet: hex("#F2CFA0") }
 const px = (x, y, c) => { ctx.fillStyle = typeof c === "string" ? c : rgbStr(c); ctx.fillRect(Math.round(x), Math.round(y), 1, 1) }
 function line(x0, y0, x1, y1, c, size = 1) {
   ctx.fillStyle = typeof c === "string" ? c : rgbStr(c)
@@ -93,30 +97,33 @@ function wrap(s, maxW) {
 }
 
 // ---------------------------------------------------------------- what each bottle is (shown on hover)
-const PLAIN = { rice: "rice", rye: "rye", rum: "rum", coffee: "coffee", yuzu: "yuzu", ume: "ume", lemongrass: "lemongrass", glow: "glow", ginger: "ginger", shiso: "shiso", soda: "soda", bitters: "bitters", chili: "chili" }
 const CUP_NAME = { cup_quarter: "A quarter", cup_half: "A half", cup_one: "One" }
-const DESC = {
-  rice: "A clean, clear spirit. Strong, with a whisper of sweetness, so everything else shows through.",
-  rye: "Strong rye whiskey with a smoky, peppery edge and a little bitterness.",
-  rum: "Strong and gently sweet, with a faint hint of smoke.",
-  coffee: "Dark and rich: as sweet as it is bitter, with some kick and a roasted edge.",
-  yuzu: "Sharp, bright citrus. Very sour, with a fresh zing.",
-  ume: "Plum ferment: sweet and sour at once, with a slightly bitter finish.",
-  lemongrass: "Fresh, grassy and sweet, with a light tang. Pours slowly.",
-  glow: "Pure sweetness, thick and glowing. A little goes a long way. Pours slowly.",
-  ginger: "Hot ginger: spicy and a little sweet.",
-  shiso: "Fizzy and herbal: fresh, lightly bitter, a little sweet. Bubbles lift the fresh notes.",
-  soda: "Bubbles and no flavor. Makes a drink longer and livelier, and softens everything in it.",
-  bitters: "Very bitter, with a touch of spice. Dashes only: 0.05 parts each, six at most.",
-  chili: "Pure heat. Dashes only: 0.05 parts each, six at most.",
-}
+// plain words and descriptions for every bottle and garnish come from the catalog (catalog.js)
+const DESC = Object.fromEntries(Object.entries(ITEMS).map(([id, it]) => [id, it.desc]))
 
 // ---------------------------------------------------------------- where things are
-const railOf = Object.fromEntries(L.rail.map((r) => [r.id, r]))
+// ---------------------------------------------------------------- progress: the night, the money, what's owned
+// Saved in the browser (economy.js). For testing: ?clock=10 runs the clock 10 times faster, ?credits=500 adds
+// credits, ?reset=1 starts over.
+const QS = new URLSearchParams(location.search)
+if (QS.get("reset")) ECO.clearProgress()
+const prog = ECO.loadProgress()
+if (QS.get("credits")) prog.credits += Math.max(0, +QS.get("credits") || 0)
+const CLOCK = Math.max(0.1, +QS.get("clock") || 1)
+const saveProg = () => ECO.saveProgress(prog)
+saveProg()
+
 const ingOf = Object.fromEntries(L.ingredients.map((g) => [g.id, g]))
-const liquidOf = (id) => (id === "water" ? hex("#E2EEF0") : hex(ingOf[id].liquid))
+const liquidOf = (id) => (id === "water" ? hex("#E2EEF0") : ITEMS[id] && ITEMS[id].group === "garnish" ? hex(ITEMS[id].color) : hex(ingOf[id].liquid))
+// the rail: 13 slots (L.slots), spirits in the left 4, the rest in the right 9; which bottle stands in each is the
+// player's choice (prog.rail), changed from the back bar
+const railIds = () => [...prog.rail.spirit, ...prog.rail.mixer]
+function railPos(id) {
+  const k = railIds().indexOf(id); if (k < 0) return null
+  return { x: L.slots[k].x, floor: L.BOTTLE_FLOOR - ingOf[id].lift, slot: k }
+}
 function bottleBox(id) {
-  const r = railOf[id], i = IMG["bottle_" + id]
+  const r = railPos(id) || { x: -200, floor: 0 }, i = IMG["bottle_" + id]
   return { x: Math.round(r.x - i.width / 2), y: r.floor - i.height, w: i.width, h: i.height }
 }
 // where the liquid comes out of each bottle, in its sprite's pixels: the pour spout's tip, the cap's opening, the
@@ -187,24 +194,31 @@ function frostOf(img) {
 }
 const FROST = { shaker: frostOf(IMG.shaker), shaker_cap: frostOf(IMG.shaker_cap) }
 
-// ---------------------------------------------------------------- the test guest
-// They ask in vibe words (three things that matter most to them, plus a mood or a quirk), you serve, they react.
+// ---------------------------------------------------------------- the guests
+// They ask in vibe words (three things that matter most to them, plus a mood, a quirk, a craving or a garnish), you
+// serve, they react and tip. Every guest's order is checked first: the bar must be able to make it well with what
+// it owns (bot.js). Phases: asking, served (drinking), reacting, and closed (daytime: no guest, the bar is yours).
 const GR = rng((Date.now() % 1e9) + 1)
-const CROWD_IDS = Object.keys(CROWDS)
-let crowdPick = null                                 // null: any crowd
 const guest = { g: null, said: [], phase: "asking", t: 0, result: null, back: 1 }
 function newGuest() {
-  guest.g = makeGuest(GR, crowdPick); guest.said = request(guest.g)
+  guest.g = servableGuest(GR, null, { owned: prog.owned, fresh: prog.fresh }); guest.said = request(guest.g)
   guest.look = makeLook(Math.floor(GR() * 1e9), guest.g.crowd)             // a new face for each guest (guestgen.js)
-  guest.phase = "asking"; guest.t = 0; guest.result = null; guest.saved = false; guest.enter = 0
+  guest.phase = "asking"; guest.t = 0; guest.result = null; guest.saved = false; guest.enter = 0; guest.tip = 0
 }
-newGuest(); guest.back = 1
+function closeBar() { guest.g = null; guest.look = null; guest.said = []; guest.phase = "closed"; guest.result = null }
+if (prog.phase === "day") { closeBar() } else { newGuest(); guest.back = 1 }
+// the bar is workable: a guest is waiting, or it's day and the bar is the player's to practice on
+const atBar = () => guest.phase === "asking" || guest.phase === "closed"
+const nightOver = () => prog.phase === "night" && prog.hour >= ECO.NIGHT_END - 1e-9
 function nextGuest() {
   closeSpectro()
   if (guest.phase !== "asking") { sim.emptyGlass(); guest.back = 0 }   // the empty glass slides back from the guest
+  // past 05:00 nobody new comes in: the night ends, the takings are paid, and it's day
+  if (nightOver()) { ECO.endNight(prog); saveProg(); closeBar(); openDay(); return }
   newGuest()
 }
 function serve() {
+  if (guest.phase === "closed") { sim.say("The bar is closed for the day. Open it from the day screen when you're ready."); return }
   if (guest.phase !== "asking") return
   if (sim.total() < FILL_LINE - 0.05) { sim.say(`Pour at least the minimum drink amount first: ${FILL_LINE} parts, the lights on the glass turn green.`); return }
   dropHeld()
@@ -213,6 +227,7 @@ function serve() {
   const t = sim.tasteOf(S.glass), s = score(guest.g, t)
   guest.result = { t, s, fb: feedback(guest.g, t, s) }
   const vs = REACTIONS[guest.g.crowd][s.tier]; guest.reaction = vs[Math.floor(GR() * vs.length)]
+  guest.tip = ECO.recordGuest(prog, guest.g.crowd, s.score); saveProg()
   guest.phase = "served"; guest.t = 0
   closeSpectro()
 }
@@ -221,7 +236,7 @@ function serve() {
 const SERVED = { x: 330, y: 192, s: 0.85 }           // the guest's hands
 function glassPose() {
   const sx = SERVED.x - glass.cx, sy = SERVED.y - glass.base
-  if (guest.phase !== "asking") {
+  if (guest.phase === "served" || guest.phase === "reacting") {
     const gc = guest.phase === "served" && guest.t < T_REACH ? null : guestCanvases(), g = gc && gc.glass
     if (g) return { bx: GBOX.x + g.x, by: GBOX.y + g.y, a: g.a, s: SERVED.s }
     const e = ease(Math.min(1, guest.t / 0.6)); return { dx: sx * e, dy: sy * e, s: 1 + (SERVED.s - 1) * e }
@@ -237,7 +252,7 @@ function glassPose() {
 //   combos    two ingredients that built Depth, Brightness or Toasted to at least 2 between them (the biggest giver
 //             of each of the note's two parent notes). Any drink you taste or serve counts.
 const BOOK_KEY = "neonDome.discoveries.v1"
-const PAIRINGS = [["Fermented and smoked", "depth", "Something fermented with something smoked"], ["Citrus and herbal", "brightness", "Something citrus with something herbal"], ["Roasted and spice", "toasted", "Something roasted with something spicy"]]
+const PAIRINGS = DISCOVERIES.map(([, , note, , name]) => [name, note])
 const COMBO_MIN = 2
 let found = { pairings: {}, combos: {} }
 try { found = { pairings: {}, combos: {}, ...JSON.parse(globalThis.localStorage?.getItem(BOOK_KEY) || "{}") } } catch {}
@@ -252,7 +267,7 @@ function saveRecipe() {
   const r = sim.readout(), c = S.glass
   const items = r.rows.filter((row) => row.id !== "water" && (row.parts >= 0.04 || row.dashes)).map((row) => row.dashes ? [row.id, 0, row.dashes] : [row.id, +row.parts.toFixed(2), 0])
   const rec = { no: recipes.length ? recipes[recipes.length - 1].no + 1 : 1, crowd: guest.g.crowdName, tier: guest.result.s.tier, score: Math.round(guest.result.s.score),
-    color: sim.srgb(sim.compColor(c.parts)), items, ice: r.ice, method: c.log.length ? logText(c.log) : "Built in the glass", total: +r.total.toFixed(2) }
+    color: sim.srgb(sim.compColor(c.parts)), items, ice: r.ice, method: c.log.length ? logText(c.log) : "Built in the glass", total: +r.total.toFixed(2), garnish: c.garnish || null }
   recipes.push(rec); guest.saved = true
   try { globalThis.localStorage?.setItem(RECIPE_KEY, JSON.stringify(recipes)) } catch {}
   book.page[1] = recipes.length - 1
@@ -278,8 +293,7 @@ function noteDiscoveries(t) {
   sim.say(fresh.length === 1 ? `New in your book: ${fresh[0]}` : `${fresh.length} new finds in your book.`)
 }
 // the book's short names: the words on the rail tapes
-const BOOK_NAME = { rice: "Rice", rye: "Rye", rum: "Rum", coffee: "Coffee", yuzu: "Yuzu", ume: "Ume", lemongrass: "Lemongrass",
-  glow: "Glow", ginger: "Ginger", shiso: "Shiso", soda: "Soda", bitters: "Bitters", chili: "Chili" }
+const BOOK_NAME = Object.fromEntries(Object.entries(ITEMS).map(([id, it]) => [id, it.plain]))
 const namesOf = (k) => k.split("+").map((id) => BOOK_NAME[id] || SHORT[id]).join(" + ")
 
 // ---------------------------------------------------------------- the spectrograph: what the drink tastes like
@@ -303,8 +317,8 @@ function drinkContents() {
   return sh && sim.volOf(g) < 0.004 && sim.volOf(sh) >= 0.004 ? sh : g
 }
 const SPEC_ROWS = [...BASE, ...FUSED]
-const rowY = (i) => SPEC.y + 37 + i * 11 + (i >= BASE.length ? 4 : 0)
-const BAR_X = SPEC.x + 66, UNIT = 10
+const rowY = (i) => SPEC.y + 37 + i * 9 + (i >= BASE.length ? 3 : 0)
+const BAR_X = SPEC.x + 70, UNIT = 9.4
 
 // ---------------------------------------------------------------- buttons (rebuilt every frame, so they always match what's drawn)
 let buttons = []
@@ -329,22 +343,32 @@ let hover = null
 function toScene(e) { const r = view.getBoundingClientRect(); return { x: (e.clientX - r.left) * CW / r.width - EXT, y: (e.clientY - r.top) * H / r.height } }
 function targetAt(x, y) {
   for (let i = buttons.length - 1; i >= 0; i--) if (inBox(x, y, buttons[i])) return { kind: "button", key: buttons[i].key, b: buttons[i] }
-  if (book.open) return { kind: "modal" }
+  if (book.open || backBar.open || day.open) return { kind: "modal" }
+  if (garnishPick.open) return garnishPick.rect && inBox(x, y, garnishPick.rect) ? { kind: "modal" } : { kind: "away" }
+  // carrying a bottle from the back bar: only the slots on its side of the rail answer
+  if (carry.id) {
+    for (const id of prog.rail[ITEMS[carry.id].group]) { const b = bottleBox(id); if (x >= b.x + 2 && x < b.x + b.w - 2 && y >= Math.min(b.y, L.RAIL_TOP - 30)) return { kind: "slot", id } }
+    return { kind: "away" }
+  }
   if (spectro.open && inBox(x, y, SPEC)) {
-    const i = SPEC_ROWS.findIndex((_, k) => y >= rowY(k) - 2 && y < rowY(k) + 9)
+    const i = SPEC_ROWS.findIndex((_, k) => y >= rowY(k) - 1 && y < rowY(k) + 8)
     const dial = x >= SPEC.x + 186 ? (y >= SPEC.y + 96 && y < SPEC.y + 160 ? "balance" : null) : null
     return { kind: "spectro", row: i >= 0 && x < SPEC.x + 186 ? SPEC_ROWS[i] : dial }
   }
-  if (guest.phase !== "asking") return null
+  if (!atBar()) return null
   if (S.toolMode) return inPoly(x, y, WELL) ? { kind: "ice" } : null       // a lifted tool can still take ice
   // bottles on the rail (the one in hand has left its slot)
-  for (const g of L.ingredients) {
-    if (S.held && S.held.id === g.id) continue
-    if (hitBottle(g.id, x, y)) return { kind: "bottle", id: g.id }
+  for (const id of railIds()) {
+    if (S.held && S.held.id === id) continue
+    if (hitBottle(id, x, y)) return { kind: "bottle", id }
   }
   // the spoon in the glass first: its handle sticks up in front of the screen's bottom edge
   if (!S.held && !S.grab && S.spoon.state === "glass" && onSpoon(x, y)) return { kind: "spoon" }
   if (!S.held && !S.grab && inBox(x, y, SCREEN)) return { kind: "screen" }
+  if (!S.held && !S.grab && y < 29) return { kind: "shelf" }
+  if (!S.held && !S.grab && inBox(x, y, HUD_CLOCK)) return { kind: "hudClock" }
+  if (!S.held && !S.grab && inBox(x, y, HUD_BANK)) return { kind: "hudBank" }
+  if (!S.held && inBox(x, y, trayBox())) return { kind: "tray" }
   const glassBox = { x: glass.left, y: glass.top, w: glass.w, h: glass.h }
   if (S.held && S.held.kind === "glass" && inBox(x, y, glassBox)) return { kind: "mat" }   // set the glass back down
   const bottleInHand = S.held && (S.held.kind === "bottle" || S.held.kind === "dasher")
@@ -391,9 +415,17 @@ view.addEventListener("pointerdown", (e) => {
   const p = toScene(e); pointer.x = p.x; pointer.y = p.y; pointer.down = true
   const t = targetAt(p.x, p.y)
   if (t && t.kind === "button") { t.b.act(); return }
-  if (book.open || (t && t.kind === "spectro")) return
+  if (book.open || backBar.open || day.open || (t && t.kind === "spectro")) return
+  if (garnishPick.open) { garnishPick.open = false; return }               // a click away closes the picker
+  if (carry.id) {
+    if (t && t.kind === "slot" && e.button === 0) dropIntoSlot(t.id)
+    else { sim.say(`${ITEMS[carry.id].name} went back on the shelf.`); carry.id = null }
+    return
+  }
+  if (t && t.kind === "shelf" && atBar()) { openBackBar(); return }
+  if (t && t.kind === "tray" && atBar()) { openGarnishes(); return }
   if (e.button === 2) { putBackHeld(); return }
-  if (guest.phase !== "asking") { sim.say(guest.phase === "served" ? "They're tasting it." : "Press Next guest in the taste breakdown to serve someone new."); return }
+  if (!atBar()) { sim.say(guest.phase === "served" ? "They're tasting it." : "Press Next guest in the taste breakdown to serve someone new."); return }
   if (e.button === 0 && doubleClick(e, p)) return
   if (t && t.kind === "ice") { sim.grabIce(p.x, p.y, e.timeStamp / 1000); return }      // a cube from the well, to drag or flick
   if (S.toolMode) { sim.press(true); return }                     // hold anywhere to shake or stir
@@ -454,10 +486,12 @@ view.addEventListener("wheel", (e) => {
     while (Math.abs(listScroll.wheel) >= 30) { const d = Math.sign(listScroll.wheel); listScroll.target += d * 8; listScroll.wheel -= d * 30 }
   }
 }, { passive: false })
-view.addEventListener("contextmenu", (e) => { e.preventDefault(); putBackHeld() })
+view.addEventListener("contextmenu", (e) => { e.preventDefault(); if (carry.id) { carry.id = null; return } putBackHeld() })
 addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return
-  if (book.open) book.open = false; else if (spectro.open) finishTasting(); else if (S.toolMode) sim.putToolDown(); else putBackHeld()
+  if (book.open) book.open = false; else if (garnishPick.open) garnishPick.open = false; else if (backBar.open) backBar.open = false
+  else if (carry.id) carry.id = null; else if (day.open) day.open = false
+  else if (spectro.open) finishTasting(); else if (S.toolMode) sim.putToolDown(); else putBackHeld()
 })
 
 // ---------------------------------------------------------------- fit the window, crisp
@@ -702,13 +736,13 @@ const GCTX = glassLayer.getContext("2d"); GCTX.imageSmoothingEnabled = false
 function drawGlass() {
   const pose = glassPose(), h = S.held && S.held.kind === "glass" ? S.held : null
   ctx = GCTX; ctx.clearRect(0, 0, W, H)
-  drawLiquid(); drawIce(); drawGlassSpoon(); ctx.drawImage(IMG.glass, glass.left, glass.top)
-  if (!h && guest.phase === "asking" && guest.back >= 1) drawFillLine()
+  drawLiquid(); drawIce(); drawGlassSpoon(); ctx.drawImage(IMG.glass, glass.left, glass.top); drawGarnishOn()
+  if (!h && atBar() && guest.back >= 1) drawFillLine()
   ctx = MAIN
   // in hand: held by the right end of its rim and turned about it, drink and all
   if (h) { const lip = sim.glassLip(); ctx.save(); ctx.translate(Math.round(h.x), Math.round(h.y)); ctx.rotate(h.angle); ctx.drawImage(glassLayer, -lip.x, -lip.y); ctx.restore(); return }
   const lift = S.moving && S.moving.kind === "glass" ? 5 : 0
-  if (guest.phase === "asking" && guest.back >= 1) drawShadow(glass.cx, glass.base - 1 - glass.ryB, 13, glass.ryB, lift ? 0.3 : 0.45)
+  if (atBar() && guest.back >= 1) drawShadow(glass.cx, glass.base - 1 - glass.ryB, 13, glass.ryB, lift ? 0.3 : 0.45)
   if (pose.bx !== undefined) {               // in the guest's hand: its base at the hand, tipped toward their lips
     ctx.save(); ctx.translate(Math.round(pose.bx), Math.round(pose.by)); ctx.rotate(pose.a); ctx.scale(pose.s, pose.s)
     ctx.drawImage(glassLayer, -glass.cx, -glass.base); ctx.restore(); return
@@ -728,22 +762,59 @@ function drawStream() {
   }
   for (const s of S.splats) { ctx.globalAlpha = Math.min(1, s.life * 2); fill(s.x - 1, s.y, 3, 1, sim.srgb(s.color)); ctx.globalAlpha = 1 }
   // spilled over the rim: drips running down the outside of the glass
-  if (S.overflow > 0.02 && guest.phase === "asking" && !S.glassHeld) {
+  if (S.overflow > 0.02 && atBar() && !S.glassHeld) {
     ctx.globalAlpha = Math.min(1, S.overflow * 2); const col = sim.srgb(S.mean), [il, ir] = glass.inner(glass.rimY)
     for (const [x, ph] of [[il - 2, 0], [ir + 2, 1.7], [il + 5, 3.1]]) { const len = 6 + Math.round((Math.sin(S.t * 3 + ph) * 0.5 + 0.5) * 30); line(x, glass.rimY, x, glass.rimY + len, col) }
     ctx.globalAlpha = 1
   }
 }
 function drawRail() {
-  for (const g of L.ingredients) {
-    if (S.held && S.held.id === g.id) {
+  for (const id of railIds()) {
+    const r = railPos(id)
+    if (S.held && S.held.id === id) {
       // its empty slot shows a faint ghost of it, brighter when pointed at: click there to put it back
-      const r = railOf[g.id]; spriteAt("bottle_" + g.id, r.x, r.floor, hover && hover.kind === "rail" ? 0.45 : 0.18); continue
+      spriteAt("bottle_" + id, r.x, r.floor, hover && hover.kind === "rail" ? 0.45 : 0.18); continue
     }
-    const r = railOf[g.id], hov = hover && hover.kind === "bottle" && hover.id === g.id
-    spriteAt("bottle_" + g.id + (hov ? "_hover" : ""), r.x, r.floor - (hov ? 6 : 0))
+    // carrying a bottle from the back bar: the slots it can go in (its own side) glow, the one pointed at rises
+    const swap = carry.id && ITEMS[carry.id].group === ITEMS[id].group, aim = swap && hover && hover.kind === "slot" && hover.id === id
+    const hov = (hover && hover.kind === "bottle" && hover.id === id) || aim
+    if (carry.id && !swap) ctx.globalAlpha = 0.45
+    spriteAt("bottle_" + id + (hov ? "_hover" : ""), r.x, r.floor - (hov ? 6 : 0))
+    ctx.globalAlpha = 1
   }
   ctx.drawImage(IMG.front, -EXT, 0)
+  drawTapes()
+}
+// the tape under each slot names the bottle standing there. Names are shortened only where two long ones would
+// touch (the 3x5 letters of the rail's tapes; alcohol on amber tape, the rest on cream)
+const TAPE_FONT = { A: "###/#.#/###/#.#/#.#", B: "##./#.#/##./#.#/##.", C: "###/#../#../#../###", D: "##./#.#/#.#/#.#/##.", E: "###/#../##./#../###",
+  F: "###/#../##./#../#..", G: "###/#../#.#/#.#/###", H: "#.#/#.#/###/#.#/#.#", I: "###/.#./.#./.#./###", J: "..#/..#/..#/#.#/###",
+  K: "#.#/#.#/##./#.#/#.#", L: "#../#../#../#../###", M: "#.#/###/###/#.#/#.#", N: "##./#.#/#.#/#.#/#.#", O: "###/#.#/#.#/#.#/###",
+  P: "###/#.#/###/#../#..", Q: "###/#.#/#.#/###/..#", R: "##./#.#/##./#.#/#.#", S: "###/#../###/..#/###", T: "###/.#./.#./.#./.#.",
+  U: "#.#/#.#/#.#/#.#/###", V: "#.#/#.#/#.#/#.#/.#.", W: "#.#/#.#/###/###/#.#", X: "#.#/#.#/.#./#.#/#.#", Y: "#.#/#.#/###/.#./.#.", Z: "###/..#/.#./#../###", " ": ".../.../.../.../..." }
+function tapeText(str, x, y, col) {
+  ctx.fillStyle = col
+  ;[...str].forEach((ch, i) => (TAPE_FONT[ch] || "").split("/").forEach((row, r) => [...row].forEach((v, k) => { if (v === "#") ctx.fillRect(x + i * 4 + k, y + r, 1, 1) })))
+}
+// shorter by a letter: the last vowel goes first (GRAPEFRUIT, GRAPEFRUT, GRAPEFRT), then the last letter
+const shorten = (w) => { for (let i = w.length - 1; i > 0; i--) if ("AEIOU".includes(w[i])) return w.slice(0, i) + w.slice(i + 1); return w.slice(0, -1) }
+function drawTapes() {
+  const ids = railIds(), xs = ids.map((id) => railPos(id).x), words = ids.map((id) => ITEMS[id].plain.toUpperCase())
+  const wOf = (w) => w.length * 4 - 1 + 4
+  // shorten the longer of any two tapes that would touch, a letter at a time
+  for (let pass = 0; pass < 40; pass++) {
+    let changed = false
+    for (let k = 0; k + 1 < ids.length; k++) if ((wOf(words[k]) + wOf(words[k + 1])) / 2 + 2 > xs[k + 1] - xs[k]) {
+      const j = words[k].length >= words[k + 1].length ? k : k + 1
+      if (words[j].length > 3) { words[j] = shorten(words[j]); changed = true }
+    }
+    if (!changed) break
+  }
+  ids.forEach((id, k) => {
+    const w = words[k].length * 4 - 1, left = Math.round(xs[k] - w / 2), alc = ITEMS[id].group === "spirit"
+    fill(left - 2, L.RAIL_TOP + 5, w + 4, 7, alc ? "#E8B060" : "#F2E4C8"); fill(left - 2, L.RAIL_TOP + 11, w + 4, 1, alc ? "#A9783A" : "#E9A08A")
+    tapeText(words[k], left, L.RAIL_TOP + 6, "#1C231E")
+  })
 }
 function drawHeld() {
   const h = S.held; if (!h) return
@@ -834,6 +905,7 @@ function gauge(label, x, y, w, f, value, color) {
 // in it, and its taste profile as it stands. It hangs above the counter, clear of everything you can pick up, and
 // draws behind the action, so a bottle or a stream in front of it is never hidden. Click it for the full breakdown.
 const SCREEN = { x: 4, y: 43, w: 260, h: 109 }   // under the shelf and the DRINKS sign, left of the guest buttons
+const PLH = 7                     // the taste profile's row pitch (ten notes, then the fused ones as chips)
 // tiny 3x4 letters for the SHKR tag on the screen (much smaller than the screen's own font)
 const MICRO = { S: [".##", "#..", "..#", "##."], H: ["#.#", "###", "#.#", "#.#"], K: ["#.#", "##.", "##.", "#.#"], R: ["##.", "#.#", "##.", "#.#"] }
 const microW = (str) => str.length * 4 - 1
@@ -862,7 +934,7 @@ function drawScreen() {
 }
 const LH = 8                      // the screen's line pitch, in its small font
 function drawScreenBody() {
-  const P = SCREEN, free = !S.held && !S.grab && !S.moving && guest.phase === "asking"
+  const P = SCREEN, free = !S.held && !S.grab && !S.moving && atBar()
   // the two cables up to the shelf, then the bezel
   for (const cx of [P.x + 24, P.x + 200]) { fill(cx, 33, 1, P.y - 33, "#2A2F35"); fill(cx + 1, 33, 1, P.y - 33, "#4A525A") }
   fill(P.x - 2, P.y - 2, P.w + 4, P.h + 4, "#1B1F24"); frame1(P.x - 2, P.y - 2, P.w + 4, P.h + 4, "#3A4048")
@@ -883,7 +955,7 @@ function drawScreenBody() {
   fill(P.x + 3, P.y + 17, P.w - 6, 1, "rgba(95,243,232,0.3)")
   // the columns, measured from the text itself: the taste profile on the right is as wide as its longest label plus
   // a bar; the contents on the left get the rest
-  const labelW = Math.max(...SPEC_ROWS.map((n) => textW(LABEL[n]))), BAR = 50, valW = textW("10.0")
+  const labelW = Math.max(...BASE.map((n) => textW(LABEL[n]))), BAR = 50, valW = textW("10.0")
   const colR = P.x + P.w - 4 - valW - 4 - BAR - 4 - labelW - 9   // the left column's right edge
   const leftW = colR - (P.x + 5)                            // room for text in the left column
   // status lines under the contents, wrapped to the column so they never run into the profile
@@ -893,7 +965,7 @@ function drawScreenBody() {
     if (!sc.ice) say2("Shaker: no ice", "#FF8AA8")
     else if (rs.total > 0.004) say2(sc.techT > 0.05 ? `Shaker: shaken ${sc.techT.toFixed(1)} s` : "Shaker: not shaken yet", sh.working ? "#FFC94A" : HOLO.dim)
   }
-  if (guest.phase === "asking") {
+  if (atBar()) {
     if (r.full) say2("Full to the rim", "#FF8AA8")
     if (S.spoon.state === "glass" || c.stirT > 0.05) {
       if (S.spoon.state === "glass" && !r.ice) say2("No ice: it stays warm", "#FF8AA8")
@@ -960,8 +1032,8 @@ function drawScreenBody() {
   // right: the taste profile, a row per note (the divider is drawn here unless the list's scroll bar took its place): label, a bar built from what each ingredient gives (in its color), the value
   if (!listScroll.bar) fill(colR + 4, P.y + 19, 1, P.h - 21, "rgba(95,243,232,0.2)")
   const dc = drinkContents(), t = sim.volOf(dc) > 0.01 ? sim.tasteOf(dc) : null, lx = colR + 9, bx = lx + labelW + 4, vx = P.x + P.w - 4
-  SPEC_ROWS.forEach((n, k) => {
-    const yy = P.y + 19 + k * LH, v = t ? t.notes[n] : 0, on = v > 0.05
+  BASE.forEach((n, k) => {
+    const yy = P.y + 19 + k * PLH, v = t ? t.notes[n] : 0, on = v > 0.05
     text(LABEL[n], lx, yy, on ? HOLO.text : HOLO.dim)
     fill(bx, yy + 3, BAR, 1, HOLO.track)
     for (let q = 0; q <= 10; q += 5) fill(bx + q * BAR / 10, yy + 2, 1, 3, HOLO.track)
@@ -976,6 +1048,20 @@ function drawScreenBody() {
     }
     text(on ? v.toFixed(1) : "0", vx, yy, on ? HOLO.value : HOLO.dim, "right")
   })
+  // the fused notes under the rows, as chips: only the ones in the drink, biggest first, two lines at most
+  {
+    const y0 = P.y + 19 + BASE.length * PLH + 2
+    fill(lx, y0 - 1, vx - lx, 1, "rgba(95,243,232,0.15)")
+    const chips = t ? FUSED.filter((n) => t.notes[n] > 0.05).sort((a, b) => t.notes[b] - t.notes[a]) : []
+    if (!chips.length) text("Fused: none yet", lx, y0 + 1, HOLO.dim)
+    let cx = lx, cy = y0 + 1
+    for (const n of chips) {
+      const str = `${LABEL[n]} ${t.notes[n].toFixed(1)}`, w = 5 + textW(str)
+      if (cx + w > vx + 1) { cx = lx; cy += LH; if (cy > P.y + P.h - 7) break }
+      fill(cx, cy + 2, 3, 3, FUSED_COLOR[n]); text(str, cx + 5, cy, rgbStr(mixRgb(FUSED_COLOR[n], [255, 255, 255], 0.35)))
+      cx += w + 6
+    }
+  }
   SCREEN.layout = { colR, leftW, lx, labelW, bx, barEnd: bx + BAR, valLeft: vx - valW, status, rows: rows.length, rowsBottom: rowsEnd, statusTop: bottom }     // for the layout check in the tests
 }
 
@@ -1024,16 +1110,18 @@ const CT_FAR = 186
 const HEAD = { x: 362, y: 92 }
 function drawBubble() {
   const g = guest.g, x = 374, w = 103, inner = w - 10
+  if (!g) return
   const lines = []                                   // [text, color]
   if (guest.phase === "asking") {
     if (g.mood) for (const l of wrap(g.moodLine || g.mood.name + ".", inner)) lines.push([l, "#FFB3D9"])
-    for (const s of guest.said) for (const l of wrap(s.text, inner)) lines.push([l, CREAM])
+    for (const s of guest.said) for (const l of wrap(s.text, inner)) lines.push([l, s.ax === "garnish" ? "#FFC94A" : CREAM])
   } else if (guest.phase === "served") {
     lines.push([".".repeat(1 + (Math.floor(guest.t * 3) % 3)), CREAM])
   } else {
     const { s, fb } = guest.result
     lines.push([`${s.tier} (${Math.round(s.score)})`, s.score >= 85 ? "#FFE27A" : s.score >= 65 ? "#9CF0B0" : s.score >= 40 ? "#E9C08A" : "#FF8A7A"])
     for (const l of fb.lines) for (const w2 of wrap(l, inner)) lines.push([w2, CREAM])
+    lines.push([guest.tip > 0 ? `Tip: ${guest.tip} cr` : "No tip.", guest.tip > 0 ? "#9CF0B0" : DIM])
   }
   const t = guest.phase === "asking" ? guest.t : guest.phase === "served" ? 1 : guest.t - SIP_DONE
   const pop = ease(Math.min(1, t / 0.2)), h = 8 + lines.length * 9
@@ -1085,8 +1173,9 @@ function drawSpectro() {
   if (!spectro.open) return
   const t = spectroTaste(); if (!t) { closeSpectro(); return }
   // the story of the bar you point at goes under the bars, whole: the panel grows to fit it
-  const story = rowStory(t, spectro.row).split("\n").flatMap((part) => wrap(part, SPEC.w - 16)).slice(0, 8)
-  SPEC.h = 168 + story.length * 9 + 2
+  const story = rowStory(t, spectro.row).split("\n").flatMap((part) => wrap(part, SPEC.w - 16)).slice(0, 5)
+  const storyTop = rowY(SPEC_ROWS.length - 1) + 22 - SPEC.y
+  SPEC.h = storyTop + 4 + story.length * 9 + 3
   const slide = 1 - (1 - Math.min(1, spectro.t / 0.28)) ** 3
   const P = { ...SPEC, y: Math.round(SPEC.y - (1 - slide) * (SPEC.h + SPEC.y)) }
   const dy = P.y - SPEC.y
@@ -1095,7 +1184,7 @@ function drawSpectro() {
   // header: what's being tasted, and how it was made
   const what = served ? "THE SERVED DRINK" : drinkContents() === S.glass ? "TASTE: THE GLASS" : "TASTE: THE SHAKER"
   text(what, P.x + 8, P.y + 5, HOLO.title)
-  const cl = served ? "Next guest" : "Close", cw = textW(cl) + 10
+  const cl = served ? (nightOver() ? "Close the bar" : "Next guest") : "Close", cw = textW(cl) + 10
   button(cl, P.x + P.w - 6 - cw, P.y + 3, served ? finishTasting : closeSpectro, { w: cw, tone: "holo", key: "spectroClose" })
   // once the guest has tasted it, the drink can be saved to the book as a recipe card
   if (served) { const l = guest.saved ? "Saved" : "Save recipe", w = textW(l) + 10; button(l, P.x + P.w - 10 - cw - w, P.y + 3, saveRecipe, { w, tone: "holo", key: "saveRecipe", on: guest.saved }) }
@@ -1144,10 +1233,10 @@ function drawSpectro() {
       const base = Math.max(0, v - bonus), col = FUSED_COLOR[n]
       fill(bx, by, Math.round(base * UNIT), bh, col); fill(bx, by, Math.round(base * UNIT), 1, mixRgb(col, [255, 255, 255], 0.5))
       if (bonus > 0) { const x0 = Math.round(bx + base * UNIT), w = Math.max(1, Math.round(Math.min(bonus, v) * UNIT)); ctx.globalAlpha = 0.5 + 0.5 * Math.sin(S.t * 5); fill(x0, by - 1, w, bh + 2, HOLO.glow); ctx.globalAlpha = 1; fill(x0, by, w, bh, HOLO.glow) }
-      const j = FUSED.indexOf(n), cx = P.x + 3 + j * 3, ys = [...PARENTS[n].map((p) => rowY(SPEC_ROWS.indexOf(p)) + dy + 3), y + 3]
+      const j = FUSED.indexOf(n), cx = P.x + 2 + j * 2, ys = [...PARENTS[n].map((p) => rowY(SPEC_ROWS.indexOf(p)) + dy + 3), y + 3]
       ctx.globalAlpha = hov ? 1 : 0.55
       fill(cx, Math.min(...ys), 1, Math.max(...ys) - Math.min(...ys) + 1, col)
-      for (const yy of ys) fill(cx, yy, 10 - j * 3 - 1 + 1, 1, col)
+      for (const yy of ys) fill(cx, yy, P.x + 11 - cx, 1, col)
       ctx.globalAlpha = 1
       if (n in arrows) arrowMark(Math.round(bx + v * UNIT) + 3, y + 3, arrows[n])
     }
@@ -1161,7 +1250,7 @@ function drawSpectro() {
   // discoveries, then the hovered row's story
   let y = rowY(SPEC_ROWS.length - 1) + dy + 12
   for (const d of t.discoveries.slice(0, 1)) text(`Discovered: ${d.name}, +${d.bonus.toFixed(1)} ${LABEL[d.note]}`, P.x + 8, y, HOLO.glow)
-  y = P.y + 162
+  y = P.y + storyTop
   fill(P.x + 6, y, P.w - 12, 1, "rgba(95,243,232,0.25)"); y += 4
   for (const l of story) { text(l, P.x + 8, y, HOLO.text); y += 9 }
 }
@@ -1197,7 +1286,7 @@ function pageBoxes() {
 function bookEntries() {
   const out = []
   for (const n of FUSED) {
-    const secret = PAIRINGS.find(([, note]) => note === n), sk = found.pairings[secret[0]] || []
+    const sk = PAIRINGS.filter(([, note]) => note === n).flatMap(([name]) => found.pairings[name] || [])
     const keys = [...new Set([...sk, ...(found.combos[n] || [])])]
     for (const k of keys) out.push({ k, n, star: sk.includes(k) })
   }
@@ -1309,6 +1398,7 @@ function drawRecipe(P) {
   }
   for (const [id, parts, dashes] of r.items) row(SHORT[id], dashes ? `${dashes} dash${dashes > 1 ? "es" : ""}` : parts.toFixed(2), liquidOf(id))
   if (r.ice) row("Ice", `${r.ice} cube${r.ice > 1 ? "s" : ""}`, "#E8F4F4")
+  if (r.garnish && ITEMS[r.garnish]) row(ITEMS[r.garnish].name, "on top", hex(ITEMS[r.garnish].color))
   fill(P.x + 6, y + 1, P.w - 12, 1, INK3); y += 5
   text("Total", P.x + 14, y, INK2); text(`${r.total.toFixed(2)} parts`, P.x + P.w - 8, y, INK2, "right"); y += 11
   for (const l of wrap(r.method, P.w - 22)) { if (y > P.y + P.h - 22) break; text(l, P.x + 8, y, INK2); y += 9 }
@@ -1331,8 +1421,17 @@ function trackDwell(dt) {
 }
 function drawTooltip() {
   if (!hover || S.pressing || S.moving || S.stirring || book.open) return
+  // cards that show at once: bottles on the rail and the back bar, garnishes, the supplier's rows
+  const bk = hover.kind === "button" ? hover.key : ""
+  const card = (id) => (ITEMS[id].group === "garnish" ? "Garnish. " : ITEMS[id].group === "spirit" ? "Alcohol. " : "No alcohol. ") + DESC[id]
+  if (/^(bb|gp|shop|buy):/.test(bk)) { const id = bk.split(":")[1], b = hover.b; tooltip(ITEMS[id].name, card(id), b.x + b.w / 2, b.y - 4); return }
+  if (hover.kind === "slot") { const b = bottleBox(hover.id); tooltip(`Swap for ${ITEMS[hover.id].name}`, `Click to put ${ITEMS[carry.id].name} here. ${ITEMS[hover.id].name} goes back on the shelf.`, b.x + b.w / 2, b.y - 8); return }
   if (hover.kind !== "bottle" && dwell.t < DWELL) return
-  if (hover.kind === "bottle") { const b = bottleBox(hover.id); tooltip(ingOf[hover.id].name, (ingOf[hover.id].alcohol ? "Alcohol. " : "No alcohol. ") + DESC[hover.id], b.x + b.w / 2, b.y - 8) }
+  if (hover.kind === "bottle") { const b = bottleBox(hover.id); tooltip(ITEMS[hover.id].name, card(hover.id), b.x + b.w / 2, b.y - 8) }
+  else if (hover.kind === "shelf") tooltip("Back bar", "Every bottle you own that isn't on the rail stands here. Click to pick one and swap it onto the rail.", pointer.x, 60)
+  else if (hover.kind === "tray") tooltip("Garnish tray", prog.owned.some(isGarnish) ? "Click to pick a garnish for the glass. It adds a little of a note on top, whatever the drink's size. Some guests ask for one." : "Empty. Buy garnishes at the supplier during the day.", TRAY.x, trayBox().y - 4)
+  else if (hover.kind === "hudClock") tooltip("The night", `The bar opens at 20:00 and lets the last guest in before 05:00 (the city's clock: ${(ECO.NIGHT_SECONDS / 60).toFixed(1)} real minutes). The guest at the bar always finishes, then it's day.`, HUD_CLOCK.x + 50, 120)
+  else if (hover.kind === "hudBank") tooltip("Credits", `In the bank, and tonight's tips so far. Tips and your wage (${ECO.WAGE} cr a night, however many guests you serve) are paid when the night ends. Spend them at the supplier.`, HUD_BANK.x + 50, 120)
   else if (hover.kind === "cup") { const cup = S.cups[hover.id]; tooltip(`${CUP_NAME[cup.id]} jigger`, `A bar measuring cup. Holds exactly ${CUP_NAME[cup.id].toLowerCase()} part. Click to set it beside the glass, pour a bottle into it, then click it to pick it up and pour the measure. Drag it to move it.`, cup.x, cupBox(cup).y - 4) }
   else if (hover.kind === "activeCup") tooltip("Jigger", sim.volOf(S.cups[hover.id].c) > 0.001 ? "Click to pick it up, then hold to pour it." : "Pour a bottle into it, or click to put it away.", S.cups[hover.id].x, cupBox(S.cups[hover.id]).y - 14)
   else if (hover.kind === "tool") {
@@ -1346,7 +1445,7 @@ function drawTooltip() {
   else if (hover.kind === "spoonHome") tooltip("Bar spoon", "Click to put it in the glass, then stir there.", S.spoon.home.x, holderBox().y - 4)
   else if (hover.kind === "spoon") tooltip("Bar spoon", "Press and hold on it, then move the mouse in circles to stir. Back and forth doesn't stir. Click it to take it out." + (sim.readout().ice ? "" : " Put ice in first, or the drink won't get cold."), glass.cx, spoonGlassBox().y - 4)
   else if (hover.kind === "ice") tooltip("Ice well", "Drag a cube out and drop it into the glass, shaker or stirring glass, or flick it in. The shaker and stirring glass need ice to chill a drink; in the glass it melts in slowly.", WELL_MID.x + 50, WELL[0][1] - 4)
-  else if (hover.kind === "glass" && guest.phase === "asking")
+  else if (hover.kind === "glass" && atBar())
     tooltip("The glass", `The lights on its sides mark the minimum drink amount: ${FILL_LINE} parts. They turn from red to green once there's enough. Guests won't take a smaller drink. It holds up to ${MAX_PARTS} parts.` + " Slide it over to the guest to serve it. Click to pick it up and pour it out. Drag it to move it. Double-click to empty it.", glass.cx, glass.top - 4)
 }
 function drawNotice() {
@@ -1359,16 +1458,238 @@ function drawNotice() {
   ctx.globalAlpha = 1
 }
 
+// ---------------------------------------------------------------- the night clock and the bank, on the shelf's lip
+// Two small LED strips either side of the DRINKS sign: the night and its time (the city's clock), and the credits
+// in the bank with tonight's tips so far (tips and the wage are paid when the night ends).
+const HUD_CLOCK = { x: 36, y: 31, w: 104, h: 10 }, HUD_BANK = { x: 268, y: 31, w: 100, h: 10 }
+function led(b) { fill(b.x, b.y, b.w, b.h, "#0B1418"); frame1(b.x, b.y, b.w, b.h, "#2E3A44") }
+function drawHUD() {
+  useFont(true)
+  led(HUD_CLOCK); led(HUD_BANK)
+  const t = HUD_CLOCK, last = prog.phase === "night" && prog.hour >= ECO.NIGHT_END - 1e-9
+  if (prog.phase === "day") { text(`DAY ${prog.night}`, t.x + 4, t.y + 2, HOLO.title); text("BAR CLOSED", t.x + t.w - 4, t.y + 2, "#FFC94A", "right") }
+  else {
+    text(`NIGHT ${prog.night}`, t.x + 4, t.y + 2, HOLO.title)
+    text(last ? "LAST GUEST" : ECO.clockText(prog.hour), t.x + t.w - 4, t.y + 2, last ? (Math.floor(S.t * 2) % 2 ? "#FF8AA8" : "#FFC94A") : HOLO.value, "right")
+  }
+  const b = HUD_BANK
+  text(`${prog.credits} cr`, b.x + 4, b.y + 2, "#FFE27A")
+  if (prog.phase === "night") text(`+${prog.tonight.tips} tips`, b.x + b.w - 4, b.y + 2, "#9CF0B0", "right")
+  useFont(false)
+}
+
+// ---------------------------------------------------------------- garnishes: the tray on the counter and its picker
+// The tray sits left of the mat. Click it to see the garnishes you own; pick one and it goes on the glass (one at a
+// time: picking another swaps it). A garnish has no volume: it's an aroma on top (catalog.js says what each adds).
+const TRAY = { x: 170, base: 207 }
+const trayBox = () => ({ x: TRAY.x - 13, y: TRAY.base - 11, w: 26, h: 11 })
+const garnishPick = { open: false, t: 0 }
+const GP = { x: 96, w: 176, bottom: 192 }
+function openGarnishes() {
+  if (!prog.owned.some(isGarnish)) { sim.say("No garnishes yet. Buy them at the supplier during the day."); return }
+  garnishPick.open = true; garnishPick.t = 0
+}
+function putGarnish(id) {
+  if (sim.total() < 0.3) { sim.say("Make the drink first, then garnish it."); return }
+  S.glass.garnish = id; garnishPick.open = false
+  sim.say(`${ITEMS[id].name} on the glass.`)
+}
+function drawTray() {
+  const b = trayBox(), hov = hover && hover.kind === "tray"
+  drawShadow(TRAY.x, TRAY.base - 1, 13, 2, 0.35)
+  ctx.drawImage(IMG[hov ? "garnish_tray_hover" : "garnish_tray"], b.x, b.y)
+  // a fleck of each owned garnish's color in the bowls
+  const own = prog.owned.filter(isGarnish)
+  own.slice(0, 12).forEach((id, k) => { const x = b.x + 4 + (k % 3) * 7 + Math.floor(k / 3) * 1, y = b.y + 2 + (Math.floor(k / 3) % 2); px(x, y, hex(ITEMS[id].color)); px(x + 1, y, hex(ITEMS[id].color)) })
+}
+function drawGarnishPicker() {
+  if (!garnishPick.open) return
+  const own = prog.owned.filter(isGarnish), per = 5, rows = Math.ceil(own.length / per), h = 18 + rows * 32 + 18
+  const P = { ...GP, h, y: GP.bottom - h }
+  garnishPick.rect = P
+  fill(P.x, P.y, P.w, P.h, "#141A16"); frame1(P.x, P.y, P.w, P.h, "rgba(232,176,96,0.8)")
+  text("GARNISH", P.x + 6, P.y + 4, "#FFC94A")
+  button("x", P.x + P.w - 15, P.y + 2, () => (garnishPick.open = false), { w: 12, key: "gpClose" })
+  own.forEach((id, k) => {
+    const x = P.x + 7 + (k % per) * 33, y = P.y + 16 + Math.floor(k / per) * 32, key = "gp:" + id
+    const on = S.glass.garnish === id, hov = hover && hover.kind === "button" && hover.key === key
+    if (on || hov) fill(x, y, 31, 30, on ? "rgba(232,176,96,0.3)" : "rgba(232,176,96,0.15)")
+    ctx.drawImage(IMG["garnish_" + id + (hov ? "_hover" : "")], x + 1, y + 1, 28, 28)       // twice size, pixel for pixel
+    buttons.push({ x, y, w: 31, h: 30, key, act: () => putGarnish(id) })
+  })
+  const by = P.y + P.h - 14
+  if (S.glass.garnish) button("Take it off", P.x + 6, by, () => { S.glass.garnish = null; garnishPick.open = false }, { key: "gpOff" })
+  else { useFont(true); text("Pick one for the glass.", P.x + 6, by + 3, DIM); useFont(false) }
+}
+// on the glass: rims as crystals along the rim, sprigs and fruit perched on it, flowers and spice floating
+function drawGarnishOn() {
+  const id = S.glass.garnish; if (!id) return
+  const it = ITEMS[id], [il, ir] = glass.inner(glass.rimY)
+  if (it.fam.includes("rim")) {
+    const a = hex(it.color), b = mixRgb(a, [255, 255, 255], 0.5)
+    for (let x = il - 1; x <= ir + 1; x++) { px(x, glass.rimY - 1, (x * 7) % 3 ? a : b); if (x % 2) px(x, glass.rimY, a) }
+    return
+  }
+  const img = IMG["garnish_" + id]
+  if (id === "orchid" || id === "nutmeg" || id === "beans") {
+    const sy = sim.total() > 0.05 ? Math.round(sim.surfaceY()) : glass.rimY
+    ctx.drawImage(img, Math.round(glass.cx - 7), sy - 11)
+  } else ctx.drawImage(img, Math.round(ir - 8), glass.rimY - 12)
+}
+
+// a bottle carried from the back bar follows the pointer, upright, until it's put in a slot
+function drawCarried() {
+  if (!carry.id || backBar.open) return
+  const img = IMG["bottle_" + carry.id]
+  ctx.globalAlpha = 0.9; ctx.drawImage(img, Math.round(pointer.x - img.width / 2), Math.round(pointer.y - img.height * 0.4)); ctx.globalAlpha = 1
+}
+// ---------------------------------------------------------------- the back bar: every bottle you own
+// Click the top shelf to open it. The bottles not on the rail stand here; pick one, then click a slot on its side
+// of the rail (alcohol on the left, the rest on the right): the bottle there goes back on the shelf.
+const carry = { id: null }
+const backBar = { open: false, t: 0 }
+const BB = { x: 20, y: 16, w: 440, h: 232 }
+function openBackBar() { backBar.open = true; backBar.t = 0; carry.id = null }
+function pickFromShelf(id) {
+  backBar.open = false; carry.id = id
+  sim.say(`Click a bottle on the ${ITEMS[id].group === "spirit" ? "left (alcohol)" : "right (no alcohol)"} side of the rail to put ${ITEMS[id].name} in its place. Right-click to put it back.`)
+}
+function dropIntoSlot(id) {
+  const k = prog.rail[ITEMS[carry.id].group].indexOf(id)
+  if (k < 0) return
+  const was = ITEMS[id].name
+  ECO.swapIntoRail(prog, carry.id, k); saveProg()
+  sim.say(`${ITEMS[carry.id].name} is on the rail. ${was} went back on the shelf.`)
+  carry.id = null
+}
+function drawBackBar() {
+  if (!backBar.open) return
+  ctx.globalAlpha = 0.55; fill(-EXT, 0, CW, H, "#06080A"); ctx.globalAlpha = 1
+  const P = BB
+  fill(P.x, P.y, P.w, P.h, "#1A1410"); frame1(P.x, P.y, P.w, P.h, "#7A4A30")
+  fill(P.x + 1, P.y + 1, P.w - 2, 12, "#2A1C14")
+  text("BACK BAR", P.x + 6, P.y + 3, "#FFC94A")
+  useFont(true); text("Pick a bottle to put on the rail", P.x + 70, P.y + 4, CREAM); useFont(false)
+  button("x", P.x + P.w - 15, P.y + 2, () => (backBar.open = false), { w: 12, key: "bbClose" })
+  const shelf = ECO.onShelf(prog), spirits = shelf.filter((id) => ITEMS[id].group === "spirit"), mixers = shelf.filter((id) => ITEMS[id].group === "mixer")
+  const rows = [["SPIRITS (ALCOHOL)", spirits.slice(0, 12)], ["FLAVORS", mixers.slice(0, 12)], ["", mixers.slice(12, 24)]]
+  rows.forEach(([title, ids], r) => {
+    const top = P.y + 16 + r * 70, lip = top + 58
+    // the shelf: a warm glow behind, a wooden lip in front that hides the bottles' lower halves
+    fill(P.x + 4, top, P.w - 8, lip - top, "#24180F"); fill(P.x + 4, lip - 14, P.w - 8, 14, "rgba(255,194,120,0.06)")
+    if (title) { useFont(true); text(title, P.x + 8, top + 2, "#E8B060"); useFont(false) }
+    ids.forEach((id, k) => {
+      const cx = P.x + 26 + k * 35, img = IMG["bottle_" + id], key = "bb:" + id, hov = hover && hover.kind === "button" && hover.key === key
+      const vis = Math.min(img.height, 44 + (hov ? 4 : 0))
+      ctx.drawImage(IMG["bottle_" + id + (hov ? "_hover" : "")], 0, 0, img.width, vis, Math.round(cx - img.width / 2), lip - vis, img.width, vis)
+      buttons.push({ x: cx - 15, y: lip - 46, w: 30, h: 58, key, act: () => pickFromShelf(id) })
+    })
+    fill(P.x + 4, lip, P.w - 8, 8, "#7A4A30"); fill(P.x + 4, lip, P.w - 8, 1, "#9C6440"); fill(P.x + 4, lip + 7, P.w - 8, 1, "#3A2218")
+    ids.forEach((id, k) => {
+      const cx = P.x + 26 + k * 35, word = ITEMS[id].plain.toUpperCase().slice(0, 8), w = word.length * 4 - 1
+      tapeText(word, Math.round(cx - w / 2), lip + 2, "#F2E4C8")
+    })
+    if (!ids.length && title) { useFont(true); text(r === 0 ? "No spare spirits yet. Buy more at the supplier." : "No spare flavors yet. Buy more at the supplier.", P.x + P.w / 2, top + 30, DIM, "center"); useFont(false) }
+  })
+}
+
+// ---------------------------------------------------------------- the day: the night's takings and the supplier
+// After the last guest, the bar closes: the wage and tips are paid, and the supplier is open. Buy bottles and
+// garnishes, set up the rail (the back bar works now too, with no clock running), practice, then open the bar.
+const day = { open: false, t: 0, tab: "spirit", page: 0 }
+const DP = { x: 16, y: 14, w: 448, h: 244 }
+const SHOP_TABS = [["spirit", "Spirits"], ["mixer", "Flavors"], ["garnish", "Garnishes"]]
+function openDay() { day.open = true; day.t = 0; day.page = 0; carry.id = null; backBar.open = false; garnishPick.open = false }
+function openBar() {
+  ECO.startNight(prog); saveProg(); day.open = false
+  sim.emptyGlass(); for (const id of Object.keys(S.tools)) sim.emptyVessel(id)
+  newGuest(); guest.back = 1
+  sim.say(`Night ${prog.night}. The bar is open.`)
+}
+function buyItem(id) {
+  const why = ECO.buy(prog, id)
+  if (why === "short") { sim.say(`Not enough credits for ${ITEMS[id].name} yet.`); return }
+  if (why) return
+  saveProg()
+  sim.say(isGarnish(id) ? `Bought ${ITEMS[id].name}. It's in the garnish tray on the counter.` : `Bought ${ITEMS[id].name}. It's on the back bar: click the top shelf to put it on the rail.`)
+}
+function drawDay() {
+  if (!day.open) return
+  ctx.globalAlpha = 0.6; fill(-EXT, 0, CW, H, "#06080A"); ctx.globalAlpha = 1
+  const P = DP
+  fill(P.x, P.y, P.w, P.h, "rgba(18,22,20,0.97)"); frame1(P.x, P.y, P.w, P.h, "rgba(232,176,96,0.8)")
+  // left: last night
+  const last = prog.history[prog.history.length - 1], lx = P.x + 8
+  text(last ? `NIGHT ${last.night} IS OVER` : `DAY ${prog.night}`, lx, P.y + 6, "#FFC94A")
+  let y = P.y + 22
+  const row = (a, b, col = CREAM) => { text(a, lx, y, DIM); text(b, lx + 130, y, col, "right"); y += 11 }
+  if (last) { row("Guests served", String(last.guests)); row("Wage", `${last.wage} cr`); row("Tips", `${last.tips} cr`, "#9CF0B0"); row("Earned", `${last.total} cr`, "#FFE27A"); y += 4 }
+  row("In the bank", `${prog.credits} cr`, "#FFE27A")
+  const left = BUYABLE.filter((id) => !prog.owned.includes(id)).length
+  y += 6
+  useFont(true)
+  for (const l of wrap(left ? `${left} things left to buy at the supplier.` : "You own everything the supplier sells. The bar is complete.", 128)) { text(l, lx, y, CREAM); y += 9 }
+  y += 4
+  for (const l of wrap("Bottles you buy go on the back bar (click the top shelf). Garnishes go in the tray by the mat.", 128)) { text(l, lx, y, DIM); y += 9 }
+  useFont(false)
+  button("Open the bar", lx, P.y + P.h - 34, openBar, { w: 130, key: "openBar" })
+  button("Set up the rail first", lx, P.y + P.h - 18, () => (day.open = false), { w: 130, key: "dayClose" })
+  // right: the supplier, a tab per kind, ten to a page
+  const sx = P.x + 150, sw = P.w - 158
+  fill(sx - 4, P.y + 4, 1, P.h - 8, "rgba(232,176,96,0.3)")
+  text("SUPPLIER", sx, P.y + 6, "#FFC94A")
+  let tx = sx + 64
+  for (const [tab, label] of SHOP_TABS) { const w = textW(label) + 10; button(label, tx, P.y + 3, () => { day.tab = tab; day.page = 0 }, { w, key: "tab:" + tab, on: day.tab === tab }); tx += w + 4 }
+  const items = BUYABLE.filter((id) => ITEMS[id].group === day.tab).sort((a, b) => ITEMS[a].price - ITEMS[b].price || ITEMS[a].name.localeCompare(ITEMS[b].name))
+  const per = 10, pages = Math.ceil(items.length / per); day.page = clamp(day.page, 0, pages - 1)
+  items.slice(day.page * per, day.page * per + per).forEach((id, k) => {
+    const it = ITEMS[id], ry = P.y + 22 + k * 19, own = prog.owned.includes(id), afford = prog.credits >= it.price, key = "shop:" + id
+    const hov = hover && hover.kind === "button" && (hover.key === key || hover.key === "buy:" + id)
+    if (hov) fill(sx - 2, ry - 2, sw + 2, 18, "rgba(232,176,96,0.08)")
+    buttons.push({ x: sx - 2, y: ry - 2, w: sw - 50, h: 18, key, act: () => {} })
+    if (isGarnish(id)) ctx.drawImage(IMG["garnish_" + id], sx, ry - 1)
+    else { const img = IMG["bottle_" + id]; ctx.drawImage(img, 0, 2, img.width, 14, Math.round(sx + 7 - img.width / 4), ry, Math.round(img.width / 2), 7); fill(sx + 2, ry + 8, 10, 6, rgbStr(liquidOf(id))) }
+    text(it.name, sx + 18, ry + 1, own ? DIM : CREAM)
+    useFont(true); text(noteHint(id), sx + 18, ry + 10, own ? "#5A6458" : DIM); useFont(false)
+    if (own) text("Owned", sx + sw - 4, ry + 3, "#9CF0B0", "right")
+    else button(`${it.price} cr`, sx + sw - 46, ry + 1, () => buyItem(id), { w: 44, key: "buy:" + id, dim: !afford })
+  })
+  if (pages > 1) {
+    useFont(true); text(`${day.page + 1} / ${pages}`, sx + sw / 2, P.y + P.h - 12, DIM, "center"); useFont(false)
+    if (day.page > 0) button("<", sx + sw / 2 - 40, P.y + P.h - 15, () => day.page--, { w: 14, key: "dayPrev" })
+    if (day.page < pages - 1) button(">", sx + sw / 2 + 26, P.y + P.h - 15, () => day.page++, { w: 14, key: "dayNext" })
+  }
+}
+// what a bottle or garnish adds, in note names: its two biggest notes ("Fruity, Sour"), or a garnish's effect
+function noteHint(id) {
+  const it = ITEMS[id]
+  if (isGarnish(id)) return [...Object.keys(it.fx.add || {}).map((n) => "+" + LABEL[n]), ...Object.keys(it.fx.hide || {}).map((n) => "hides " + LABEL[n])].join(", ")
+  const top = Object.entries(it.v).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([n]) => LABEL[n])
+  return (it.dash ? "dashes: " : "") + (top.join(", ") || "no flavor") + (it.tags.includes("fizz") ? ", fizzy" : "")
+}
+// with the bar closed and the day screen put away: a small card where the guest's bubble goes
+function drawClosedCard() {
+  if (guest.phase !== "closed" || day.open) return
+  const x = 374, y = 32, w = 103, lines = wrap("Practice, or set up the rail from the back bar (the top shelf).", w - 10), h = 44 + lines.length * 8
+  fill(x, y, w, h, "rgba(20,26,22,0.9)"); frame1(x, y, w, h, "rgba(232,176,96,0.75)")
+  useFont(true); text("The bar is closed.", x + 5, y + 5, CREAM); lines.forEach((l, i) => text(l, x + 5, y + 14 + i * 8, DIM)); useFont(false)
+  const by = y + 16 + lines.length * 8
+  button("Supplier", x + 5, by, openDay, { w: w - 10, key: "toDay" })
+  button("Open the bar", x + 5, by + 13, openBar, { w: w - 10, key: "openBar2" })
+}
+
 function render() {
   buttons = []
   MAIN.setTransform(1, 0, 0, 1, EXT, 0)          // everything below is in the scene's own coordinates
   ctx.drawImage(IMG.bg, -EXT, 0)
   drawScreen()
+  drawHUD()
   drawGuestBody()
   drawWellHover()
   for (const cup of Object.values(S.cups)) if (cup.state === "home" || cup.state === "toHome") drawCup(cup)
   for (const tool of Object.values(S.tools)) if (tool.state === "home") drawToolHome(tool)
   drawHolder()
+  drawTray()
   for (const cup of Object.values(S.cups)) if (cup.state === "carried") drawCup(cup)
   for (const tool of Object.values(S.tools)) if (tool.state === "carried") drawToolHome(tool)
   drawServeZone()
@@ -1380,9 +1701,14 @@ function render() {
   for (const tool of Object.values(S.tools)) if (tool.state !== "home" && tool.state !== "carried" && tool.state !== "hand") drawToolMoving(tool)
   drawLabels()
   drawBubble()
+  drawClosedCard()
   drawHeld()                           // whatever is in hand stays on top, even over the bubble and the panel
+  drawCarried()
   drawThrown()                         // ice in the air goes over the panels, so a flick can be followed the whole way
   if (!book.open) drawSpectro()
+  drawGarnishPicker()
+  drawBackBar()
+  drawDay()
   drawBook()
   drawTooltip()
   drawNotice()
@@ -1391,8 +1717,12 @@ function render() {
 // ---------------------------------------------------------------- the loop: physics in fixed steps, drawn once a frame
 let last = performance.now(), acc = 0
 const settle = { key: "", t: 0, done: true }
+let saveT = 0
 function update(dt) {
   guest.t += dt; book.t += dt; spectro.t += dt
+  // the night runs on the city's clock (stopped by the browser when the tab is hidden); saved every few seconds
+  if (prog.phase === "night" && prog.hour < ECO.NIGHT_END) prog.hour = Math.min(ECO.NIGHT_END, prog.hour + dt * ECO.GAME_HOURS_PER_SECOND * CLOCK)
+  if ((saveT += dt) > 5) { saveT = 0; saveProg() }
   // once what's on the screen has stopped changing for a moment, any combination in it counts as found
   const c = drinkContents(), key = sim.volOf(c).toFixed(2) + ":" + [...c.parts.keys()].join()
   if (key !== settle.key) { settle.key = key; settle.t = 0; settle.done = false }
@@ -1413,10 +1743,11 @@ function frame(now) {
   hover = targetAt(pointer.x, pointer.y)
   trackDwell(dt)
   if (spectro.open && hover && hover.kind === "spectro") spectro.row = hover.row
-  view.style.cursor = S.grab || S.moving || S.stirring ? "grabbing" : hover && hover.kind === "spoon" ? "grab" : hover && hover.kind === "spoonHome" ? "pointer" : S.toolMode ? (pointer.down ? "grabbing" : "grab") : S.held ? (pointer.down ? "grabbing" : hover ? "pointer" : "grab") : hover && hover.kind !== "spectro" && hover.kind !== "modal" && hover.kind !== "screen" ? "pointer" : "default"
+  view.style.cursor = S.grab || S.moving || S.stirring ? "grabbing" : hover && hover.kind === "spoon" ? "grab" : hover && hover.kind === "spoonHome" ? "pointer" : S.toolMode ? (pointer.down ? "grabbing" : "grab") : S.held ? (pointer.down ? "grabbing" : hover ? "pointer" : "grab") : hover && !["spectro", "modal", "screen", "away", "hudClock", "hudBank"].includes(hover.kind) && !(hover.kind === "button" && /^shop:/.test(hover.key)) ? "pointer" : "default"
   render()
   requestAnimationFrame(frame)
 }
 requestAnimationFrame(frame)
 // a handle for the browser console and the node test harness: the simulation, the guest, and today's buttons
-globalThis.pourlab = { sim, guest, spectro, book, SCREEN, textW: textWSmall, get buttons() { return buttons }, get hover() { return hover } }
+globalThis.pourlab = { sim, guest, spectro, book, SCREEN, textW: textWSmall, get buttons() { return buttons }, get hover() { return hover },
+  prog, day, backBar, carry, garnishPick, openDay, openBar, serve, nextGuest, railIds }

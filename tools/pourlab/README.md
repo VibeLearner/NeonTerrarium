@@ -35,7 +35,7 @@ between the two, it shows only what's in the glass.
 - **Move things around:** press and drag the glass, the shaker or a cup to slide it somewhere else on the counter.
 - **Empty** the glass or the shaker by double-clicking it: everything goes, ice too.
 - **Info cards:** a bottle's card shows as soon as you point at it; anything else (the glass, a tool, the spoon, a
-  cup, the ice well, the screen) shows its card once the pointer has rested on it for about 2 seconds.
+  cup, the ice well) shows its card once the pointer has rested on it for about 2 seconds.
 
 **Technique** (the three ways to make a drink, from the design doc)
 

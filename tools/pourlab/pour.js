@@ -1282,7 +1282,6 @@ function drawTooltip() {
   }
   else if (hover.kind === "spoonHome") tooltip("Bar spoon", "Click to put it in the glass, then stir there.", S.spoon.home.x, holderBox().y - 4)
   else if (hover.kind === "spoon") tooltip("Bar spoon", "Press and hold on it, then move the mouse in circles to stir. Back and forth doesn't stir. Click it to take it out." + (sim.readout().ice ? "" : " Put ice in first, or the drink won't get cold."), glass.cx, spoonGlassBox().y - 4)
-  else if (hover.kind === "screen") tooltip("The screen", "What's in the drink, and how it tastes right now. After you serve, the full breakdown opens with the guest's reaction.", SCREEN.x + SCREEN.w / 2 + 40, SCREEN.y + SCREEN.h + 62)
   else if (hover.kind === "ice") tooltip("Ice well", "Drag a cube out and drop it into the glass, shaker or stirring glass, or flick it in. The shaker and stirring glass need ice to chill a drink; in the glass it melts in slowly.", WELL_MID.x + 50, WELL[0][1] - 4)
   else if (hover.kind === "glass" && guest.phase === "asking")
     tooltip("The glass", `The lights on its sides mark the minimum drink amount: ${FILL_LINE} parts. They turn from red to green once there's enough. Guests won't take a smaller drink. It holds up to ${MAX_PARTS} parts.` + " Slide it over to the guest to serve it. Click to pick it up and pour it out. Drag it to move it. Double-click to empty it.", glass.cx, glass.top - 4)

@@ -13,9 +13,10 @@ with `fetch`, so opening the file directly won't work):
 Everything is done by hand: there are no action buttons at the bar. Point at anything (a bottle, cup, tool, the ice
 well, the glass, the screen) to see a card saying what it is and does.
 
-**The screen** hangs from the top shelf on the left. It shows what's in the glass or the shaker, switching by itself to whichever you're pouring into or holding, and the drink's taste profile as it
-stands (one short bar per note). Click the tabs to look at another vessel; click the screen for the full taste
-breakdown.
+**The screen** hangs from the top shelf on the left. It lists everything in the drink in one list: what's in the
+glass, and anything still in the shaker, marked with a gold [SHKR] tag next to its amount. The taste profile beside
+it is for the whole drink (glass and shaker together, since it all ends up in the glass). Click the screen for the
+full taste breakdown.
 
 **Pouring**
 
@@ -59,7 +60,7 @@ breakdown.
   least the minimum drink amount: 2.5 parts. The small lights on the sides of the glass show it: red until there
   is enough, green after (it holds up to 8). They react in the same vibe
   words, and the full taste breakdown opens with their arrows: gold for more, pink for less, green for spot on.
-- **The screen** hanging from the shelf shows what's in the glass or the tool you're using, in a small font. When
+- **The screen** hanging from the shelf shows the whole drink in a small font. When
   the list is longer than the screen, it scrolls: the mouse wheel over the screen, or the little arrows on the
   divider. A new ingredient scrolls itself into view.
 - The full taste breakdown (click the screen) has one bar per note, built from the ingredients that give it; a

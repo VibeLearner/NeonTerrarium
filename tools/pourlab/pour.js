@@ -843,7 +843,6 @@ function drawScreenBody() {
   const t = r.total > 0.01 ? sim.tasteOf(c) : null, lx = colR + 9, bx = lx + labelW + 4, vx = P.x + P.w - 4
   SPEC_ROWS.forEach((n, k) => {
     const yy = P.y + 19 + k * LH, v = t ? t.notes[n] : 0, on = v > 0.05
-    if (k === BASE.length) fill(lx, yy - 1, vx - lx, 1, "rgba(95,243,232,0.12)")   // the three combined notes below
     text(LABEL[n], lx, yy, on ? HOLO.text : HOLO.dim)
     fill(bx, yy + 3, BAR, 1, HOLO.track)
     for (let q = 0; q <= 10; q += 5) fill(bx + q * BAR / 10, yy + 2, 1, 3, HOLO.track)

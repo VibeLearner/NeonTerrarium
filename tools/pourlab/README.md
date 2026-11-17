@@ -15,8 +15,8 @@ well, the glass, the screen) to see a card saying what it is and does.
 
 **The screen** hangs from the top shelf on the left. It lists everything in the drink in one list: what's in the
 glass, and anything still in the shaker, marked with a gold [SHKR] tag next to its amount. The taste profile beside
-it is for the whole drink (glass and shaker together, since it all ends up in the glass). Click the screen for the
-full taste breakdown.
+it shows the glass; if everything is still in the shaker, it shows the shaker. When the ingredients are split
+between the two, it shows only what's in the glass. Click the screen for the full taste breakdown.
 
 **Pouring**
 

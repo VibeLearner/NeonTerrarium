@@ -273,14 +273,11 @@ function spectroTaste() {
   if (spectro.src === "served") return guest.result && guest.result.t
   return sim.tasteOf(drinkContents())
 }
-// the drink as a whole: what's in the glass plus anything waiting in the shaker (it all ends up in the glass)
+// what the taste profile shows: the glass, unless everything is still in the shaker (then the shaker). When the
+// ingredients are split between the two, only the glass's taste is shown.
 function drinkContents() {
   const g = S.glass, sh = S.tools.shaker && S.tools.shaker.c
-  if (!sh || sim.volOf(sh) < 0.004) return g
-  if (sim.volOf(g) < 0.004) return sh
-  const sum = (a, b) => { const m = new Map(a); for (const [k, v] of b) m.set(k, (m.get(k) || 0) + v); return m }
-  return { ...g, parts: sum(g.parts, sh.parts), dashes: sum(g.dashes, sh.dashes), chillVol: g.chillVol + sh.chillVol, fizzKeep: g.fizzKeep + sh.fizzKeep,
-    shaken: g.shaken || sh.shaken, log: [...g.log, ...sh.log.filter((l) => !g.log.includes(l))] }
+  return sh && sim.volOf(g) < 0.004 && sim.volOf(sh) >= 0.004 ? sh : g
 }
 const SPEC_ROWS = [...BASE, ...FUSED]
 const rowY = (i) => SPEC.y + 37 + i * 11 + (i >= BASE.length ? 4 : 0)
@@ -1029,7 +1026,7 @@ function drawSpectro() {
   holoPanel(P.x, P.y, P.w, P.h, spectro.t)
   const served = spectro.src === "served", arrows = served ? guest.result.fb.arrows : {}
   // header: what's being tasted, and how it was made
-  const what = served ? "THE SERVED DRINK" : "TASTE: THE DRINK"
+  const what = served ? "THE SERVED DRINK" : drinkContents() === S.glass ? "TASTE: THE GLASS" : "TASTE: THE SHAKER"
   text(what, P.x + 8, P.y + 5, HOLO.title)
   button("Close", P.x + P.w - 40, P.y + 3, closeSpectro, { w: 34, tone: "holo" })
   // once the guest has tasted it, the drink can be saved to the book as a recipe card

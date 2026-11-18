@@ -1,4 +1,4 @@
-import { pickLine } from "./voices.js"
+import { pickLine, NONE_WORD } from "./voices.js"
 import { ITEMS, STARTER, GARNISHES, isGarnish } from "./catalog.js"
 // Neon Dome flavor model, from the "Neon Dome: Drink Crafting Design" doc. No drawing: it takes what's in a vessel
 // and how it was made, and returns how the drink tastes, why, and what a guest makes of it.
@@ -261,7 +261,7 @@ export function makeGuest(R, crowdId, bar = null) {
     const weights = newer.map((n) => (fresh.some((id) => ITEMS[id] && (ITEMS[id].v || {})[n] >= 6) ? 2 : 1))
     let t = rc2 * weights.reduce((a, b) => a + b, 0), k = 0
     while (t > weights[k] && k < newer.length - 1) t -= weights[k++]
-    const n = newer[k], high = rc3 < 0.4 && top[n] >= 7.5
+    const n = newer[k], high = rc3 < 0.4 && top[n] >= 8
     craving = { note: n, level: high ? 3 : 2 }
     ranges[n] = high ? [6, 9.5, 2.5] : [3.5, 6.5, 2.5]
   }
@@ -350,8 +350,14 @@ export function feedback(g, t, s) {
   const bad = s.misses.filter((m) => m.miss > 0.35 && (m.dir < 0 || asked(m.ax) || m.ax === "balance")).sort((a, b) => b.cost - a.cost).slice(0, 2 - lines.length)
   for (const m of bad) { lines.push(pickLine(g.crowd, m.dir > 0 ? "more" : "less", m.ax) || (m.dir > 0 ? MORE[m.ax] : LESS[m.ax])); arrows[m.ax] = m.dir }
   if (lines.length < 2 && s.score >= 65) {
-    const good = s.misses.filter((m) => m.miss === 0 && SPOT_ON[m.ax] && asked(m.ax)).sort((a, b) => b.w - a.w)[0]
-    if (good) { lines.push(pickLine(g.crowd, "spot", good.ax) || SPOT_ON[good.ax]); arrows[good.ax] = 0 }
+    // (praise for layers never goes to someone who asked for something simple)
+    const good = s.misses.filter((m) => m.miss === 0 && SPOT_ON[m.ax] && asked(m.ax) && !(m.ax === "complexity" && m.hi <= 3.5)).sort((a, b) => b.w - a.w)[0]
+    if (good) {
+      // they asked for none of it: praise its absence, never its taste
+      const none = good.hi <= 1 && NONE_WORD[good.ax]
+      const line = none ? (pickLine(g.crowd, "spotNone") || "No {w}, just right.").replace("{w}", NONE_WORD[good.ax]) : pickLine(g.crowd, "spot", good.ax) || SPOT_ON[good.ax]
+      lines.push(line[0].toUpperCase() + line.slice(1)); arrows[good.ax] = 0
+    }
   }
   return { lines: [pickLine(g.crowd, "tier", s.tier) || s.line, ...lines], arrows }
 }

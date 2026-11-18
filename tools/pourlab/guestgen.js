@@ -194,7 +194,7 @@ const CROWD_STYLE = {
     tops: [["suit", 4], ["turtleblazer", 2], ["polo", 2], ["waistcoat", 2]],
     hats: [[null, 1]],
     hairs: [["sidepart", 4], ["bob", 2], ["ponytail", 2], ["short", 2], ["slick", 2], ["bun", 2]],
-    extras: { lanyard: 0.4, earpiece: 0.35, arglasses: 0.28, glasses: 0.15, stubble: 0.08 },
+    extras: { lanyard: 0.4, earpiece: 0.35, arglasses: 0.28, glasses: 0.15, stubble: 0.08, beard: 0.1 },
     chin: [3, 5], brows: 1,
   },
   luxury: {
@@ -205,9 +205,30 @@ const CROWD_STYLE = {
     tops: [["longcoat", 3], ["tux", 2], ["silk", 3], ["highcollar", 2]],
     hats: [["pillbox", 1], [null, 7]],
     hairs: [["slick", 3], ["updo", 3], ["bob", 2], ["long", 3], ["sidepart", 2], ["bald", 1]],
-    extras: { earrings: 0.55, necklace: 0.4, shades: 0.14, monocle: 0.12, fur: 0.3, beautymark: 0.25 },
+    extras: { earrings: 0.55, necklace: 0.4, shades: 0.14, monocle: 0.12, fur: 0.3, beautymark: 0.25, beard: 0.14 },
     chin: [2, 4], brows: 1,
   },
+}
+
+// the neck's half width: a share of the face, wider on a heavy build
+const neckW = (L) => L.neckW || Math.round(L.rw * 0.42)
+
+// ---------------------------------------------------------------- the bar's manager
+// Vic runs the Dome. He's there when the bar is closed and tastes whatever you slide him: a heavy build, a loud
+// camp-collar shirt open at the neck, a gold chain, slicked-back hair, a pencil mustache over five-o'clock shadow,
+// a double chin, heavy-lidded eyes, a smirk and a toothpick. One fixed look (no seed), made from a luxury look with
+// everything that matters set by hand.
+export function managerLook() {
+  const L = makeLook(4242, "luxury")
+  Object.assign(L, {
+    manager: true, heavy: true, gender: "male", S: 56, rw: 26, neckW: 13, chin: 7, jaw: 0.3,
+    skin: ramp("#D69A72"), hair: ramp("#1C1418"), iris: ramp("#5A3A22"), hairStyle: "greased", hat: null,
+    top: "camp", cloth: ramp("#A82E3A"), under: ramp("#E8D8B0"), accent: ramp("#F2C84A"),
+    lashes: false, browThick: 2, lip: null, mouthW: 6, rest: "smirk", restEyes: "half", sleeve: "short", beardStyle: "pencil",
+    extras: { stubble: true, necklace: true, toothpick: true, pencil: true, shadesUp: true },
+  })
+  L.gold = ramp("#E8B060")
+  return L
 }
 
 // ---------------------------------------------------------------- the look
@@ -258,6 +279,11 @@ export function makeLook(seed, crowd) {
   L.bangs = 4 + Math.floor(R() * 3)                                 // how many locks in the fringe
   L.sweep = (R() - 0.5) * 8                                         // which way the fringe falls
   L.part = R() < 0.5 ? -1 : 1
+  // a beard's style, by crowd (drawn last, so every other part of a look stays what it was)
+  const BEARDS = { industrial: [["full", 3], ["long", 2], ["boxed", 2], ["chinstrap", 1], ["goatee", 1]],
+    residential: [["full", 2], ["boxed", 3], ["goatee", 2], ["chinstrap", 2], ["mustache", 1]],
+    commercial: [["boxed", 3], ["goatee", 2], ["mustache", 1]], luxury: [["goatee", 3], ["mustache", 3], ["boxed", 2]] }
+  L.beardStyle = weighted(R, BEARDS[crowd] || BEARDS.residential)
   return L
 }
 
@@ -310,7 +336,7 @@ export function drawGuest(L, frame) {
   const ids = body(ctx, po.L, armR)
   const neckId = B.shape(L.skin, { cls: "skin", shade: 3, cast: (x, y, b) => { const n = b.at(x, y - 6); return n === ctx.faceId } })
   ctx.neckId = neckId
-  const nw = Math.round(L.rw * 0.42)
+  const nw = neckW(L)
   rows(B, neckId, hy + 16, ids.t0 + 6, () => hx - nw, () => hx + nw - 1, below)
   collarOver(ctx, ids)
   head(ctx)
@@ -344,7 +370,7 @@ function body(ctx, armL, armR) {
   const { L, B, hx, hy, S, by } = ctx
   const top = L.top, lean = (r) => ({ cls: r, shade: 5, deep: 1, lit: 2 })
   const torsoRamp = top === "overalls" ? L.under : L.cloth
-  const nw = Math.round(L.rw * 0.42)
+  const nw = neckW(L)
   // the far sides first: upper arms (shoulder to elbow), then the torso over them
   const sleeve = top === "overalls" || top === "vest" ? L.under : L.cloth
   const armId = B.shape(sleeve, lean(sleeve))
@@ -352,7 +378,8 @@ function body(ctx, armL, armR) {
   const torso = B.shape(torsoRamp, lean(torsoRamp))
   const t0 = hy + 33 + by
   // the trapezius slopes from the neck down to the shoulders, then the chest falls straight to the counter
-  const half = (y) => { const t = Math.max(0, Math.min(1, (y - t0) / 24)); return nw + 1 + (S - 6 - nw) * (1 - Math.pow(1 - t, 2)) }
+  const span = L.heavy ? 15 : 24, belly = (y) => (L.heavy ? Math.max(0, y - (t0 + 40)) * 0.3 : 0)
+  const half = (y) => { const t = Math.max(0, Math.min(1, (y - t0) / span)); return nw + 1 + (S - 6 - nw) * (1 - Math.pow(1 - t, 2)) + belly(y) }
   rows(B, torso, t0, CLIP_Y, (y) => CX - half(y), (y) => CX + half(y), below)
   // short sleeves: bare arms below the sleeve's hem
   if (L.sleeve === "short") {
@@ -363,7 +390,7 @@ function body(ctx, armL, armR) {
 }
 // what goes around the neck in front of it: collars, turtlenecks, a scarf, headphones resting on the neck
 function collarOver(ctx, ids) {
-  const { L, B, hx, hy } = ctx, top = L.top, nw = Math.round(L.rw * 0.42), y0 = ids.t0
+  const { L, B, hx, hy } = ctx, top = L.top, nw = neckW(L), y0 = ids.t0
   if (top === "turtleblazer") { const id = B.shape(L.under, { shade: 3, lit: 1 }); rows(B, id, hy + 22, y0 + 4, () => hx - nw - 2, () => hx + nw + 1, below) }
   if (top === "highcollar" || top === "longcoat") {
     const id = B.shape(L.extras.fur && top === "longcoat" ? ramp("#E8DCC8") : L.cloth, { shade: 4, lit: 2 })
@@ -410,15 +437,47 @@ function head(ctx) {
     else { const t = (y - yJaw) / (yChin - yJaw); w = L.chin + (rw - L.chin) * (1 - Math.pow(t, 1 + L.jaw)) }
     for (let x = Math.round(hx - w); x <= Math.round(hx + w - 1); x++) B.put(x, y, face)
   }
-  // a beard is its own shape (shaded and outlined like hair)
-  if (L.extras.beard) {
-    const bd = B.shape(L.hair, { cls: "hair", shade: 3, lit: 1 })
-    for (let y = hy + 8; y <= yChin + 2; y++) for (let x = hx - rw; x <= hx + rw; x++) {
-      if (B.at(x, y) !== face && !(y > yChin && Math.abs(x - hx) < L.chin + 2)) continue
-      const mouthGap = Math.abs(x - hx) < L.mouthW / 2 + 2 && y > hy + 14 && y < hy + 21
-      const cheek = y < hy + 15 && Math.abs(x - hx) < rw - 5
-      if (!mouthGap && !cheek) B.put(x, y, bd)
-    }
+  // a heavy build: full jowls round out the lower face (the double chin's crease is drawn with the features)
+  if (L.heavy) ellipse(B, face, hx, yChin - 5, L.chin + 8, 8.5)
+  if (L.extras.beard) beard(ctx, face, yChin)
+}
+
+// A beard is its own shape (shaded and outlined like hair), cut from smooth curves so its edges step evenly:
+//   full: from the sideburns down, the cheek line curving to the corners of the mouth, past the chin
+//   boxed: the same, kept short and close to the jaw     long: full, falling to a rounded point below the chin
+//   goatee: a mustache and a chin patch joined round the mouth     chinstrap: a band along the jaw
+//   mustache: just the mustache
+// The mouth always stays clear (an oval round the lips).
+function beard(ctx, face, yChin) {
+  const { L, B, hx, hy } = ctx, rw = L.rw, st = L.beardStyle || "full"
+  const bd = B.shape(L.hair, { cls: "hair", shade: 3, lit: 1 })
+  const mw = L.mouthW / 2 + 1.5, my = hy + 17.5
+  const inMouth = (x, y) => ((x - hx) / (mw + 0.5)) ** 2 + ((y - my) / 2.3) ** 2 < 1
+  // the face's half width at a row (the head's own outline)
+  const yJaw = hy + 6, half = (y) => { if (y <= yJaw) { const d = (y - (hy - 2)) / 24; return rw * Math.sqrt(Math.max(0, 1 - d * d)) } const t = (y - yJaw) / (yChin - yJaw); return L.chin + (rw - L.chin) * (1 - Math.pow(t, 1 + L.jaw)) }
+  const mustache = (x, y) => { const dx = Math.abs(x - hx), top = hy + 13.5 + (dx / (mw + 2)) ** 2 * 1.5; return dx <= mw + 2 && y >= top && y <= top + 2.6 }
+  const ext = { full: 5, boxed: 2, long: 10, goatee: 3, chinstrap: 1, mustache: 0, pencil: 0 }[st]
+  // below the chin: a rounded (or, long, pointed) bottom
+  const under = (x, y) => { if (y <= yChin || y > yChin + ext) return false; const t = (y - yChin) / (ext + 0.5); const w = (st === "long" ? (L.chin + 3) * (1 - t * 0.85) : (L.chin + 1.5) * Math.sqrt(1 - t * t)); return Math.abs(x - hx) <= w }
+  for (let y = hy; y <= yChin + ext; y++) for (let x = Math.floor(hx - rw); x <= Math.ceil(hx + rw); x++) {
+    const onFace = B.at(x, y) === face, dx = Math.abs(x - hx), e = half(y) - dx
+    if (!onFace && !under(x, y)) continue
+    if (inMouth(x, y)) continue
+    let on = false
+    if (st === "full" || st === "boxed" || st === "long") {
+      // sideburns down the face's edge from the ears, then the cheek line: level under the cheekbones, dipping to the
+      // corners of the mouth (the cheeks above it stay bare)
+      const side = st === "boxed" ? 2.6 : 3.4, cheekY = hy + 11 + 4 * Math.max(0, 1 - dx / (rw - 2))
+      on = (e <= side && y >= hy + 1) || y >= cheekY || mustache(x, y)
+    } else if (st === "goatee") {
+      const chinPatch = ((x - hx) / (L.chin + 3.5)) ** 2 + ((y - (yChin - 1)) / 7) ** 2 < 1 && y > my + 1
+      const join = dx >= mw - 0.5 && dx <= mw + 1.5 && y >= hy + 14 && y <= my + 3
+      on = mustache(x, y) || chinPatch || join || under(x, y)
+    } else if (st === "chinstrap") on = (e <= 3.6 && y >= hy + 2) || under(x, y)
+    else if (st === "mustache") on = mustache(x, y)
+    // a pencil mustache: one thin line just over the lip, its ends turned down
+    else if (st === "pencil") { const top = hy + 14.5 + (dx >= mw + 1 ? 1 : 0); on = dx <= mw + 1.5 && dx >= 0.5 && y >= top && y < top + 1.2 }
+    if (on) B.put(x, y, bd)
   }
 }
 
@@ -473,6 +532,11 @@ function frontHair(ctx) {
     }
     fringe(L.bangs + 1, 5, rw - 4, L.sweep, 8)
     for (const sd of [-1, 1]) lock(B, id, hx + sd * (rw - 2), hy - 12, hx + sd * (rw + 5), hy - 2, hx + sd * (rw + 4), hy + 8, 7)
+  } else if (s === "greased") {
+    // slicked straight back with grease: a high, smooth hairline and long flat locks combed over the top
+    crown(() => hy - 19)
+    for (let k = 0; k < 6; k++) lock(B, id, hx - 13 + k * 5, hy - 19, hx - 12 + k * 5, hy - 27, hx - 8 + k * 4, hy - 30, 7)
+    for (const sd of [-1, 1]) lock(B, id, hx + sd * (rw - 2), hy - 16, hx + sd * (rw + 1), hy - 9, hx + sd * (rw - 1), hy - 2, 5)
   } else if (s === "sidepart" || s === "slick") {
     crown(() => hy - (s === "slick" ? 18 : 14))
     if (s === "sidepart") {
@@ -613,7 +677,7 @@ function face(ctx, C) {
   const ey = hy + 3, g = L.eyeGap
   // skin marks first, so the features sit on top
   // stubble: a soft tint along the jaw and over the lip (no dither: this style keeps flat tones)
-  if (L.extras.stubble) for (let y = hy + 10; y <= hy + 26; y++) for (let x = hx - L.rw; x <= hx + L.rw; x++) if (Math.hypot((x - hx) / L.rw, (y - hy - 4) / 20) > 0.66 || (y === hy + 14 && Math.abs(x - hx) < 4)) { const i = y * B.w + x; if (ok(B.at(x, y)) && C[i]) C[i] = mixc(C[i], L.hair[0], 0.22) }
+  if (L.extras.stubble) for (let y = hy + 10; y <= hy + 26; y++) for (let x = hx - L.rw; x <= hx + L.rw; x++) if (Math.hypot((x - hx) / L.rw, (y - hy - 4) / 20) > 0.66 || (y === hy + 14 && Math.abs(x - hx) < 4)) { const i = y * B.w + x; if (ok(B.at(x, y)) && C[i]) C[i] = mixc(C[i], L.hair[0], L.heavy ? 0.12 : 0.22) }
   if (L.extras.freckles) for (const [dx, dy] of [[-12, 9], [-10, 10], [-13, 11], [12, 9], [10, 10], [13, 11]]) P(C, B, hx + dx, hy + dy, L.skin[1], ok)
   if (L.extras.grease) { lineC(C, B, hx + 10, hy + 12, hx + 14, hy + 11, mixc(L.skin[0], INKLINE, 0.3), ok); P(C, B, hx + 12, hy + 13, L.skin[0], ok) }
   if (L.extras.scar) lineC(C, B, hx - 13, hy - 4, hx - 10, hy + 5, L.skin[4], ok)
@@ -650,11 +714,24 @@ function face(ctx, C) {
   const map = { L: lineCol, k: mixc(L.skin[0], L.skin[1], 0.5), w: hexRgb("#FAF6F0"), d: hexRgb("#4A1420"), t: hexRgb("#E87A88") }
   stamp(C, B, hx - Math.floor(mw / 2) + 1, hy + 16 - (m.length > 2 ? 1 : 0), m, map, ok)
   if (L.lip && /flat|smile|softsmile|smirk|tight|pursed/.test(mouth)) lineC(C, B, hx - 1, hy + 18, hx + 1, hy + 18, L.lip[2], ok)
+  // a pencil mustache: one thin dark line over the lip, its ends turned down (drawn over the mouth's top row)
+  if (L.extras.pencil) { const mw = L.mouthW / 2 + 1; lineC(C, B, hx - mw, hy + 14, hx + mw, hy + 14, L.hair[0], () => true); for (const sd of [-1, 1]) P(C, B, hx + sd * (mw + 1), hy + 15, L.hair[0], () => true) }
+  // a double chin: a soft crease under the jaw
+  if (L.heavy) for (let x = -L.chin - 2; x <= L.chin + 2; x++) P(C, B, hx + x, hy + 28 - Math.round((x / (L.chin + 3)) ** 2 * 3), L.skin[1], ok)
+  // the manager's toothpick, parked in the corner of his mouth (out while he drinks)
+  if (L.extras.toothpick && !/drink|open|wide|o$/.test(mouth)) { lineC(C, B, hx + 3, hy + 18, hx + 12, hy + 14, hexRgb("#8A6A3A"), () => true); lineC(C, B, hx + 3, hy + 17, hx + 12, hy + 13, hexRgb("#F0D49C"), () => true) }
+  // tinted aviators pushed up on his greased hair
+  if (L.extras.shadesUp) for (const sd of [-1, 1]) {
+    const cx = hx + sd * 7, cy = hy - 21
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -4; dx <= 4; dx++) if ((dx / 4.6) ** 2 + (dy / 2.8) ** 2 < 1) P(C, B, cx + dx, cy + dy, dy < 0 ? hexRgb("#6A3A5A") : hexRgb("#3A1E34"), () => true)
+    P(C, B, cx - 2 * sd, cy - 1, hexRgb("#E8A8D0"), () => true)
+    lineC(C, B, cx - 5, cy - 3, cx + 5, cy - 3, L.gold[3], () => true)
+  }
 }
 
 // ---------------------------------------------------------------- clothes: necklines, lapels, folds, patterns
 function clothesDetail(ctx, C, ids) {
-  const { L, B, hx, S } = ctx, top = L.top, y0 = ids.t0, nw = Math.round(L.rw * 0.42)
+  const { L, B, hx, S } = ctx, top = L.top, y0 = ids.t0, nw = neckW(L)
   const onT = (n) => n === ids.torso, onBody = (n) => n === ids.torso || n === ids.armId
   const cl = L.cloth, un = L.under, ac = L.accent, line = lineOf(cl)
   // a V neckline: what's under shows in a V from the collarbones down
@@ -705,6 +782,21 @@ function clothesDetail(ctx, C, ids) {
     }
     // reflective stripes
     for (const yy of [y0 + 22, y0 + 32]) if (yy < CLIP_Y) for (let x = hx - S - 8; x <= hx + S + 8; x++) { P(C, B, x, yy, top === "vest" ? hexRgb("#D8E4E2") : ac[2], onBody); P(C, B, x, yy + 1, hexRgb("#F4F8F6"), onBody); P(C, B, x, yy + 2, top === "vest" ? hexRgb("#B8C4C2") : ac[1], onBody) }
+  } else if (top === "camp") {
+    // a loud camp-collar shirt: a bold leaf print over the shading, open at the neck, wide flat collars, buttons
+    const lum = (c) => c[0] * 0.3 + c[1] * 0.59 + c[2] * 0.11, mid = lum(cl[2])
+    for (let y = y0; y <= CLIP_Y; y++) for (let x = hx - S - 12; x <= hx + S + 12; x++) {
+      const i = y * B.w + x; if (!onBody(B.at(x, y)) || !C[i]) continue
+      const col = Math.floor((x - hx + 98) / 13), u = (x - hx + 98) % 13, v = (y - y0 + (col % 2) * 6 + 26) % 12
+      const leaf = (u === 2 && v >= 4 && v <= 6) || (u === 3 && v >= 3 && v <= 6) || (u === 4 && v >= 2 && v <= 5) || (u === 5 && v >= 2 && v <= 3)
+      const bloom = (u === 9 || u === 10) && (v === 9 || v === 10)
+      const dark = lum(C[i]) < mid - 4
+      if (leaf) C[i] = dark ? ac[1] : ac[2]
+      else if (bloom) C[i] = dark ? un[1] : un[3]
+    }
+    vee(16, 7, L.skin)
+    for (const s of [-1, 1]) stamp(C, B, hx + (s < 0 ? -nw - 9 : nw + 2), y0 - 1, ["xxxxxxx", ".xxxxxx", "..xxxxx", "...xxx.", "....x.."], { x: cl[3] }, onT, s > 0)
+    for (let yy = y0 + 20; yy < CLIP_Y; yy += 7) P(C, B, hx, yy, un[3], onT)
   } else if (top === "flannel") {
     for (let y = y0; y <= CLIP_Y; y++) for (let x = hx - S - 8; x <= hx + S + 8; x++) {
       const id = B.at(x, y); if (!onBody(id)) continue
@@ -754,7 +846,7 @@ function clothesDetail(ctx, C, ids) {
   if (L.extras.necklace && L.seed % 2) stamp(C, B, hx - 1, y0 + 10, [".x.", "xyx", ".x."], { x: L.gold[2], y: L.accent[3] }, (n) => n === ids.torso || n === ctx.neckId)
 }
 function crew(ctx, C, y0, r, ok, open = false) {
-  const { L, B, hx } = ctx, nw = Math.round(L.rw * 0.42)
+  const { L, B, hx } = ctx, nw = neckW(L)
   // the neck hole: skin showing in a soft U, the collar's rib on its edge
   for (let x = hx - nw - 2; x <= hx + nw + 1; x++) {
     const d = Math.round(4 * Math.sqrt(Math.max(0, 1 - ((x - hx + 0.5) / (nw + 2.5)) ** 2)))
@@ -833,7 +925,7 @@ function forearm(ctx, AB, arm, side) {
   if (cyber) {
     const id = AB.shape(L.metal, lean(L.metal)); capsule(AB, id, e[0], e[1], wx, wy, 7, 5.5)
   } else if (bare) {
-    const id = AB.shape(L.skin, { cls: "skin", shade: 3, lit: 1 }); capsule(AB, id, e[0], e[1], wx, wy, 6.5, 5)
+    const id = AB.shape(L.skin, { cls: "skin", shade: 3, lit: 1 }); capsule(AB, id, e[0], e[1], wx, wy, L.heavy ? 8 : 6.5, L.heavy ? 6.5 : 5)
     if (L.sleeve === "rolled") { const r = AB.shape(sleeve, lean(sleeve)); ellipse(AB, r, e[0], e[1], 9, 7) }
   } else {
     const id = AB.shape(sleeve, lean(sleeve)); capsule(AB, id, e[0], e[1], wx, wy, 8, 6.5)

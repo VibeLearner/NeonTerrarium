@@ -633,6 +633,14 @@ const NEWER = {
     garnishMiss: { none: ["No garnish, I see.", "I had hoped for the garnish.", "The garnish seems to have been forgotten."], other: ["Not quite the garnish I had in mind.", "An unexpected garnish.", "A different garnish than I asked for."] },
   },
 }
+// spotNone: praise for something they asked NOT to have ("no smoke"), with {w} the plain word for the note. Without
+// it, a guest who said "can't stand smoke" and liked the drink could praise its smoke.
+NEWER.industrial.spotNone = ["Not a lick of {w}. Good.", "Zero {w}, like I said.", "No {w} in sight. Right."]
+NEWER.residential.spotNone = ["No {w} at all, just how I asked.", "Not a bit of {w}, lovely.", "You kept the {w} out, thank you."]
+NEWER.commercial.spotNone = ["Zero {w}, per spec.", "No {w}, as requested.", "The {w} was fully excluded. Good."]
+NEWER.luxury.spotNone = ["Not a trace of {w}. Thank you.", "Entirely free of {w}. Thoughtful.", "You spared me the {w}. Perfect."]
+export const NONE_WORD = { strength: "booze", sweet: "sugar", sour: "tang", bitter: "bitterness", fresh: "green", smoke: "smoke", spice: "heat",
+  fruity: "fruit", floral: "flowers", creamy: "cream" }
 for (const [crowd, v] of Object.entries(NEWER)) {
   const into = { industrial: I, residential: R, commercial: C, luxury: X }[crowd]
   for (const [kind, sets] of Object.entries(v)) into[kind] = { ...(into[kind] || {}), ...sets }

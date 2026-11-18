@@ -7,7 +7,8 @@ import { BASE, FUSED, LABEL, PARENTS, CROWDS, DISCOVERIES, request, score, feedb
 import { ITEMS, STARTER, BUYABLE, GARNISHES, isGarnish } from "./catalog.js"
 import * as ECO from "./economy.js"
 import { servableGuest } from "./bot.js"
-import { BOX as GBOX, makeLook, frameCanvases, REACTIONS } from "./guestgen.js"
+import { managerSays, managerTier } from "./manager.js"
+import { BOX as GBOX, makeLook, managerLook, frameCanvases, REACTIONS } from "./guestgen.js"
 
 const W = 480, H = 270
 const view = document.getElementById("view")
@@ -204,9 +205,11 @@ const guest = { g: null, said: [], phase: "asking", t: 0, result: null, back: 1 
 function newGuest() {
   guest.g = servableGuest(GR, null, { owned: prog.owned, fresh: prog.fresh }); guest.said = request(guest.g)
   guest.look = makeLook(Math.floor(GR() * 1e9), guest.g.crowd)             // a new face for each guest (guestgen.js)
-  guest.phase = "asking"; guest.t = 0; guest.result = null; guest.saved = false; guest.enter = 0; guest.tip = 0
+  guest.phase = "asking"; guest.t = 0; guest.result = null; guest.saved = false; guest.enter = 0; guest.tip = 0; guest.manager = false
 }
-function closeBar() { guest.g = null; guest.look = null; guest.said = []; guest.phase = "closed"; guest.result = null }
+// closed: Vic, the manager (manager.js), sits at the bar. He'll taste anything you slide him: no score, no tip.
+const MANAGER = managerLook()
+function closeBar() { guest.g = null; guest.look = MANAGER; guest.manager = true; guest.said = []; guest.phase = "closed"; guest.result = null; guest.t = 0; guest.saved = false; guest.tip = 0 }
 if (prog.phase === "day") { closeBar() } else { newGuest(); guest.back = 1 }
 // the bar is workable: a guest is waiting, or it's day and the bar is the player's to practice on
 const atBar = () => guest.phase === "asking" || guest.phase === "closed"
@@ -214,17 +217,26 @@ const nightOver = () => prog.phase === "night" && prog.hour >= ECO.NIGHT_END - 1
 function nextGuest() {
   closeSpectro()
   if (guest.phase !== "asking") { sim.emptyGlass(); guest.back = 0 }   // the empty glass slides back from the guest
+  if (guest.manager) { closeBar(); return }                          // Vic stays put: the bar's still closed
   // past 05:00 nobody new comes in: the night ends, the takings are paid, and it's day
   if (nightOver()) { ECO.endNight(prog); saveProg(); closeBar(); openDay(); return }
   newGuest()
 }
 function serve() {
-  if (guest.phase === "closed") { sim.say("The bar is closed for the day. Open it from the day screen when you're ready."); return }
-  if (guest.phase !== "asking") return
+  if (guest.phase !== "asking" && guest.phase !== "closed") return
   if (sim.total() < FILL_LINE - 0.05) { sim.say(`Pour at least the minimum drink amount first: ${FILL_LINE} parts, the lights on the glass turn green.`); return }
   dropHeld()
   if (S.toolMode) sim.putToolDown()
   sim.homeSpoon()
+  if (guest.phase === "closed") {
+    // Vic tastes it: what he says, his face, the breakdown after; nothing scored, nothing paid
+    const t = sim.tasteOf(S.glass)
+    guest.result = { t, s: null, fb: { lines: managerSays(t), arrows: {} } }
+    const vs = REACTIONS.commercial[managerTier(t)]; guest.reaction = vs[Math.floor(GR() * vs.length)]
+    guest.phase = "served"; guest.t = 0
+    closeSpectro()
+    return
+  }
   const t = sim.tasteOf(S.glass), s = score(guest.g, t)
   guest.result = { t, s, fb: feedback(guest.g, t, s) }
   const vs = REACTIONS[guest.g.crowd][s.tier]; guest.reaction = vs[Math.floor(GR() * vs.length)]
@@ -267,7 +279,9 @@ function saveRecipe() {
   if (!guest.result || guest.saved) return
   const r = sim.readout(), c = S.glass
   const items = r.rows.filter((row) => row.id !== "water" && (row.parts >= 0.04 || row.dashes)).map((row) => row.dashes ? [row.id, 0, row.dashes] : [row.id, +row.parts.toFixed(2), 0])
-  const rec = { no: recipes.length ? recipes[recipes.length - 1].no + 1 : 1, crowd: guest.g.crowdName, tier: guest.result.s.tier, score: Math.round(guest.result.s.score),
+  const rated = guest.result.s
+  const rec = { no: recipes.length ? recipes[recipes.length - 1].no + 1 : 1, crowd: guest.manager ? "Vic, the manager" : guest.g.crowdName,
+    tier: rated ? rated.tier : "Tasted by Vic", score: rated ? Math.round(rated.score) : null,
     color: sim.srgb(sim.compColor(c.parts)), items, ice: r.ice, method: c.log.length ? logText(c.log) : "Built in the glass", total: +r.total.toFixed(2), garnish: c.garnish || null }
   recipes.push(rec); guest.saved = true
   try { globalThis.localStorage?.setItem(RECIPE_KEY, JSON.stringify(recipes)) } catch {}
@@ -1074,7 +1088,7 @@ const T_REACH = 0.6, T_LIFT = 0.95, T_DRINK = 1.35, T_DOWN = 2.45, SIP_DONE = 2.
 function blinkNow() { const p = ((S.t + (guest.look ? guest.look.seed % 97 : 0) * 0.37) % 4.3); return p < 0.13 }
 function guestFrameNow() {
   const t = guest.t
-  if (guest.phase === "asking") return { pose: "idle", blink: blinkNow() }
+  if (guest.phase === "asking" || guest.phase === "closed") return { pose: "idle", blink: blinkNow(), expr: guest.manager ? { eyes: blinkNow() ? "closed" : "half", mouth: "smirk" } : undefined }
   if (guest.phase === "served") {
     if (t < T_REACH) return { pose: "idle", expr: { look: [0, 2] } }
     if (t < T_LIFT) return { pose: "reach", expr: { look: [0, 2] } }
@@ -1111,13 +1125,16 @@ const CT_FAR = 186
 const HEAD = { x: 362, y: 92 }
 function drawBubble() {
   const g = guest.g, x = 374, w = 103, inner = w - 10
-  if (!g) return
+  if ((!g && !guest.manager) || guest.phase === "closed") return
   const lines = []                                   // [text, color]
   if (guest.phase === "asking") {
     if (g.mood) for (const l of wrap(g.moodLine || g.mood.name + ".", inner)) lines.push([l, "#FFB3D9"])
     for (const s of guest.said) for (const l of wrap(s.text, inner)) lines.push([l, s.ax === "garnish" ? "#FFC94A" : CREAM])
   } else if (guest.phase === "served") {
     lines.push([".".repeat(1 + (Math.floor(guest.t * 3) % 3)), CREAM])
+  } else if (guest.manager) {
+    lines.push(["VIC, THE MANAGER", "#FFC94A"])
+    for (const l of guest.result.fb.lines) for (const w2 of wrap(l, inner)) lines.push([w2, CREAM])
   } else {
     const { s, fb } = guest.result
     lines.push([`${s.tier} (${Math.round(s.score)})`, s.score >= 85 ? "#FFE27A" : s.score >= 65 ? "#9CF0B0" : s.score >= 40 ? "#E9C08A" : "#FF8A7A"])
@@ -1185,7 +1202,7 @@ function drawSpectro() {
   // header: what's being tasted, and how it was made
   const what = served ? "THE SERVED DRINK" : drinkContents() === S.glass ? "TASTE: THE GLASS" : "TASTE: THE SHAKER"
   text(what, P.x + 8, P.y + 5, HOLO.title)
-  const cl = served ? (nightOver() ? "Close the bar" : "Next guest") : "Close", cw = textW(cl) + 10
+  const cl = served ? (guest.manager ? "Done" : nightOver() ? "Close the bar" : "Next guest") : "Close", cw = textW(cl) + 10
   button(cl, P.x + P.w - 6 - cw, P.y + 3, served ? finishTasting : closeSpectro, { w: cw, tone: "holo", key: "spectroClose" })
   // once the guest has tasted it, the drink can be saved to the book as a recipe card
   if (served) { const l = guest.saved ? "Saved" : "Save recipe", w = textW(l) + 10; button(l, P.x + P.w - 10 - cw - w, P.y + 3, saveRecipe, { w, tone: "holo", key: "saveRecipe", on: guest.saved }) }
@@ -1385,7 +1402,8 @@ function drawRecipe(P) {
   }
   const r = recipes[book.page[1]]
   useFont(false); text(`No. ${r.no}`, P.x + 8, P.y + 22, EINK); useFont(true)
-  text(`${r.tier}, ${r.score}`, P.x + 8, P.y + 34, r.score >= 65 ? "#2E6B4A" : r.score >= 40 ? INK2 : "#8A3A3A")
+  if (r.score === null || r.score === undefined) text(r.tier, P.x + 8, P.y + 34, INK2)
+  else text(`${r.tier}, ${r.score}`, P.x + 8, P.y + 34, r.score >= 65 ? "#2E6B4A" : r.score >= 40 ? INK2 : "#8A3A3A")
   // the drink itself: a small tumbler in its color
   const gx = Math.round(P.x + P.w - 26), gy = P.y + 22
   fill(gx + 1, gy + 6, 14, 13, rgbStr(mixRgb(r.color, [200, 208, 192], 0.2))); fill(gx + 1, gy + 6, 14, 1, rgbStr(mixRgb(r.color, [255, 255, 255], 0.35)))
@@ -1477,6 +1495,28 @@ function drawHUD() {
   text(`${prog.credits} cr`, b.x + 4, b.y + 2, "#FFE27A")
   if (prog.phase === "night") text(`+${prog.tonight.tips} tips`, b.x + b.w - 4, b.y + 2, "#9CF0B0", "right")
   useFont(false)
+}
+
+// ---------------------------------------------------------------- the OPEN / CLOSED sign
+// A small neon sign hanging in the window beside the guest: OPEN in green while the bar is serving, CLOSED in red
+// during the day. Tubes glow (a soft halo drawn first), and now and then a letter stutters.
+const SIGN = { x: 268, y: 66, w: 38, h: 15 }
+function drawNeonSign() {
+  const open = prog.phase === "night", word = open ? "OPEN" : "CLOSED", P = SIGN
+  const tube = open ? "#7DFFB4" : "#FF5A6A", glow = open ? "rgba(125,255,180,0.28)" : "rgba(255,90,106,0.28)"
+  // the hanging chains and a dark backing plate
+  fill(P.x + 5, P.y - 10, 1, 10, "#2E3A44"); fill(P.x + P.w - 6, P.y - 10, 1, 10, "#2E3A44")
+  fill(P.x, P.y, P.w, P.h, "rgba(8,10,14,0.82)"); frame1(P.x, P.y, P.w, P.h, "#2E3A44")
+  const w = textW(word), x0 = Math.round(P.x + (P.w - w) / 2), y0 = P.y + 4
+  // a stutter: one letter drops out for a moment every few seconds
+  const stutter = Math.floor(S.t * 7) % 37 === 0 ? Math.floor(S.t) % word.length : -1
+  ;[...word].forEach((ch, i) => {
+    if (i === stutter) return
+    const cx = x0 + textW(word.slice(0, i))
+    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) text(ch, cx + dx, y0 + dy, glow)
+    text(ch, cx, y0, tube)
+  })
+  fill(P.x + 2, P.y + P.h - 3, P.w - 4, 1, glow)
 }
 
 // ---------------------------------------------------------------- garnishes: the tray on the counter and its picker
@@ -1671,7 +1711,7 @@ function noteHint(id) {
 // with the bar closed and the day screen put away: a small card where the guest's bubble goes
 function drawClosedCard() {
   if (guest.phase !== "closed" || day.open) return
-  const x = 374, y = 32, w = 103, lines = wrap("Practice, or set up the rail from the back bar (the top shelf).", w - 10), h = 44 + lines.length * 8
+  const x = 374, y = 32, w = 103, lines = wrap("Vic, the manager, will taste anything you slide him. The back bar (top shelf) sets up the rail.", w - 10), h = 44 + lines.length * 8
   fill(x, y, w, h, "rgba(20,26,22,0.9)"); frame1(x, y, w, h, "rgba(232,176,96,0.75)")
   useFont(true); text("The bar is closed.", x + 5, y + 5, CREAM); lines.forEach((l, i) => text(l, x + 5, y + 14 + i * 8, DIM)); useFont(false)
   const by = y + 16 + lines.length * 8
@@ -1686,6 +1726,7 @@ function render() {
   ctx.drawImage(IMG.bg, -EXT, 0)
   drawScreen()
   drawHUD()
+  drawNeonSign()
   drawGuestBody()
   drawWellHover()
   for (const cup of Object.values(S.cups)) if (cup.state === "home" || cup.state === "toHome") drawCup(cup)

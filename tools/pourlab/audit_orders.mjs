@@ -11,7 +11,7 @@
 //      with little Y, so a person can see how to make it, not just a search.
 import { makeGuest, request, score, feedback, taste, INGREDIENTS, BASE, levelOf } from "./flavor.js"
 import { STARTER, BUYABLE, ITEMS, isGarnish } from "./catalog.js"
-import { seedVoices } from "./voices.js"
+import { seedVoices, VOICES, NONE_WORD } from "./voices.js"
 import { servableGuest, bestDrink, drinkOf, plainRoute } from "./bot.js"
 
 const SEED = +(process.argv[2] || 3), N = +(process.argv[3] || 60)
@@ -23,7 +23,7 @@ let fails = 0
 const examples = []
 for (const k of [0, 10, 20, 40]) {
   const owned = [...STARTER, ...order.slice(0, k)]
-  const tally = { guests: 0, hiddenFloor: 0, unsaidMore: 0, saidMissed: 0, notGood: 0, noRoute: 0 }
+  const tally = { guests: 0, hiddenFloor: 0, unsaidMore: 0, saidMissed: 0, notGood: 0, noRoute: 0, praisedNone: 0, noneChecked: 0 }
   for (let i = 0; i < N; i++) {
     const g = servableGuest(R, null, { owned, fresh: [] }), said = request(g), saidAx = new Set(said.map((s) => s.ax))
     tally.guests++
@@ -38,11 +38,31 @@ for (const k of [0, 10, 20, 40]) {
     const rough = { ...b.r, parts: new Map([...b.r.parts].map(([id, p]) => [id, Math.max(0.25, p + (R() < 0.5 ? -0.5 : 0.5))])) }
     const tr = taste(drinkOf(rough)), sr = score(g, tr), fb = feedback(g, tr, sr)
     for (const m of sr.misses.filter((mm) => mm.miss > 0.35).sort((a, b2) => b2.cost - a.cost).slice(0, 2)) if (m.dir > 0 && !saidAx.has(m.ax) && m.ax !== "balance") { tally.unsaidMore++; if (examples.length < 18) examples.push(`stage ${k}: says "${fb.lines.slice(1).join(" ")}" about unsaid ${m.ax} | asked: ${said.map((q) => q.text).join(" ")}`); break }
+    // 5. praise for a note they asked NOT to have must be about its absence, on every note: the best drink's feedback
+    //    (a liked drink) is checked, said by said
+    const fbBest = feedback(g, t, s), spotLines = new Set(Object.values(VOICES).flatMap((V) => Object.values(V.spot || {}).flat()))
+    for (const sx of said) if (sx.ax !== "garnish" && g.ranges[sx.ax][1] <= 1 && NONE_WORD[sx.ax]) {
+      tally.noneChecked++
+      if (fbBest.arrows[sx.ax] === 0) { const l = fbBest.lines.find((x) => spotLines.has(x)); if (l || !fbBest.lines.some((x) => x.toLowerCase().includes(NONE_WORD[sx.ax]))) { tally.praisedNone++; if (examples.length < 30) examples.push(`stage ${k}: asked "${sx.text}" and heard "${fbBest.lines.join(" ")}"`) } }
+    }
     // 4. a plain route for "lots of X" with "none of Y"
     if (!plainRoute(g, owned)) { tally.noRoute++; if (examples.length < 24) examples.push(`stage ${k}: no plain route | ${said.map((q) => q.text).join(" ")}`) }
   }
-  console.log(`stage ${String(k).padStart(2)}: ${tally.guests} guests | unsaid floors ${tally.hiddenFloor} | "more" about unsaid ${tally.unsaidMore} | best drink misses a said thing ${tally.saidMissed} | best under Good ${tally.notGood} | no plain route ${tally.noRoute}`)
-  if (tally.hiddenFloor || tally.unsaidMore || tally.saidMissed || tally.notGood || tally.noRoute) fails++
+  console.log(`stage ${String(k).padStart(2)}: ${tally.guests} guests | unsaid floors ${tally.hiddenFloor} | "more" about unsaid ${tally.unsaidMore} | best drink misses a said thing ${tally.saidMissed} | best under Good ${tally.notGood} | no plain route ${tally.noRoute} | "none" asks praised for the note ${tally.praisedNone} (of ${tally.noneChecked})`)
+  if (tally.hiddenFloor || tally.unsaidMore || tally.saidMissed || tally.notGood || tally.noRoute || tally.praisedNone) fails++
+}
+// every note, every crowd: a guest who asked for none of it, served a drink with none of it, praises its absence
+{
+  let bad = 0, n = 0
+  for (const crowd of Object.keys(VOICES)) for (const note of BASE) for (let rep = 0; rep < 4; rep++) {
+    const g = makeGuest(R, crowd, { owned: [...STARTER, ...BUYABLE] })
+    g.ranges = { [note]: [0, 0.8, 10] }; g.saidAxes = [note]; g.garnishAsk = null; g.loves = null
+    const t = { notes: Object.fromEntries([...BASE, "depth", "brightness", "toasted", "juicy", "velvet", "complexity", "balance"].map((x) => [x, 0])), garnish: null }
+    const s = score(g, t), fb = feedback(g, t, s); n++
+    if (!fb.lines.slice(1).some((l) => l.toLowerCase().includes(NONE_WORD[note]))) { bad++; console.log(`  ${crowd} asked for no ${note}, heard: ${fb.lines.join(" ")}`) }
+  }
+  console.log(`"none" praise sweep: ${n - bad} of ${n} praise the note's absence`)
+  if (bad) fails++
 }
 for (const e of examples) console.log("  " + e)
 console.log(fails ? `\n${fails} stages with problems` : "\nall orders say what they score, and can be made")

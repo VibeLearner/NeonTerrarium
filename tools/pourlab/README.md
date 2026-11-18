@@ -100,6 +100,13 @@ between the two, it shows only what's in the glass.
 - **The day:** a screen shows what the night earned, and the **supplier**: 10 spirits, 20 flavors and 10 garnishes
   (896 credits for everything), in tabs, with what each tastes like. Buy what you can afford, then **Open the bar**,
   or **Set up the rail first**: the bar stays closed (no clock) and you can practice with anything you own.
+- **The OPEN / CLOSED sign** hangs in the window left of the guest: green OPEN while the bar serves, red CLOSED
+  during the day.
+- **Vic, the manager,** sits at the bar while it's closed: heavy-set, loud shirt, gold chain, greased hair, pencil
+  mustache, aviators on his head and a toothpick (`managerLook` in `guestgen.js`). Slide him a drink and he tastes it
+  like a guest, then tells you what he tastes (`manager.js`): the strongest notes in the screen's own names and how
+  much of each, any fused note or secret pairing, and what's wrong (what drags Balance down, or what's hiding a note).
+  No score, no tip. The breakdown opens after (press Done), and you can save the recipe ("Tasted by Vic").
 - **The back bar:** click the top shelf. Every bottle you own that isn't on the rail stands there. Pick one, then
   click a bottle on its side of the rail (alcohol on the left, the rest on the right) to swap them.
 - **Garnishes** go in the wooden tray left of the mat. Click it, pick one, and it goes on the glass (picking another
@@ -118,7 +125,10 @@ between the two, it shows only what's in the glass.
 - **They only hold you to what they said:** a guest's three or four spoken wishes are the only things they want
   more of. Anything they didn't mention can only be too much ("Too bitter" when they never asked for bitter), never
   missing, and Balance can always be too rough. Their "needed more" and "spot on" lines are only about what they
-  asked for.
+  asked for, and a guest who asked for none of something praises its absence ("Not a trace of smoke"), never its
+  taste.
+- **Beards** come in six styles, picked by crowd: full, boxed, long, goatee, chinstrap and mustache, cut from
+  smooth curves.
 - **Saved in the browser:** the night, the clock, credits, what you own and your rail. For testing, add to the
   address: `?clock=10` (the clock runs 10 times faster), `?credits=500` (adds credits), `?reset=1` (starts over).
 
@@ -132,6 +142,7 @@ between the two, it shows only what's in the glass.
 | `flavor.js` | the taste model from the design doc: notes, masking, carrying, fused notes, Complexity, Balance, crowds, guests, scoring |
 | `catalog.js` | every bottle and garnish: what it tastes like, its tags, how it pours, its price, its plain name and description |
 | `economy.js` | nights on the city clock, the wage and tips, prices, buying, the rail, and the saved progress |
+| `manager.js` | Vic, the manager: what he says about a drink he tastes while the bar is closed |
 | `bot.js` | the bot bartender: searches for the best drink a guest could get from what the bar owns |
 | `audit_orders.mjs` | the order audit: for guests at each stage of the shop, checks they're only held to what they said, only ask for "more" of what they said, that the best drink lands every said thing, and that each order has a plain route. `node tools/pourlab/audit_orders.mjs` |
 | `sim_progress.mjs` | the progression simulation: a bot plays every stage of the shop; checks orders can be made, the pacing (about 2 hours relaxed, 1.5 quick), that the new notes behave as you'd guess, and edge cases. `node tools/pourlab/sim_progress.mjs` (add `--quick` for a short run) |

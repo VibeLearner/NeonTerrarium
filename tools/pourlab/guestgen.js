@@ -216,7 +216,7 @@ const neckW = (L) => L.neckW || Math.round(L.rw * 0.42)
 // ---------------------------------------------------------------- the bar's manager
 // Vic runs the Dome. He's there when the bar is closed and tastes whatever you slide him: a heavy build, a loud
 // camp-collar shirt open at the neck, a gold chain, slicked-back hair, a pencil mustache over five-o'clock shadow,
-// a double chin, heavy-lidded eyes, a smirk and a toothpick. One fixed look (no seed), made from a luxury look with
+// a double chin, heavy-lidded eyes and a smirk. One fixed look (no seed), made from a luxury look with
 // everything that matters set by hand.
 export function managerLook() {
   const L = makeLook(4242, "luxury")
@@ -225,7 +225,7 @@ export function managerLook() {
     skin: ramp("#D69A72"), hair: ramp("#1C1418"), iris: ramp("#5A3A22"), hairStyle: "greased", hat: null,
     top: "camp", cloth: ramp("#A82E3A"), under: ramp("#E8D8B0"), accent: ramp("#F2C84A"),
     lashes: false, browThick: 2, lip: null, mouthW: 6, rest: "smirk", restEyes: "half", sleeve: "short", beardStyle: "pencil",
-    extras: { stubble: true, necklace: true, toothpick: true, pencil: true, shadesUp: true },
+    extras: { stubble: true, necklace: true, pencil: true, shadesUp: true },
   })
   L.gold = ramp("#E8B060")
   return L
@@ -718,8 +718,6 @@ function face(ctx, C) {
   if (L.extras.pencil) { const mw = L.mouthW / 2 + 1; lineC(C, B, hx - mw, hy + 14, hx + mw, hy + 14, L.hair[0], () => true); for (const sd of [-1, 1]) P(C, B, hx + sd * (mw + 1), hy + 15, L.hair[0], () => true) }
   // a double chin: a soft crease under the jaw
   if (L.heavy) for (let x = -L.chin - 2; x <= L.chin + 2; x++) P(C, B, hx + x, hy + 28 - Math.round((x / (L.chin + 3)) ** 2 * 3), L.skin[1], ok)
-  // the manager's toothpick, parked in the corner of his mouth (out while he drinks)
-  if (L.extras.toothpick && !/drink|open|wide|o$/.test(mouth)) { lineC(C, B, hx + 3, hy + 18, hx + 12, hy + 14, hexRgb("#8A6A3A"), () => true); lineC(C, B, hx + 3, hy + 17, hx + 12, hy + 13, hexRgb("#F0D49C"), () => true) }
   // tinted aviators pushed up on his greased hair
   if (L.extras.shadesUp) for (const sd of [-1, 1]) {
     const cx = hx + sd * 7, cy = hy - 21

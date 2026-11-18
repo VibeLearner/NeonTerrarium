@@ -105,7 +105,7 @@ between the two, it shows only what's in the glass.
   serves, red CLOSED during the day. **Click it by day to open the bar.** By day the **top shelf** opens the
   supplier (with buttons to set up the rail from the back bar, or go back to the bar); at night it opens the back bar.
 - **Vic, the manager,** sits at the bar while it's closed: heavy-set, loud shirt, gold chain, greased hair, pencil
-  mustache, aviators on his head and a toothpick (`managerLook` in `guestgen.js`). Slide him a drink and he tastes it
+  mustache and aviators on his head (`managerLook` in `guestgen.js`). Slide him a drink and he tastes it
   like a guest, then tells you what he tastes (`manager.js`): the strongest notes in the screen's own names and how
   much of each, any fused note or secret pairing, and what's wrong (what drags Balance down, or what's hiding a note).
   No score, no tip. The breakdown opens after (press Done), and you can save the recipe ("Tasted by Vic").

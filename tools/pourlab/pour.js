@@ -244,7 +244,7 @@ function serve() {
   const t = sim.tasteOf(S.glass), s = score(guest.g, t)
   guest.result = { t, s, fb: feedback(guest.g, t, s) }
   const vs = REACTIONS[guest.g.crowd][s.tier]; guest.reaction = vs[Math.floor(GR() * vs.length)]
-  guest.tip = ECO.recordGuest(prog, guest.g.crowd, s.score); saveProg()
+  guest.tip = 0                       // paid when they've tasted it and say what they think (see update)
   guest.phase = "served"; guest.t = 0
   closeSpectro()
 }
@@ -1887,6 +1887,8 @@ function update(dt) {
   // the guest takes a sip, then says what they think; the spectrograph opens with their arrows on it
   if (guest.phase === "served" && guest.t >= SIP_DONE) {
     guest.phase = "reacting"
+    // the tip lands with their verdict, not when the glass is slid over
+    if (!guest.manager && guest.result.s) { guest.tip = ECO.recordGuest(prog, guest.g.crowd, guest.result.s.score); saveProg() }
     openSpectro("served")
     noteDiscoveries(guest.result.t)
   }

@@ -95,6 +95,12 @@ between the two, it shows only what's in the glass.
   last guest comes in before 05:00. That's 22.5 real minutes. At 05:00 nobody new comes in; the guest at the bar
   always finishes (the button reads **Close the bar**), then it's day. There's no rush and no penalty for serving
   just one guest a night.
+- **The sky through the dome** follows the clock: a dark night with stars, the moon crossing the glass and the odd
+  shooting star, then dawn from about 03:30 and the sun up out of the city by 05:00. By day the clock stands still at
+  09:00 (clouds still drift). Opening the bar runs the clock forward from 09:00 to 20:00 in a few seconds: the sun
+  sets, the sky darkens, then the club's lights come on and the first guest walks in.
+- **The club is live** while the bar is open, until 04:00, as in the game: the dance floor lights in patterns to a
+  124 bpm beat, four colored beams sweep round the floor, and the mirror ball throws glints.
 - **Pay:** a wage of 130 credits a night, however many guests you serve, plus a tip from each guest: more the more
   they liked it (nothing for a Bad drink), and more from the richer crowds. Each guest after the first in a night
   tips a little less. The strip right of the sign shows the bank and tonight's tips; it's all paid when the night ends.
@@ -144,6 +150,7 @@ between the two, it shows only what's in the glass.
 | `flavor.js` | the taste model from the design doc: notes, masking, carrying, fused notes, Complexity, Balance, crowds, guests, scoring |
 | `catalog.js` | every bottle and garnish: what it tastes like, its tags, how it pours, its price, its plain name and description |
 | `economy.js` | nights on the city clock, the wage and tips, prices, buying, the rail, and the saved progress |
+| `room.js` | the room behind the guest: the sky by the hour (three baked backgrounds faded together, the sun, moon, stars and clouds drawn through the sky mask) and the club's lights |
 | `manager.js` | Vic, the manager: what he says about a drink he tastes while the bar is closed |
 | `bot.js` | the bot bartender: searches for the best drink a guest could get from what the bar owns |
 | `audit_orders.mjs` | the order audit: for guests at each stage of the shop, checks they're only held to what they said, only ask for "more" of what they said, that the best drink lands every said thing, and that each order has a plain route. `node tools/pourlab/audit_orders.mjs` |
@@ -155,14 +162,14 @@ between the two, it shows only what's in the glass.
 | `guests.html`, `guests.js` | the generator's preview page: lineups per crowd, animated through a drink, every frame, roll new faces, save a PNG sheet. Open http://localhost:8000/tools/pourlab/guests.html |
 | `font_small.js` | the smaller hand-drawn pixel font used on the hanging screen (capitals 6 pixels tall, lowercase 4) |
 | `export_layout.mjs` | reads the art file and writes `assets/layout.json` (positions, the rail's 13 slots, all 43 bottles) and `assets/font5x7.json` |
-| `assets/` | what the page loads: `pour_bg.png` (everything that never moves), `pour_front.png` (the rail's front plate), `sprites/` (bottles and their hover look, the glass, cups, shaker and its cap, the stirring glass, no longer used: the bar spoon is drawn in code), `neon_dome.png` (the whole scene, for reference) |
+| `assets/` | what the page loads: `pour_bg_day.png`, `pour_bg_dawn.png`, `pour_bg_night.png` (everything that never moves, at three times of day, without the sun), `pour_sky_mask.png` (white wherever sky shows through the glass), `pour_front.png` (the rail's front plate), `sprites/` (bottles and their hover look, the glass, cups, shaker and its cap, the stirring glass, no longer used: the bar spoon is drawn in code), `neon_dome.png` (the whole scene, for reference) |
 
 In the browser console, `pourlab` gives you the simulation, the guest and the spectrograph state to poke at.
 
 ## Changing the art
 
 The art is made with the pxl skill (a Claude skill, not part of this repo). After editing `art/neon_dome.px.js`:
-build it with pxl into a scratch folder, copy `scenes/pour_bg.png`, `scenes/pour_front.png`, `scenes/neon_dome.png`
+build it with pxl into a scratch folder, copy `scenes/pour_bg_day.png`, `scenes/pour_bg_dawn.png`, `scenes/pour_bg_night.png`, `scenes/pour_sky_mask.png`, `scenes/pour_front.png`, `scenes/neon_dome.png`
 into `assets/` and `sprites/bottle_*.png`, `sprites/garnish_*.png`, `glass.png`, `cup_*.png`, `shaker*.png`, `mixing_glass*.png` into
 `assets/sprites/`, then run `node tools/pourlab/export_layout.mjs` so the page's positions match.
 

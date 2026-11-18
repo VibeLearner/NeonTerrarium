@@ -23,6 +23,8 @@ vm.runInContext(src + `
   // the tools as vessels, in their sprites own pixels: rim half widths at top and base, height, middle x, rim top y
   vessels: { shaker: { rt: 11, rb: 9, h: 46, cx: 13, top: 1, opaque: true }, mixing_glass: { rt: 13, rb: 13, h: 30, cx: 14, top: 14 } },
   foot: FOOT,
+  // the dance floor's top and bottom at each screen x (the page lights its tiles at night)
+  floor: Array.from({ length: W }, (_, x) => [farY(x) + 20, railY(x)]),
 }`, ctx)
 fs.writeFileSync(path.join(here, "assets/layout.json"), JSON.stringify(ctx.__layout, null, 1))
 console.log("wrote assets/layout.json:", ctx.__layout.rail.length, "bottles,", ctx.__layout.tools.length, "tools, pour x", ctx.__layout.POUR_X)

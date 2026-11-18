@@ -450,40 +450,61 @@ const neonOf = (e) => {
   const lit = (e.kind === "ring" && (e.k === 1 || e.k === 3)) || (e.kind === "zig" && e.k === 2)
   return lit ? ((e.a[0] + e.b[0]) / 2 < 240 ? "N" : "V") : null
 }
-function skyThroughGlass(c) {
-  const tones = ["B", "b", "b", "s", "s", "S", "H"]
+// The time of day the dome's glass shows. The pour page bakes three backgrounds (day, dawn, night) and fades between
+// them by the clock; it draws the sun, the moon, the stars and the clouds itself (so they can move), through the mask
+// that pour_sky_mask marks out (pure white wherever sky shows).
+const MOODS = {
+  day: { sky: ["B", "b", "b", "s", "s", "S", "H"], city: ["h", "j", "i"], lit: [null, ["S"], ["Y"]], litP: 0.1,
+    haze: "H", panes: ["l", "w"], shaft: "w", depth: "s", floorLit: true },
+  dawn: { sky: ["#26306A", "#3A4486", "#5A5AA2", "#8A6AAE", "#C47EA8", "#EE9A8E", "#FFC28A"], city: ["#6A5E92", "#4E4878", "#383660"],
+    lit: [null, ["#FFD98A"], ["#FFD98A", "#FFB070"]], litP: 0.12, haze: "#F4B8A8", panes: ["#C9A0E0", "#FFE0D0"], shaft: "#FFC09A", depth: "#A890B8", floorLit: true },
+  night: { sky: ["#0A0D22", "#10153A", "#161C4A", "#1F2258", "#2C2766", "#46307A", "#6E3A8C"], city: ["#2A2C5C", "#1E2046", "#141632"],
+    lit: [["#7FF3FF", "#FF8AD8"], ["#FFD98A", "#7FF3FF"], ["#FFD98A", "#FF8AD8", "#7FF3FF"]], litP: 0.13,
+    haze: "#2E2460", panes: ["#3A2E7A", "#5A4AA0"], shaft: null, depth: "#161A3A", floorLit: false },
+}
+// the sun's place in the morning (the page moves it up from the horizon at dawn)
+const SUN = { x: 96, y: 70 }
+const skyThroughGlass = (mood = "day", sun = true) => (c) => {
+  const tones = MOODS[mood].sky
   for (let y = 0; y < HORIZON + 4; y++) for (let x = X0; x < W; x++) {
     // whole rows step between tones (no checkerboard): the next tone comes in by rows at shrinking gaps
     const v = Math.max(0, y + 20) / (HORIZON + 30) * (tones.length - 1), f = v - Math.floor(v)
     const next = f > [0.8, 0.6, 0.9, 0.7][y % 4]
     c.px(x, y, tones[Math.min(tones.length - 1, Math.floor(v) + (next ? 1 : 0))])
   }
+  if (!sun) return
   // the low morning sun, off to the left
   for (let yy = -10; yy <= 10; yy++) for (let xx = -10; xx <= 10; xx++) {
-    const d = Math.hypot(xx, yy), px = 96 + xx, py = 70 + yy
+    const d = Math.hypot(xx, yy), px = SUN.x + xx, py = SUN.y + yy
     if (d <= 5) c.px(px, py, "w"); else if (d <= 7) c.px(px, py, "Y"); else if (d <= 10 && (px + py) % 2) c.px(px, py, "H")
   }
 }
-function cityThroughGlass(c) {
-  const r = c.rng(7)
+// lit windows come from a hash of the spot, not the city's dice, so every time of day has the same buildings
+const winHash = (x, y) => ((((x * 374761393) ^ (y * 668265263)) * 1274126177) >>> 0) / 4294967296
+const cityThroughGlass = (mood = "day") => (c) => {
+  const r = c.rng(7), M = MOODS[mood]
   const band = (top, var_, col, lit, step) => {
     for (let x = X0 - 4; x < W;) {
       const bw = step[0] + Math.floor(r() * step[1]), t = top + Math.floor(r() * var_)
       c.rect(x, t, bw, HORIZON + 6 - t, col)
       if (r() < 0.35 && bw > 6) c.vline(x + 2, t - 5, 5, col)
-      if (lit) for (let yy = t + 3; yy < HORIZON + 4; yy += 3) for (let xx = x + 1; xx < x + bw - 1; xx += 2) if (r() < 0.1) c.px(xx, yy, lit)
+      if (lit) for (let yy = t + 3; yy < HORIZON + 4; yy += 3) for (let xx = x + 1; xx < x + bw - 1; xx += 2) {
+        const h = winHash(xx, yy)
+        if (h < M.litP) c.px(xx, yy, lit[Math.floor(h / M.litP * lit.length) % lit.length])
+      }
       x += bw + (r() < 0.3 ? 1 : 0)
     }
   }
-  band(74, 16, "h", null, [10, 14])
-  band(84, 12, "j", "S", [8, 12])
-  band(94, 10, "i", "Y", [7, 10])
+  band(74, 16, M.city[0], M.lit[0], [10, 14])
+  band(84, 12, M.city[1], M.lit[1], [8, 12])
+  band(94, 10, M.city[2], M.lit[2], [7, 10])
 }
-function panes(c) {
+const panes = (mood = "day") => (c) => {
   // each pane of glass catches the light a little differently: a lavender tint, a pale sheen, or clear
+  const [a, b] = MOODS[mood].panes
   LAT.tris.forEach((t, k) => {
     const h = (k * 2654435761 >>> 0) % 7
-    if (h < 3) c.poly(t.flat(), "l"); else if (h === 3) c.poly(t.flat(), "w")
+    if (h < 3) c.poly(t.flat(), a); else if (h === 3) c.poly(t.flat(), b)
   })
 }
 function struts(c) {
@@ -514,14 +535,15 @@ function farSide(c) {
     if (inWin) { c.px(x, y0 + 8, k % 3 ? "m" : "v"); c.vline(x, y0 + 9, 4, k % 3 ? "Z" : "z") }
   }
 }
-// the dance floor down below: dark tiles, a very few lit (it's morning: the club is idling)
-function danceFloor(c) {
+// the dance floor down below: dark tiles, a very few lit (it's morning: the club is idling). At night the page lights it.
+const danceFloor = (mood = "day") => (c) => {
+  const lit = MOODS[mood].floorLit
   for (let x = X0; x < W; x++) {
     const top = farY(x) + 20, bot = railY(x)
     for (let y = top; y < bot; y++) {
       const tx = Math.floor(x / 6), ty = Math.floor((y - top) / 3), h = ((tx * 73856093) ^ (ty * 19349663)) >>> 0
       const edge = x % 6 === 0 || (y - top) % 3 === 2
-      c.px(x, y, edge ? "0" : h % 41 === 0 ? ["N", "V", "Z"][h % 3] : "1")
+      c.px(x, y, edge ? "0" : lit && h % 41 === 0 ? ["N", "V", "Z"][h % 3] : "1")
     }
   }
 }
@@ -1033,11 +1055,11 @@ function railFront(c, words = true) {
 const railStamps = (hover) => STARTER_ART.map((ing, k) => stamp("bottle_" + ing.id + (ing.id === hover ? "_hover" : ""), railX(k), BOTTLE_FLOOR - lift(ing) - (ing.id === hover ? 6 : 0)))
 
 function barScene(name, hover) { return scene(name, { w: W, h: H, bg: "3", world: { light: [-1, -0.6] } },
-  layer("sky", skyThroughGlass, cityThroughGlass),
+  layer("sky", skyThroughGlass(), cityThroughGlass()),
   layer("haze", { opacity: 0.3 }, rect(0, 86, W, 30, "H")),
-  layer("panes", { opacity: 0.22 }, panes),
+  layer("panes", { opacity: 0.22 }, panes()),
   layer("far side", farSide),
-  layer("dance floor", danceFloor),
+  layer("dance floor", danceFloor()),
   layer("light shafts", { opacity: 0.07 }, poly([88, 70, 120, 66, 300, 170, 210, 170], "w"), poly([130, 72, 160, 70, 360, 170, 300, 170], "w")),
   layer("near rail", nearRail),
   layer("depth haze", { opacity: 0.28 }, rect(0, 108, W, CT - 108, "s")),
@@ -1071,15 +1093,15 @@ barScene("neon_dome")
 // with their shadows and reflections, so they can be picked up); the shaker and stirring glass stay in for now.
 // pour_front: the rail's front plate on its own, drawn over the bottles.
 const STATIC_TOOLS = () => []   // the pour lab moves every tool now
-const bgScene = (name, ox) => scene(name, { w: W + ox, h: H, bg: "3", world: { light: [-1, -0.6] } },
-  layer("sky", { x: ox }, skyThroughGlass, cityThroughGlass),
-  layer("haze", { x: ox, opacity: 0.3 }, rect(X0, 86, W - X0, 30, "H")),
-  layer("panes", { x: ox, opacity: 0.22 }, panes),
+const bgScene = (name, ox, mood = "day", sun = true) => scene(name, { w: W + ox, h: H, bg: "3", world: { light: [-1, -0.6] } },
+  layer("sky", { x: ox }, skyThroughGlass(mood, sun), cityThroughGlass(mood)),
+  layer("haze", { x: ox, opacity: 0.3 }, rect(X0, 86, W - X0, 30, MOODS[mood].haze)),
+  layer("panes", { x: ox, opacity: 0.22 }, panes(mood)),
   layer("far side", { x: ox }, farSide),
-  layer("dance floor", { x: ox }, danceFloor),
-  layer("light shafts", { x: ox, opacity: 0.07 }, poly([88, 70, 120, 66, 300, 170, 210, 170], "w"), poly([130, 72, 160, 70, 360, 170, 300, 170], "w")),
+  layer("dance floor", { x: ox }, danceFloor(mood)),
+  ...(MOODS[mood].shaft ? [layer("light shafts", { x: ox, opacity: mood === "day" ? 0.07 : 0.05 }, poly([88, 70, 120, 66, 300, 170, 210, 170], MOODS[mood].shaft), poly([130, 72, 160, 70, 360, 170, 300, 170], MOODS[mood].shaft))] : []),
   layer("near rail", { x: ox }, nearRail),
-  layer("depth haze", { x: ox, opacity: 0.28 }, rect(X0, 108, W - X0, CT - 108, "s")),
+  layer("depth haze", { x: ox, opacity: 0.28 }, rect(X0, 108, W - X0, CT - 108, MOODS[mood].depth)),
   layer("dome", { x: ox }, struts, lightRig, stamp("mirror_ball", 196, 78)),
   layer("counter", { x: ox }, counterTop),
   layer("reflections", { x: ox, opacity: 0.35 }, reflections),
@@ -1098,9 +1120,24 @@ const bgScene = (name, ox) => scene(name, { w: W + ox, h: H, bg: "3", world: { l
   glow("Vv", { r: 5, strength: 0.35 }),
   glow("G", { r: 3, strength: 0.4 }),
   glow("Zz", { r: 3, strength: 0.3 }),
-  glow("w", { where: [84 + ox, 58, 24, 24], r: 12, strength: 0.25 }),
+  ...(sun ? [glow("w", { where: [84 + ox, 58, 24, 24], r: 12, strength: 0.25 })] : []),
 )
 bgScene("pour_bg", 0)
+// the pour page's three times of day, without the sun (the page draws the sun, the moon, stars and clouds itself)
+bgScene("pour_bg_day", 0, "day", false)
+bgScene("pour_bg_dawn", 0, "dawn", false)
+bgScene("pour_bg_night", 0, "night", false)
+// where the sky shows through the glass: pure white there, the room as it is everywhere else (no tints over it)
+scene("pour_sky_mask", { w: W, h: H, bg: "3" },
+  layer("sky", rect(0, 0, W, HORIZON + 4, "#FFFFFF"), cityThroughGlass()),
+  layer("far side", farSide),
+  layer("dance floor", danceFloor()),
+  layer("near rail", nearRail),
+  layer("dome", struts, lightRig, stamp("mirror_ball", 196, 78)),
+  layer("counter", counterTop),
+  layer("far edge", farEdge),
+  layer("top shelf", shelfBack, shelfBottles, shelfBoard),
+)
 // the wide view for the pour lab: EXT more px of empty bar on the left
 bgScene("pour_bg_wide", EXT)
 scene("pour_front", { w: W, h: H }, layer("rail front", (c) => railFront(c, false)))

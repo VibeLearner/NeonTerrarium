@@ -9,6 +9,7 @@ import * as ECO from "./economy.js"
 import { servableGuest } from "./bot.js"
 import { managerSays, managerTier } from "./manager.js"
 import { BOX as GBOX, makeLook, managerLook, frameCanvases, REACTIONS } from "./guestgen.js"
+import { createRoom, lookAt } from "./room.js"
 
 const W = 480, H = 270
 const view = document.getElementById("view")
@@ -27,7 +28,8 @@ const TOOL_IMGS = ["shaker", "shaker_cap", "mixing_glass", "mixing_glass_bare"]
 const names = ["glass", "cup_quarter", "cup_half", "cup_one", ...TOOL_IMGS, ...L.ingredients.flatMap((g) => ["bottle_" + g.id, "bottle_" + g.id + "_hover"]),
   ...GARNISHES.flatMap((id) => ["garnish_" + id, "garnish_" + id + "_hover"]), "garnish_tray", "garnish_tray_hover"]
 await Promise.all([
-  loadImg("assets/pour_bg.png").then((i) => (IMG.bg = i)),
+  ...["day", "dawn", "night"].map((m) => loadImg(`assets/pour_bg_${m}.png`).then((i) => (IMG["bg_" + m] = i))),
+  loadImg("assets/pour_sky_mask.png").then((i) => (IMG.sky_mask = i)),
   loadImg("assets/pour_front.png").then((i) => (IMG.front = i)),
   ...names.map((n) => loadImg("assets/sprites/" + n + ".png").then((i) => (IMG[n] = i))),
 ])
@@ -36,6 +38,7 @@ const EXT = 0, CW = W                     // the canvas is the scene, 480x270
 view.width = CW; view.height = H
 MAIN.imageSmoothingEnabled = false   // (again: resizing a canvas resets this, and anything drawn scaled would blur)
 const sim = createSim(L, sizes)
+const room = createRoom({ IMG, L, W, H })
 const S = sim.S, glass = sim.glass
 
 // ---------------------------------------------------------------- small helpers
@@ -430,6 +433,7 @@ view.addEventListener("pointerdown", (e) => {
   e.preventDefault(); view.setPointerCapture(e.pointerId)
   const p = toScene(e); pointer.x = p.x; pointer.y = p.y; pointer.down = true
   const t = targetAt(p.x, p.y)
+  if (ff.on) return                    // the clock is running forward to opening time
   if (t && t.kind === "button") { t.b.act(); return }
   if (book.open || backBar.open || day.open || (t && t.kind === "spectro")) return
   if (garnishPick.open) { garnishPick.open = false; return }               // a click away closes the picker
@@ -1495,7 +1499,8 @@ function drawHUD() {
   useFont(true)
   led(HUD_CLOCK); led(HUD_BANK)
   const t = HUD_CLOCK, last = prog.phase === "night" && prog.hour >= ECO.NIGHT_END - 1e-9
-  if (prog.phase === "day") { text(`DAY ${prog.night}`, t.x + 4, t.y + 2, HOLO.title); text("BAR CLOSED", t.x + t.w - 4, t.y + 2, "#FFC94A", "right") }
+  if (prog.phase === "day" && ff.on) { text(`DAY ${prog.night}`, t.x + 4, t.y + 2, HOLO.title); text(ECO.clockText(ffHour()), t.x + t.w - 4, t.y + 2, "#FFC94A", "right") }
+  else if (prog.phase === "day") { text(`DAY ${prog.night}`, t.x + 4, t.y + 2, HOLO.title); text("BAR CLOSED", t.x + t.w - 4, t.y + 2, "#FFC94A", "right") }
   else {
     text(`NIGHT ${prog.night}`, t.x + 4, t.y + 2, HOLO.title)
     text(last ? "LAST GUEST" : ECO.clockText(prog.hour), t.x + t.w - 4, t.y + 2, last ? (Math.floor(S.t * 2) % 2 ? "#FF8AA8" : "#FFC94A") : HOLO.value, "right")
@@ -1651,8 +1656,20 @@ const day = { open: false, t: 0, tab: "spirit", page: 0 }
 const DP = { x: 16, y: 14, w: 448, h: 244 }
 const SHOP_TABS = [["spirit", "Spirits"], ["mixer", "Flavors"], ["garnish", "Garnishes"]]
 function openDay() { day.open = true; day.t = 0; day.page = 0; carry.id = null; backBar.open = false; garnishPick.open = false }
+// Opening the bar runs the clock forward from the day's 09:00 to 20:00 in a few seconds: the sun goes down, the sky
+// darkens, the moon comes up, then the club's lights come on and the first guest walks in.
+const ff = { on: false, t: 0, dur: 3.6 }
+const DAY_HOUR = 9
+const ffHour = () => DAY_HOUR + (ECO.NIGHT_START - DAY_HOUR) * ease(clamp(ff.t / ff.dur, 0, 1))
 function openBar() {
-  ECO.startNight(prog); saveProg(); day.open = false
+  if (ff.on || prog.phase !== "day") return
+  day.open = false; backBar.open = false; garnishPick.open = false; carry.id = null
+  ff.on = true; ff.t = 0
+  sim.say("Opening up...")
+}
+function finishOpen() {
+  ff.on = false
+  ECO.startNight(prog); saveProg()
   sim.emptyGlass(); for (const id of Object.keys(S.tools)) sim.emptyVessel(id)
   newGuest(); guest.back = 1
   sim.say(`Night ${prog.night}. The bar is open.`)
@@ -1724,7 +1741,8 @@ function render() {
   buttons = []
   MAIN.setTransform(1, 0, 0, 1, EXT, 0)          // everything below is in the scene's own coordinates
   MAIN.imageSmoothingEnabled = false              // scaled sprites (garnish picker, served glass, shop icons) stay sharp
-  ctx.drawImage(IMG.bg, -EXT, 0)
+  room.drawSky(ctx)                    // the background for the hour, with the sun, moon, stars and clouds through the glass
+  room.drawClub(ctx)                   // at night: the floor lit to the beat, the beams, the mirror ball's glints
   drawScreen()
   drawHUD()
   drawNeonSign()
@@ -1766,6 +1784,10 @@ function update(dt) {
   // the night runs on the city's clock (stopped by the browser when the tab is hidden); saved every few seconds
   if (prog.phase === "night" && prog.hour < ECO.NIGHT_END) prog.hour = Math.min(ECO.NIGHT_END, prog.hour + dt * ECO.GAME_HOURS_PER_SECOND * CLOCK)
   if ((saveT += dt) > 5) { saveT = 0; saveProg() }
+  // the sky and the club: by day the clock stands still (09:00) unless it's running forward to opening time
+  if (ff.on && (ff.t += dt) >= ff.dur) finishOpen()
+  const hour = ff.on ? ffHour() : prog.phase === "day" ? DAY_HOUR : prog.hour
+  room.update(dt, lookAt(hour), prog.phase === "night" && lookAt(hour).club, ff.on ? 40 : 1)
   // once what's on the screen has stopped changing for a moment, any combination in it counts as found
   const c = drinkContents(), key = sim.volOf(c).toFixed(2) + ":" + [...c.parts.keys()].join()
   if (key !== settle.key) { settle.key = key; settle.t = 0; settle.done = false }
@@ -1793,4 +1815,4 @@ function frame(now) {
 requestAnimationFrame(frame)
 // a handle for the browser console and the node test harness: the simulation, the guest, and today's buttons
 globalThis.pourlab = { sim, guest, spectro, book, SCREEN, textW: textWSmall, get buttons() { return buttons }, get hover() { return hover },
-  prog, day, backBar, carry, garnishPick, openDay, openBar, serve, nextGuest, railIds }
+  prog, day, backBar, carry, garnishPick, openDay, openBar, serve, nextGuest, railIds, room, ff }

@@ -40,7 +40,19 @@ const KEY = "neonDome.progress.v1"
 export function newProgress() {
   return { v: 1, night: 1, phase: "night", hour: NIGHT_START, credits: 0, owned: [...STARTER], fresh: [],
     rail: { spirit: [...STARTER_RAIL.spirit], mixer: [...STARTER_RAIL.mixer] },
-    tonight: { wage: WAGE, tips: 0, guests: [] }, history: [], bought: [] }
+    tonight: { wage: WAGE, tips: 0, guests: [] }, history: [], bought: [], shelf: Array(SHELF_SLOTS).fill(null) }
+}
+// The top shelf's display: SHELF_SLOTS spots, each a bottle you own that isn't on the rail (or empty). New bottles
+// go up there, and so does a bottle the rail swaps out; you choose what fills an empty spot. It's a shortcut: the
+// back bar still holds everything that's not on the rail.
+export const SHELF_SLOTS = 10
+function cleanShelf(want, owned, rail) {
+  const out = Array(SHELF_SLOTS).fill(null)
+  for (let k = 0; k < SHELF_SLOTS; k++) {
+    const id = want[k]
+    if (id && owned.includes(id) && !isGarnish(id) && ITEMS[id] && !rail[groupOf(id)].includes(id) && !out.includes(id)) out[k] = id
+  }
+  return out
 }
 // a saved game is checked before use: anything missing or unknown falls back to the starter state, piece by piece
 export function sanitize(p) {
@@ -55,12 +67,15 @@ export function sanitize(p) {
     for (const id of [...base.rail[grp], ...owned]) if (rail[grp].length < RAIL_SLOTS[grp] && groupOf(id) === grp && !rail[grp].includes(id)) rail[grp].push(id)
   }
   const num = (v, d) => (typeof v === "number" && isFinite(v) ? v : d)
+  // the shelf display: as saved, or (an older save without one) the spare bottles in the order they were bought
+  const spare = owned.filter((id) => !isGarnish(id) && !rail[groupOf(id)].includes(id))
+  const shelf = cleanShelf(Array.isArray(p.shelf) ? p.shelf : spare, owned, rail)
   return {
     ...base, night: Math.max(1, Math.floor(num(p.night, 1))), phase: p.phase === "day" ? "day" : "night",
     hour: Math.min(NIGHT_END, Math.max(NIGHT_START, num(p.hour, NIGHT_START))), credits: Math.max(0, Math.floor(num(p.credits, 0))),
     owned, fresh: (p.fresh || []).filter((id) => owned.includes(id)), rail,
     tonight: p.tonight && Array.isArray(p.tonight.guests) ? { wage: num(p.tonight.wage, WAGE), tips: num(p.tonight.tips, 0), guests: p.tonight.guests.slice(0, 200) } : base.tonight,
-    history: Array.isArray(p.history) ? p.history.slice(-60) : [], bought: Array.isArray(p.bought) ? p.bought.filter((id) => ITEMS[id]) : [],
+    history: Array.isArray(p.history) ? p.history.slice(-60) : [], bought: Array.isArray(p.bought) ? p.bought.filter((id) => ITEMS[id]) : [], shelf,
   }
 }
 export function loadProgress(store = globalThis.localStorage) {
@@ -103,6 +118,23 @@ export function buy(p, id) {
   // repaired save might)
   const grp = groupOf(id)
   if (!isGarnish(id) && p.rail[grp].length < RAIL_SLOTS[grp]) p.rail[grp].push(id)
+  // otherwise it goes up on the top shelf, in the first empty spot
+  else if (!isGarnish(id)) shelfAdd(p, id)
+  return null
+}
+// put a bottle in the first empty spot on the shelf display (if there is one and it isn't up there already)
+function shelfAdd(p, id) {
+  if (!p.shelf || p.shelf.includes(id)) return
+  const k = p.shelf.indexOf(null); if (k >= 0) p.shelf[k] = id
+}
+// fill one spot on the shelf display (id null clears it): any bottle you own that isn't on the rail
+export function setShelf(p, k, id) {
+  if (k < 0 || k >= SHELF_SLOTS) return "no spot"
+  if (id === null) { p.shelf[k] = null; return null }
+  if (!p.owned.includes(id) || isGarnish(id)) return "not owned"
+  if (p.rail[groupOf(id)].includes(id)) return "on the rail"
+  const at = p.shelf.indexOf(id); if (at >= 0) p.shelf[at] = null      // moved from another spot
+  p.shelf[k] = id
   return null
 }
 // swap a bottle from the back bar into a rail slot (same side only); the one there goes back to the shelf
@@ -115,8 +147,15 @@ export function swapIntoRail(p, id, slot) {
     const at = p.rail[grp].indexOf(id); [p.rail[grp][at], p.rail[grp][slot]] = [p.rail[grp][slot], p.rail[grp][at]]
     return null
   }
+  // the bottle that comes off the rail takes the new one's spot on the shelf display if it was up there, or else the
+  // first empty spot
+  const was = p.rail[grp][slot]
   p.rail[grp][slot] = id
+  const at = p.shelf.indexOf(id)
+  if (at >= 0) p.shelf[at] = was; else shelfAdd(p, was)
   return null
 }
+// the spare bottles not on the shelf display (the ones an empty spot can take)
+export const offDisplay = (p) => onShelf(p).filter((id) => !p.shelf.includes(id))
 export const onShelf = (p) => p.owned.filter((id) => !isGarnish(id) && !p.rail[groupOf(id)].includes(id))
 export const ownedGarnishes = (p) => p.owned.filter(isGarnish)

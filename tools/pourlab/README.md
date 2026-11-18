@@ -108,15 +108,20 @@ between the two, it shows only what's in the glass.
   (896 credits for everything), in tabs, with what each tastes like. Buy what you can afford, then **Open the bar**
   (or click the sign later), or go back to the closed bar: no clock runs, and you can practice with anything you own.
 - **The OPEN / CLOSED sign** hangs from the shelf top right, above the guest's speech: green OPEN while the bar
-  serves, red CLOSED during the day. **Click it by day to open the bar.** By day the **top shelf** opens the
-  supplier (with buttons to set up the rail from the back bar, or go back to the bar); at night it opens the back bar.
+  serves, red CLOSED during the day. **Click it by day to open the bar.** By day the **top shelf's edge** (the
+  wooden lip with DRINKS on it) opens the supplier (with buttons to set up the rail from the back bar, or go back to
+  the bar); at night it opens the back bar.
 - **Vic, the manager,** sits at the bar while it's closed: heavy-set, loud shirt, gold chain, greased hair, pencil
   mustache and aviators on his head (`managerLook` in `guestgen.js`). Slide him a drink and he tastes it
   like a guest, then tells you what he tastes (`manager.js`): the strongest notes in the screen's own names and how
   much of each, any fused note or secret pairing, and what's wrong (what drags Balance down, or what's hiding a note).
   No score, no tip. The breakdown opens after (press Done), and you can save the recipe ("Tasted by Vic").
-- **The back bar:** click the top shelf. Every bottle you own that isn't on the rail stands there. Pick one, then
-  click a bottle on its side of the rail (alcohol on the left, the rest on the right) to swap them.
+- **The top shelf** shows your own bottles: ten spots, empty at the start (a dashed outline with a plus). A bottle
+  you buy goes up in the first empty spot, and a bottle the rail swaps out takes the spot of the one that went down.
+  It's a quick swap: click a bottle up there, then a bottle on its side of the rail. Click an empty spot to choose a
+  spare bottle to stand there; right-click a bottle to take it off the shelf (it stays in the back bar).
+- **The back bar:** click the top shelf's edge. Every bottle you own that isn't on the rail stands there. Pick one,
+  then click a bottle on its side of the rail (alcohol on the left, the rest on the right) to swap them.
 - **Garnishes** go in the wooden tray left of the mat. Click it, pick one, and it goes on the glass (picking another
   swaps it; "Take it off" removes it). A garnish has no volume: it adds a fixed nudge to a note or two (a lemon
   twist adds 1.2 Fresh, a salt rim hides some Bitter), however big the drink. Some guests ask for a kind of garnish
@@ -162,7 +167,7 @@ between the two, it shows only what's in the glass.
 | `guests.html`, `guests.js` | the generator's preview page: lineups per crowd, animated through a drink, every frame, roll new faces, save a PNG sheet. Open http://localhost:8000/tools/pourlab/guests.html |
 | `font_small.js` | the smaller hand-drawn pixel font used on the hanging screen (capitals 6 pixels tall, lowercase 4) |
 | `export_layout.mjs` | reads the art file and writes `assets/layout.json` (positions, the rail's 13 slots, all 43 bottles) and `assets/font5x7.json` |
-| `assets/` | what the page loads: `pour_bg_day.png`, `pour_bg_dawn.png`, `pour_bg_night.png` (everything that never moves, at three times of day, without the sun), `pour_sky_mask.png` (white wherever sky shows through the glass), `pour_front.png` (the rail's front plate), `sprites/` (bottles and their hover look, the glass, cups, shaker and its cap, the stirring glass, no longer used: the bar spoon is drawn in code), `neon_dome.png` (the whole scene, for reference) |
+| `assets/` | what the page loads: `pour_bg_day.png`, `pour_bg_dawn.png`, `pour_bg_night.png` (everything that never moves, at three times of day, without the sun), `pour_sky_mask.png` (white wherever sky shows through the glass), `sprites/shelf_*.png` (each bottle's top-shelf look, backlit), `pour_front.png` (the rail's front plate), `sprites/` (bottles and their hover look, the glass, cups, shaker and its cap, the stirring glass, no longer used: the bar spoon is drawn in code), `neon_dome.png` (the whole scene, for reference) |
 
 In the browser console, `pourlab` gives you the simulation, the guest and the spectrograph state to poke at.
 
@@ -170,7 +175,7 @@ In the browser console, `pourlab` gives you the simulation, the guest and the sp
 
 The art is made with the pxl skill (a Claude skill, not part of this repo). After editing `art/neon_dome.px.js`:
 build it with pxl into a scratch folder, copy `scenes/pour_bg_day.png`, `scenes/pour_bg_dawn.png`, `scenes/pour_bg_night.png`, `scenes/pour_sky_mask.png`, `scenes/pour_front.png`, `scenes/neon_dome.png`
-into `assets/` and `sprites/bottle_*.png`, `sprites/garnish_*.png`, `glass.png`, `cup_*.png`, `shaker*.png`, `mixing_glass*.png` into
+into `assets/` and `sprites/bottle_*.png`, `sprites/shelf_*.png`, `sprites/garnish_*.png`, `glass.png`, `cup_*.png`, `shaker*.png`, `mixing_glass*.png` into
 `assets/sprites/`, then run `node tools/pourlab/export_layout.mjs` so the page's positions match.
 
 ## How it works (and the game-dev terms)

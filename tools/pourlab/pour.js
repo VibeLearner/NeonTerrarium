@@ -26,7 +26,8 @@ const FONT = await (await fetch("assets/font5x7.json" + FRESH)).json()
 const IMG = {}
 const TOOL_IMGS = ["shaker", "shaker_cap", "mixing_glass", "mixing_glass_bare"]
 const names = ["glass", "cup_quarter", "cup_half", "cup_one", ...TOOL_IMGS, ...L.ingredients.flatMap((g) => ["bottle_" + g.id, "bottle_" + g.id + "_hover"]),
-  ...GARNISHES.flatMap((id) => ["garnish_" + id, "garnish_" + id + "_hover"]), "garnish_tray", "garnish_tray_hover"]
+  ...GARNISHES.flatMap((id) => ["garnish_" + id, "garnish_" + id + "_hover"]),
+  ...L.ingredients.flatMap((g) => ["shelf_" + g.id, "shelf_" + g.id + "_hover"]), "garnish_tray", "garnish_tray_hover"]
 await Promise.all([
   ...["day", "dawn", "night"].map((m) => loadImg(`assets/pour_bg_${m}.png`).then((i) => (IMG["bg_" + m] = i))),
   loadImg("assets/pour_sky_mask.png").then((i) => (IMG.sky_mask = i)),
@@ -363,6 +364,7 @@ function targetAt(x, y) {
   for (let i = buttons.length - 1; i >= 0; i--) if (inBox(x, y, buttons[i])) return { kind: "button", key: buttons[i].key, b: buttons[i] }
   if (book.open || backBar.open || day.open) return { kind: "modal" }
   if (garnishPick.open) return garnishPick.rect && inBox(x, y, garnishPick.rect) ? { kind: "modal" } : { kind: "away" }
+  if (quick.open) return quick.rect && inBox(x, y, quick.rect) ? { kind: "modal" } : { kind: "away" }
   // carrying a bottle from the back bar: only the slots on its side of the rail answer
   if (carry.id) {
     for (const id of prog.rail[ITEMS[carry.id].group]) { const b = bottleBox(id); if (x >= b.x + 2 && x < b.x + b.w - 2 && y >= Math.min(b.y, L.RAIL_TOP - 30)) return { kind: "slot", id } }
@@ -384,9 +386,10 @@ function targetAt(x, y) {
   if (!S.held && !S.grab && S.spoon.state === "glass" && onSpoon(x, y)) return { kind: "spoon" }
   if (!S.held && !S.grab && inBox(x, y, SCREEN)) return { kind: "screen" }
   if (!S.held && !S.grab && inBox(x, y, SIGN)) return { kind: "sign" }
-  if (!S.held && !S.grab && y < 29) return { kind: "shelf" }
+  if (!S.held && !S.grab && y < TOP_SHELF.base) return { kind: "shelfSpot", k: clamp(Math.floor(x / TOP_SHELF.spot), 0, ECO.SHELF_SLOTS - 1) }
   if (!S.held && !S.grab && inBox(x, y, HUD_CLOCK)) return { kind: "hudClock" }
   if (!S.held && !S.grab && inBox(x, y, HUD_BANK)) return { kind: "hudBank" }
+  if (!S.held && !S.grab && y < TOP_SHELF.base + 27) return { kind: "shelf" }        // the shelf's front edge and underside
   if (!S.held && inBox(x, y, trayBox())) return { kind: "tray" }
   const glassBox = { x: glass.left, y: glass.top, w: glass.w, h: glass.h }
   if (S.held && S.held.kind === "glass" && inBox(x, y, glassBox)) return { kind: "mat" }   // set the glass back down
@@ -437,6 +440,7 @@ view.addEventListener("pointerdown", (e) => {
   if (t && t.kind === "button") { t.b.act(); return }
   if (book.open || backBar.open || day.open || (t && t.kind === "spectro")) return
   if (garnishPick.open) { garnishPick.open = false; return }               // a click away closes the picker
+  if (quick.open) { quick.open = false; return }
   if (carry.id) {
     if (t && t.kind === "slot" && e.button === 0) dropIntoSlot(t.id)
     else { sim.say(`${ITEMS[carry.id].name} went back on the shelf.`); carry.id = null }
@@ -444,6 +448,13 @@ view.addEventListener("pointerdown", (e) => {
   }
   // the top shelf: the back bar at night; by day, the supplier (which has a button for the back bar)
   if (t && t.kind === "shelf" && atBar()) { if (guest.phase === "closed") openDay(); else openBackBar(); return }
+  if (t && t.kind === "shelfSpot") {
+    if (!atBar()) { sim.say("They're tasting it. Swap bottles once they're done."); return }
+    if (e.button === 2) return
+    const id = prog.shelf[t.k]
+    if (id) pickFromShelf(id, t.k); else openQuick(t.k)
+    return
+  }
   if (t && t.kind === "sign" && guest.phase === "closed") { openBar(); return }
   if (t && t.kind === "tray" && atBar()) { openGarnishes(); return }
   if (e.button === 2) { putBackHeld(); return }
@@ -508,10 +519,20 @@ view.addEventListener("wheel", (e) => {
     while (Math.abs(listScroll.wheel) >= 30) { const d = Math.sign(listScroll.wheel); listScroll.target += d * 8; listScroll.wheel -= d * 30 }
   }
 }, { passive: false })
-view.addEventListener("contextmenu", (e) => { e.preventDefault(); if (carry.id) { carry.id = null; return } putBackHeld() })
+view.addEventListener("contextmenu", (e) => {
+  e.preventDefault()
+  if (carry.id) { carry.id = null; return }
+  // right-click a bottle on the top shelf: it comes off the display (it's still in the back bar)
+  const p = toScene(e), t = targetAt(p.x, p.y)
+  if (t && t.kind === "shelfSpot" && prog.shelf[t.k] && atBar()) {
+    const id = prog.shelf[t.k]; ECO.setShelf(prog, t.k, null); saveProg()
+    sim.say(`${ITEMS[id].name} is off the shelf. It's still in the back bar.`); return
+  }
+  putBackHeld()
+})
 addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return
-  if (book.open) book.open = false; else if (garnishPick.open) garnishPick.open = false; else if (backBar.open) backBar.open = false
+  if (book.open) book.open = false; else if (garnishPick.open) garnishPick.open = false; else if (quick.open) quick.open = false; else if (backBar.open) backBar.open = false
   else if (carry.id) carry.id = null; else if (day.open) day.open = false
   else if (spectro.open) finishTasting(); else if (S.toolMode) sim.putToolDown(); else putBackHeld()
 })
@@ -1456,10 +1477,15 @@ function drawTooltip() {
   const bk = hover.kind === "button" ? hover.key : ""
   const card = (id) => (ITEMS[id].group === "garnish" ? "Garnish. " : ITEMS[id].group === "spirit" ? "Alcohol. " : "No alcohol. ") + DESC[id]
   if (/^(bb|gp|shop|buy):/.test(bk)) { const id = bk.split(":")[1], b = hover.b; tooltip(ITEMS[id].name, card(id), b.x + b.w / 2, b.y - 4); return }
-  if (hover.kind === "slot") { const b = bottleBox(hover.id); tooltip(`Swap for ${ITEMS[hover.id].name}`, `Click to put ${ITEMS[carry.id].name} here. ${ITEMS[hover.id].name} goes back on the shelf.`, b.x + b.w / 2, b.y - 8); return }
+  if (hover.kind === "slot") { const b = bottleBox(hover.id); tooltip(`Swap for ${ITEMS[hover.id].name}`, `Click to put ${ITEMS[carry.id].name} here. ${ITEMS[hover.id].name} goes ${carry.from >= 0 || prog.shelf.includes(null) ? "up on the top shelf" : "to the back bar"}.`, b.x + b.w / 2, b.y - 8); return }
   if (hover.kind !== "bottle" && dwell.t < DWELL) return
   if (hover.kind === "bottle") { const b = bottleBox(hover.id); tooltip(ITEMS[hover.id].name, card(hover.id), b.x + b.w / 2, b.y - 8) }
-  else if (hover.kind === "shelf") tooltip(guest.phase === "closed" ? "Supplier" : "Back bar", guest.phase === "closed" ? "Click to buy bottles and garnishes, see last night's takings, or set up the rail from the back bar." : "Every bottle you own that isn't on the rail stands here. Click to pick one and swap it onto the rail.", pointer.x, 60)
+  else if (hover.kind === "shelf") tooltip(guest.phase === "closed" ? "Supplier" : "Back bar", guest.phase === "closed" ? "Click the shelf's edge to buy bottles and garnishes, see last night's takings, or set up the rail from the back bar." : "Click the shelf's edge to see every bottle you own that isn't on the rail.", pointer.x, 112)
+  else if (hover.kind === "shelfSpot") {
+    const id = prog.shelf[hover.k], cx = TOP_SHELF.spot * hover.k + TOP_SHELF.spot / 2
+    if (id) tooltip(ITEMS[id].name, `${ITEMS[id].desc} Click to pick it up, then click a bottle on the rail to swap them. Right-click to take it off the shelf.`, cx, 112)
+    else tooltip("Empty spot", "Click to stand a bottle you own here, ready to swap onto the rail.", cx, 112)
+  }
   else if (hover.kind === "sign") tooltip(prog.phase === "day" ? "Open the bar" : "Open", prog.phase === "day" ? "Click the sign to open the bar and start the night." : "The bar is open until the last guest after 05:00.", SIGN.x + SIGN.w / 2, 110)
   else if (hover.kind === "tray") tooltip("Garnish tray", prog.owned.some(isGarnish) ? "Click to pick a garnish for the glass. It adds a little of a note on top, whatever the drink's size. Some guests ask for one." : "Empty. Buy garnishes at the supplier during the day.", TRAY.x, trayBox().y - 4)
   else if (hover.kind === "hudClock") tooltip("The night", `The bar opens at 20:00 and lets the last guest in before 05:00 (the city's clock: ${(ECO.NIGHT_SECONDS / 60).toFixed(1)} real minutes). The guest at the bar always finishes, then it's day.`, HUD_CLOCK.x + 50, 120)
@@ -1599,15 +1625,77 @@ function drawCarried() {
   const img = IMG["bottle_" + carry.id]
   ctx.globalAlpha = 0.9; ctx.drawImage(img, Math.round(pointer.x - img.width / 2), Math.round(pointer.y - img.height * 0.4)); ctx.globalAlpha = 1
 }
+// ---------------------------------------------------------------- the top shelf: the bottles you've got up there
+// Ten spots along the shelf over the bar. New bottles go up there, and a bottle the rail swaps out takes the spot of
+// the one that went down, so the shelf is a quick swap: click a bottle, then a bottle on the rail. An empty spot
+// shows a dashed outline and a plus: click it to choose a spare bottle to stand there. (The back bar, opened from the
+// shelf's edge, still holds every bottle that's not on the rail.)
+const TOP_SHELF = { spot: W / ECO.SHELF_SLOTS, base: 30 }
+const quick = { open: false, k: 0, t: 0, rect: null }
+function drawTopShelf() {
+  const B = TOP_SHELF.base
+  for (let k = 0; k < ECO.SHELF_SLOTS; k++) {
+    const cx = Math.round(TOP_SHELF.spot * k + TOP_SHELF.spot / 2), id = prog.shelf[k]
+    const hov = hover && hover.kind === "shelfSpot" && hover.k === k, picking = quick.open && quick.k === k
+    if (id && !(carry.id === id && carry.from === k)) {
+      const img = IMG["shelf_" + id + (hov ? "_hover" : "")]
+      ctx.drawImage(img, Math.round(cx - img.width / 2), B - img.height)
+      continue
+    }
+    // empty (or its bottle is in your hand): a dashed outline up out of frame and a small plus, as in the art
+    const col = hov || picking ? "#FFE27A" : carry.from === k && carry.id ? "#C98A4C" : "#A9783A"
+    ctx.fillStyle = col
+    for (let y = 1; y < B; y += 2) { ctx.fillRect(cx - 11, y, 1, 1); ctx.fillRect(cx + 11, y, 1, 1) }
+    if (!(carry.id && carry.from === k)) { ctx.fillRect(cx - 3, B - 14, 7, 1); ctx.fillRect(cx, B - 17, 1, 7) }
+  }
+}
+function openQuick(k) {
+  const spare = ECO.offDisplay(prog)
+  if (!spare.length) {
+    sim.say(ECO.onShelf(prog).length ? "Every spare bottle you own is already up on the shelf." : "Nothing spare to put here: every bottle you own is on the rail. Buy more at the supplier during the day.")
+    return
+  }
+  quick.open = true; quick.k = k; quick.t = 0; garnishPick.open = false
+}
+// the quick picker: your spare bottles (not on the rail, not on the shelf), spirits first; pick one for the spot
+function drawQuick() {
+  if (!quick.open) return
+  const spare = ECO.offDisplay(prog).sort((a, b) => (ITEMS[a].group === ITEMS[b].group ? 0 : ITEMS[a].group === "spirit" ? -1 : 1))
+  if (!spare.length) { quick.open = false; return }
+  const per = Math.min(10, spare.length), cw = 30, ch = 42, rows = Math.ceil(spare.length / per)
+  const w = Math.max(150, per * cw + 8), h = 18 + rows * ch + 4, cx = TOP_SHELF.spot * quick.k + TOP_SHELF.spot / 2
+  const P = { x: clamp(Math.round(cx - w / 2), 4, W - 4 - w), y: TOP_SHELF.base + 10, w, h }
+  quick.rect = P
+  // a pointer up to the spot it fills
+  fill(cx - 2, P.y - 3, 5, 1, "rgba(232,176,96,0.8)"); fill(cx - 1, P.y - 2, 3, 1, "rgba(232,176,96,0.8)"); fill(cx, P.y - 1, 1, 1, "rgba(232,176,96,0.8)")
+  fill(P.x, P.y, P.w, P.h, "#141A16"); frame1(P.x, P.y, P.w, P.h, "rgba(232,176,96,0.8)")
+  text("PUT UP ON THE SHELF", P.x + 6, P.y + 4, "#FFC94A")
+  button("x", P.x + P.w - 15, P.y + 2, () => (quick.open = false), { w: 12, key: "qsClose" })
+  spare.forEach((id, i) => {
+    const x = P.x + 4 + (i % per) * cw, y = P.y + 16 + Math.floor(i / per) * ch, key = "qs:" + id
+    const hov = hover && hover.kind === "button" && hover.key === key
+    fill(x, y, cw - 2, ch - 2, hov ? "rgba(232,176,96,0.22)" : "rgba(255,194,120,0.06)")
+    const img = IMG["shelf_" + id + (hov ? "_hover" : "")]
+    ctx.save(); ctx.beginPath(); ctx.rect(x, y, cw - 2, 30); ctx.clip()
+    ctx.drawImage(img, Math.round(x + (cw - 2) / 2 - img.width / 2), y + 30 - img.height); ctx.restore()
+    const word = ITEMS[id].plain.toUpperCase().slice(0, 7), tw = word.length * 4 - 1
+    tapeText(word, Math.round(x + (cw - 2) / 2 - tw / 2), y + 31, "#F2E4C8")
+    buttons.push({ x, y, w: cw - 2, h: ch - 2, key, act: () => {
+      ECO.setShelf(prog, quick.k, id); saveProg(); quick.open = false
+      sim.say(`${ITEMS[id].name} is up on the shelf. Click it, then a bottle on the rail, to swap them.`)
+    } })
+  })
+}
+
 // ---------------------------------------------------------------- the back bar: every bottle you own
 // Click the top shelf to open it. The bottles not on the rail stand here; pick one, then click a slot on its side
 // of the rail (alcohol on the left, the rest on the right): the bottle there goes back on the shelf.
-const carry = { id: null }
+const carry = { id: null, from: -1 }
 const backBar = { open: false, t: 0 }
 const BB = { x: 20, y: 16, w: 440, h: 232 }
 function openBackBar() { backBar.open = true; backBar.t = 0; carry.id = null }
-function pickFromShelf(id) {
-  backBar.open = false; carry.id = id
+function pickFromShelf(id, from = -1) {
+  backBar.open = false; quick.open = false; carry.id = id; carry.from = from
   sim.say(`Click a bottle on the ${ITEMS[id].group === "spirit" ? "left (alcohol)" : "right (no alcohol)"} side of the rail to put ${ITEMS[id].name} in its place. Right-click to put it back.`)
 }
 function dropIntoSlot(id) {
@@ -1615,8 +1703,8 @@ function dropIntoSlot(id) {
   if (k < 0) return
   const was = ITEMS[id].name
   ECO.swapIntoRail(prog, carry.id, k); saveProg()
-  sim.say(`${ITEMS[carry.id].name} is on the rail. ${was} went back on the shelf.`)
-  carry.id = null
+  sim.say(`${ITEMS[carry.id].name} is on the rail. ${was} went ${prog.shelf.includes(id) ? "up on the shelf" : "to the back bar"}.`)
+  carry.id = null; carry.from = -1
 }
 function drawBackBar() {
   if (!backBar.open) return
@@ -1743,6 +1831,7 @@ function render() {
   MAIN.imageSmoothingEnabled = false              // scaled sprites (garnish picker, served glass, shop icons) stay sharp
   room.drawSky(ctx)                    // the background for the hour, with the sun, moon, stars and clouds through the glass
   room.drawClub(ctx)                   // at night: the floor lit to the beat, the beams, the mirror ball's glints
+  drawTopShelf()
   drawScreen()
   drawHUD()
   drawNeonSign()
@@ -1768,6 +1857,7 @@ function render() {
   drawThrown()                         // ice in the air goes over the panels, so a flick can be followed the whole way
   if (!book.open) drawSpectro()
   drawGarnishPicker()
+  drawQuick()
   drawBackBar()
   drawDay()
   drawBook()
@@ -1815,4 +1905,4 @@ function frame(now) {
 requestAnimationFrame(frame)
 // a handle for the browser console and the node test harness: the simulation, the guest, and today's buttons
 globalThis.pourlab = { sim, guest, spectro, book, SCREEN, textW: textWSmall, get buttons() { return buttons }, get hover() { return hover },
-  prog, day, backBar, carry, garnishPick, openDay, openBar, serve, nextGuest, railIds, room, ff }
+  prog, day, backBar, carry, garnishPick, quick, openDay, openBar, serve, nextGuest, railIds, room, ff }

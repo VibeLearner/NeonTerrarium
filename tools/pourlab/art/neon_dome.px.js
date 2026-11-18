@@ -630,34 +630,47 @@ function shelfBottles(c) {
       c.hline(cx - 3, base - 14, 7, "g"); c.vline(cx, base - 17, 7, "g")
       return
     }
-    const segs = b.segs.map((sg) => sg[0] === "bulb" ? ["bulb", Math.round(sg[1] * SB)] : [Math.round(sg[0] * SB), Math.round(sg[1] * SB), Math.round(sg[2] * SB)])
-    const rows = bottleProfile(segs), n = rows.length, top = base - n, level = Math.round(n * (1 - b.fill))
-    // a ring round the bottle seen from below: its middle is nearer, so higher on screen (bows up)
-    const bowUp = (hw, x, amt) => Math.round(amt * (1 - ((x - cx) / Math.max(1, hw)) ** 2))
-    const labTop = n - 17, labBot = n - 7
-    rows.forEach((hw, j) => {
-      const y = top + j
-      if (y < 0) return
-      for (let x = cx - hw; x <= cx + hw; x++) {
-        const d = Math.abs(x - cx) / Math.max(1, hw)                       // 0 in the middle, 1 at the edge
-        const bw = bowUp(hw, x, Math.max(1, Math.round(hw * 0.17)))
-        const wet = j + bw >= level
-        const onLabel = b.label && j + bw >= labTop && j + bw < labBot
-        let col
-        if (x === cx - hw || x === cx + hw) col = mix(b.liquid, LITE, 0.5)             // light bending round the silhouette
-        else if (d > 0.78) col = mix(b.liquid, INK, 0.82)                               // thick glass at the edges
-        else if (onLabel) col = j + bw === labTop ? mix(b.label, LITE, 0.35) : mix(mix(b.label, b.liquid, 0.25), INK, 0.15 + 0.45 * d)
-        else if (wet) col = mix(mix(b.liquid, INK, d * d * 0.85), LITE, Math.max(0, 0.45 * (1 - d * 1.6)))   // glowing core
-        else col = mix(mix(b.liquid, INK, 0.55 + d * 0.3), LITE, Math.max(0, 0.15 * (1 - d * 2)))            // air in the bottle
-        if (wet && j + bw === level && d < 0.78) col = mix(b.liquid, LITE, 0.7)          // the liquid's surface, seen from below
-        c.px(x, y, col)
-      }
-    })
-    // a label mark in the liquid's color, and the shine of the room's light down the left side
-    if (b.label) { const my = top + n - 12 - Math.round(rows[n - 12] * 0.17); c.rect(cx - 1, my, 3, 2, mix(b.liquid, LITE, 0.2)) }
-    for (let j = Math.max(0, -top); j < n - 3; j++) if (rows[j] >= 4 && (j < labTop - 1 || j >= labBot + 1 || !b.label)) c.px(cx - rows[j] + 2, top + j, mix(b.liquid, LITE, 0.75))
-    c.hline(cx - rows[n - 1], base - 1, 2 * rows[n - 1] + 1, "0")
+    drawShelfBottle(c, b, cx, base)
   })
+}
+// one top-shelf bottle standing on the shelf at (cx, base): rows above the top of the frame are left out
+function drawShelfBottle(c, b, cx, base) {
+  const segs = b.segs.map((sg) => sg[0] === "bulb" ? ["bulb", Math.round(sg[1] * SB)] : [Math.round(sg[0] * SB), Math.round(sg[1] * SB), Math.round(sg[2] * SB)])
+  const rows = bottleProfile(segs), n = rows.length, top = base - n, level = Math.round(n * (1 - b.fill))
+  // a ring round the bottle seen from below: its middle is nearer, so higher on screen (bows up)
+  const bowUp = (hw, x, amt) => Math.round(amt * (1 - ((x - cx) / Math.max(1, hw)) ** 2))
+  const labTop = n - 17, labBot = n - 7
+  rows.forEach((hw, j) => {
+    const y = top + j
+    if (y < 0) return
+    for (let x = cx - hw; x <= cx + hw; x++) {
+      const d = Math.abs(x - cx) / Math.max(1, hw)                       // 0 in the middle, 1 at the edge
+      const bw = bowUp(hw, x, Math.max(1, Math.round(hw * 0.17)))
+      const wet = j + bw >= level
+      const onLabel = b.label && j + bw >= labTop && j + bw < labBot
+      let col
+      if (x === cx - hw || x === cx + hw) col = mix(b.liquid, LITE, 0.5)             // light bending round the silhouette
+      else if (d > 0.78) col = mix(b.liquid, INK, 0.82)                               // thick glass at the edges
+      else if (onLabel) col = j + bw === labTop ? mix(b.label, LITE, 0.35) : mix(mix(b.label, b.liquid, 0.25), INK, 0.15 + 0.45 * d)
+      else if (wet) col = mix(mix(b.liquid, INK, d * d * 0.85), LITE, Math.max(0, 0.45 * (1 - d * 1.6)))   // glowing core
+      else col = mix(mix(b.liquid, INK, 0.55 + d * 0.3), LITE, Math.max(0, 0.15 * (1 - d * 2)))            // air in the bottle
+      if (wet && j + bw === level && d < 0.78) col = mix(b.liquid, LITE, 0.7)          // the liquid's surface, seen from below
+      c.px(x, y, col)
+    }
+  })
+  // a label mark in the liquid's color, and the shine of the room's light down the left side
+  if (b.label) { const my = top + n - 12 - Math.round(rows[n - 12] * 0.17); c.rect(cx - 1, my, 3, 2, mix(b.liquid, LITE, 0.2)) }
+  for (let j = Math.max(0, -top); j < n - 3; j++) if (rows[j] >= 4 && (j < labTop - 1 || j >= labBot + 1 || !b.label)) c.px(cx - rows[j] + 2, top + j, mix(b.liquid, LITE, 0.75))
+  c.hline(cx - rows[n - 1], base - 1, 2 * rows[n - 1] + 1, "0")
+}
+// every bottle's top-shelf look, for the pour page, which stands the bottles you own on the shelf: the bottom 30 rows
+// (what shows under the top of the frame), on a canvas just wide enough; the _hover one has a gold ring
+const SHELF_H = SHELF.y + SHELF.h
+for (const ing of INGREDIENTS) {
+  const b = { segs: ing.segs, liquid: ing.liquid, fill: ing.fill, label: ing.label ? ing.label[2] : null }
+  const hw = Math.max(...bottleProfile(b.segs.map((sg) => sg[0] === "bulb" ? ["bulb", Math.round(sg[1] * SB)] : [Math.round(sg[0] * SB), Math.round(sg[1] * SB), Math.round(sg[2] * SB)])))
+  sprite("shelf_" + ing.id, { w: 2 * hw + 3, h: SHELF_H }, (c) => drawShelfBottle(c, b, hw + 1, SHELF_H))
+  sprite("shelf_" + ing.id + "_hover", { base: "shelf_" + ing.id, outline: "G" })
 }
 // the guest: one backlit silhouette at true scale. Sitting just across the bar, their head is about 3/4 the glass's
 // height and their eyes are at our eye level; behind them is the bright dome glass, so they read dark against it.
@@ -1093,7 +1106,7 @@ barScene("neon_dome")
 // with their shadows and reflections, so they can be picked up); the shaker and stirring glass stay in for now.
 // pour_front: the rail's front plate on its own, drawn over the bottles.
 const STATIC_TOOLS = () => []   // the pour lab moves every tool now
-const bgScene = (name, ox, mood = "day", sun = true) => scene(name, { w: W + ox, h: H, bg: "3", world: { light: [-1, -0.6] } },
+const bgScene = (name, ox, mood = "day", sun = true, bottles = true) => scene(name, { w: W + ox, h: H, bg: "3", world: { light: [-1, -0.6] } },
   layer("sky", { x: ox }, skyThroughGlass(mood, sun), cityThroughGlass(mood)),
   layer("haze", { x: ox, opacity: 0.3 }, rect(X0, 86, W - X0, 30, MOODS[mood].haze)),
   layer("panes", { x: ox, opacity: 0.22 }, panes(mood)),
@@ -1115,7 +1128,7 @@ const bgScene = (name, ox, mood = "day", sun = true) => scene(name, { w: W + ox,
   layer("tools", { x: ox }, ...STATIC_TOOLS().map(([n, x, y]) => stamp(n, x, y))),
   layer("rail back", { x: ox }, railBack),
   layer("shelf glow", { x: ox, opacity: 0.1 }, poly([X0, 60, 480, 60, 480, 86, X0, 86], "n")),
-  layer("top shelf", { x: ox }, shelfBack, shelfBottles, shelfBoard),
+  layer("top shelf", { x: ox }, shelfBack, ...(bottles ? [shelfBottles] : []), shelfBoard),
   glow("Nn", { r: 5, strength: 0.4 }),
   glow("Vv", { r: 5, strength: 0.35 }),
   glow("G", { r: 3, strength: 0.4 }),
@@ -1124,9 +1137,9 @@ const bgScene = (name, ox, mood = "day", sun = true) => scene(name, { w: W + ox,
 )
 bgScene("pour_bg", 0)
 // the pour page's three times of day, without the sun (the page draws the sun, the moon, stars and clouds itself)
-bgScene("pour_bg_day", 0, "day", false)
-bgScene("pour_bg_dawn", 0, "dawn", false)
-bgScene("pour_bg_night", 0, "night", false)
+bgScene("pour_bg_day", 0, "day", false, false)
+bgScene("pour_bg_dawn", 0, "dawn", false, false)
+bgScene("pour_bg_night", 0, "night", false, false)
 // where the sky shows through the glass: pure white there, the room as it is everywhere else (no tints over it)
 scene("pour_sky_mask", { w: W, h: H, bg: "3" },
   layer("sky", rect(0, 0, W, HORIZON + 4, "#FFFFFF"), cityThroughGlass()),
@@ -1136,7 +1149,7 @@ scene("pour_sky_mask", { w: W, h: H, bg: "3" },
   layer("dome", struts, lightRig, stamp("mirror_ball", 196, 78)),
   layer("counter", counterTop),
   layer("far edge", farEdge),
-  layer("top shelf", shelfBack, shelfBottles, shelfBoard),
+  layer("top shelf", shelfBack, shelfBoard),
 )
 // the wide view for the pour lab: EXT more px of empty bar on the left
 bgScene("pour_bg_wide", EXT)

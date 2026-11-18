@@ -43,7 +43,8 @@ between the two, it shows only what's in the glass.
 - **Shake:** pour into the shaker and add ice (3 cubes is best; without ice it barely gets cold). Click it to pick it
   up, then **move it back and forth**: the cap goes on and it shakes, frosting over. About 10 seconds gets it cold.
   Shaking knocks most of the fizz out, so add soda after. **Hold** to pour it into the glass; the strainer keeps the ice
-  in.
+  in. Once it's poured empty, the spent ice is tipped out. While it pours, the screen shows it as one drink (glass,
+  shaker and what's mid-air together).
 - **Stir:** stirring happens in the glass you serve. Add ice to the glass (3 cubes is best), click the **bar spoon**
   in its tin beside the shaker and it goes into the glass. Then **press on the spoon's handle** and **move the mouse
   in circles** (either way round, about one circle a second or faster). Back and forth doesn't count. Slower and
@@ -98,10 +99,11 @@ between the two, it shows only what's in the glass.
   they liked it (nothing for a Bad drink), and more from the richer crowds. Each guest after the first in a night
   tips a little less. The strip right of the sign shows the bank and tonight's tips; it's all paid when the night ends.
 - **The day:** a screen shows what the night earned, and the **supplier**: 10 spirits, 20 flavors and 10 garnishes
-  (896 credits for everything), in tabs, with what each tastes like. Buy what you can afford, then **Open the bar**,
-  or **Set up the rail first**: the bar stays closed (no clock) and you can practice with anything you own.
-- **The OPEN / CLOSED sign** hangs in the window left of the guest: green OPEN while the bar serves, red CLOSED
-  during the day.
+  (896 credits for everything), in tabs, with what each tastes like. Buy what you can afford, then **Open the bar**
+  (or click the sign later), or go back to the closed bar: no clock runs, and you can practice with anything you own.
+- **The OPEN / CLOSED sign** hangs from the shelf top right, above the guest's speech: green OPEN while the bar
+  serves, red CLOSED during the day. **Click it by day to open the bar.** By day the **top shelf** opens the
+  supplier (with buttons to set up the rail from the back bar, or go back to the bar); at night it opens the back bar.
 - **Vic, the manager,** sits at the bar while it's closed: heavy-set, loud shirt, gold chain, greased hair, pencil
   mustache, aviators on his head and a toothpick (`managerLook` in `guestgen.js`). Slide him a drink and he tastes it
   like a guest, then tells you what he tastes (`manager.js`): the strongest notes in the screen's own names and how

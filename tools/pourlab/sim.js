@@ -601,6 +601,7 @@ export function createSim(L, sizes) {
 
   // ---------------------------------------------------------------- one fixed step
   function step(dt = STEP) {
+    watchTransfer(dt)
     S.t += dt
     if (S.notice && (S.notice.t -= dt) <= 0) S.notice = null
     stepHeld(dt)
@@ -629,7 +630,12 @@ export function createSim(L, sizes) {
       if (h.back.t >= 1) {
         S.held = null
         if (h.kind === "glass") S.glassHeld = false
-        if (h.kind === "tool") { const tool = S.tools[h.id]; tool.state = "home"; tool.x = tool.home.x; tool.y = tool.home.y; tool.angle = 0 }
+        if (h.kind === "tool") {
+          const tool = S.tools[h.id]; tool.state = "home"; tool.x = tool.home.x; tool.y = tool.home.y; tool.angle = 0
+          // poured out to the last drop: the spent ice is tipped out too, like a bartender dumping a shaker
+          if (tool.poured && volOf(tool.c) < 0.02) clearContents(tool.c)
+          tool.poured = false
+        }
       }
       return
     }
@@ -664,6 +670,7 @@ export function createSim(L, sizes) {
       if (tool.working) { workTool(tool, dt); tool.stir += dt; tool.workShow = 0.4 } else tool.workShow = Math.max(0, (tool.workShow || 0) - dt)
       flow = volOf(tool.c) > 1e-6 ? 3 * f : 0
       if (flow > 0) logTechnique(tool)              // the way it was made goes along with the drink
+      if (flow > 0) tool.poured = true
       if (volOf(tool.c) <= 1e-6 && !S.pressing && h.angle < 0.3) { putBack(); return }
     } else if (h.kind === "cup") {
       const cup = S.cups[h.id]; source = cup.c
@@ -880,8 +887,32 @@ export function createSim(L, sizes) {
       chill: tot > 0 ? c.chillVol / tot : 0, dilution: tot > 0 ? (c.parts.get("water") || 0) / tot : 0, log: c.log }
   }
 
+  // A tool being poured into the glass: the same drink in two places at once (and some of it mid-air). While that
+  // lasts, and for a moment after (until the last drops land), the screen shows it as one drink: transfer() names
+  // the tool, merged() adds the glass, the tool and whatever is falling into one set of contents.
+  // (watched every step, so it holds whether or not anything is drawing)
+  function watchTransfer(dt) {
+    if (S.transferHold > 0) S.transferHold -= dt
+    let id = null
+    if (S.held && S.held.kind === "tool" && volOf(S.tools[S.held.id].c) > 0.004 && S.held.angle > 0.25) id = S.held.id
+    for (const t of Object.values(S.tools)) if (["strainUp", "straining", "strainDown"].includes(t.state)) id = t.id
+    if (id) { S.transferId = id; S.transferHold = 0.8 }
+  }
+  const transfer = () => (S.transferHold > 0 ? S.transferId : null)
+  function merged(toolId) {
+    const g = S.glass, t = S.tools[toolId].c, c = newContents()
+    for (const src of [g, t]) {
+      for (const [id, v] of src.parts) c.parts.set(id, (c.parts.get(id) || 0) + v)
+      for (const [id, n] of src.dashes) c.dashes.set(id, (c.dashes.get(id) || 0) + n)
+      c.chillVol += src.chillVol; c.fizzKeep += src.fizzKeep; c.shaken = c.shaken || src.shaken
+    }
+    for (const p of S.particles) if (p.comp && !p.spray && p.vol > 0) for (const [id, f] of p.comp) c.parts.set(id, (c.parts.get(id) || 0) + p.vol * f)
+    c.log = [...t.log, ...g.log.filter((l) => !t.log.includes(l))]; c.garnish = g.garnish
+    return c
+  }
+
   return {
-    S, L, ing, glass, MEASURE, CAP,
+    S, L, ing, glass, MEASURE, CAP, transfer, merged,
     step, pick, putBack, aim, press, addIce, grabIce, moveIce, releaseIce, activateCup, clickActiveCup, sendHome, emptyGlass,
     liftTool, putToolDown, strainTool, dumpTool, emptyTool, toolBox, toolRim, toolLip,
     pickGlass, dropGlass, glassLip, handTool, placeSpoon, homeSpoon, startStir, stirAt, endStir, emptyVessel, startMove, dragTo, endMove, canMove, freeSpot,

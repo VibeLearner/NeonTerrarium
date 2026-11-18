@@ -1684,7 +1684,7 @@ function drawDay() {
   for (const l of wrap("Bottles you buy wait on the back bar. Garnishes go in the tray by the mat. Click the sign to open.", 128)) { text(l, lx, y, DIM); y += 9 }
   useFont(false)
   button("Open the bar", lx, P.y + P.h - 50, openBar, { w: 130, key: "openBar" })
-  button("Set up the rail", lx, P.y + P.h - 34, () => { day.open = false; openBackBar() }, { w: 130, key: "dayBackBar" })
+  button("Set up the rails", lx, P.y + P.h - 34, () => { day.open = false; openBackBar() }, { w: 130, key: "dayBackBar" })
   button("Back to the bar", lx, P.y + P.h - 18, () => (day.open = false), { w: 130, key: "dayClose" })
   // right: the supplier, a tab per kind, ten to a page
   const sx = P.x + 150, sw = P.w - 158

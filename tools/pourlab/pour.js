@@ -1489,7 +1489,7 @@ function drawTooltip() {
   else if (hover.kind === "sign") tooltip(prog.phase === "day" ? "Open the bar" : "Open", prog.phase === "day" ? "Click the sign to open the bar and start the night." : "The bar is open until the last guest after 05:00.", SIGN.x + SIGN.w / 2, 110)
   else if (hover.kind === "tray") tooltip("Garnish tray", prog.owned.some(isGarnish) ? "Click to pick a garnish for the glass. It adds a little of a note on top, whatever the drink's size. Some guests ask for one." : "Empty. Buy garnishes at the supplier during the day.", TRAY.x, trayBox().y - 4)
   else if (hover.kind === "hudClock") tooltip("The night", `The bar opens at 20:00 and lets the last guest in before 05:00 (the city's clock: ${(ECO.NIGHT_SECONDS / 60).toFixed(1)} real minutes). The guest at the bar always finishes, then it's day.`, HUD_CLOCK.x + 50, 120)
-  else if (hover.kind === "hudBank") tooltip("Credits", `In the bank, and tonight's tips so far. Tips and your wage (${ECO.WAGE} cr a night, however many guests you serve) are paid when the night ends. Spend them at the supplier.`, HUD_BANK.x + 50, 120)
+  else if (hover.kind === "hudBank") tooltip("Credits", `In the bank. Each guest's tip goes in as soon as they've tasted the drink; your wage (${ECO.WAGE} cr a night, however many guests you serve) comes when the night ends. Tonight's tips so far: ${prog.tonight.tips} cr. Spend it all at the supplier.`, HUD_BANK.x + 50, 120)
   else if (hover.kind === "cup") { const cup = S.cups[hover.id]; tooltip(`${CUP_NAME[cup.id]} jigger`, `A bar measuring cup. Holds exactly ${CUP_NAME[cup.id].toLowerCase()} part. Click to set it beside the glass, pour a bottle into it, then click it to pick it up and pour the measure. Drag it to move it.`, cup.x, cupBox(cup).y - 4) }
   else if (hover.kind === "activeCup") tooltip("Jigger", sim.volOf(S.cups[hover.id].c) > 0.001 ? "Click to pick it up, then hold to pour it." : "Pour a bottle into it, or click to put it away.", S.cups[hover.id].x, cupBox(S.cups[hover.id]).y - 14)
   else if (hover.kind === "tool") {
@@ -1518,8 +1518,10 @@ function drawNotice() {
 
 // ---------------------------------------------------------------- the night clock and the bank, on the shelf's lip
 // Two small LED strips either side of the DRINKS sign: the night and its time (the city's clock), and the credits
-// in the bank with tonight's tips so far (tips and the wage are paid when the night ends).
+// in the bank (each tip lands as the guest gives their verdict, counted up, with a +N flash; the wage comes at the
+// end of the night).
 const HUD_CLOCK = { x: 36, y: 31, w: 104, h: 10 }, HUD_BANK = { x: 268, y: 31, w: 100, h: 10 }
+const bank = { shown: 0, init: false, flash: 0, flashT: 9, lastGap: 0 }
 function led(b) { fill(b.x, b.y, b.w, b.h, "#0B1418"); frame1(b.x, b.y, b.w, b.h, "#2E3A44") }
 function drawHUD() {
   useFont(true)
@@ -1532,8 +1534,19 @@ function drawHUD() {
     text(last ? "LAST GUEST" : ECO.clockText(prog.hour), t.x + t.w - 4, t.y + 2, last ? (Math.floor(S.t * 2) % 2 ? "#FF8AA8" : "#FFC94A") : HOLO.value, "right")
   }
   const b = HUD_BANK
-  text(`${prog.credits} cr`, b.x + 4, b.y + 2, "#FFE27A")
-  if (prog.phase === "night") text(`+${prog.tonight.tips} tips`, b.x + b.w - 4, b.y + 2, "#9CF0B0", "right")
+  // the number counts up to the bank's balance; a fresh tip flashes "+N" on the right for a few seconds
+  if (bank.shown > prog.credits || !bank.init) { bank.shown = prog.credits; bank.init = true }
+  if (bank.shown < prog.credits) {
+    const gap = prog.credits - bank.shown
+    if (gap !== bank.lastGap) { bank.flash = gap; bank.flashT = 0 }
+    bank.shown = Math.min(prog.credits, bank.shown + Math.max(1, Math.ceil(gap * 0.08)))
+  }
+  bank.lastGap = prog.credits - bank.shown
+  text(`${bank.shown} cr`, b.x + 4, b.y + 2, bank.shown < prog.credits ? "#FFF6C0" : "#FFE27A")
+  if (bank.flash > 0 && bank.flashT < 3) {
+    ctx.globalAlpha = bank.flashT < 2.4 ? 1 : (3 - bank.flashT) / 0.6
+    text(`+${bank.flash} cr`, b.x + b.w - 4, b.y + 2, "#9CF0B0", "right"); ctx.globalAlpha = 1
+  }
   useFont(false)
 }
 
@@ -1870,7 +1883,7 @@ let last = performance.now(), acc = 0
 const settle = { key: "", t: 0, done: true }
 let saveT = 0
 function update(dt) {
-  guest.t += dt; book.t += dt; spectro.t += dt
+  guest.t += dt; book.t += dt; spectro.t += dt; bank.flashT += dt
   // the night runs on the city's clock (stopped by the browser when the tab is hidden); saved every few seconds
   if (prog.phase === "night" && prog.hour < ECO.NIGHT_END) prog.hour = Math.min(ECO.NIGHT_END, prog.hour + dt * ECO.GAME_HOURS_PER_SECOND * CLOCK)
   if ((saveT += dt) > 5) { saveT = 0; saveProg() }

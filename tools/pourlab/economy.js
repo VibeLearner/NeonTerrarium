@@ -40,7 +40,7 @@ const KEY = "neonDome.progress.v1"
 export function newProgress() {
   return { v: 1, night: 1, phase: "night", hour: NIGHT_START, credits: 0, owned: [...STARTER], fresh: [],
     rail: { spirit: [...STARTER_RAIL.spirit], mixer: [...STARTER_RAIL.mixer] },
-    tonight: { wage: WAGE, tips: 0, guests: [] }, history: [], bought: [], shelf: Array(SHELF_SLOTS).fill(null) }
+    tonight: { wage: WAGE, tips: 0, guests: [], banked: true }, history: [], bought: [], shelf: Array(SHELF_SLOTS).fill(null) }
 }
 // The top shelf's display: SHELF_SLOTS spots, each a bottle you own that isn't on the rail (or empty). New bottles
 // go up there, and so does a bottle the rail swaps out; you choose what fills an empty spot. It's a shortcut: the
@@ -74,7 +74,7 @@ export function sanitize(p) {
     ...base, night: Math.max(1, Math.floor(num(p.night, 1))), phase: p.phase === "day" ? "day" : "night",
     hour: Math.min(NIGHT_END, Math.max(NIGHT_START, num(p.hour, NIGHT_START))), credits: Math.max(0, Math.floor(num(p.credits, 0))),
     owned, fresh: (p.fresh || []).filter((id) => owned.includes(id)), rail,
-    tonight: p.tonight && Array.isArray(p.tonight.guests) ? { wage: num(p.tonight.wage, WAGE), tips: num(p.tonight.tips, 0), guests: p.tonight.guests.slice(0, 200) } : base.tonight,
+    tonight: p.tonight && Array.isArray(p.tonight.guests) ? { wage: num(p.tonight.wage, WAGE), tips: num(p.tonight.tips, 0), guests: p.tonight.guests.slice(0, 200), banked: p.tonight.banked === true } : base.tonight,
     history: Array.isArray(p.history) ? p.history.slice(-60) : [], bought: Array.isArray(p.bought) ? p.bought.filter((id) => ITEMS[id]) : [], shelf,
   }
 }
@@ -86,16 +86,18 @@ export function saveProgress(p, store = globalThis.localStorage) {
 }
 export function clearProgress(store = globalThis.localStorage) { try { store.removeItem(KEY) } catch { /* nothing saved */ } }
 
-// a guest served: their tip goes into tonight's takings (credits arrive at the end of the night with the wage)
+// a guest served: their tip goes straight into the bank (and into tonight's takings, for the night's summary)
 export function recordGuest(p, crowd, scoreV) {
   const k = p.tonight.guests.length, tip = tipFor(crowd, scoreV, k)
   p.tonight.guests.push({ crowd, score: Math.round(scoreV), tip }); p.tonight.tips += tip
+  if (p.tonight.banked) p.credits += tip
   return tip
 }
-// the night ends: wage and tips are paid, and it's day
+// the night ends: the wage is paid (the tips are in the bank already), and it's day. (A night saved before tips
+// were banked as they came, without the banked mark, has its tips paid here.)
 export function endNight(p) {
   const total = p.tonight.wage + p.tonight.tips
-  p.credits += total
+  p.credits += p.tonight.banked ? p.tonight.wage : total
   p.history.push({ night: p.night, wage: p.tonight.wage, tips: p.tonight.tips, guests: p.tonight.guests.length, total })
   p.phase = "day"; p.fresh = []
   return total

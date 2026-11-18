@@ -103,7 +103,8 @@ between the two, it shows only what's in the glass.
   124 bpm beat, four colored beams sweep round the floor, and the mirror ball throws glints.
 - **Pay:** a wage of 130 credits a night, however many guests you serve, plus a tip from each guest: more the more
   they liked it (nothing for a Bad drink), and more from the richer crowds. Each guest after the first in a night
-  tips a little less. The strip right of the sign shows the bank and tonight's tips; it's all paid when the night ends.
+  tips a little less. The strip right of the sign shows the bank: each tip goes in as soon as the guest has tasted the drink (with a
+  green +N), and the wage comes when the night ends.
 - **The day:** a screen shows what the night earned, and the **supplier**: 10 spirits, 20 flavors and 10 garnishes
   (896 credits for everything), in tabs, with what each tastes like. Buy what you can afford, then **Open the bar**
   (or click the sign later), or go back to the closed bar: no clock runs, and you can practice with anything you own.

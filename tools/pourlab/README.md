@@ -111,8 +111,14 @@ between the two, it shows only what's in the glass.
   and Sour close together) and **Velvet** (Creamy and Sweet). Cream softens strength and bitterness; smoke covers
   flowers; bubbles lift flowers as well as fresh notes. Seven new secret pairings wait in the book.
 - **Orders follow the shelf:** a guest only asks for what the bar can make. Nobody wants flowers before there's a
-  floral bottle, or a garnish before the tray has one. Each order is checked by a quick search for the best drink
-  the bar could make (`bot.js`); a guest whose order couldn't be made well is replaced before they walk up.
+  floral bottle, or a garnish before the tray has one. Each order is checked before the guest walks up (`bot.js`):
+  a quick search must find a drink that lands everything they said and scores 80 or more, and every "lots of X"
+  said with "little or none of Y" needs a bottle that gives X on its own without much Y (so "really bitter, zero
+  sugar" waits until there's a bitter bottle that isn't sweet). Otherwise a different guest comes up.
+- **They only hold you to what they said:** a guest's three or four spoken wishes are the only things they want
+  more of. Anything they didn't mention can only be too much ("Too bitter" when they never asked for bitter), never
+  missing, and Balance can always be too rough. Their "needed more" and "spot on" lines are only about what they
+  asked for.
 - **Saved in the browser:** the night, the clock, credits, what you own and your rail. For testing, add to the
   address: `?clock=10` (the clock runs 10 times faster), `?credits=500` (adds credits), `?reset=1` (starts over).
 
@@ -127,6 +133,7 @@ between the two, it shows only what's in the glass.
 | `catalog.js` | every bottle and garnish: what it tastes like, its tags, how it pours, its price, its plain name and description |
 | `economy.js` | nights on the city clock, the wage and tips, prices, buying, the rail, and the saved progress |
 | `bot.js` | the bot bartender: searches for the best drink a guest could get from what the bar owns |
+| `audit_orders.mjs` | the order audit: for guests at each stage of the shop, checks they're only held to what they said, only ask for "more" of what they said, that the best drink lands every said thing, and that each order has a plain route. `node tools/pourlab/audit_orders.mjs` |
 | `sim_progress.mjs` | the progression simulation: a bot plays every stage of the shop; checks orders can be made, the pacing (about 2 hours relaxed, 1.5 quick), that the new notes behave as you'd guess, and edge cases. `node tools/pourlab/sim_progress.mjs` (add `--quick` for a short run) |
 | `test_sim.mjs`, `test_flavor.mjs` | check the numbers with no screen: `node tools/pourlab/test_sim.mjs` |
 | `art/neon_dome.px.js` | the bar, drawn in code with pxl (no image tools); `art/font5x7.px.js` is pxl's 5x7 font |

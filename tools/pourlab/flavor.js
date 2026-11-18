@@ -280,16 +280,28 @@ export function makeGuest(R, crowdId, bar = null) {
     garnishAsk = fams[Math.floor(rg2 * fams.length)]
   }
   const loves = C.loves || (C.lovesLater && PARENTS[C.lovesLater].every((n) => top[n] >= 3) ? C.lovesLater : null)
-  return { crowd: cid, crowdName: C.name, ranges, loves, budget: C.budget, quirk, mood, craving, garnishAsk }
+  const g = { crowd: cid, crowdName: C.name, ranges, loves, budget: C.budget, quirk, mood, craving, garnishAsk }
+  // What they'll say out loud, decided here so the score can't hold anything else against them: a quirk, craving or
+  // mood always, then the heaviest of the rest, three or four in all. Anything they don't say keeps only its upper
+  // limit (they won't complain it's missing, only if there's too much of it). Balance keeps its floor: a harsh,
+  // lopsided drink is a fault whatever was asked.
+  g.saidAxes = chooseSaid(g)
+  for (const ax of Object.keys(ranges)) if (!g.saidAxes.includes(ax) && ax !== "balance") ranges[ax] = [0, ranges[ax][1], ranges[ax][2]]
+  return g
+}
+const isMust = (g, ax) => (g.quirk && g.quirk.note === ax) || (g.craving && g.craving.note === ax) || (g.mood && ax in g.mood.shift)
+function chooseSaid(g) {
+  const axes = Object.entries(g.ranges).map(([ax, [, , w]]) => ({ ax, w, must: isMust(g, ax) }))
+  axes.sort((a, b) => (b.must - a.must) || (b.w - a.w))
+  const musts = axes.filter((a) => a.must).length
+  return axes.slice(0, Math.min(4, Math.max(3, musts))).map((a) => a.ax)
 }
 
-// What they say: the three things that matter most to them (heaviest weights), a quirk, craving or mood always
-// said; a garnish they want comes last.
+// What they say: the things chosen in makeGuest (saidAxes), each in their crowd's words; a garnish they want comes
+// last.
 export function request(g) {
-  const must = (ax) => (g.quirk && g.quirk.note === ax) || (g.craving && g.craving.note === ax) || (g.mood && ax in g.mood.shift)
-  const axes = Object.entries(g.ranges).map(([ax, [lo, hi, w]]) => ({ ax, lo, hi, w, must: must(ax) }))
-  axes.sort((a, b) => (b.must - a.must) || (b.w - a.w))
-  const said = axes.slice(0, 3).map((a) => {
+  const saidAxes = g.saidAxes || chooseSaid(g)
+  const said = saidAxes.map((ax) => ({ ax, lo: g.ranges[ax][0], hi: g.ranges[ax][1] })).map((a) => {
     const target = a.ax === "balance" || (a.hi >= 10 && a.lo > 0) ? (a.lo + 10) / 2 : (a.lo + a.hi) / 2
     const lv = a.lo <= 0 && a.hi <= 1 ? 0 : levelOf(target)
     // in the guest's own crowd's words (voices.js), never the same wording twice in a row
@@ -334,10 +346,11 @@ export function score(g, t) {
 export function feedback(g, t, s) {
   const lines = [], arrows = {}
   if (s.garnishHit && s.garnishHit !== "match") lines.push(pickLine(g.crowd, "garnishMiss", s.garnishHit) || (s.garnishHit === "none" ? "Where's my garnish?" : "Not the garnish I meant."))
-  const bad = s.misses.filter((m) => m.miss > 0.35).sort((a, b) => b.cost - a.cost).slice(0, 2 - lines.length)
+  const asked = (ax) => !g.saidAxes || g.saidAxes.includes(ax)
+  const bad = s.misses.filter((m) => m.miss > 0.35 && (m.dir < 0 || asked(m.ax) || m.ax === "balance")).sort((a, b) => b.cost - a.cost).slice(0, 2 - lines.length)
   for (const m of bad) { lines.push(pickLine(g.crowd, m.dir > 0 ? "more" : "less", m.ax) || (m.dir > 0 ? MORE[m.ax] : LESS[m.ax])); arrows[m.ax] = m.dir }
   if (lines.length < 2 && s.score >= 65) {
-    const good = s.misses.filter((m) => m.miss === 0 && SPOT_ON[m.ax]).sort((a, b) => b.w - a.w)[0]
+    const good = s.misses.filter((m) => m.miss === 0 && SPOT_ON[m.ax] && asked(m.ax)).sort((a, b) => b.w - a.w)[0]
     if (good) { lines.push(pickLine(g.crowd, "spot", good.ax) || SPOT_ON[good.ax]); arrows[good.ax] = 0 }
   }
   return { lines: [pickLine(g.crowd, "tier", s.tier) || s.line, ...lines], arrows }

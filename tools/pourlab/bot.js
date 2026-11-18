@@ -18,13 +18,16 @@ export function drinkOf(r) {
 }
 const valid = (d) => d.vol >= FILL - 1e-9 && d.vol <= MAX + 1e-9
 
-export function bestDrink(g, owned, R, iters = 700, starts = 7) {
+// strict: also land every said thing (the search pays 25 points per point any said thing is off), which is what a
+// player is aiming for when they follow the order
+const saidMiss = (g, s) => Math.max(0, ...(g.saidAxes || []).map((ax) => (s.misses.find((m) => m.ax === ax) || { miss: 0 }).miss))
+export function bestDrink(g, owned, R, iters = 700, starts = 7, strict = false) {
   const pours = owned.filter((id) => INGREDIENTS[id] && !INGREDIENTS[id].dash), dashers = owned.filter((id) => INGREDIENTS[id] && INGREDIENTS[id].dash)
   const garn = [null, ...owned.filter(isGarnish)]
-  const evalR = (r) => { const d = drinkOf(r); if (!valid(d)) return -1; return score(g, taste(d)).score }
+  const evalR = (r) => { const d = drinkOf(r); if (!valid(d)) return -1e9; const s = score(g, taste(d)); return strict ? s.score - 25 * saidMiss(g, s) : s.score }
   const clone = (r) => ({ parts: new Map(r.parts), dashes: new Map(r.dashes), method: r.method, t: r.t, garnish: r.garnish })
   const pick = (a) => a[Math.floor(R() * a.length)]
-  let best = null, bestS = -1
+  let best = null, bestS = -Infinity
   for (let s = 0; s < starts && bestS < 99.5; s++) {
     let r = { parts: new Map(), dashes: new Map(), method: pick(["build", "stir", "shake"]), t: pick([4, 8, 12, 20]), garnish: null }
     const n = 2 + Math.floor(R() * 3)
@@ -46,16 +49,39 @@ export function bestDrink(g, owned, R, iters = 700, starts = 7) {
   return { r: best, score: bestS }
 }
 
-// A guest the bar can serve well: up to 6 tries, each checked by a short search (a few thousand tastings, a few
-// milliseconds). The last try is kept if none clears the bar, which the simulation shows doesn't happen.
-export const SERVABLE = 75
-export function servableGuest(R, crowdId, bar, tries = 6) {
-  let g = null
-  for (let k = 0; k < tries; k++) {
-    g = makeGuest(R, crowdId, bar)
-    const b = bestDrink(g, [...bar.owned], R, 400, 4)
-    g.bestScore = b.score
-    if (b.score >= SERVABLE) return g
+// A guest the bar can serve well, and whose order a person can see how to make:
+//   - the bot's best drink lands every said thing (within 0.4 of what they asked) and scores at least 80;
+//   - every "lots of X" said alongside "none (or little) of Y" has a plain route: an owned bottle that gives X on
+//     its own (a dasher counted at its six-dash most) with little Y. "Really bitter, zero sugar" with only the
+//     starter bar fails this (the only bitter bottle you can pour freely is the coffee liqueur, as sweet as it is
+//     bitter, and six dashes of bitters only reach a bitter edge), so that guest asks for something else.
+// Up to 8 tries, each a short search (a few thousand tastings, a few milliseconds). If none passes, the try whose
+// best drink came closest is kept (the simulation shows this doesn't happen).
+export const SERVABLE = 80, SAID_SLACK = 0.4
+const alone = (id, n) => { const it = INGREDIENTS[id]; const v = (it.v[n] || 0) * (it.dash ? 0.12 : 0.7); return 10 * (1 - Math.exp(-v / 8)) }
+export function plainRoute(g, owned) {
+  const said = g.saidAxes || [], notes = said.filter((ax) => g.ranges[ax] && !["complexity", "balance"].includes(ax))
+  const lots = notes.filter((ax) => g.ranges[ax][0] >= 5), little = notes.filter((ax) => g.ranges[ax][1] <= 3.5)
+  for (const x of lots) {
+    if (!little.length) continue
+    const ok = owned.some((id) => INGREDIENTS[id] && alone(id, x) >= g.ranges[x][0] - 1 &&
+      little.every((y) => (INGREDIENTS[id].v[y] || 0) <= 0.3 * (INGREDIENTS[id].v[x] || 0)))
+    if (!ok) return false
   }
-  return g
+  return true
+}
+export function servableGuest(R, crowdId, bar, tries = 8) {
+  const owned = [...bar.owned]
+  let keep = null, keepQ = -1
+  for (let k = 0; k < tries; k++) {
+    const g = makeGuest(R, crowdId, bar)
+    const b = bestDrink(g, owned, R, 450, 4, true), s = score(g, taste(drinkOf(b.r)))
+    const worstSaid = saidMiss(g, s)
+    g.bestScore = s.score
+    const route = plainRoute(g, owned)
+    if (s.score >= SERVABLE && worstSaid <= SAID_SLACK && route) return g
+    const q = s.score - 20 * worstSaid - (route ? 0 : 30)
+    if (q > keepQ) { keepQ = q; keep = g }
+  }
+  return keep
 }

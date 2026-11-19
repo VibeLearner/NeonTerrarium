@@ -731,7 +731,23 @@
   // can stand on them; 'none' keeps every club piece out of the apartment household furnisher.
   window.PODLAB_TAGS = Object.assign(window.PODLAB_TAGS || {}, Object.fromEntries(['A', 'B', 'C', 'D'].map(s => ['club_cl_dance_' + s, 'rug none club:dance'])));
   const SETS = ['A', 'B', 'C', 'D'];
-  const reg = (k, label, fn, nm) => ({ k, label, archs: Object.fromEntries(SETS.map(s => ['club_' + k + '_' + s, [nm[s], fn(s), { set: s }]])) });
+  // Club scale (owner, Nov 19): the club is a 35 m room seen close, so its pieces are drawn half as big again as an apartment's. Each
+  // piece's parts go into one group scaled CLUB_SCALE (so anything that bakes a piece from its root keeps the scale), and what the
+  // builder reads as numbers follows: the stated size, the surfaces things stand on, the lights' reach; the footprint is measured again.
+  // Dance tiles and floors stay true to the floor grid.
+  const CLUB_SCALE = 1.5;
+  const big = gen => (r, c) => {
+    const info = gen(r, c), b = info && info.b; if (!b || !b.g) return info;
+    const F = CLUB_SCALE, inner = new T.Group(); inner.scale.setScalar(F);
+    for (const ch of b.g.children.slice()) inner.add(ch);
+    b.g.add(inner); b.cur = b.g; b.stack = [];
+    inner.traverse(o => { if (o.isLight && o.distance) o.distance *= F; });
+    for (const sf of b.surfaces) for (const k of ['x', 'y', 'z', 'w', 'd', 'r']) if (typeof sf[k] === 'number') sf[k] *= F;
+    for (const k of ['W', 'D', 'H']) if (typeof info[k] === 'number') info[k] *= F;
+    if (info.center) info.center = info.center.map(v => v * F);
+    b.mark(); return info;
+  };
+  const reg = (k, label, fn, nm) => ({ k, label, archs: Object.fromEntries(SETS.map(s => ['club_' + k + '_' + s, [nm[s], k === 'cl_dance' ? fn(s) : big(fn(s)), { set: s }]])) });
   return {
     categories: [
       reg('cl_booths', 'Booths', booth, { A: 'Lounge booth', B: 'Orbital booth', C: 'Rave booth', D: 'Bathhouse booth' }),
@@ -910,7 +926,7 @@
   // the starter kit: the disco floor laid, and a DJ booth at the dance floor's north edge facing it, in one set picked from the seed
   function recipe(o) {
     o = o || {}; const seed = (o.seed >>> 0) || 1, set = o.set && SETS.includes(o.set) ? o.set : SETS[seed % 4], pieces = [];
-    pieces.push({ id: 1, arch: 'club_cl_dj_' + set, seed: (seed * 13 + 5) % 100000, x: RM, y: 0, z: RM - DANCE_R - .9, ry: 0, wh: 0, anc: 'c', parent: 0, colors: {}, light: null });
+    pieces.push({ id: 1, arch: 'club_cl_dj_' + set, seed: (seed * 13 + 5) % 100000, x: RM, y: 0, z: RM - DANCE_R - 1.4, ry: 0, wh: 0, anc: 'c', parent: 0, colors: {}, light: null });
     return { v: 1, app: 'podlab-build', home: home(o), walls: 'cutaway', fin: { floor: floorsFor(seed), wall: {}, seg: {} }, pieces };
   }
   // a club saved before the zones (one room): the same grid in nine zones, and the disco floor on any zone with no tiling (bridge.js)

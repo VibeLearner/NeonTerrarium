@@ -53,12 +53,29 @@ HOLD = (HOLD_MARK + '\n<script>(()=>{if(!(window.matchMedia&&matchMedia(\'(point
 HOLD_AT = '<script>window.PODLAB_EMBED=true;window.PODCITY_NOPACK=true</script>\n'
 
 # The Neon Dome's club furniture (furnish/club.js): one more furniture section, in the lab's own grammar and kit (K.STYLE, K.HAB). Sections
-# register themselves on window.PODLAB_SECTIONS and the lab core reads them when it starts, so the tag goes right before the core's script.
+# register themselves on window.PODLAB_SECTIONS and the lab core reads them when it starts, so it goes right before the core's script,
+# inline like the lab's own sections (the builder's furnishing worker bundles the page's inline section scripts).
 CLUB_MARK = '<!-- Neon Terrarium: the club furniture section (tools/furnish/build.py) -->'
 CORE_AT = '<script>\n(function(){\n"use strict";\nconst T=window.THREE;'
 # Tags from sections (window.PODLAB_TAGS, e.g. furnish/club.js's dance tiles place like a rug) join the pods' own tag table.
 TAGS_AT = 'const TG={};for(const k in TAG_SRC)'
 TAGS_HOOK = 'Object.assign(TAG_SRC,window.PODLAB_TAGS||{});'
+# The club room (furnish/club.js, PODLAB_CLUB*): a home with tier 'club' is the Neon Dome's round ground floor. These hooks, each applied once:
+# the club categories join the Build rail's catalog; buildPod skips an apartment's straight wall runs for a club and lets club.js build its
+# shell (the drum wall, the gallery, the dome's light); the rail shows the club's groups while a club is open (railFor, from intoStage).
+CLUB_HOOKS = [
+    ("['floors','Floors','Floors','floor','fin'],['walls','Walls','Walls','brick','fin']]\n  .map(",
+     "['floors','Floors','Floors','floor','fin'],['walls','Walls','Walls','brick','fin']].concat(window.PODLAB_CLUBCATS||[])\n  .map("),
+    ("const runs=wallRunsOf(P);const faceList=[];",
+     "const runs=P.type==='club'?[]:wallRunsOf(P);const faceList=[];if(P.type==='club'&&window.PODLAB_CLUBSHELL)window.PODLAB_CLUBSHELL(P,root,{T,TILE});"),
+    ("const GROUP_OF={};GROUPS.forEach(g=>g.cats.forEach(k=>GROUP_OF[k]=g));const lastCat={};",
+     "const GROUP_OF={};GROUPS.forEach(g=>g.cats.forEach(k=>GROUP_OF[k]=g));const lastCat={};"
+     "const GROUPS_APT=GROUPS.slice();function railFor(club){club=!!club;if(GROUPS.__club===club)return;const want=club?(window.PODLAB_CLUBGROUPS||[]).map(g=>Object.assign({},g,{cats:g.cats.filter(k=>CATK[k])})).filter(g=>g.cats.length):GROUPS_APT;"
+     "GROUPS.length=0;GROUPS.push(...want);GROUPS.__club=club;for(const k in GROUP_OF)delete GROUP_OF[k];GROUPS.forEach(g=>g.cats.forEach(k=>GROUP_OF[k]=g));for(const k in lastCat)delete lastCat[k];if($('bRail')&&$('bRail').innerHTML){closeFly();buildRail()}}"),
+    ("function intoStage(s){", "function intoStage(s){try{railFor(!!(s&&s.P&&s.P.type==='club'))}catch(e){console.warn('club rail',e)}"),
+    ("mk(new T.BoxGeometry(Wm+.24,.22,Dm+.24),plinth,",
+     "mk(P.type==='club'?new T.CylinderGeometry(Wm/2+.45,Wm/2+.45,.22,96):new T.BoxGeometry(Wm+.24,.22,Dm+.24),plinth,"),
+]
 
 
 def ver(f):
@@ -99,8 +116,17 @@ def game_side(html):
             html = html.replace(TAGS_AT, TAGS_HOOK + TAGS_AT, 1)
         else:
             print('warning: the pods tag table was not found: section tags are left out (update TAGS_AT)')
+    for a, b in CLUB_HOOKS:
+        if b in html:
+            continue
+        if html.count(a) == 1:
+            html = html.replace(a, b, 1)
+        else:
+            print('warning: a club hook was not found: %s... (update CLUB_HOOKS)' % a[:40])
     if html.count(CORE_AT) == 1:
-        html = html.replace(CORE_AT, CLUB_MARK + '\n<script src="furnish/club.js?v=%s"></script>\n' % ver('club.js') + CORE_AT, 1)
+        # inline, as the lab's own sections are: the builder's furnishing worker bundles the page's inline section scripts
+        club = open(os.path.join(REPO, 'furnish', 'club.js'), encoding='utf-8').read()
+        html = html.replace(CORE_AT, CLUB_MARK + '\n<script>' + club.rstrip() + '\n</script>\n' + CORE_AT, 1)
     else:
         print('warning: the lab core script was not found: the club furniture is left out (update CORE_AT)')
     # the game's own files, last, each with a ?v= from its contents (an older set from a previous run goes first)

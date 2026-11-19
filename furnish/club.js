@@ -639,7 +639,7 @@
   /* ---------------- registration: one category per kind, four sets per category ---------------- */
   // Tags for the builder (tools/furnish/build.py adds window.PODLAB_TAGS to the pods' tag table): dance tiles place like a rug, so pieces
   // can stand on them; 'none' keeps every club piece out of the apartment household furnisher.
-  window.PODLAB_TAGS = Object.assign(window.PODLAB_TAGS || {}, Object.fromEntries(['A', 'B', 'C', 'D'].map(s => ['club_dance_' + s, 'rug none club:dance'])));
+  window.PODLAB_TAGS = Object.assign(window.PODLAB_TAGS || {}, Object.fromEntries(['A', 'B', 'C', 'D'].map(s => ['club_cl_dance_' + s, 'rug none club:dance'])));
   const SETS = ['A', 'B', 'C', 'D'];
   const reg = (k, label, fn, nm) => ({ k, label, archs: Object.fromEntries(SETS.map(s => ['club_' + k + '_' + s, [nm[s], fn(s), { set: s }]])) });
   return {
@@ -656,3 +656,88 @@
     ]
   };
 }});
+
+/* =========================================================================================
+   THE CLUB ROOM: the Neon Dome's ground floor as a home the builder can open (home.tier 'club'). tools/furnish/build.py hooks these
+   into the lab: PODLAB_CLUBCATS join the Build rail's categories, PODLAB_CLUBGROUPS replace the rail's groups while a club is open,
+   and PODLAB_CLUBSHELL builds the club's shell (in buildPod, instead of an apartment's straight wall runs). PODLAB_CLUB.home() and
+   .recipe() make a club home and its starter kit. Sizes are the game's, in lab meters (x3.16).
+   ========================================================================================= */
+(function () {
+  'use strict';
+  const TILE = .5, SCALE = 3.16;
+  const N = 70, RM = N * TILE / 2;                                   // a 70 x 70 tile grid (35 m) holding the round floor, radius 17.5 m
+  const GI = 3.5 * SCALE, DRUM = 1.5 * SCALE;                        // the gallery's inner edge, and the drum's height (its top is the gallery)
+  const inside = (i, j) => Math.hypot((i + .5) * TILE - RM, (j + .5) * TILE - RM) <= RM - .05;
+  const SETS = ['A', 'B', 'C', 'D'];
+
+  window.PODLAB_CLUBCATS = [
+    ['cl_booths', 'Booths', 'Booths', 'sofa', 'club'], ['cl_stools', 'Bar stools', 'Stools', 'chair', 'club'],
+    ['cl_tables', 'High tables', 'High tables', 'table', 'club'], ['cl_counters', 'Bar counters', 'Counters', 'kitchen', 'club'],
+    ['cl_dance', 'Dance floor', 'Dance floor', 'floor', 'club'], ['cl_dj', 'DJ booths', 'DJ booth', 'tv', 'club'],
+    ['cl_pendants', 'Pendants', 'Pendants', 'lamp', 'club'], ['cl_signs', 'Neon signs', 'Signs', 'frame', 'club'],
+    ['cl_center', 'Centerpieces', 'Centerpieces', 'box', 'club']];
+  window.PODLAB_CLUBGROUPS = [
+    { k: 'seat', title: 'Seating', short: 'Seating', icon: 'sofa', m: '#38E8E0', key: '1', cats: ['cl_booths', 'cl_stools'] },
+    { k: 'tab', title: 'Tables and counters', short: 'Tables', icon: 'table', m: '#FFB347', key: '2', cats: ['cl_tables', 'cl_counters'] },
+    { k: 'dance', title: 'Dance floor and DJ', short: 'Dance', icon: 'floor', m: '#FF4FA3', key: '3', cats: ['cl_dance', 'cl_dj'] },
+    { k: 'light', title: 'Lights and signs', short: 'Lights', icon: 'lamp', m: '#a77bff', key: '4', cats: ['cl_pendants', 'cl_signs'] },
+    { k: 'center', title: 'Centerpieces', short: 'Center', icon: 'box', m: '#5aff7a', key: '5', cats: ['cl_center'] }];
+
+  // the club's shell: the drum wall round the floor (full height on the far side, low on the side facing the camera, so the floor shows,
+  // as an apartment's cutaway walls do), the gallery overhead as a faint ring with its neon rail and posts, and four glass panes at the
+  // room's edges tagged as windows, so PodRender brings in daylight and the city's night light through the dome.
+  window.PODLAB_CLUBSHELL = function (P, root, o) {
+    const T = o.T, PI = Math.PI, n = 64, low = .9, c = new T.Vector3(RM, 0, RM);
+    const drumM = new T.MeshStandardMaterial({ color: '#30323e', roughness: .85 }), capM = new T.MeshStandardMaterial({ color: '#000', emissive: '#ff4fc8', emissiveIntensity: 1.1 });
+    const dir = new T.Vector3(), nrm = new T.Vector3();
+    for (let k = 0; k < n; k++) {
+      const a = (k + .5) / n * PI * 2, seg = (RM + .15) * PI * 2 / n + .02;
+      const g = new T.Group(); g.position.set(c.x + Math.cos(a) * (RM + .15), 0, c.z + Math.sin(a) * (RM + .15)); g.rotation.y = PI / 2 - a; root.add(g);
+      const body = new T.Mesh(new T.BoxGeometry(seg, 1, .3), drumM); body.position.y = .5; body.castShadow = true; body.receiveShadow = true; g.add(body);
+      const cap = new T.Mesh(new T.BoxGeometry(seg, .04, .32), capM); cap.castShadow = false; g.add(cap);
+      g.userData.drumAngle = a;
+      const fit = h => { body.scale.y = h; body.position.y = h / 2; cap.position.y = h + .02; };
+      fit(DRUM);
+      // near side low: decided per frame from the build view's camera (an orthographic camera; light probes and shadows see it whole)
+      body.onBeforeRender = (r, s, cam) => {
+        if (!cam.isOrthographicCamera) return;
+        cam.getWorldDirection(dir); nrm.set(Math.cos(a), 0, Math.sin(a));
+        const near = nrm.x * -dir.x + nrm.z * -dir.z > .15, h = near ? low : DRUM;
+        if (body.scale.y !== h) { fit(h); g.updateMatrixWorld(true); }
+      };
+    }
+    // the gallery: a faint ring at the drum's top (so the floor under it stays in view), the neon rail on its inner edge, posts
+    const galM = new T.MeshStandardMaterial({ color: '#1c1a26', roughness: .8, transparent: true, opacity: .16, depthWrite: false, side: T.DoubleSide });
+    const ring = new T.Mesh(new T.RingGeometry(GI, RM + .3, 96, 1), galM); ring.rotation.x = -PI / 2; ring.position.set(c.x, DRUM + .05, c.z); ring.castShadow = false; ring.receiveShadow = false; root.add(ring);
+    const railA = new T.MeshStandardMaterial({ color: '#145452', emissive: '#38e8e0', emissiveIntensity: 1.2 }), railB = new T.MeshStandardMaterial({ color: '#5a1d4a', emissive: '#ff4fc8', emissiveIntensity: 1.2 });
+    for (let k = 0; k < 2; k++) { const t = new T.Mesh(new T.TorusGeometry(GI, .035, 6, 128, PI), k ? railB : railA); t.rotation.x = -PI / 2; t.rotation.z = k * PI; t.position.set(c.x, DRUM + 1.3, c.z); t.castShadow = false; root.add(t); }
+    const postM = new T.MeshStandardMaterial({ color: '#2a2e3c', roughness: .6 });
+    for (let k = 0; k < 10; k++) { const a = k / 10 * PI * 2, p = new T.Mesh(new T.CylinderGeometry(.06, .06, 1.3, 8), postM); p.position.set(c.x + Math.cos(a) * GI, DRUM + .7, c.z + Math.sin(a) * GI); root.add(p); }
+    // the dome's light: glass panes at the four points where the round room meets its grid's edges
+    const glassM = new T.MeshStandardMaterial({ color: '#b8b0ff', transparent: true, opacity: .1, depthWrite: false, roughness: .1 });
+    for (const [x, z, alongX] of [[RM, .02, true], [RM, N * TILE - .02, true], [.02, RM, false], [N * TILE - .02, RM, false]]) {
+      const w = new T.Group(); w.userData.window = true; w.position.set(x, 0, z); root.add(w);
+      const m = new T.Mesh(alongX ? new T.BoxGeometry(6, 2.6, .02) : new T.BoxGeometry(.02, 2.6, 6), glassM); m.position.y = 1.4; m.castShadow = false; w.add(m);
+    }
+  };
+
+  // a club home: the round floor on the grid, one room, the entrance on the south (the dome's door faces +z)
+  function home(o) {
+    o = o || {}; const room = [];
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) room.push(inside(i, j) ? 0 : -1);
+    let jd = N - 1; while (jd > 0 && !inside(N / 2, jd)) jd--;
+    return { tier: 'club', W: N, D: N, room: room.join(','), rooms: [{ kind: 'living', label: 'Club floor' }], doorways: [], door: { k: jd * N + N / 2, side: 'S' },
+      night: o.night !== false, hh: 0, variant: 'club' };
+  }
+  // the starter kit: a 4 x 4 m dance floor in the middle and a DJ booth behind it, facing the floor, in one set picked from the seed
+  function recipe(o) {
+    o = o || {}; const seed = (o.seed >>> 0) || 1, set = o.set && SETS.includes(o.set) ? o.set : SETS[seed % 4], pieces = [];
+    let id = 1; const put = (arch, sd, x, z, ry) => pieces.push({ id: id++, arch, seed: sd, x: +x.toFixed(4), y: 0, z: +z.toFixed(4), ry, wh: 0, anc: 'c', parent: 0, colors: {}, light: null });
+    const tileSeed = (seed * 7 + 3) % 100000;
+    for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) put('club_cl_dance_' + set, tileSeed, RM - 1.5 + i, RM + .5 + j - 1.5, 0);
+    put('club_cl_dj_' + set, (seed * 13 + 5) % 100000, RM, RM - 3.4, 0);
+    return { v: 1, app: 'podlab-build', home: home(o), walls: 'cutaway', fin: { floor: {}, wall: {}, seg: {} }, pieces };
+  }
+  window.PODLAB_CLUB = { home, recipe, N, RM, TILE, SCALE, GI, DRUM };
+})();

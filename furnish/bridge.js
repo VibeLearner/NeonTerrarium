@@ -90,6 +90,13 @@
         S.dirty = false; S.ready = true; S.homeMs = Math.round(performance.now() - S.t0); sync();
         if (PB().onChange){ const off = PB().onChange(() => { if (S.visit === visit){ S.dirty = true; sync(); } }); if (typeof off === 'function') S.offs.push(off); }
         if (PB().onSave){ const off = PB().onSave(() => save()); if (typeof off === 'function') S.offs.push(off); }
+        // the Neon Dome (docs/club-furnish.md): one DJ booth per club. A second one placed or copied is taken back at once.
+        if (h.kind === 'club' && PB().onChange && PB().pieces && PB().undo){
+          const off = PB().onChange(() => { if (S.visit !== visit) return; let n = 0;
+            try { n = PB().pieces().filter(p => /^club_cl_dj_/.test(p.arch)).length; } catch (e) { return; }
+            if (n > 1){ PB().undo(); say('One DJ booth per club: move the one you have, or remove it first'); } });
+          if (typeof off === 'function') S.offs.push(off);
+        }
       } catch (e) { console.error('furnish: the home could not be opened', e); send({ type: 'furnish:error', message: 'The apartment could not be opened: ' + (e && e.message || e) }); }
     })();
   }

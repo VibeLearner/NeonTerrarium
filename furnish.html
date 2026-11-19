@@ -12085,7 +12085,7 @@ return {
 
 </script>
 <!-- Neon Terrarium: the club furniture section (tools/furnish/build.py) -->
-<script src="furnish/club.js?v=c31f8a0097"></script>
+<script src="furnish/club.js?v=1fefbc3f6d"></script>
 <script>
 (function(){
 "use strict";
@@ -13237,7 +13237,7 @@ deskbench:'desk r:any d:arcade h:tinkering',deskstand:'desk r:any d:arcade h:fit
 hbdeskops:'desk r:any d:nighthab h:hacking',hbdeskhatch:'desk r:any d:cream m:compact',hbdeskcubby:'desk r:any d:nighthab h:hacking',
 hbdeskcorner:'desk r:any d:nighthab h:gaming h:hacking',hbdeskmold:'desk r:any d:cream'
 };
-const TG={};for(const k in TAG_SRC)TG[k]=new Set(TAG_SRC[k].split(/\s+/));
+Object.assign(TAG_SRC,window.PODLAB_TAGS||{});const TG={};for(const k in TAG_SRC)TG[k]=new Set(TAG_SRC[k].split(/\s+/));
 const UNTAGGED=Object.keys(ARCHS).filter(k=>!TG[k]);
 const UNPLACEABLE=Object.keys(TG).filter(k=>TG[k].has('none')).map(k=>k+' (kids, excluded)').concat(Object.keys(TG).filter(k=>[...TG[k]].some(t=>t.startsWith('finish:'))).map(k=>k+' (finish, applied not placed)'));
 const ALLK=Object.keys(ARCHS).filter(k=>TG[k]&&!TG[k].has('none'));

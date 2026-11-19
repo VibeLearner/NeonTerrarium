@@ -24,7 +24,7 @@ then shows through the dome's glass in the city, and the crowd uses it. Owner's 
 ## Steps
 
 1. **Club catalog in the furnisher.** Done: furnish/club.js, loaded by build.py.
-2. **Dance floor tiles** in club.js: a 1 m floor tile per set (glass, chrome, hazard deck, mosaic), flat, flagged as dance floor.
+2. **Dance floor tiles** in club.js: done. A 1 m tile per set (`cl_dance`, `club_dance_<set>`), 2 by 2 or 3 by 3 lit panels, `dance: true`. They are tagged `rug` through `window.PODLAB_TAGS`, which build.py joins to the pods tag table (`TAGS_HOOK`), so other pieces can stand on them.
 3. **The club home** in the furnisher:
    - A recipe with `home.tier = 'club'`: a round floor on the 0.5 m grid (the ground floor out to the drum wall).
    - A club shell instead of an apartment's walls: the drum wall, the gallery overhead, the dome glass (windows for PodRender's day

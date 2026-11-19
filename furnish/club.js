@@ -609,7 +609,37 @@
     };
   }
 
+  /* =========================================================================================
+     DANCE FLOOR TILES: 1 m square, flat (placed like a rug, so other pieces can stand on them). Laid side by side they make one floor;
+     in the city the game lights joined tiles to the beat (clubFx). Here each shows its lit look. Glow is the tile's job, so always on.
+     ========================================================================================= */
+  function danceTile(set) {
+    return (r, c) => {
+      const b = new B(), p = [];
+      const n = r.opt('grid', [2, 3]), S1 = 1, h = .035, cell = S1 / n;
+      const k = { A: kitA, B: kitB, C: kitC, D: kitD }[set](c);
+      const lit = (col, i = .85) => M(H.shade(col, -.55), { emissive: col, emissiveIntensity: i, roughness: .18 });
+      let frameM, cols;
+      if (set === 'A') { frameM = M('#1e181b', { roughness: .3, metalness: .05 }); cols = c.pick([['#ff3fa4', '#ffb35c'], ['#ffb35c', '#ff6a3d'], ['#ff3fa4', '#9b6bff']]); p.push('black lacquer grid', 'brass dividers'); }
+      else if (set === 'B') { frameM = H.chromeM(); cols = c.pick([['#ffcf8a', '#ff9a3d'], ['#ffe9c2', '#ffb35c'], ['#ffcf8a', '#5ff0ff']]); p.push('chrome grid', 'warm frosted panels'); }
+      else if (set === 'C') { frameM = k.hull2M; cols = c.pick([['#ff4f9a', '#5ff0ff'], ['#a6ff4d', '#5ff0ff'], ['#ff3b30', '#ffb35c']]); p.push('steel deck grid', 'inset light squares'); }
+      else { frameM = tileM(k, 2, 2); cols = [k.water, c.pick(['#a8d4c0', '#8fb9cc', '#ef8c74'])]; p.push('mosaic tile border', 'frosted glass panels'); }
+      const mats = cols.map((col, q) => lit(col, q ? .5 : .65));
+      b.box(S1, h - .012, S1, frameM, 0, 0, 0);
+      for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+        const x = -S1 / 2 + cell * (i + .5), z = -S1 / 2 + cell * (j + .5), g = set === 'D' ? .09 : set === 'C' ? .07 : .035;
+        b.box(cell - g, .012, cell - g, mats[(i + j) % 2], x, h - .012, z);
+      }
+      if (set === 'A') for (let i = 1; i < n; i++) { b.box(.012, .004, S1, k.brassM || M('#b98c43', { roughness: .32, metalness: .85 }), -S1 / 2 + cell * i, h, 0); b.box(S1, .004, .012, M('#b98c43', { roughness: .32, metalness: .85 }), 0, h, -S1 / 2 + cell * i); }
+      b.mark();
+      return { b, name: { A: 'Lounge dance tile', B: 'Orbital dance tile', C: 'Rave dance tile', D: 'Bathhouse dance tile' }[set], parts: p.concat([n + ' by ' + n + ' panels']), role: 'Dance floor', dance: true, rug: true, W: S1, D: S1, H: h + .004 };
+    };
+  }
+
   /* ---------------- registration: one category per kind, four sets per category ---------------- */
+  // Tags for the builder (tools/furnish/build.py adds window.PODLAB_TAGS to the pods' tag table): dance tiles place like a rug, so pieces
+  // can stand on them; 'none' keeps every club piece out of the apartment household furnisher.
+  window.PODLAB_TAGS = Object.assign(window.PODLAB_TAGS || {}, Object.fromEntries(['A', 'B', 'C', 'D'].map(s => ['club_dance_' + s, 'rug none club:dance'])));
   const SETS = ['A', 'B', 'C', 'D'];
   const reg = (k, label, fn, nm) => ({ k, label, archs: Object.fromEntries(SETS.map(s => ['club_' + k + '_' + s, [nm[s], fn(s), { set: s }]])) });
   return {
@@ -621,7 +651,8 @@
       reg('cl_dj', 'DJ booths', dj, { A: 'Lounge DJ booth', B: 'Orbital DJ booth', C: 'Rave DJ booth', D: 'Bathhouse DJ booth' }),
       reg('cl_pendants', 'Pendants', pendant, { A: 'Lantern cluster', B: 'Dome pendant', C: 'Work-lamp bar', D: 'Globe tank pendant' }),
       reg('cl_signs', 'Neon signs', sign, { A: 'Lounge sign', B: 'Orbital sign', C: 'Rave sign', D: 'Bathhouse sign' }),
-      reg('cl_center', 'Centerpieces', centerpiece, { A: 'Lantern tree', B: 'Porthole column', C: 'Speaker tower', D: 'Aquarium column' })
+      reg('cl_center', 'Centerpieces', centerpiece, { A: 'Lantern tree', B: 'Porthole column', C: 'Speaker tower', D: 'Aquarium column' }),
+      reg('cl_dance', 'Dance floor', danceTile, { A: 'Lounge dance tile', B: 'Orbital dance tile', C: 'Rave dance tile', D: 'Bathhouse dance tile' })
     ]
   };
 }});

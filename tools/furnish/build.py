@@ -56,6 +56,9 @@ HOLD_AT = '<script>window.PODLAB_EMBED=true;window.PODCITY_NOPACK=true</script>\
 # register themselves on window.PODLAB_SECTIONS and the lab core reads them when it starts, so the tag goes right before the core's script.
 CLUB_MARK = '<!-- Neon Terrarium: the club furniture section (tools/furnish/build.py) -->'
 CORE_AT = '<script>\n(function(){\n"use strict";\nconst T=window.THREE;'
+# Tags from sections (window.PODLAB_TAGS, e.g. furnish/club.js's dance tiles place like a rug) join the pods' own tag table.
+TAGS_AT = 'const TG={};for(const k in TAG_SRC)'
+TAGS_HOOK = 'Object.assign(TAG_SRC,window.PODLAB_TAGS||{});'
 
 
 def ver(f):
@@ -91,6 +94,11 @@ def game_side(html):
     if i >= 0:
         j = html.find('</script>\n', i)
         html = html[:i] + html[j + len('</script>\n'):]
+    if TAGS_HOOK not in html:
+        if html.count(TAGS_AT) == 1:
+            html = html.replace(TAGS_AT, TAGS_HOOK + TAGS_AT, 1)
+        else:
+            print('warning: the pods tag table was not found: section tags are left out (update TAGS_AT)')
     if html.count(CORE_AT) == 1:
         html = html.replace(CORE_AT, CLUB_MARK + '\n<script src="furnish/club.js?v=%s"></script>\n' % ver('club.js') + CORE_AT, 1)
     else:

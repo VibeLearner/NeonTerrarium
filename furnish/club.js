@@ -636,6 +636,47 @@
     };
   }
 
+  /* =========================================================================================
+     CLUB FLOORS: floor finishes (a floorMat that repeats every 2.5 m, as the lab's finishes do), one per set. A new club lays its set's.
+     A: black terrazzo with brass chips and a brass inlay line every 1.25 m. B: caramel resin terrazzo with cream chips and chrome seams.
+     C: steel deck plates, tread pattern, bolts and scuffs. D: small mosaic in the set's tiles with pale grout and a few lit glass chips.
+     ========================================================================================= */
+  function floorTex(c, set) {
+    const P = 512, cvs = K.cv(P, P), x = cvs.getContext('2d'), m = P / 2.5;   // 2.5 m across
+    const rnd = () => c();
+    if (set === 'A' || set === 'B') {
+      const base = set === 'A' ? c.pick(['#1d1a20', '#221b1f', '#1a1d1f']) : c.pick(['#7a4a2a', '#6b4630', '#83552e']);
+      const chips = set === 'A' ? ['#b98c43', '#6b1d29', '#25685b', '#3a3540', '#d9cfb4'] : ['#ecd79b', '#d8ccb0', '#cf6a2e', '#f1ebdd', '#5a3a22'];
+      x.fillStyle = base; x.fillRect(0, 0, P, P);
+      for (let i = 0; i < 2600; i++) { const r = .6 + rnd() * (set === 'A' ? 1.8 : 2.6); x.fillStyle = chips[Math.floor(rnd() * chips.length)]; x.globalAlpha = .55 + rnd() * .45; x.beginPath(); x.ellipse(rnd() * P, rnd() * P, r, r * (.6 + rnd() * .5), rnd() * 3, 0, 7); x.fill(); }
+      x.globalAlpha = 1; x.strokeStyle = set === 'A' ? '#b98c43' : 'rgba(220,226,232,.55)'; x.lineWidth = set === 'A' ? 2 : 1.5;
+      for (let k = 0; k <= 2; k++) { const p = k * 1.25 * m; x.beginPath(); x.moveTo(p, 0); x.lineTo(p, P); x.stroke(); x.beginPath(); x.moveTo(0, p); x.lineTo(P, p); x.stroke(); }
+    } else if (set === 'C') {
+      const base = c.pick(['#2c3338', '#2a2f33', '#30302c']); x.fillStyle = base; x.fillRect(0, 0, P, P);
+      const pl = 1.25 * m;
+      for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) {
+        const x0 = i * pl, y0 = j * pl; x.fillStyle = H.shade(base, (i + j) % 2 ? .03 : -.02); x.fillRect(x0 + 2, y0 + 2, pl - 4, pl - 4);
+        x.fillStyle = H.shade(base, .09); for (let a = 0; a < 14; a++) for (let b = 0; b < 14; b++) { const px = x0 + 10 + a * (pl - 20) / 13, py = y0 + 10 + b * (pl - 20) / 13; x.save(); x.translate(px, py); x.rotate((a + b) % 2 ? .7 : -.7); x.fillRect(-5, -1.2, 10, 2.4); x.restore(); }
+        x.fillStyle = '#16191b'; for (const [bx, by] of [[8, 8], [pl - 8, 8], [8, pl - 8], [pl - 8, pl - 8]]) { x.beginPath(); x.arc(x0 + bx, y0 + by, 3, 0, 7); x.fill(); }
+      }
+      x.strokeStyle = '#121416'; x.lineWidth = 3; for (let k = 0; k <= 2; k++) { const p = k * pl; x.beginPath(); x.moveTo(p, 0); x.lineTo(p, P); x.stroke(); x.beginPath(); x.moveTo(0, p); x.lineTo(P, p); x.stroke(); }
+      for (let i = 0; i < 40; i++) { x.fillStyle = 'rgba(0,0,0,' + (.08 + rnd() * .12) + ')'; x.beginPath(); x.ellipse(rnd() * P, rnd() * P, 4 + rnd() * 26, 2 + rnd() * 8, rnd() * 3, 0, 7); x.fill(); }
+    } else {
+      const k = kitD(c), cols = k.tiles.cols.concat([H.shade(k.tiles.cols[0], -.25), H.shade(k.tiles.cols[1], -.2)]), n = 40, s = P / n;
+      x.fillStyle = '#e9e4d6'; x.fillRect(0, 0, P, P);
+      for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) { x.fillStyle = cols[Math.floor(rnd() * cols.length)]; x.fillRect(i * s + 1, j * s + 1, s - 2, s - 2); }
+    }
+    return cvs;
+  }
+  function clubFloor(set) {
+    return (r, c) => {
+      const tx = K.TX(floorTex, [c, set], [1, 1]);
+      const mat = M('#ffffff', { map: tx, roughness: set === 'C' ? .55 : set === 'D' ? .3 : .22, metalness: set === 'C' ? .35 : 0 });
+      return { b: new B(), name: { A: 'Black terrazzo', B: 'Caramel terrazzo', C: 'Deck plate', D: 'Bathhouse mosaic' }[set], parts: ['club floor, 2.5 m repeat'],
+        role: 'Club floor', W: 2.5, D: 2.5, H: .01, finish: 'floor', floorMat: mat };
+    };
+  }
+
   /* ---------------- registration: one category per kind, four sets per category ---------------- */
   // Tags for the builder (tools/furnish/build.py adds window.PODLAB_TAGS to the pods' tag table): dance tiles place like a rug, so pieces
   // can stand on them; 'none' keeps every club piece out of the apartment household furnisher.
@@ -652,7 +693,8 @@
       reg('cl_pendants', 'Pendants', pendant, { A: 'Lantern cluster', B: 'Dome pendant', C: 'Work-lamp bar', D: 'Globe tank pendant' }),
       reg('cl_signs', 'Neon signs', sign, { A: 'Lounge sign', B: 'Orbital sign', C: 'Rave sign', D: 'Bathhouse sign' }),
       reg('cl_center', 'Centerpieces', centerpiece, { A: 'Lantern tree', B: 'Porthole column', C: 'Speaker tower', D: 'Aquarium column' }),
-      reg('cl_dance', 'Dance floor', danceTile, { A: 'Lounge dance tile', B: 'Orbital dance tile', C: 'Rave dance tile', D: 'Bathhouse dance tile' })
+      reg('cl_dance', 'Dance floor', danceTile, { A: 'Lounge dance tile', B: 'Orbital dance tile', C: 'Rave dance tile', D: 'Bathhouse dance tile' }),
+      reg('cl_floors', 'Club floors', clubFloor, { A: 'Black terrazzo', B: 'Caramel terrazzo', C: 'Deck plate', D: 'Bathhouse mosaic' })
     ]
   };
 }});
@@ -676,52 +718,140 @@
     ['cl_tables', 'High tables', 'High tables', 'table', 'club'], ['cl_counters', 'Bar counters', 'Counters', 'kitchen', 'club'],
     ['cl_dance', 'Dance floor', 'Dance floor', 'floor', 'club'], ['cl_dj', 'DJ booths', 'DJ booth', 'tv', 'club'],
     ['cl_pendants', 'Pendants', 'Pendants', 'lamp', 'club'], ['cl_signs', 'Neon signs', 'Signs', 'frame', 'club'],
-    ['cl_center', 'Centerpieces', 'Centerpieces', 'box', 'club']];
+    ['cl_center', 'Centerpieces', 'Centerpieces', 'box', 'club'], ['cl_floors', 'Club floors', 'Floors', 'floor', 'club']];
   window.PODLAB_CLUBGROUPS = [
     { k: 'seat', title: 'Seating', short: 'Seating', icon: 'sofa', m: '#38E8E0', key: '1', cats: ['cl_booths', 'cl_stools'] },
     { k: 'tab', title: 'Tables and counters', short: 'Tables', icon: 'table', m: '#FFB347', key: '2', cats: ['cl_tables', 'cl_counters'] },
     { k: 'dance', title: 'Dance floor and DJ', short: 'Dance', icon: 'floor', m: '#FF4FA3', key: '3', cats: ['cl_dance', 'cl_dj'] },
     { k: 'light', title: 'Lights and signs', short: 'Lights', icon: 'lamp', m: '#a77bff', key: '4', cats: ['cl_pendants', 'cl_signs'] },
-    { k: 'center', title: 'Centerpieces', short: 'Center', icon: 'box', m: '#5aff7a', key: '5', cats: ['cl_center'] }];
+    { k: 'center', title: 'Centerpieces', short: 'Center', icon: 'box', m: '#5aff7a', key: '5', cats: ['cl_center'] },
+    { k: 'fin', title: 'Club floors', short: 'Floors', icon: 'brick', m: '#c9a24a', key: '6', cats: ['cl_floors'] }];
 
-  // the club's shell: the drum wall round the floor (full height on the far side, low on the side facing the camera, so the floor shows,
-  // as an apartment's cutaway walls do), the gallery overhead as a faint ring with its neon rail and posts, and four glass panes at the
-  // room's edges tagged as windows, so PodRender brings in daylight and the city's night light through the dome.
+  // The club's shell, two levels as in the city: the ground floor inside the drum wall, and the gallery on top of the drum (its deck, neon
+  // rail, posts and the bar at the back), two flights of stairs up to it beside the entrance, and over it all the geodesic glass dome
+  // with its dark frame and runs of neon struts. Everything is split by the direction it faces from the middle, so PODLAB_CLUBVIEW can open
+  // the side facing the camera, with the Walls buttons: Up (all of it), Cutaway (the near side of the drum low, the near half of the gallery,
+  // stairs and dome away), Down (the ground floor alone, the drum low all round). Four glass panes at the room's edges are tagged as
+  // windows, so PodRender brings day and night light in through the dome.
   window.PODLAB_CLUBSHELL = function (P, root, o) {
-    const T = o.T, PI = Math.PI, n = 64, low = .9, c = new T.Vector3(RM, 0, RM);
-    const drumM = new T.MeshStandardMaterial({ color: '#30323e', roughness: .85 }), capM = new T.MeshStandardMaterial({ color: '#000', emissive: '#ff4fc8', emissiveIntensity: 1.1 });
-    const dir = new T.Vector3(), nrm = new T.Vector3();
-    for (let k = 0; k < n; k++) {
-      const a = (k + .5) / n * PI * 2, seg = (RM + .15) * PI * 2 / n + .02;
-      const g = new T.Group(); g.position.set(c.x + Math.cos(a) * (RM + .15), 0, c.z + Math.sin(a) * (RM + .15)); g.rotation.y = PI / 2 - a; root.add(g);
-      const body = new T.Mesh(new T.BoxGeometry(seg, 1, .3), drumM); body.position.y = .5; body.castShadow = true; body.receiveShadow = true; g.add(body);
-      const cap = new T.Mesh(new T.BoxGeometry(seg, .04, .32), capM); cap.castShadow = false; g.add(cap);
-      g.userData.drumAngle = a;
-      const fit = h => { body.scale.y = h; body.position.y = h / 2; cap.position.y = h + .02; };
-      fit(DRUM);
-      // near side low: decided per frame from the build view's camera (an orthographic camera; light probes and shadows see it whole)
-      body.onBeforeRender = (r, s, cam) => {
-        if (!cam.isOrthographicCamera) return;
-        cam.getWorldDirection(dir); nrm.set(Math.cos(a), 0, Math.sin(a));
-        const near = nrm.x * -dir.x + nrm.z * -dir.z > .15, h = near ? low : DRUM;
-        if (body.scale.y !== h) { fit(h); g.updateMatrixWorld(true); }
-      };
+    const T = o.T, PI = Math.PI, TAU = PI * 2, c = new T.Vector3(RM, 0, RM), LOW = .9;
+    const parts = []; root.userData.club = { parts, mode: null, az: null };
+    // the apartment's square base slab, made round
+    for (const m of root.children) { const pr = m.isMesh && m.geometry && m.geometry.type === 'BoxGeometry' && m.geometry.parameters;
+      if (pr && Math.abs(pr.height - .22) < 1e-6) { m.geometry.dispose(); m.geometry = new T.CylinderGeometry(RM + .45, RM + .45, .22, 96); m.position.set(c.x, m.position.y, c.z); break; } }
+    const at = (r, a) => [c.x + Math.cos(a) * r, c.z + Math.sin(a) * r];
+    const mesh = (g, m, x, y, z, ry, grp, sh) => { const o2 = new T.Mesh(g, m); o2.position.set(x, y, z); if (ry) o2.rotation.y = ry; o2.castShadow = sh !== false; o2.receiveShadow = true; (grp || root).add(o2); return o2; };
+    const part = (kind, a, g, extra) => { const q = Object.assign({ kind, a, g }, extra || {}); parts.push(q); return q; };
+    const neon = (body, em, k) => new T.MeshStandardMaterial({ color: body, emissive: em, emissiveIntensity: k || 1.2, roughness: .4 });
+    const drumM = new T.MeshStandardMaterial({ color: '#30323e', roughness: .82, metalness: .2 }), drum2M = new T.MeshStandardMaterial({ color: '#3e4252', roughness: .7, metalness: .3 });
+    const capM = neon('#5a1d4a', '#ff4fc8', 1.1), cyanM = neon('#145452', '#38e8e0'), pinkM = neon('#5a1d4a', '#ff4fc8');
+    const deckM = new T.MeshStandardMaterial({ color: '#1c1a26', roughness: .6, metalness: .35 }), frameM = new T.MeshStandardMaterial({ color: '#2a2e3c', roughness: .55, metalness: .5 });
+    const glassM = new T.MeshStandardMaterial({ color: '#b8b0ff', transparent: true, opacity: .12, roughness: .05, depthWrite: false, side: T.DoubleSide });
+
+    // 1. the drum wall, 64 segments: a dark wall, a lighter ledge at the top, a pink neon band just under it; a lit window band inside
+    const ND = 64;
+    for (let k = 0; k < ND; k++) {
+      const a = (k + .5) / ND * TAU, seg = (RM + .15) * TAU / ND + .03, [x, z] = at(RM + .15, a);
+      const g = new T.Group(); g.position.set(x, 0, z); g.rotation.y = PI / 2 - a; root.add(g);
+      const body = mesh(new T.BoxGeometry(seg, 1, .3), drumM, 0, .5, 0, 0, g);
+      const ledge = mesh(new T.BoxGeometry(seg, .14, .5), drum2M, 0, 0, -.05, 0, g);
+      const band = mesh(new T.BoxGeometry(seg, .05, .02), capM, 0, 0, -.16, 0, g, false);
+      const win = k % 3 ? null : mesh(new T.BoxGeometry(seg * .6, .5, .02), neon('#2a1430', k % 2 ? '#c060ff' : '#4ad8ff', .55), 0, 2.4, -.16, 0, g, false);
+      part('drum', a, g, { fit: h => { body.scale.y = h; body.position.y = h / 2; ledge.position.y = h + .07; band.position.y = h - .12; if (win) win.visible = h > 3; } });
     }
-    // the gallery: a faint ring at the drum's top (so the floor under it stays in view), the neon rail on its inner edge, posts
-    const galM = new T.MeshStandardMaterial({ color: '#1c1a26', roughness: .8, transparent: true, opacity: .16, depthWrite: false, side: T.DoubleSide });
-    const ring = new T.Mesh(new T.RingGeometry(GI, RM + .3, 96, 1), galM); ring.rotation.x = -PI / 2; ring.position.set(c.x, DRUM + .05, c.z); ring.castShadow = false; ring.receiveShadow = false; root.add(ring);
-    const railA = new T.MeshStandardMaterial({ color: '#145452', emissive: '#38e8e0', emissiveIntensity: 1.2 }), railB = new T.MeshStandardMaterial({ color: '#5a1d4a', emissive: '#ff4fc8', emissiveIntensity: 1.2 });
-    for (let k = 0; k < 2; k++) { const t = new T.Mesh(new T.TorusGeometry(GI, .035, 6, 128, PI), k ? railB : railA); t.rotation.x = -PI / 2; t.rotation.z = k * PI; t.position.set(c.x, DRUM + 1.3, c.z); t.castShadow = false; root.add(t); }
-    const postM = new T.MeshStandardMaterial({ color: '#2a2e3c', roughness: .6 });
-    for (let k = 0; k < 10; k++) { const a = k / 10 * PI * 2, p = new T.Mesh(new T.CylinderGeometry(.06, .06, 1.3, 8), postM); p.position.set(c.x + Math.cos(a) * GI, DRUM + .7, c.z + Math.sin(a) * GI); root.add(p); }
-    // the dome's light: glass panes at the four points where the round room meets its grid's edges
-    const glassM = new T.MeshStandardMaterial({ color: '#b8b0ff', transparent: true, opacity: .1, depthWrite: false, roughness: .1 });
+    // 2. the gallery: 32 deck sectors on the drum top, an edge fascia with a neon line, glass rail panels with a neon top rail, posts
+    const NG = 32, gy = DRUM + .1, rm = (GI + RM) / 2;
+    for (let k = 0; k < NG; k++) {
+      const a0 = k / NG * TAU, a1 = (k + 1) / NG * TAU, am = (a0 + a1) / 2, g = new T.Group(); root.add(g);
+      const sh = new T.Shape(); const st = 6;
+      for (let q = 0; q <= st; q++) { const t = a0 + (a1 - a0) * q / st; const px = Math.cos(t) * (RM + .2), pz = Math.sin(t) * (RM + .2); q ? sh.lineTo(px, pz) : sh.moveTo(px, pz); }
+      for (let q = st; q >= 0; q--) { const t = a0 + (a1 - a0) * q / st; sh.lineTo(Math.cos(t) * GI, Math.sin(t) * GI); }
+      const deck = new T.ExtrudeGeometry(sh, { depth: .3, bevelEnabled: false }); deck.rotateX(PI / 2);
+      mesh(deck, deckM, c.x, gy, c.z, 0, g);   // (the shape is drawn in x,z; rotated so its thickness runs down from gy)
+      const fas = new T.CylinderGeometry(GI - .01, GI - .01, .3, 6, 1, true, PI / 2 - a1, a1 - a0); mesh(fas, frameM, c.x, gy - .15, c.z, 0, g, false).material.side = T.DoubleSide;
+      const line = new T.CylinderGeometry(GI - .02, GI - .02, .04, 6, 1, true, PI / 2 - a1, a1 - a0); mesh(line, k % 2 ? cyanM : pinkM, c.x, gy - .2, c.z, 0, g, false).material.side = T.DoubleSide;
+      const rail = new T.CylinderGeometry(GI + .05, GI + .05, 1.0, 6, 1, true, PI / 2 - a1, a1 - a0); mesh(rail, glassM, c.x, gy + .5, c.z, 0, g, false);
+      const top = new T.TorusGeometry(GI + .05, .035, 6, 8, a1 - a0); const tm = mesh(top, k % 2 ? cyanM : pinkM, c.x, gy + 1.02, c.z, 0, g, false); tm.rotation.x = PI / 2; tm.rotation.z = a0;
+      const [px, pz] = at(GI + .05, a0); mesh(new T.CylinderGeometry(.05, .05, 1.05, 8), frameM, px, gy + .52, pz, 0, g);
+      if (k % 4 === 0) { const [bx, bz] = at(GI + .6, am); const br = mesh(new T.BoxGeometry(.12, 1.6, .12), frameM, bx, gy - 1.0, bz, 0, g); br.rotation.z = 0; }   // brackets under the deck
+      part('gal', am, g);
+    }
+    // 3. the bar on the gallery, at the back (the city's dome has it there): a lacquer counter, brass top edge, back shelves of lit bottles
+    {
+      const a = -PI / 2, g = new T.Group(); root.add(g); const [x, z] = at(rm - .6, a); g.position.set(x, gy, z); g.rotation.y = 0;
+      const lac = new T.MeshStandardMaterial({ color: '#2a1f2a', roughness: .3 }), brass = new T.MeshStandardMaterial({ color: '#b98c43', roughness: .32, metalness: .85 });
+      mesh(new T.BoxGeometry(7.6, 1.1, .7), lac, 0, .55, 0, 0, g); mesh(new T.BoxGeometry(7.8, .05, .85), brass, 0, 1.12, 0, 0, g);
+      mesh(new T.BoxGeometry(7.4, .03, .02), cyanM, 0, .2, .36, 0, g, false);
+      const sh = new T.Group(); sh.position.z = -2.2; g.add(sh);
+      mesh(new T.BoxGeometry(7.6, 2.6, .35), drum2M, 0, 1.3, 0, 0, sh);
+      const cols = ['#ff4fc8', '#38e8e0', '#ffb347', '#9b6bff', '#5aff7a'];
+      for (let row = 0; row < 3; row++) { mesh(new T.BoxGeometry(7.2, .04, .4), brass, 0, .8 + row * .6, .2, 0, sh, false);
+        for (let b = 0; b < 22; b++) { const col = cols[(b * 7 + row * 3) % cols.length]; mesh(new T.CylinderGeometry(.06, .07, .32, 8), neon('#' + new T.Color(col).multiplyScalar(.3).getHexString(), col, .5), -3.4 + b * .325, .98 + row * .6, .22, 0, sh, false); } }
+      mesh(new T.BoxGeometry(7.4, .05, .02), cyanM, 0, 2.5, .19, 0, sh, false);
+      part('gal', a, g);
+    }
+    // 4. stairs up to the gallery, one flight each side of the entrance (south, +z), curving along the gallery's open edge to land on it:
+    //    solid steps, neon nosings
+    const NS = 24, rise = (gy) / NS, rs = GI - .9;
+    for (const side of [-1, 1]) {
+      const a0 = PI / 2 + side * .3, span = side * .72;
+      for (let k = 0; k < NS; k++) {
+        const a = a0 + span * (k + .5) / NS, [x, z] = at(rs, a), h = rise * (k + 1), g = new T.Group(); g.position.set(x, 0, z); g.rotation.y = PI / 2 - a; root.add(g);
+        const wdt = (rs * Math.abs(span) / NS) + .02;
+        const step = mesh(new T.BoxGeometry(wdt, 1, 1.6), drum2M, 0, .5, 0, 0, g);
+        const nose = mesh(new T.BoxGeometry(wdt, .03, .03), side < 0 ? cyanM : pinkM, 0, 0, -.8, 0, g, false);
+        step.scale.y = h; step.position.y = h / 2; nose.position.y = h + .015;
+        part('stair', a, g, { fit: lowOnly => { g.visible = !lowOnly || h <= LOW; } });   // (cut away: only the bottom steps stay)
+      }
+    }
+    // 5. the dome: the city's geodesic (rings of points zipped into triangles), glass panes, a dark frame, neon runs on two rings and a zigzag
+    {
+      const DR = RM, DH = 4.4 * SCALE, yb = gy + .3, rings = [[20, 0], [20, .32], [15, .64], [10, .96], [5, 1.27]], pts = [], ri = [];
+      rings.forEach(([n, e], k) => { const off = (k % 2) * PI / n, idx = []; for (let q = 0; q < n; q++) { const a = off + q * TAU / n; idx.push(pts.length); pts.push([DR * Math.cos(e) * Math.cos(a), DH * Math.sin(e), DR * Math.cos(e) * Math.sin(a), k]); } ri.push({ idx, off, n }); });
+      const apex = pts.length; pts.push([0, DH, 0, rings.length]);
+      const tris = [];
+      for (let k = 0; k < ri.length - 1; k++) { const A = ri[k], Bq = ri[k + 1], sb = Math.ceil((Bq.off - A.off) / (TAU / Bq.n) - 1e-9), bi = q => Bq.idx[(((q - sb) % Bq.n) + Bq.n) % Bq.n];
+        const angA = q => A.off + q * TAU / A.n, angB = q => Bq.off + (q - sb) * TAU / Bq.n; let i = 0, j = 0;
+        while (i < A.n || j < Bq.n) { const goA = j >= Bq.n || (i < A.n && angA(i + 1) < angB(j + 1)); if (goA) { tris.push([A.idx[i % A.n], bi(j), A.idx[(i + 1) % A.n]]); i++; } else { tris.push([A.idx[i % A.n], bi(j), bi(j + 1)]); j++; } } }
+      const top = ri[ri.length - 1]; for (let q = 0; q < top.n; q++) tris.push([top.idx[q], top.idx[(q + 1) % top.n], apex]);
+      const NB = 12, bins = []; for (let b = 0; b < NB; b++) { const g = new T.Group(); g.position.set(c.x, yb, c.z); root.add(g); bins.push({ g, pos: [] }); part('dome', (b + .5) / NB * TAU, g); }
+      const binOf = (x, z) => { const a = Math.atan2(z, x); return Math.floor((((a % TAU) + TAU) % TAU) / TAU * NB) % NB; };
+      for (const t of tris) { const p = t.map(q => pts[q]), mx = (p[0][0] + p[1][0] + p[2][0]) / 3, mz = (p[0][2] + p[1][2] + p[2][2]) / 3; const B2 = bins[binOf(mx, mz)]; for (const q of p) B2.pos.push(q[0], q[1], q[2]); }
+      for (const B2 of bins) { const gg = new T.BufferGeometry(); gg.setAttribute('position', new T.Float32BufferAttribute(B2.pos, 3)); gg.computeVertexNormals(); const gm = new T.Mesh(gg, glassM); gm.castShadow = false; gm.receiveShadow = false; B2.g.add(gm); }
+      const edges = new Map(); for (const t of tris) for (let e = 0; e < 3; e++) { const a = t[e], b = t[(e + 1) % 3], key = Math.min(a, b) + ':' + Math.max(a, b); if (!edges.has(key)) edges.set(key, [a, b]); }
+      const up = new T.Vector3(0, 1, 0), dv = new T.Vector3();
+      const strut = (pa, pb, m, r, g) => { dv.set(pb[0] - pa[0], pb[1] - pa[1], pb[2] - pa[2]); const L = dv.length(); const s2 = new T.Mesh(new T.CylinderGeometry(r, r, L, 6), m); s2.position.set((pa[0] + pb[0]) / 2, (pa[1] + pb[1]) / 2, (pa[2] + pb[2]) / 2); s2.quaternion.setFromUnitVectors(up, dv.normalize()); s2.castShadow = false; g.add(s2); };
+      for (const [a, b] of edges.values()) {
+        const pa = pts[a], pb = pts[b], ka = pa[3], kb = pb[3], g = bins[binOf((pa[0] + pb[0]) / 2, (pa[2] + pb[2]) / 2)].g;
+        strut(pa, pb, frameM, .1, g);
+        const ang = Math.atan2((pa[2] + pb[2]) / 2, (pa[0] + pb[0]) / 2), sideC = Math.cos(ang - .6) > 0 ? 2 : 1;
+        const lit = ka === kb && (ka === 1 || ka === 3) ? sideC : Math.abs(ka - kb) === 1 && Math.min(ka, kb) === 2 ? 3 - sideC : 0;
+        if (lit) { const s3 = 1.01; strut(pa.map((v, i) => i === 1 ? v * s3 : v * s3), pb.map((v, i) => i === 1 ? v * s3 : v * s3), lit === 1 ? cyanM : pinkM, .06, g); }
+      }
+    }
+    // 6. the dome's light: glass panes where the round room meets its grid's edges (PodRender reads userData.window)
+    const paneM = new T.MeshStandardMaterial({ color: '#b8b0ff', transparent: true, opacity: .06, depthWrite: false, roughness: .1 });
     for (const [x, z, alongX] of [[RM, .02, true], [RM, N * TILE - .02, true], [.02, RM, false], [N * TILE - .02, RM, false]]) {
       const w = new T.Group(); w.userData.window = true; w.position.set(x, 0, z); root.add(w);
-      const m = new T.Mesh(alongX ? new T.BoxGeometry(6, 2.6, .02) : new T.BoxGeometry(.02, 2.6, 6), glassM); m.position.y = 1.4; m.castShadow = false; w.add(m);
+      const m = new T.Mesh(alongX ? new T.BoxGeometry(6, 2.6, .02) : new T.BoxGeometry(.02, 2.6, 6), paneM); m.position.y = 1.4; m.castShadow = false; w.add(m);
     }
+    window.PODLAB_CLUBVIEW({ root }, 'cutaway', Math.PI / 4);
+  };
+  // the Walls buttons and the camera's turn (from wallTargets: tools/furnish/build.py): which parts stand, by the side they face
+  window.PODLAB_CLUBVIEW = function (s, mode, az) {
+    const st = s && s.root && s.root.userData.club; if (!st) return;
+    if (st.mode === mode && st.az === az) return; st.mode = mode; st.az = az;
+    const cx = Math.sin(az), cz = Math.cos(az);
+    for (const q of st.parts) {
+      const d = Math.cos(q.a) * cx + Math.sin(q.a) * cz;   // > 0: this part is on the camera's side
+      if (q.kind === 'drum') q.fit(mode === 'down' || (mode === 'cutaway' && d > .2) ? .9 : DRUM);
+      else if (q.kind === 'stair') q.fit(mode === 'down' || (mode === 'cutaway' && d > -.1));
+      else q.g.visible = mode === 'up' || (mode === 'cutaway' && d < -.15);
+    }
+    s.root.updateMatrixWorld(true);
   };
 
+  const floorOf = (set, seed) => ({ arch: 'club_cl_floors_' + set, seed: (seed * 17 + 11) % 100000 });
   // a club home: the round floor on the grid, one room, the entrance on the south (the dome's door faces +z)
   function home(o) {
     o = o || {}; const room = [];
@@ -737,7 +867,13 @@
     const tileSeed = (seed * 7 + 3) % 100000;
     for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) put('club_cl_dance_' + set, tileSeed, RM - 1.5 + i, RM + .5 + j - 1.5, 0);
     put('club_cl_dj_' + set, (seed * 13 + 5) % 100000, RM, RM - 3.4, 0);
-    return { v: 1, app: 'podlab-build', home: home(o), walls: 'cutaway', fin: { floor: {}, wall: {}, seg: {} }, pieces };
+    return { v: 1, app: 'podlab-build', home: home(o), walls: 'cutaway', fin: { floor: { 0: floorOf(set, seed) }, wall: {}, seg: {} }, pieces };
   }
-  window.PODLAB_CLUB = { home, recipe, N, RM, TILE, SCALE, GI, DRUM };
+  // the club's backdrop: no city round it (owner, Nov 19), a deep night gradient behind the dome instead (body.nt-club: railFor)
+  if (typeof window.matchMedia === 'function' && document.head && typeof document.head.appendChild === 'function') {
+    const st = document.createElement('style');
+    st.textContent = 'body.nt-club #bStage{background:radial-gradient(ellipse 70% 60% at 50% 45%,#2a1838 0%,#160f24 45%,#08070d 100%)}body.nt-club #bSky{visibility:hidden}';
+    document.head.appendChild(st);
+  }
+  window.PODLAB_CLUB = { home, recipe, floorOf, N, RM, TILE, SCALE, GI, DRUM };
 })();

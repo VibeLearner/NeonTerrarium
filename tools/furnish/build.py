@@ -13,7 +13,7 @@ the builder through PodBuilder.touch, a few hooks added to the lab's builder.js 
 that keeps a touch from cutting the loading hologram short (HOLD). Writes furnish.html next to index.html.
 Every step can run again on its own output: --refresh swaps the old tags for new ones instead of adding a second set.
 """
-import hashlib, os, subprocess, sys
+import hashlib, os, re, subprocess, sys
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 OUT = os.path.join(REPO, 'furnish.html')
@@ -57,24 +57,32 @@ HOLD_AT = '<script>window.PODLAB_EMBED=true;window.PODCITY_NOPACK=true</script>\
 # inline like the lab's own sections (the builder's furnishing worker bundles the page's inline section scripts).
 CLUB_MARK = '<!-- Neon Terrarium: the club furniture section (tools/furnish/build.py) -->'
 CORE_AT = '<script>\n(function(){\n"use strict";\nconst T=window.THREE;'
-# Tags from sections (window.PODLAB_TAGS, e.g. furnish/club.js's dance tiles place like a rug) join the pods' own tag table.
-TAGS_AT = 'const TG={};for(const k in TAG_SRC)'
-TAGS_HOOK = 'Object.assign(TAG_SRC,window.PODLAB_TAGS||{});'
-# The club room (furnish/club.js, PODLAB_CLUB*): a home with tier 'club' is the Neon Dome's round ground floor. These hooks, each applied once:
-# the club categories join the Build rail's catalog; buildPod skips an apartment's straight wall runs for a club and lets club.js build its
-# shell (the drum wall, the gallery, the dome's light); the rail shows the club's groups while a club is open (railFor, from intoStage).
-CLUB_HOOKS = [
-    ("['floors','Floors','Floors','floor','fin'],['walls','Walls','Walls','brick','fin']]\n  .map(",
-     "['floors','Floors','Floors','floor','fin'],['walls','Walls','Walls','brick','fin']].concat(window.PODLAB_CLUBCATS||[])\n  .map("),
-    ("const runs=wallRunsOf(P);const faceList=[];",
-     "const runs=P.type==='club'?[]:wallRunsOf(P);const faceList=[];if(P.type==='club'&&window.PODLAB_CLUBSHELL)window.PODLAB_CLUBSHELL(P,root,{T,TILE});"),
-    ("const GROUP_OF={};GROUPS.forEach(g=>g.cats.forEach(k=>GROUP_OF[k]=g));const lastCat={};",
-     "const GROUP_OF={};GROUPS.forEach(g=>g.cats.forEach(k=>GROUP_OF[k]=g));const lastCat={};"
-     "const GROUPS_APT=GROUPS.slice();function railFor(club){club=!!club;if(GROUPS.__club===club)return;const want=club?(window.PODLAB_CLUBGROUPS||[]).map(g=>Object.assign({},g,{cats:g.cats.filter(k=>CATK[k])})).filter(g=>g.cats.length):GROUPS_APT;"
-     "GROUPS.length=0;GROUPS.push(...want);GROUPS.__club=club;for(const k in GROUP_OF)delete GROUP_OF[k];GROUPS.forEach(g=>g.cats.forEach(k=>GROUP_OF[k]=g));for(const k in lastCat)delete lastCat[k];if($('bRail')&&$('bRail').innerHTML){closeFly();buildRail()}}"),
-    ("function intoStage(s){", "function intoStage(s){try{railFor(!!(s&&s.P&&s.P.type==='club'))}catch(e){console.warn('club rail',e)}"),
-    ("mk(new T.BoxGeometry(Wm+.24,.22,Dm+.24),plinth,",
-     "mk(P.type==='club'?new T.CylinderGeometry(Wm/2+.45,Wm/2+.45,.22,96):new T.BoxGeometry(Wm+.24,.22,Dm+.24),plinth,"),
+# Tags from sections (window.PODLAB_TAGS, e.g. furnish/club.js's dance tiles place like a rug) join the pods' own tag table; then the club
+# room (furnish/club.js, PODLAB_CLUB*): a home with tier 'club' is the Neon Dome's round ground floor. Every hook is an insertion next to an
+# anchor in the lab's code, wrapped in /*ntc*/ ... /*/ntc*/, so a run strips the old ones first and adds them again (never twice).
+NTC = re.compile(r'/\*ntc\*/.*?/\*/ntc\*/', re.S)
+CLUB_HOOKS = [   # (anchor, 'before' | 'after', code)
+    ('const TG={};for(const k in TAG_SRC)', 'before', "Object.assign(TAG_SRC,window.PODLAB_TAGS||{});"),
+    # the club categories join the Build rail's catalog
+    ("['walls','Walls','Walls','brick','fin']]", 'after', ".concat(window.PODLAB_CLUBCATS||[])"),
+    # buildPod: no straight wall runs for a club; club.js builds its shell (two levels, the dome, the dome's light)
+    ("const runs=wallRunsOf(P);const faceList=[];", 'after', "if(P.type==='club'){runs.length=0;if(window.PODLAB_CLUBSHELL)window.PODLAB_CLUBSHELL(P,root,{T,TILE})}"),
+    # the rail shows the club's groups while a club is open (railFor, from intoStage), and the page gets the club's backdrop (body.nt-club)
+    ("const GROUP_OF={};GROUPS.forEach(g=>g.cats.forEach(k=>GROUP_OF[k]=g));const lastCat={};", 'after',
+     "const GROUPS_APT=GROUPS.slice();function railFor(club){club=!!club;document.body.classList.toggle('nt-club',club);if(GROUPS.__club===club)return;"
+     "const want=club?(window.PODLAB_CLUBGROUPS||[]).map(g=>Object.assign({},g,{cats:g.cats.filter(k=>CATK[k])})).filter(g=>g.cats.length):GROUPS_APT;"
+     "GROUPS.length=0;GROUPS.push(...want);GROUPS.__club=club;for(const k in GROUP_OF)delete GROUP_OF[k];GROUPS.forEach(g=>g.cats.forEach(k=>GROUP_OF[k]=g));"
+     "for(const k in lastCat)delete lastCat[k];if($('bRail')&&$('bRail').innerHTML){closeFly();buildRail()}}"),
+    ("function intoStage(s){", 'after', "try{railFor(!!(s&&s.P&&s.P.type==='club'))}catch(e){console.warn('club rail',e)}"),
+    # the Walls buttons and the camera's turn reach the club's shell (which side of it stands)
+    ("function wallTargets(s,mode,az,hov){", 'after', "if(s&&s.P&&s.P.type==='club'&&window.PODLAB_CLUBVIEW)window.PODLAB_CLUBVIEW(s,mode,az);"),
+    # only the dome, no city round it (owner, Nov 19): PodContext (the city backdrop and its hologram) stays out of a club
+    ("function ctxEarly(pk,tier){const C=window.PodContext;", 'after', "if(tier==='club')return false;"),
+    ("function ctxEnter(){const C=window.PodContext;", 'after', "if(B.home&&B.home.tier==='club')return;"),
+    # the header names the club
+    ("const podText=p=>!p?'':", 'after', "p.kind==='club'||(B.home&&B.home.tier==='club')?'Neon Dome · the club floor':"),
+    # the dome fills the view when a club opens
+    ("B.tx=B.tz=0;B.zoom=1;B.az=SH.AZ0;", 'after', "if(rc.home.tier==='club')B.zoom=1.3;"),
 ]
 
 
@@ -111,18 +119,12 @@ def game_side(html):
     if i >= 0:
         j = html.find('</script>\n', i)
         html = html[:i] + html[j + len('</script>\n'):]
-    if TAGS_HOOK not in html:
-        if html.count(TAGS_AT) == 1:
-            html = html.replace(TAGS_AT, TAGS_HOOK + TAGS_AT, 1)
-        else:
-            print('warning: the pods tag table was not found: section tags are left out (update TAGS_AT)')
-    for a, b in CLUB_HOOKS:
-        if b in html:
-            continue
-        if html.count(a) == 1:
-            html = html.replace(a, b, 1)
-        else:
-            print('warning: a club hook was not found: %s... (update CLUB_HOOKS)' % a[:40])
+    html = NTC.sub('', html)
+    for anchor, where, code in CLUB_HOOKS:
+        if html.count(anchor) != 1:
+            print('warning: a club hook anchor was not found once: %s... (update CLUB_HOOKS)' % anchor[:40]); continue
+        w = '/*ntc*/' + code + '/*/ntc*/'
+        html = html.replace(anchor, w + anchor if where == 'before' else anchor + w, 1)
     if html.count(CORE_AT) == 1:
         # inline, as the lab's own sections are: the builder's furnishing worker bundles the page's inline section scripts
         club = open(os.path.join(REPO, 'furnish', 'club.js'), encoding='utf-8').read()

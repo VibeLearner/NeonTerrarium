@@ -29,15 +29,27 @@ then shows through the dome's glass in the city, and the crowd uses it. Owner's 
    - `PODLAB_CLUB.home()` and `.recipe({seed, set, night})` (furnish/club.js) make a club recipe: `home.tier = 'club'`, a 70 by 70 grid
      of 0.5 m tiles (35 m) whose cells inside a 17.5 m circle are the one room "Club floor", the entrance on the south. The starter kit is a
      4 by 4 m dance floor in the middle and a DJ booth behind it, facing it, in one set picked from the seed.
-   - `PODLAB_CLUBSHELL` builds the shell in place of an apartment's straight wall runs:
-     - the drum wall in 64 segments, full height (4.7 m) on the far side and 0.9 m on the side facing the build camera (chosen per frame);
-     - the gallery overhead as a faint ring with its neon rail and 10 posts;
+   - `PODLAB_CLUBSHELL` builds the shell in place of an apartment's straight wall runs, two levels as in the city (owner, Nov 19):
+     - the drum wall in 64 segments (4.7 m), with a ledge, a pink neon band and lit windows inside;
+     - the gallery on top of the drum: 32 deck sectors, an edge fascia with neon, glass rail panels with a cyan and pink top rail,
+       posts, brackets, and the bar at the back (a lacquer counter, shelves of lit bottles);
+     - two curved flights of stairs from beside the entrance up to the gallery's edge;
+     - the geodesic glass dome (the city's own rings and triangles, 17.5 m by 13.9 m) with its dark frame and runs of neon struts;
      - four glass panes tagged `userData.window` at the room's edges, so PodRender brings day and night light through the dome.
+   - `PODLAB_CLUBVIEW` (from `wallTargets`, so the Walls buttons and the camera's turn) decides what stands by the side each part faces:
+     Up shows it all; Cutaway drops the near side of the drum to 0.9 m and takes away the near half of the gallery, stairs and dome;
+     Down leaves the ground floor with the drum low all round.
+   - Only the dome, no city (owner, Nov 19): PodContext stays out of a club (`ctxEarly`, `ctxEnter`), the painted skyline is hidden,
+     and a night gradient sits behind the dome (`body.nt-club`). The view opens zoomed in (1.3) so the dome fills the screen. The header
+     says "Neon Dome · the club floor".
+   - Club floors (`cl_floors`): a floor finish per set (black terrazzo with brass inlay, caramel terrazzo, deck plate, bathhouse mosaic).
+     A new club lays its set's; a club saved without one gets it when it opens (furnish/bridge.js).
    - The Build rail shows the club's groups (Seating, Tables, Dance, Lights, Center: `PODLAB_CLUBGROUPS`) while a club is open, and the
      apartment's otherwise (`railFor`, from `intoStage`). The club categories join the rail's catalog (`PODLAB_CLUBCATS`).
-   - The base slab is round for a club.
+   - The base slab is round for a club (in the shell).
    - One DJ booth per club: furnish/bridge.js takes a second one back (undo) with a message.
-   - All of this goes in through `CLUB_HOOKS` in tools/furnish/build.py (each applied once, so `--refresh` can run again). club.js is
+   - All of this goes in through `CLUB_HOOKS` in tools/furnish/build.py: insertions next to anchors in the lab's code, wrapped in
+     `/*ntc*/ ... /*/ntc*/`, which every run strips and adds again (so `--refresh` never adds a hook twice). club.js is
      inlined in the page like the lab's own sections, because the builder's furnishing worker bundles the inline section scripts.
 4. **Entry from the game** (js/furnish.js): done.
    - With no zone, tool or mode picked, a click or tap on a standing Neon Dome (no drag) opens the furnisher with its club (`openClub`;

@@ -34,16 +34,23 @@ then shows through the dome's glass in the city, and the crowd uses it. Owner's 
      - the gallery on top of the drum: 32 deck sectors, an edge fascia with neon, glass rail panels with a cyan and pink top rail,
        posts, brackets, and the bar at the back (a lacquer counter, shelves of lit bottles);
      - two curved flights of stairs from beside the entrance up to the gallery's edge;
-     - the geodesic glass dome (the city's own rings and triangles, 17.5 m by 13.9 m) with its dark frame and runs of neon struts;
+     - no glass dome over it (owner, Nov 19), so the club reads open from above;
+     - inlaid rims round the dance floor (6 m) and along the gallery's edge: dark metal with a cyan and a pink neon line;
      - four glass panes tagged `userData.window` at the room's edges, so PodRender brings day and night light through the dome.
    - `PODLAB_CLUBVIEW` (from `wallTargets`, so the Walls buttons and the camera's turn) decides what stands by the side each part faces:
-     Up shows it all; Cutaway drops the near side of the drum to 0.9 m and takes away the near half of the gallery, stairs and dome;
+     Up shows it all; Cutaway drops the near side of the drum to 0.9 m and takes away the near half of the gallery and stairs;
      Down leaves the ground floor with the drum low all round.
    - Only the dome, no city (owner, Nov 19): PodContext stays out of a club (`ctxEarly`, `ctxEnter`), the painted skyline is hidden,
      and a night gradient sits behind the dome (`body.nt-club`). The view opens zoomed in (1.3) so the dome fills the screen. The header
      says "Neon Dome · the club floor".
-   - Club floors (`cl_floors`): a floor finish per set (black terrazzo with brass inlay, caramel terrazzo, deck plate, bathhouse mosaic).
-     A new club lays its set's; a club saved without one gets it when it opens (furnish/bridge.js).
+   - The floor is disco tile everywhere, as in the city (owner, Nov 19), in nine zones (rooms to the builder: the dance floor, the inner
+     ring's four quarters, the four quarters under the gallery), so the Floors tool lays a tiling on one zone, or on all with Shift.
+     Disco floors (`cl_floors`): eight tilings (Classic disco, Checker glow, Pixel mosaic, Nested squares, Diamond lattice, Glass bricks,
+     Mirror squares, Starlight studs) in four palettes (City neon, Amber, Ice, Acid): `club_cl_floors_<tiling>[_amber|_ice|_acid]`.
+     Each draws a colour and a glow picture spanning 7.5 m. A new club lays classic disco in the middle, mirror squares round it and
+     starlight studs under the gallery, all City neon. A club saved before the zones is moved onto them when it opens
+     (`PODLAB_CLUB.upgrade`, from furnish/bridge.js).
+   - The starter kit is the DJ booth at the dance floor's north edge, facing it (the floor itself is the dance floor now).
    - The Build rail shows the club's groups (Seating, Tables, Dance, Lights, Center: `PODLAB_CLUBGROUPS`) while a club is open, and the
      apartment's otherwise (`railFor`, from `intoStage`). The club categories join the rail's catalog (`PODLAB_CLUBCATS`).
    - The base slab is round for a club (in the shell).

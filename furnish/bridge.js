@@ -83,10 +83,7 @@
         if (warming){ try { if (PB().warmStop) await PB().warmStop(); else await warming; } catch (e) {} if (S.visit !== visit) return; sleep(false); }
         let fresh = false;   // (a Neon Dome furnished for the first time: the starter kit, kept on Exit like any change)
         if (h.kind === 'club' && !(m.recipe && m.recipe.home) && window.PODLAB_CLUB){ m.recipe = window.PODLAB_CLUB.recipe({ seed: h.seed || 1, night: m.time !== 'day' }); fresh = true; }
-        else if (h.kind === 'club' && window.PODLAB_CLUB && m.recipe && m.recipe.home){   // (a club saved before club floors: its set's floor, from its DJ booth)
-          const rc = m.recipe; rc.fin = rc.fin || { floor: {}, wall: {}, seg: {} }; rc.fin.floor = rc.fin.floor || {};
-          if (!rc.fin.floor[0]){ const dj = (rc.pieces || []).find(p => /^club_cl_dj_[ABCD]$/.test(p.arch)); rc.fin.floor[0] = window.PODLAB_CLUB.floorOf(dj ? dj.arch.slice(-1) : 'A', h.seed || 1); fresh = true; }
-        }
+        else if (h.kind === 'club' && window.PODLAB_CLUB && m.recipe && m.recipe.home && window.PODLAB_CLUB.upgrade(m.recipe, h.seed || 1)) fresh = true;   // (a club saved before the disco floor's zones)
         if (m.recipe && m.recipe.home && Array.isArray(m.recipe.pieces)){ const rc = m.recipe; rc.home.pod = pod; await PB().load(rc, { openEarly: true }); }   // (openEarly: the hologram starts at the click, as for a new home)
         else if (m.household && PB().furnishFor) await PB().furnishFor(m.household, { tier: m.tier || null, pod });   // (lived in: furnished for the household that lives there)
         else await PB().newHome(m.tier || null, pod);   // (vacant, or an older lab: empty; null: the building's own tier and windows)

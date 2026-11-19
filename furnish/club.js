@@ -637,43 +637,92 @@
   }
 
   /* =========================================================================================
-     CLUB FLOORS: floor finishes (a floorMat that repeats every 2.5 m, as the lab's finishes do), one per set. A new club lays its set's.
-     A: black terrazzo with brass chips and a brass inlay line every 1.25 m. B: caramel resin terrazzo with cream chips and chrome seams.
-     C: steel deck plates, tread pattern, bolts and scuffs. D: small mosaic in the set's tiles with pale grout and a few lit glass chips.
+     DISCO FLOORS: the club's floor is disco tile everywhere, as the city's dance floor is (glass tiles on a near-black base, a thin dark
+     gap round each, lit ones in pink, cyan and violet). Eight tilings, each a floor finish the player lays zone by zone (the club floor is
+     nine zones: the dance floor, the inner ring's four quarters, the four quarters under the gallery). A tiling's picture spans 7.5 m
+     (three of the builder's 2.5 m floor repeats), so its pattern doesn't stamp every 2.5 m. Each seed picks a palette and which tiles are
+     lit. Glow is the floor's job: the lit tiles are the room's light.
      ========================================================================================= */
-  function floorTex(c, set) {
-    const P = 512, cvs = K.cv(P, P), x = cvs.getContext('2d'), m = P / 2.5;   // 2.5 m across
-    const rnd = () => c();
-    if (set === 'A' || set === 'B') {
-      const base = set === 'A' ? c.pick(['#1d1a20', '#221b1f', '#1a1d1f']) : c.pick(['#7a4a2a', '#6b4630', '#83552e']);
-      const chips = set === 'A' ? ['#b98c43', '#6b1d29', '#25685b', '#3a3540', '#d9cfb4'] : ['#ecd79b', '#d8ccb0', '#cf6a2e', '#f1ebdd', '#5a3a22'];
-      x.fillStyle = base; x.fillRect(0, 0, P, P);
-      for (let i = 0; i < 2600; i++) { const r = .6 + rnd() * (set === 'A' ? 1.8 : 2.6); x.fillStyle = chips[Math.floor(rnd() * chips.length)]; x.globalAlpha = .55 + rnd() * .45; x.beginPath(); x.ellipse(rnd() * P, rnd() * P, r, r * (.6 + rnd() * .5), rnd() * 3, 0, 7); x.fill(); }
-      x.globalAlpha = 1; x.strokeStyle = set === 'A' ? '#b98c43' : 'rgba(220,226,232,.55)'; x.lineWidth = set === 'A' ? 2 : 1.5;
-      for (let k = 0; k <= 2; k++) { const p = k * 1.25 * m; x.beginPath(); x.moveTo(p, 0); x.lineTo(p, P); x.stroke(); x.beginPath(); x.moveTo(0, p); x.lineTo(P, p); x.stroke(); }
-    } else if (set === 'C') {
-      const base = c.pick(['#2c3338', '#2a2f33', '#30302c']); x.fillStyle = base; x.fillRect(0, 0, P, P);
-      const pl = 1.25 * m;
-      for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) {
-        const x0 = i * pl, y0 = j * pl; x.fillStyle = H.shade(base, (i + j) % 2 ? .03 : -.02); x.fillRect(x0 + 2, y0 + 2, pl - 4, pl - 4);
-        x.fillStyle = H.shade(base, .09); for (let a = 0; a < 14; a++) for (let b = 0; b < 14; b++) { const px = x0 + 10 + a * (pl - 20) / 13, py = y0 + 10 + b * (pl - 20) / 13; x.save(); x.translate(px, py); x.rotate((a + b) % 2 ? .7 : -.7); x.fillRect(-5, -1.2, 10, 2.4); x.restore(); }
-        x.fillStyle = '#16191b'; for (const [bx, by] of [[8, 8], [pl - 8, 8], [8, pl - 8], [pl - 8, pl - 8]]) { x.beginPath(); x.arc(x0 + bx, y0 + by, 3, 0, 7); x.fill(); }
+  const DISCO_PAL = {
+    neon: ['#ff4dcc', '#40e6ff', '#a666ff'],        // the city's own: pink, cyan, violet
+    amber: ['#ffb347', '#ff5f7a', '#ffd86b'],
+    ice: ['#5ff0ff', '#d4f8ff', '#4a7dff'],
+    acid: ['#a6ff4d', '#ff3fd0', '#38e8e0']
+  };
+  const DISCO = {
+    classic: 'Classic disco', checker: 'Checker glow', mosaic: 'Pixel mosaic', frames: 'Nested squares',
+    diamond: 'Diamond lattice', bricks: 'Glass bricks', mirror: 'Mirror squares', studs: 'Starlight studs'
+  };
+  const hexRGB = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  const rgbHex = a => '#' + a.map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
+  const mixC = (a, b, t) => { const A = hexRGB(a), Bc = hexRGB(b); return rgbHex(A.map((v, i) => v + (Bc[i] - v) * t)); };
+  const BASE = '#0c0a12', GROUT = '#050408';
+  // one tiling, drawn twice from the same seed: the colour picture (glass tints on the dark base) and the glow picture (lit tiles)
+  function discoPaint(type, seed, pal, glow) {
+    const P = 1024, SPAN = 7.5, m = P / SPAN, cvs = K.cv(P, P), x = cvs.getContext('2d');
+    let st = (seed >>> 0) || 1; const rnd = () => { st = (st * 1664525 + 1013904223) >>> 0; return st / 4294967296; };
+    const cols = DISCO_PAL[pal] || DISCO_PAL.neon;
+    x.fillStyle = glow ? '#000' : GROUT; x.fillRect(0, 0, P, P);
+    // a glass tile: dim tint when off, its colour lit from the middle when on (a soft hot centre, as lit glass reads)
+    const tile = (x0, y0, w, h, col, on, k) => {
+      if (glow) {
+        if (!on) return;
+        const gr = x.createRadialGradient(x0 + w / 2, y0 + h / 2, 0, x0 + w / 2, y0 + h / 2, Math.max(w, h) * .72);
+        gr.addColorStop(0, mixC(col, '#ffffff', .35 * (k == null ? 1 : k))); gr.addColorStop(.6, col); gr.addColorStop(1, mixC(col, '#000000', .35));
+        x.fillStyle = gr; x.fillRect(x0, y0, w, h);
+      } else {
+        x.fillStyle = mixC(BASE, col, on ? .42 : .14); x.fillRect(x0, y0, w, h);
+        x.fillStyle = 'rgba(255,255,255,' + (on ? .07 : .04) + ')'; x.fillRect(x0, y0, w, Math.max(1, h * .08));   // a lit top edge: glass
       }
-      x.strokeStyle = '#121416'; x.lineWidth = 3; for (let k = 0; k <= 2; k++) { const p = k * pl; x.beginPath(); x.moveTo(p, 0); x.lineTo(p, P); x.stroke(); x.beginPath(); x.moveTo(0, p); x.lineTo(P, p); x.stroke(); }
-      for (let i = 0; i < 40; i++) { x.fillStyle = 'rgba(0,0,0,' + (.08 + rnd() * .12) + ')'; x.beginPath(); x.ellipse(rnd() * P, rnd() * P, 4 + rnd() * 26, 2 + rnd() * 8, rnd() * 3, 0, 7); x.fill(); }
-    } else {
-      const k = kitD(c), cols = k.tiles.cols.concat([H.shade(k.tiles.cols[0], -.25), H.shade(k.tiles.cols[1], -.2)]), n = 40, s = P / n;
-      x.fillStyle = '#e9e4d6'; x.fillRect(0, 0, P, P);
-      for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) { x.fillStyle = cols[Math.floor(rnd() * cols.length)]; x.fillRect(i * s + 1, j * s + 1, s - 2, s - 2); }
+    };
+    const grid = (n, fn) => { const s = P / n, g = Math.max(2, s * .08); for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) fn(i, j, i * s + g / 2, j * s + g / 2, s - g, s - g); };
+    if (type === 'classic') grid(6, (i, j, x0, y0, w, h) => tile(x0, y0, w, h, cols[(i + j) % 3], rnd() < .52));
+    else if (type === 'checker') grid(12, (i, j, x0, y0, w, h) => tile(x0, y0, w, h, cols[Math.floor((i + j) / 2) % 3], (i + j) % 2 === 0));
+    else if (type === 'mosaic') grid(24, (i, j, x0, y0, w, h) => { const r = rnd(); tile(x0, y0, w, h, cols[Math.floor(rnd() * 3)], r < .34, .6); });
+    else if (type === 'frames') grid(6, (i, j, x0, y0, w, h) => {
+      const a = cols[(i + j) % 3], b = cols[(i + j + 1) % 3];
+      tile(x0, y0, w, h, a, true, .4);
+      const in1 = w * .16, in2 = w * .3, in3 = w * .42;
+      x.fillStyle = glow ? '#000' : GROUT; x.fillRect(x0 + in1, y0 + in1, w - 2 * in1, h - 2 * in1);
+      tile(x0 + in1 + 3, y0 + in1 + 3, w - 2 * in1 - 6, h - 2 * in1 - 6, b, true, .5);
+      x.fillStyle = glow ? '#000' : GROUT; x.fillRect(x0 + in2, y0 + in2, w - 2 * in2, h - 2 * in2);
+      tile(x0 + in3, y0 + in3, w - 2 * in3, h - 2 * in3, a, (i * 3 + j) % 2 === 0, 1);
+    });
+    else if (type === 'diamond') {
+      const n = 6, s = P / n;
+      for (let j = -1; j <= n; j++) for (let i = -1; i <= n; i++) for (const off of [0, .5]) {
+        const cx = (i + off) * s, cy = (j + off) * s, r = s * .46, col = cols[(i + j + (off ? 1 : 0)) % 3 < 0 ? 0 : (i + j + (off ? 1 : 0) + 3) % 3], on = off ? (i + j) % 2 === 0 : true;
+        x.save(); x.beginPath(); x.moveTo(cx, cy - r); x.lineTo(cx + r, cy); x.lineTo(cx, cy + r); x.lineTo(cx - r, cy); x.closePath(); x.clip();
+        tile(cx - r, cy - r, 2 * r, 2 * r, col, on, off ? 1 : .45); x.restore();
+      }
     }
+    else if (type === 'bricks') {
+      const rows = 12, bw = P / 6, bh = P / rows, g = 4;
+      for (let j = 0; j < rows; j++) for (let i = -1; i <= 6; i++) { const ox = (j % 2) * bw / 2; tile(i * bw + ox + g / 2, j * bh + g / 2, bw - g, bh - g, cols[(j + (i & 1)) % 3], rnd() < .4, .5); }
+    }
+    else if (type === 'mirror') grid(12, (i, j, x0, y0, w, h) => {
+      if (glow) { const col = cols[(i + j) % 2 ? 0 : 1]; x.fillStyle = col; x.fillRect(x0 - 2, y0 + h, w + 4, 2); x.fillRect(x0 + w, y0 - 2, 2, h + 4); return; }   // lit grout lines
+      const v = 150 + Math.floor(rnd() * 40), sh = x.createLinearGradient(x0, y0, x0 + w, y0 + h);
+      sh.addColorStop(0, rgbHex([v + 30, v + 32, v + 42])); sh.addColorStop(.5, rgbHex([v - 20, v - 18, v - 8])); sh.addColorStop(1, rgbHex([v + 12, v + 14, v + 24]));
+      x.fillStyle = sh; x.fillRect(x0, y0, w, h);
+    });
+    else if (type === 'studs') grid(12, (i, j, x0, y0, w, h) => {   // dark glass, a regular grid of LED studs, most in one colour
+      if (!glow) { x.fillStyle = mixC(BASE, cols[2], .1); x.fillRect(x0, y0, w, h); x.fillStyle = 'rgba(255,255,255,.035)'; x.fillRect(x0, y0, w, Math.max(1, h * .06)); }
+      for (let a = 0; a < 2; a++) for (let b = 0; b < 2; b++) {
+        const sx = x0 + w * (a + .5) / 2, sy = y0 + h * (b + .5) / 2, on = rnd() < .32, col = rnd() < .15 ? cols[0] : cols[2];
+        x.fillStyle = glow ? (on ? col : '#000') : mixC(BASE, col, on ? .55 : .2); x.beginPath(); x.arc(sx, sy, 6.5, 0, 7); x.fill(); }
+    });
     return cvs;
   }
-  function clubFloor(set) {
+  const PAL_NAME = { neon: 'City neon', amber: 'Amber', ice: 'Ice', acid: 'Acid' };
+  function discoFloor(type, pal) {
     return (r, c) => {
-      const tx = K.TX(floorTex, [c, set], [1, 1]);
-      const mat = M('#ffffff', { map: tx, roughness: set === 'C' ? .55 : set === 'D' ? .3 : .22, metalness: set === 'C' ? .35 : 0 });
-      return { b: new B(), name: { A: 'Black terrazzo', B: 'Caramel terrazzo', C: 'Deck plate', D: 'Bathhouse mosaic' }[set], parts: ['club floor, 2.5 m repeat'],
-        role: 'Club floor', W: 2.5, D: 2.5, H: .01, finish: 'floor', floorMat: mat };
+      const seed = c.int(1, 999999), rep = [1 / 3, 1 / 3];
+      const map = K.TX(discoPaint, [type, seed, pal, false], rep), em = K.TX(discoPaint, [type, seed, pal, true], rep);
+      const mirror = type === 'mirror';
+      const mat = M('#ffffff', { map, emissive: '#ffffff', emissiveMap: em, emissiveIntensity: mirror ? .9 : type === 'studs' ? 1.1 : .85,
+        roughness: mirror ? .08 : .16, metalness: mirror ? .85 : .1 });
+      return { b: new B(), name: DISCO[type] + ' · ' + PAL_NAME[pal], parts: ['disco tiles', PAL_NAME[pal] + ' palette', '7.5 m pattern'], role: 'Disco floor', W: 2.5, D: 2.5, H: .01, finish: 'floor', floorMat: mat };
     };
   }
 
@@ -694,7 +743,8 @@
       reg('cl_signs', 'Neon signs', sign, { A: 'Lounge sign', B: 'Orbital sign', C: 'Rave sign', D: 'Bathhouse sign' }),
       reg('cl_center', 'Centerpieces', centerpiece, { A: 'Lantern tree', B: 'Porthole column', C: 'Speaker tower', D: 'Aquarium column' }),
       reg('cl_dance', 'Dance floor', danceTile, { A: 'Lounge dance tile', B: 'Orbital dance tile', C: 'Rave dance tile', D: 'Bathhouse dance tile' }),
-      reg('cl_floors', 'Club floors', clubFloor, { A: 'Black terrazzo', B: 'Caramel terrazzo', C: 'Deck plate', D: 'Bathhouse mosaic' })
+      { k: 'cl_floors', label: 'Disco floors', archs: Object.fromEntries([].concat(...Object.keys(DISCO).map(t => Object.keys(PAL_NAME).map(pl =>
+        ['club_cl_floors_' + t + (pl === 'neon' ? '' : '_' + pl), [DISCO[t] + ' · ' + PAL_NAME[pl], discoFloor(t, pl), {}]])))) }
     ]
   };
 }});
@@ -728,8 +778,8 @@
     { k: 'fin', title: 'Club floors', short: 'Floors', icon: 'brick', m: '#c9a24a', key: '6', cats: ['cl_floors'] }];
 
   // The club's shell, two levels as in the city: the ground floor inside the drum wall, and the gallery on top of the drum (its deck, neon
-  // rail, posts and the bar at the back), two flights of stairs up to it beside the entrance, and over it all the geodesic glass dome
-  // with its dark frame and runs of neon struts. Everything is split by the direction it faces from the middle, so PODLAB_CLUBVIEW can open
+  // rail, posts and the bar at the back), two flights of stairs up to it beside the entrance
+  // (no glass dome over it: owner, Nov 19, so the club reads open from above). Everything is split by the direction it faces from the middle, so PODLAB_CLUBVIEW can open
   // the side facing the camera, with the Walls buttons: Up (all of it), Cutaway (the near side of the drum low, the near half of the gallery,
   // stairs and dome away), Down (the ground floor alone, the drum low all round). Four glass panes at the room's edges are tagged as
   // windows, so PodRender brings day and night light in through the dome.
@@ -743,7 +793,7 @@
     const mesh = (g, m, x, y, z, ry, grp, sh) => { const o2 = new T.Mesh(g, m); o2.position.set(x, y, z); if (ry) o2.rotation.y = ry; o2.castShadow = sh !== false; o2.receiveShadow = true; (grp || root).add(o2); return o2; };
     const part = (kind, a, g, extra) => { const q = Object.assign({ kind, a, g }, extra || {}); parts.push(q); return q; };
     const neon = (body, em, k) => new T.MeshStandardMaterial({ color: body, emissive: em, emissiveIntensity: k || 1.2, roughness: .4 });
-    const drumM = new T.MeshStandardMaterial({ color: '#30323e', roughness: .82, metalness: .2 }), drum2M = new T.MeshStandardMaterial({ color: '#3e4252', roughness: .7, metalness: .3 });
+    const drumM = new T.MeshStandardMaterial({ color: '#221a2c', roughness: .82, metalness: .2 }), drum2M = new T.MeshStandardMaterial({ color: '#352a40', roughness: .7, metalness: .3 });
     const capM = neon('#5a1d4a', '#ff4fc8', 1.1), cyanM = neon('#145452', '#38e8e0'), pinkM = neon('#5a1d4a', '#ff4fc8');
     const deckM = new T.MeshStandardMaterial({ color: '#1c1a26', roughness: .6, metalness: .35 }), frameM = new T.MeshStandardMaterial({ color: '#2a2e3c', roughness: .55, metalness: .5 });
     const glassM = new T.MeshStandardMaterial({ color: '#b8b0ff', transparent: true, opacity: .12, roughness: .05, depthWrite: false, side: T.DoubleSide });
@@ -804,30 +854,12 @@
         part('stair', a, g, { fit: lowOnly => { g.visible = !lowOnly || h <= LOW; } });   // (cut away: only the bottom steps stay)
       }
     }
-    // 5. the dome: the city's geodesic (rings of points zipped into triangles), glass panes, a dark frame, neon runs on two rings and a zigzag
-    {
-      const DR = RM, DH = 4.4 * SCALE, yb = gy + .3, rings = [[20, 0], [20, .32], [15, .64], [10, .96], [5, 1.27]], pts = [], ri = [];
-      rings.forEach(([n, e], k) => { const off = (k % 2) * PI / n, idx = []; for (let q = 0; q < n; q++) { const a = off + q * TAU / n; idx.push(pts.length); pts.push([DR * Math.cos(e) * Math.cos(a), DH * Math.sin(e), DR * Math.cos(e) * Math.sin(a), k]); } ri.push({ idx, off, n }); });
-      const apex = pts.length; pts.push([0, DH, 0, rings.length]);
-      const tris = [];
-      for (let k = 0; k < ri.length - 1; k++) { const A = ri[k], Bq = ri[k + 1], sb = Math.ceil((Bq.off - A.off) / (TAU / Bq.n) - 1e-9), bi = q => Bq.idx[(((q - sb) % Bq.n) + Bq.n) % Bq.n];
-        const angA = q => A.off + q * TAU / A.n, angB = q => Bq.off + (q - sb) * TAU / Bq.n; let i = 0, j = 0;
-        while (i < A.n || j < Bq.n) { const goA = j >= Bq.n || (i < A.n && angA(i + 1) < angB(j + 1)); if (goA) { tris.push([A.idx[i % A.n], bi(j), A.idx[(i + 1) % A.n]]); i++; } else { tris.push([A.idx[i % A.n], bi(j), bi(j + 1)]); j++; } } }
-      const top = ri[ri.length - 1]; for (let q = 0; q < top.n; q++) tris.push([top.idx[q], top.idx[(q + 1) % top.n], apex]);
-      const NB = 12, bins = []; for (let b = 0; b < NB; b++) { const g = new T.Group(); g.position.set(c.x, yb, c.z); root.add(g); bins.push({ g, pos: [] }); part('dome', (b + .5) / NB * TAU, g); }
-      const binOf = (x, z) => { const a = Math.atan2(z, x); return Math.floor((((a % TAU) + TAU) % TAU) / TAU * NB) % NB; };
-      for (const t of tris) { const p = t.map(q => pts[q]), mx = (p[0][0] + p[1][0] + p[2][0]) / 3, mz = (p[0][2] + p[1][2] + p[2][2]) / 3; const B2 = bins[binOf(mx, mz)]; for (const q of p) B2.pos.push(q[0], q[1], q[2]); }
-      for (const B2 of bins) { const gg = new T.BufferGeometry(); gg.setAttribute('position', new T.Float32BufferAttribute(B2.pos, 3)); gg.computeVertexNormals(); const gm = new T.Mesh(gg, glassM); gm.castShadow = false; gm.receiveShadow = false; B2.g.add(gm); }
-      const edges = new Map(); for (const t of tris) for (let e = 0; e < 3; e++) { const a = t[e], b = t[(e + 1) % 3], key = Math.min(a, b) + ':' + Math.max(a, b); if (!edges.has(key)) edges.set(key, [a, b]); }
-      const up = new T.Vector3(0, 1, 0), dv = new T.Vector3();
-      const strut = (pa, pb, m, r, g) => { dv.set(pb[0] - pa[0], pb[1] - pa[1], pb[2] - pa[2]); const L = dv.length(); const s2 = new T.Mesh(new T.CylinderGeometry(r, r, L, 6), m); s2.position.set((pa[0] + pb[0]) / 2, (pa[1] + pb[1]) / 2, (pa[2] + pb[2]) / 2); s2.quaternion.setFromUnitVectors(up, dv.normalize()); s2.castShadow = false; g.add(s2); };
-      for (const [a, b] of edges.values()) {
-        const pa = pts[a], pb = pts[b], ka = pa[3], kb = pb[3], g = bins[binOf((pa[0] + pb[0]) / 2, (pa[2] + pb[2]) / 2)].g;
-        strut(pa, pb, frameM, .1, g);
-        const ang = Math.atan2((pa[2] + pb[2]) / 2, (pa[0] + pb[0]) / 2), sideC = Math.cos(ang - .6) > 0 ? 2 : 1;
-        const lit = ka === kb && (ka === 1 || ka === 3) ? sideC : Math.abs(ka - kb) === 1 && Math.min(ka, kb) === 2 ? 3 - sideC : 0;
-        if (lit) { const s3 = 1.01; strut(pa.map((v, i) => i === 1 ? v * s3 : v * s3), pb.map((v, i) => i === 1 ? v * s3 : v * s3), lit === 1 ? cyanM : pinkM, .06, g); }
-      }
+    // 5. the floor's rims: an inlaid band of dark metal with a neon line at each edge, round the dance floor and along the gallery's
+    //    edge above, where the zones meet (it finishes the grid's stepped zone edges, as a real club's floor trim would)
+    const rimM = new T.MeshStandardMaterial({ color: '#1a1622', roughness: .28, metalness: .7 });
+    for (const [r0, inner, outer] of [[DANCE_R, cyanM, pinkM], [GI, pinkM, cyanM]]) {
+      const band = new T.Mesh(new T.RingGeometry(r0 - .34, r0 + .34, 160, 1), rimM); band.rotation.x = -PI / 2; band.position.set(c.x, .012, c.z); band.receiveShadow = true; band.castShadow = false; root.add(band);
+      for (const [rr, m2] of [[r0 - .3, inner], [r0 + .3, outer]]) { const l = new T.Mesh(new T.RingGeometry(rr - .025, rr + .025, 160, 1), m2); l.rotation.x = -PI / 2; l.position.set(c.x, .016, c.z); l.castShadow = false; root.add(l); }
     }
     // 6. the dome's light: glass panes where the round room meets its grid's edges (PodRender reads userData.window)
     const paneM = new T.MeshStandardMaterial({ color: '#b8b0ff', transparent: true, opacity: .06, depthWrite: false, roughness: .1 });
@@ -851,23 +883,44 @@
     s.root.updateMatrixWorld(true);
   };
 
-  const floorOf = (set, seed) => ({ arch: 'club_cl_floors_' + set, seed: (seed * 17 + 11) % 100000 });
-  // a club home: the round floor on the grid, one room, the entrance on the south (the dome's door faces +z)
+  // The club floor's nine zones (rooms to the builder, so the Floors tool lays a tiling on one, or on all with Shift): the dance floor in
+  // the middle (6 m across the radius), the inner ring out to the gallery's edge in four quarters, and the ring under the gallery in four.
+  // The entrance is south (+z: the dome's door).
+  const DISCO = { classic: 1, checker: 1, mosaic: 1, frames: 1, diamond: 1, bricks: 1, mirror: 1, studs: 1 };   // (the tilings: the section's DISCO)
+  const DANCE_R = 6, QN = ['east', 'south', 'west', 'north'];
+  const ZONES = [{ kind: 'living', label: 'Dance floor' }].concat(QN.map(q => ({ kind: 'living', label: 'Inner ring, ' + q })), QN.map(q => ({ kind: 'living', label: 'Under the gallery, ' + q })));
+  const zoneAt = (i, j) => {
+    const dx = (i + .5) * TILE - RM, dz = (j + .5) * TILE - RM, r = Math.hypot(dx, dz);
+    if (r > RM - .05) return -1; if (r < DANCE_R) return 0;
+    const q = Math.floor(((Math.atan2(dz, dx) + Math.PI / 4) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) / (Math.PI / 2)) % 4;
+    return (r < GI ? 1 : 5) + q;
+  };
+  // the tilings a new club lays, all in the city's palette and calmer towards the walls: classic disco on the dance floor, mirror squares
+  // with lit grout round it, starlight studs under the gallery
+  const floorOf = (type, seed, pal) => ({ arch: 'club_cl_floors_' + (DISCO[type] ? type : 'classic') + (pal && pal !== 'neon' ? '_' + pal : ''), seed: (seed * 17 + 11) % 100000 });
+  const floorsFor = seed => { const f = { 0: floorOf('classic', seed) }; for (let z = 1; z <= 4; z++) f[z] = floorOf('mirror', seed + 1); for (let z = 5; z <= 8; z++) f[z] = floorOf('studs', seed + 2); return f; };
+  // a club home: the round floor on the grid, in its nine zones, the entrance on the south
   function home(o) {
     o = o || {}; const room = [];
-    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) room.push(inside(i, j) ? 0 : -1);
-    let jd = N - 1; while (jd > 0 && !inside(N / 2, jd)) jd--;
-    return { tier: 'club', W: N, D: N, room: room.join(','), rooms: [{ kind: 'living', label: 'Club floor' }], doorways: [], door: { k: jd * N + N / 2, side: 'S' },
-      night: o.night !== false, hh: 0, variant: 'club' };
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) room.push(zoneAt(i, j));
+    let jd = N - 1; while (jd > 0 && zoneAt(N / 2, jd) < 0) jd--;
+    return { tier: 'club', W: N, D: N, room: room.join(','), rooms: ZONES.map(z => Object.assign({}, z)), doorways: [], door: { k: jd * N + N / 2, side: 'S' },
+      night: o.night !== false, hh: 0, variant: 'club', zones: 9 };
   }
-  // the starter kit: a 4 x 4 m dance floor in the middle and a DJ booth behind it, facing the floor, in one set picked from the seed
+  // the starter kit: the disco floor laid, and a DJ booth at the dance floor's north edge facing it, in one set picked from the seed
   function recipe(o) {
     o = o || {}; const seed = (o.seed >>> 0) || 1, set = o.set && SETS.includes(o.set) ? o.set : SETS[seed % 4], pieces = [];
-    let id = 1; const put = (arch, sd, x, z, ry) => pieces.push({ id: id++, arch, seed: sd, x: +x.toFixed(4), y: 0, z: +z.toFixed(4), ry, wh: 0, anc: 'c', parent: 0, colors: {}, light: null });
-    const tileSeed = (seed * 7 + 3) % 100000;
-    for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) put('club_cl_dance_' + set, tileSeed, RM - 1.5 + i, RM + .5 + j - 1.5, 0);
-    put('club_cl_dj_' + set, (seed * 13 + 5) % 100000, RM, RM - 3.4, 0);
-    return { v: 1, app: 'podlab-build', home: home(o), walls: 'cutaway', fin: { floor: { 0: floorOf(set, seed) }, wall: {}, seg: {} }, pieces };
+    pieces.push({ id: 1, arch: 'club_cl_dj_' + set, seed: (seed * 13 + 5) % 100000, x: RM, y: 0, z: RM - DANCE_R - .9, ry: 0, wh: 0, anc: 'c', parent: 0, colors: {}, light: null });
+    return { v: 1, app: 'podlab-build', home: home(o), walls: 'cutaway', fin: { floor: floorsFor(seed), wall: {}, seg: {} }, pieces };
+  }
+  // a club saved before the zones (one room): the same grid in nine zones, and the disco floor on any zone with no tiling (bridge.js)
+  function upgrade(rc, seed) {
+    if (!rc || !rc.home || rc.home.tier !== 'club') return false; let changed = false;
+    if (rc.home.zones !== 9) { rc.home = Object.assign(home({ night: rc.home.night }), { pod: rc.home.pod }); changed = true; }
+    rc.fin = rc.fin || { floor: {}, wall: {}, seg: {} }; rc.fin.floor = rc.fin.floor || {};
+    const want = floorsFor(seed || 1);
+    for (const z in want) { const f = rc.fin.floor[z]; if (!f || !/^club_cl_floors_(classic|checker|mosaic|frames|diamond|bricks|mirror|studs)(_amber|_ice|_acid)?$/.test(f.arch)) { rc.fin.floor[z] = want[z]; changed = true; } }
+    return changed;
   }
   // the club's backdrop: no city round it (owner, Nov 19), a deep night gradient behind the dome instead (body.nt-club: railFor)
   if (typeof window.matchMedia === 'function' && document.head && typeof document.head.appendChild === 'function') {
@@ -875,5 +928,5 @@
     st.textContent = 'body.nt-club #bStage{background:radial-gradient(ellipse 70% 60% at 50% 45%,#2a1838 0%,#160f24 45%,#08070d 100%)}body.nt-club #bSky{visibility:hidden}';
     document.head.appendChild(st);
   }
-  window.PODLAB_CLUB = { home, recipe, floorOf, N, RM, TILE, SCALE, GI, DRUM };
+  window.PODLAB_CLUB = { home, recipe, upgrade, floorOf, N, RM, TILE, SCALE, GI, DRUM, DANCE_R };
 })();

@@ -3,7 +3,7 @@
 
 usage: python3 tools/furnish/build.py [path/to/podlab]     (default: $PODLAB, else tools/podlab, else ../podlab)
        python3 tools/furnish/build.py --refresh            (no lab needed: re-applies the game side below to the furnish.html already here,
-                                                             after editing furnish/*.css or *.js, so their ?v= follow)
+                                                             after editing furnish/*.css or *.js, so their ?v= follow; furnish/club.js too)
 
 Runs the lab's own `build.py --embed` (Build mode only, boots straight into Build, no localStorage), then adds what the game needs:
 window.PODCITY_NOPACK (the city comes from the game, never from city/*.wasm), furnish/bridge.css + furnish/bridge.js (the Exit to city
@@ -52,6 +52,11 @@ HOLD = (HOLD_MARK + '\n<script>(()=>{if(!(window.matchMedia&&matchMedia(\'(point
         'addEventListener(t,hold,{capture:true,passive:false})})()</script>\n')
 HOLD_AT = '<script>window.PODLAB_EMBED=true;window.PODCITY_NOPACK=true</script>\n'
 
+# The Neon Dome's club furniture (furnish/club.js): one more furniture section, in the lab's own grammar and kit (K.STYLE, K.HAB). Sections
+# register themselves on window.PODLAB_SECTIONS and the lab core reads them when it starts, so the tag goes right before the core's script.
+CLUB_MARK = '<!-- Neon Terrarium: the club furniture section (tools/furnish/build.py) -->'
+CORE_AT = '<script>\n(function(){\n"use strict";\nconst T=window.THREE;'
+
 
 def ver(f):
     return hashlib.sha1(open(os.path.join(REPO, 'furnish', f), 'rb').read()).hexdigest()[:10]
@@ -81,6 +86,15 @@ def game_side(html):
             html = html.replace(API_AT, TOUCH_API + 'window.PodBuilder={version:1,touch:TOUCHAPI,', 1)
         else:
             print('warning: no window.PodBuilder={version:1, in the lab build: the phone layout is left out (update TOUCH_API)')
+    # the club furniture section, before the lab core (see CLUB_MARK); an older tag from a previous run goes first
+    i = html.find(CLUB_MARK)
+    if i >= 0:
+        j = html.find('</script>\n', i)
+        html = html[:i] + html[j + len('</script>\n'):]
+    if html.count(CORE_AT) == 1:
+        html = html.replace(CORE_AT, CLUB_MARK + '\n<script src="furnish/club.js?v=%s"></script>\n' % ver('club.js') + CORE_AT, 1)
+    else:
+        print('warning: the lab core script was not found: the club furniture is left out (update CORE_AT)')
     # the game's own files, last, each with a ?v= from its contents (an older set from a previous run goes first)
     i = html.find(MARK)
     if i >= 0:

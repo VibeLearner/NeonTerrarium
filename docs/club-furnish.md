@@ -41,7 +41,7 @@ then shows through the dome's glass in the city, and the crowd uses it. Owner's 
      Up shows it all; Cutaway drops the near side of the drum to 0.9 m and takes away the near half of the gallery and stairs;
      Down leaves the ground floor with the drum low all round.
    - Only the dome, no city (owner, Nov 19): PodContext stays out of a club (`ctxEarly`, `ctxEnter`), the painted skyline is hidden,
-     and a night gradient sits behind the dome (`body.nt-club`). The view opens zoomed in (1.3) so the dome fills the screen. The header
+     and a night gradient sits behind the dome (`body.nt-club`). The view opens close and low (owner, Nov 19): zoom 2.6, about 13 m of floor across, panning to move round, at 42 degrees up instead of an apartment's 58, so pieces read at their size and with their height. The header
      says "Neon Dome · the club floor".
    - The floor is disco tile everywhere, as in the city (owner, Nov 19), in nine zones (rooms to the builder: the dance floor, the inner
      ring's four quarters, the four quarters under the gallery), so the Floors tool lays a tiling on one zone, or on all with Shift.

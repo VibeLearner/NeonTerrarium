@@ -81,8 +81,9 @@ CLUB_HOOKS = [   # (anchor, 'before' | 'after', code)
     ("function ctxEnter(){const C=window.PodContext;", 'after', "if(B.home&&B.home.tier==='club')return;"),
     # the header names the club
     ("const podText=p=>!p?'':", 'after', "p.kind==='club'||(B.home&&B.home.tier==='club')?'Neon Dome · the club floor':"),
-    # the dome fills the view when a club opens
-    ("B.tx=B.tz=0;B.zoom=1;B.az=SH.AZ0;", 'after', "if(rc.home.tier==='club')B.zoom=1.3;"),
+    # a club opens close and low (owner, Nov 19): about 13 m of floor across the view, panning to move round, from 42 degrees up rather
+    # than an apartment's 58, so the pieces, the drum and the gallery read at their size and with their height
+    ("B.tx=B.tz=0;B.zoom=1;B.az=SH.AZ0;", 'after', "if(rc.home.tier==='club'){B.zoom=2.6;B.pitch=42}"),
 ]
 
 

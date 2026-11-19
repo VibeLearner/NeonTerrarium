@@ -15581,7 +15581,7 @@ async function loadRecipe(rc,o){o=o||{};if(!rc||!rc.home||!rc.pieces)throw new E
     B.defFloor=new T.MeshStandardMaterial({color:'#2a2731',roughness:.9});B.defWall=new T.MeshStandardMaterial({color:'#2a2633',roughness:.9});
     s.sc.background=null;s.sc.userData.transparentBackground=true;tagWork(s);s.wallBoxes=wallBoxes(s);makeOverlays();pf.shellMs+=performance.now()-a;await yslice();
     if(job){pfStage('finishes wait');await pwait(job.waitAll(finishKeys(rc),10000))}
-    pfStage('finishes');a=performance.now();applyFinishes();B.walls=rc.walls||B.walls||'cutaway';syncWallChips();B.tx=B.tz=0;B.zoom=1;B.az=SH.AZ0;/*ntc*/if(rc.home.tier==='club')B.zoom=1.3;/*/ntc*/
+    pfStage('finishes');a=performance.now();applyFinishes();B.walls=rc.walls||B.walls||'cutaway';syncWallChips();B.tx=B.tz=0;B.zoom=1;B.az=SH.AZ0;/*ntc*/if(rc.home.tier==='club'){B.zoom=2.6;B.pitch=42}/*/ntc*/
     SH.wallTargets(s,B.walls,B.az,null);SH.applyWalls(s);B.camDirty=true;updateCam();pf.shellMs+=performance.now()-a;
     if(o.early&&B.ctxPending)ctxSetHome();await yslice();
     pfStage('pieces');let i=0;B.nextId=1;

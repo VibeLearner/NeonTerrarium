@@ -81,13 +81,15 @@
     (async () => {
       try {
         if (warming){ try { if (PB().warmStop) await PB().warmStop(); else await warming; } catch (e) {} if (S.visit !== visit) return; sleep(false); }
+        let fresh = false;   // (a Neon Dome furnished for the first time: the starter kit, kept on Exit like any change)
+        if (h.kind === 'club' && !(m.recipe && m.recipe.home) && window.PODLAB_CLUB){ m.recipe = window.PODLAB_CLUB.recipe({ seed: h.seed || 1, night: m.time !== 'day' }); fresh = true; }
         if (m.recipe && m.recipe.home && Array.isArray(m.recipe.pieces)){ const rc = m.recipe; rc.home.pod = pod; await PB().load(rc, { openEarly: true }); }   // (openEarly: the hologram starts at the click, as for a new home)
         else if (m.household && PB().furnishFor) await PB().furnishFor(m.household, { tier: m.tier || null, pod });   // (lived in: furnished for the household that lives there)
         else await PB().newHome(m.tier || null, pod);   // (vacant, or an older lab: empty; null: the building's own tier and windows)
         if (S.visit !== visit) return;
         try { if (PB().setResidents) PB().setResidents(m.vacant ? [] : (m.residents || []), { vacant: !!m.vacant }); } catch (e) {}
         try { PB().setTime(m.time === 'day' ? 'day' : 'night', { host: true }); } catch (e) {}
-        S.dirty = false; S.ready = true; S.homeMs = Math.round(performance.now() - S.t0); sync();
+        S.dirty = fresh; S.ready = true; S.homeMs = Math.round(performance.now() - S.t0); sync();
         if (PB().onChange){ const off = PB().onChange(() => { if (S.visit === visit){ S.dirty = true; sync(); } }); if (typeof off === 'function') S.offs.push(off); }
         if (PB().onSave){ const off = PB().onSave(() => save()); if (typeof off === 'function') S.offs.push(off); }
         // the Neon Dome (docs/club-furnish.md): one DJ booth per club. A second one placed or copied is taken back at once.

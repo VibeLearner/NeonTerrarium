@@ -39,8 +39,15 @@ then shows through the dome's glass in the city, and the crowd uses it. Owner's 
    - One DJ booth per club: furnish/bridge.js takes a second one back (undo) with a message.
    - All of this goes in through `CLUB_HOOKS` in tools/furnish/build.py (each applied once, so `--refresh` can run again). club.js is
      inlined in the page like the lab's own sections, because the builder's furnishing worker bundles the inline section scripts.
-4. **Entry from the game** (js/furnish.js): clicking a standing Neon Dome opens the furnisher with the club home (a `club` home row in the
-   head, keyed by the dome's id). The recipe is saved with the city under `neonIsland.furnish` (key `club:<mega id>`).
+4. **Entry from the game** (js/furnish.js): done.
+   - With no zone, tool or mode picked, a click or tap on a standing Neon Dome (no drag) opens the furnisher with its club (`openClub`;
+     `FURN.openClub(m)` from the console).
+   - The club's home row (`clubRow`) is the dome's floor: its corner cell, section `'club'`, floor 0, so the save key is `'i,j|club|0'` in
+     `neonIsland.furnish`. It sits at the floor's height, with a footprint the dome's size turned the way its entrance faces. `head()` adds
+     it to the homes, so the lab finds where the club sits.
+   - Nobody lives there: no household. The label is "Neon Dome · the club floor", and the tier is `'club'`.
+   - A dome furnished for the first time opens with the starter kit (furnish/bridge.js, from `PODLAB_CLUB.recipe` and the dome's seed),
+     and it counts as a change, so Exit keeps it.
 5. **Through the glass:** on Save the furnisher also sends a light copy of the furniture (merged positions, colors, emissive) and the
    dance floor tiles. The game builds it inside the dome with its toon materials. `buildNeonDome` drops the fixed floor and stage when a
    club has a recipe, and `clubFx` lights the placed tiles and aims the beams at them.

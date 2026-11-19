@@ -12789,7 +12789,7 @@ return {
     }
     else if (type === 'mirror') grid(12, (i, j, x0, y0, w, h) => {
       if (glow) { const col = cols[(i + j) % 2 ? 0 : 1]; x.fillStyle = col; x.fillRect(x0 - 2, y0 + h, w + 4, 2); x.fillRect(x0 + w, y0 - 2, 2, h + 4); return; }   // lit grout lines
-      const v = 150 + Math.floor(rnd() * 40), sh = x.createLinearGradient(x0, y0, x0 + w, y0 + h);
+      const v = 78 + Math.floor(rnd() * 26), sh = x.createLinearGradient(x0, y0, x0 + w, y0 + h);   // smoked mirror: darker than the pieces on it
       sh.addColorStop(0, rgbHex([v + 30, v + 32, v + 42])); sh.addColorStop(.5, rgbHex([v - 20, v - 18, v - 8])); sh.addColorStop(1, rgbHex([v + 12, v + 14, v + 24]));
       x.fillStyle = sh; x.fillRect(x0, y0, w, h);
     });
@@ -12807,7 +12807,7 @@ return {
       const seed = c.int(1, 999999), rep = [1 / 3, 1 / 3];
       const map = K.TX(discoPaint, [type, seed, pal, false], rep), em = K.TX(discoPaint, [type, seed, pal, true], rep);
       const mirror = type === 'mirror';
-      const mat = M('#ffffff', { map, emissive: '#ffffff', emissiveMap: em, emissiveIntensity: mirror ? .9 : type === 'studs' ? 1.1 : .85,
+      const mat = M('#ffffff', { map, emissive: '#ffffff', emissiveMap: em, emissiveIntensity: mirror ? .6 : type === 'studs' ? .8 : .5,
         roughness: mirror ? .08 : .16, metalness: mirror ? .85 : .1 });
       return { b: new B(), name: DISCO[type] + ' · ' + PAL_NAME[pal], parts: ['disco tiles', PAL_NAME[pal] + ' palette', '7.5 m pattern'], role: 'Disco floor', W: 2.5, D: 2.5, H: .01, finish: 'floor', floorMat: mat };
     };
@@ -12832,8 +12832,24 @@ return {
     for (const sf of b.surfaces) for (const k of ['x', 'y', 'z', 'w', 'd', 'r']) if (typeof sf[k] === 'number') sf[k] *= F;
     for (const k of ['W', 'D', 'H']) if (typeof info[k] === 'number') info[k] *= F;
     if (info.center) info.center = info.center.map(v => v * F);
-    b.mark(); return info;
+    b.mark();
+    // a soft contact shadow under every standing piece: a dark pool drawn over the floor (it dims the floor's own glow too, which no
+    // light-cast shadow can, since a disco tile lights itself), so the piece sits on the floor instead of floating over it
+    if (!info.ceiling && !info.wall && !info.wallOnly && !b.markBox.isEmpty()) {
+      const mb = b.markBox, w = (mb.max.x - mb.min.x) * 1.1 + .12, d = (mb.max.z - mb.min.z) * 1.1 + .12;
+      const sh = new T.Mesh(new T.PlaneGeometry(w, d), new T.MeshBasicMaterial({ color: '#000000', alphaMap: shadowTex(), transparent: true, opacity: .95, depthWrite: false }));
+      sh.rotation.x = -Math.PI / 2; sh.position.set((mb.max.x + mb.min.x) / 2, .006, (mb.max.z + mb.min.z) / 2); sh.castShadow = sh.receiveShadow = false; sh.renderOrder = 1; sh.userData.contactShadow = true;
+      b.g.add(sh);
+    }
+    return info;
   };
+  let SHADOW_TX = null;   // one soft oval: dark in the middle, gone at the edge
+  function shadowTex() {
+    if (SHADOW_TX) return SHADOW_TX;
+    const cv = K.cv(128, 128), x = cv.getContext && cv.getContext('2d');
+    if (x && x.createRadialGradient) { const g = x.createRadialGradient(64, 64, 6, 64, 64, 64); g.addColorStop(0, '#ffffff'); g.addColorStop(.4, '#ececec'); g.addColorStop(.72, '#6a6a6a'); g.addColorStop(1, '#000000'); x.fillStyle = g; x.fillRect(0, 0, 128, 128); }
+    SHADOW_TX = new T.CanvasTexture(cv); return SHADOW_TX;
+  }
   const reg = (k, label, fn, nm) => ({ k, label, archs: Object.fromEntries(SETS.map(s => ['club_' + k + '_' + s, [nm[s], k === 'cl_dance' ? fn(s) : big(fn(s)), { set: s }]])) });
   return {
     categories: [

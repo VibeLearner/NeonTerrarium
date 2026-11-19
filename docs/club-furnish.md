@@ -53,6 +53,10 @@ then shows through the dome's glass in the city, and the crowd uses it. Owner's 
    - Club scale (owner, Nov 19): club pieces are drawn 1.5 times an apartment's (`CLUB_SCALE` in furnish/club.js), because the club is a
      35 m room seen close. Each piece's parts sit in one scaled group, and its stated size, surfaces and lights' reach follow; the
      footprint is measured again. Dance tiles and floors stay true to the grid. The crowd (step 6) should match this scale.
+   - Grounding (owner, Nov 19: pieces looked pasted on the floor): every standing club piece carries a soft contact shadow, a dark oval
+     drawn over the floor (`userData.contactShadow`). A disco tile lights itself, so no cast shadow or ambient occlusion can darken it;
+     the oval does. The floor's glow was turned down (0.5 for most tilings) and the mirror squares are smoked, so the pieces are the
+     most solid, lightest things on the floor.
    - The starter kit is the DJ booth at the dance floor's north edge, facing it (the floor itself is the dance floor now).
    - The Build rail shows the club's groups (Seating, Tables, Dance, Lights, Center: `PODLAB_CLUBGROUPS`) while a club is open, and the
      apartment's otherwise (`railFor`, from `intoStage`). The club categories join the rail's catalog (`PODLAB_CLUBCATS`).

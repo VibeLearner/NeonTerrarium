@@ -11,7 +11,7 @@ const FURN = (() => {
   // detail by distance from the home, in game units (x3.16 in the lab). The lab's backdrop is sharp only within about 45 m (14 units):
   // full detail to NEAR, clustered on a CG grid to MID, simple blocks (the clustered stand-in clustered again on a CG_FAR grid) beyond.
   // F.lightCity = false sends the city as before (full detail to 46, clustered beyond) to compare.
-  const SAVE_KEY = 'neonIsland.furnish', NEAR = 18, MID = 60, CG = .22, CG_FAR = .9, PAGE = 'furnish.html?v=2026-10-31fu';
+  const SAVE_KEY = 'neonIsland.furnish', NEAR = 18, MID = 60, CG = .22, CG_FAR = .9, PAGE = 'furnish.html?v=2026-11-19club';
   const btn = document.getElementById('furnBtn'), hint = document.getElementById('modeHint');
   // The LIDAR Array unlocks Scan pod (mega.js): the button shows once the array is unlocked, greyed out while none stands, and only the homes in an array's range
   // can be picked. What the card shows of who lives there is what has been learned (lidar.js: the scan, the person cam, a trace
@@ -122,7 +122,7 @@ const FURN = (() => {
 
   /* ---------- pick mode ---------- */
   const zoneCol = z => ZONES[z] ? ZONES[z].col : '#e3d6bd';
-  const label = h => h.kind === 'lift' ? 'Lifted pod' : h.kind === 'luxury' ? 'Luxury' : 'Residential';
+  const label = h => h.kind === 'club' ? 'Neon Dome' : h.kind === 'lift' ? 'Lifted pod' : h.kind === 'luxury' ? 'Luxury' : 'Residential';
   function setPick(on){
     if (on === F.pick) return;
     F.pick = on; F.hov = null; showPick(null);
@@ -428,6 +428,7 @@ const FURN = (() => {
       const bySec = new Map(); for (const h of H){ if (h.kind === 'lift') continue; const L = bySec.get(h.section) || []; L.push(h); bySec.set(h.section, L); }
       for (const [s, L] of bySec) towers.push({ cell: [c.i, c.j], section: s, zone: L[0].zone, kind: L[0].kind, floors: [L[0].floor, L[L.length - 1].floor], pods: L.length, base: +L[0].base.toFixed(3), top: +L[0].top.toFixed(3), x: c.x, z: c.z });
     }
+    if (home && home.kind === 'club') homes.push(Object.assign({}, home));   // (the Neon Dome's floor: not a building's pod, so it is added here)
     const MK = ['id', 'kind', 'i', 'j', 'w', 'h', 'x', 'z', 'top', 'roofH', 'rot', 'levels', 'seed', 'si', 'sj'];   // (the plain fields only: a megastructure also holds its meshes and parts)
     const megasOut = []; for (const m of megas.values()){ const r = {}; for (const k of MK){ const v = m[k]; if (typeof v === 'number' || typeof v === 'string') r[k] = v; } megasOut.push(r); }
     const camera = { pos: cam.position.toArray(), quat: cam.quaternion.toArray(), zoom: cam.zoom, type: cam.type, left: cam.left, right: cam.right, top: cam.top, bottom: cam.bottom, goal: [camGoal.x, camGoal.y || 0, camGoal.z] };
@@ -616,8 +617,10 @@ const FURN = (() => {
     const post = (m, x) => { try { fr.contentWindow.postMessage(m, location.origin, x || []); } catch (e) { console.error('Furnish pod: could not send', m.type, e); } };
     try { fr.contentWindow.postMessage({ type: 'furnish:wake' }, location.origin); } catch (e) {}
     const t0 = performance.now(), hd = head(h);
-    let who = { vacant: false, household: null, residents: [] }; try { who = householdFor(h); } catch (e) { console.warn('Furnish pod: no household for this pod', e); }
-    post({ type: 'furnish:begin', head: hd, home: h, recipe: getRecipe(h), tier: null, time: nightNow(), label: label(h) + ' · pod ' + h.pod + ' of ' + h.pods, household: who.household, residents: who.residents, vacant: who.vacant, sim: true });
+    let who = { vacant: false, household: null, residents: [] };
+    if (h.kind === 'club') who = { vacant: true, household: null, residents: [] };   // (nobody lives in a club: the furnisher opens its saved club, or a new one with the starter kit)
+    else try { who = householdFor(h); } catch (e) { console.warn('Furnish pod: no household for this pod', e); }
+    post({ type: 'furnish:begin', head: hd, home: h, recipe: getRecipe(h), tier: h.kind === 'club' ? 'club' : null, time: nightNow(), label: h.kind === 'club' ? 'Neon Dome · the club floor' : label(h) + ' · pod ' + h.pod + ' of ' + h.pods, household: who.household, residents: who.residents, vacant: who.vacant, sim: true });
     const headMs = performance.now() - t0;
     let st = null;
     try { st = await stream(h, (plots, em, k, done, x) => post({ type: 'furnish:plots', plots, em, k, done }, x), alive); }
@@ -645,6 +648,29 @@ const FURN = (() => {
     else hide();
   }
   F.close = close;
+  /* ---------- the Neon Dome: click a standing dome (no zone, tool or mode picked) to furnish its ground floor (docs/club-furnish.md) ----------
+     Its home row is the dome's floor, not a building's pod: the dome's corner cell, section 'club', floor 0 (so the save key is
+     'i,j|club|0'), at the floor's height, a footprint the size of the dome turned the way its entrance faces (the dome's local +z). */
+  function clubRow(m){
+    const c = m && m.club; if (!c || !c.m) return null;
+    const e = c.m, ry = Math.atan2(e[8], e[10]), D = (c.outer || 5.45)*2 + .2;
+    return { cell: [m.i, m.j], section: 'club', floor: 0, zone: 'club', kind: 'club', mega: m.id, seed: m.seed >>> 0, x: m.x, z: m.z,
+      y: c.floorY - .04, y1: c.gy, fp: { w: D, d: D, ry }, pod: 1, pods: 1 };
+  }
+  function openClub(m){ const h = clubRow(m); if (!h || F.busy || F.open) return false; openHome(h); return true; }
+  F.openClub = openClub; F.clubRow = clubRow;
+  const clubFree = () => !F.pick && !F.open && !S.zone && !(typeof delMode !== 'undefined' && delMode) && !(typeof hwMode !== 'undefined' && hwMode) &&
+    !(typeof mtMode !== 'undefined' && mtMode) && !(typeof megaPick !== 'undefined' && megaPick) && !(typeof tiltMode !== 'undefined' && tiltMode) && !(typeof PERIM !== 'undefined' && PERIM);
+  const clubAt = (x, y) => { let pk = null; try { pk = pickAt(x, y); } catch (e) { return null; } const m = pk && pk.c && pk.c.mega ? megas.get(pk.c.mega) : null; return m && m.kind === 'club' && m.club ? m : null; };
+  let clubPress = null;
+  canvas.addEventListener('pointerdown', e => { clubPress = clubFree() && (e.button === 0 || e.pointerType === 'touch') && e.isPrimary ? { id: e.pointerId, x: e.clientX, y: e.clientY } : null; }, { capture: true });
+  canvas.addEventListener('pointerup', e => {
+    const p = clubPress; clubPress = null;
+    if (!p || p.id !== e.pointerId || !clubFree() || Math.hypot(e.clientX - p.x, e.clientY - p.y) > 6) return;
+    const m = clubAt(e.clientX, e.clientY); if (!m) return;
+    e.stopImmediatePropagation(); openClub(m);
+  }, { capture: true });
+  canvas.addEventListener('pointercancel', () => { clubPress = null; }, { capture: true });
   F._open = openHome;   // (for checks: open a home row from homesOf)
   addEventListener('message', e => {
     const fr = F.frame; if (!fr || e.source !== fr.contentWindow || e.origin !== location.origin) return;

@@ -618,9 +618,9 @@ const FURN = (() => {
     try { fr.contentWindow.postMessage({ type: 'furnish:wake' }, location.origin); } catch (e) {}
     const t0 = performance.now(), hd = head(h);
     let who = { vacant: false, household: null, residents: [] };
-    if (h.kind === 'club') who = { vacant: true, household: null, residents: [] };   // (nobody lives in a club: the furnisher opens its saved club, or a new one with the starter kit)
+    if (h.kind === 'club') who = { vacant: false, household: null, residents: [] };   // (nobody lives in a club, and none is missed: no vacant note; the furnisher opens its saved club, or a new one with the starter kit)
     else try { who = householdFor(h); } catch (e) { console.warn('Furnish pod: no household for this pod', e); }
-    post({ type: 'furnish:begin', head: hd, home: h, recipe: getRecipe(h), tier: h.kind === 'club' ? 'club' : null, time: nightNow(), label: h.kind === 'club' ? 'Neon Dome · the club floor' : label(h) + ' · pod ' + h.pod + ' of ' + h.pods, household: who.household, residents: who.residents, vacant: who.vacant, sim: true });
+    post({ type: 'furnish:begin', head: hd, home: h, recipe: getRecipe(h), tier: h.kind === 'club' ? 'club' : null, time: nightNow(), label: h.kind === 'club' ? 'Neon Dome · the club floor' : label(h) + ' · pod ' + h.pod + ' of ' + h.pods, household: who.household, residents: who.residents, vacant: who.vacant, sim: h.kind !== 'club' });   // (sim: the LIDAR reconstruction note, apartments only)
     const headMs = performance.now() - t0;
     let st = null;
     try { st = await stream(h, (plots, em, k, done, x) => post({ type: 'furnish:plots', plots, em, k, done }, x), alive); }
